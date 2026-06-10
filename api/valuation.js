@@ -1,0 +1,286 @@
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ ok: false, error: "Method not allowed" });
+  }
+
+  try {
+    const result = await fetchValuation(req.body || {});
+    return res.status(200).json(result);
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message || "Server error" });
+  }
+}
+
+const BASE_URL = process.env.BLACKBOOK_BASE_URL || "https://service.canadianblackbook.com";
+const API_PATH = process.env.BLACKBOOK_API_PATH || "/UsedCarWS/CanUsedAPI";
+
+async function fetchValuation(input) {
+  const vin = cleanVin(input.vin);
+  const kilometers = Number(input.kilometers || input.mileage || 0);
+  const region = String(input.region || "ON").trim();
+  const country = String(input.country || "C").trim();
+  const language = String(input.language || "en").trim();
+
+  if (!vin) throw new Error("VIN is required");
+  if (!Number.isFinite(kilometers) || kilometers < 0) throw new Error("Kilometers must be a positive number");
+
+  const username = process.env.BLACKBOOK_USERNAME;
+  const password = process.env.BLACKBOOK_PASSWORD;
+
+  if (!username || !password || password === "your_api_password_or_key") {
+    return buildDemoResponse(input, mockBlackBookResponse(vin, kilometers, region, country));
+  }
+
+  const endpoint = new URL(`${BASE_URL}${API_PATH}/UsedVehicle/VIN/${encodeURIComponent(vin)}`);
+  endpoint.searchParams.set("country", country);
+  endpoint.searchParams.set("language", language);
+  endpoint.searchParams.set("customerid", input.customerid || "test");
+  if (region) endpoint.searchParams.set("state", region);
+  if (kilometers > 0) endpoint.searchParams.set("mileage", String(kilometers));
+
+  const auth = Buffer.from(`${username}:${password}`).toString("base64");
+  const response = await fetch(endpoint, {
+    headers: {
+      Accept: "application/json",
+      Authorization: `Basic ${auth}`
+    }
+  });
+
+  const text = await response.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    json = { raw: text };
+  }
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      source: "blackbook",
+      status: response.status,
+      error: `Black Book API returned ${response.status}`,
+      raw: json
+    };
+  }
+
+  return buildDemoResponse(input, json);
+}
+
+function buildDemoResponse(input, raw) {
+  const vehicle = firstVehicle(raw);
+  const values = extractValues(vehicle);
+  const title = vehicleTitle(vehicle, input.vin);
+  const vin = cleanVin(input.vin) || vehicle?.vin;
+  const kilometers = Number(input.kilometers || input.mileage || 0);
+  const regionCode = String(input.region || "ON").trim();
+
+  return {
+    ok: true,
+    source: raw?.mock ? "mock" : "blackbook",
+    title,
+    vin,
+    kilometers,
+    region: regionName(regionCode),
+    country: String(input.country || "C").trim(),
+    optionsSelected: 0,
+    activeMarket: "wholesale",
+    columns: ["xclean", "clean", "avg", "rough"],
+    values,
+    loanValue: findNumber(vehicle, ["loan_value", "finadv", "adjusted_finadv", "finance_advance_value"]),
+    thresholds: vehicle?.kilometer_adjustments || null,
+    raw
+  };
+}
+
+function firstVehicle(raw) {
+  const candidates = [
+    raw?.used_vehicles?.used_vehicle_list,
+    raw?.used_vehicle?.used_vehicles,
+    raw?.used_vehicle?.usedvehicles,
+    raw?.usedvehicles?.usedvehicles,
+    raw?.usedvehicles,
+    raw?.used_vehicles,
+    raw?.vehicle_list,
+    raw?.vehicles
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length) return candidate[0];
+    if (candidate && typeof candidate === "object") return candidate;
+  }
+
+  return raw?.vehicle || raw;
+}
+
+function extractValues(vehicle = {}) {
+  return {
+    wholesale: extractMarket(vehicle, "whole"),
+    retail: extractMarket(vehicle, "retail"),
+    tradeIn: extractMarket(vehicle, "trade")
+  };
+}
+
+function extractMarket(vehicle, market) {
+  const aliases = market === "trade" ? ["trade", "tradein", "trade_in"] : [market];
+  const rowNames = {
+    base: ["base"],
+    options: ["add_deduct", "options", "option"],
+    mileage: ["mileage", "kilometer", "km"],
+    region: ["regional", "region"],
+    adjusted: ["adjusted"]
+  };
+  const conditions = ["xclean", "clean", "avg", "rough"];
+  const output = {};
+
+  for (const [row, prefixes] of Object.entries(rowNames)) {
+    output[row] = {};
+    for (const condition of conditions) {
+      output[row][condition] = findMarketNumber(vehicle, prefixes, aliases, condition);
+    }
+  }
+
+  return output;
+}
+
+function findMarketNumber(vehicle, rowPrefixes, marketAliases, condition) {
+  const conditionAliases = condition === "xclean" ? ["xclean", "extra_clean", "xcln"] : [condition];
+  const keys = Object.keys(vehicle || {});
+
+  for (const row of rowPrefixes) {
+    for (const market of marketAliases) {
+      for (const cond of conditionAliases) {
+        const exact = `${row}_${market}_${cond}`;
+        if (isNumberLike(vehicle[exact])) return Number(vehicle[exact]);
+      }
+    }
+  }
+
+  for (const key of keys) {
+    const normalized = key.toLowerCase();
+    if (
+      rowPrefixes.some((row) => normalized.includes(row)) &&
+      marketAliases.some((market) => normalized.includes(market)) &&
+      conditionAliases.some((cond) => normalized.includes(cond)) &&
+      isNumberLike(vehicle[key])
+    ) {
+      return Number(vehicle[key]);
+    }
+  }
+
+  return null;
+}
+
+function findNumber(object, keys) {
+  for (const key of keys) {
+    if (isNumberLike(object?.[key])) return Number(object[key]);
+  }
+  return null;
+}
+
+function isNumberLike(value) {
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+}
+
+function vehicleTitle(vehicle = {}, fallbackVin = "") {
+  const year = vehicle.model_year || vehicle.year;
+  const make = vehicle.make;
+  const model = vehicle.model;
+  const series = vehicle.series || vehicle.trim;
+  const style = vehicle.style || vehicle.body_style;
+  const parts = [year, make, model, series, style].filter(Boolean);
+  return parts.length ? parts.join(" ") : `Vehicle ${cleanVin(fallbackVin)}`;
+}
+
+function cleanVin(value) {
+  return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function regionName(code) {
+  const regions = {
+    AB: "Alberta",
+    BC: "British Columbia",
+    MB: "Manitoba",
+    NB: "New Brunswick",
+    NL: "Newfoundland and Labrador",
+    NS: "Nova Scotia",
+    NT: "Northwest Territories",
+    NU: "Nunavut",
+    ON: "Ontario",
+    PE: "Prince Edward Island",
+    QC: "Quebec",
+    SK: "Saskatchewan",
+    YT: "Yukon"
+  };
+  return regions[String(code || "").toUpperCase()] || code || "Ontario";
+}
+
+function mockBlackBookResponse(vin, kilometers, region, country) {
+  return {
+    mock: true,
+    used_vehicle: {
+      used_vehicles: [
+        {
+          vin,
+          model_year: "2024",
+          make: "Lexus",
+          model: "NX-Series",
+          series: "NX350 Premium",
+          style: "4D Utility AWD",
+          base_whole_xclean: 44200,
+          base_whole_clean: 42600,
+          base_whole_avg: 40350,
+          base_whole_rough: 38200,
+          mileage_whole_xclean: 1025,
+          mileage_whole_clean: 1550,
+          mileage_whole_avg: 2075,
+          mileage_whole_rough: 2575,
+          regional_whole_xclean: 2652,
+          regional_whole_clean: 2556,
+          regional_whole_avg: 2421,
+          regional_whole_rough: 2292,
+          add_deduct_whole_xclean: 0,
+          add_deduct_whole_clean: 0,
+          add_deduct_whole_avg: 0,
+          add_deduct_whole_rough: 0,
+          adjusted_whole_xclean: 47877,
+          adjusted_whole_clean: 46706,
+          adjusted_whole_avg: 44846,
+          adjusted_whole_rough: 43067,
+          base_retail_xclean: 50100,
+          base_retail_clean: 48600,
+          base_retail_avg: 46300,
+          base_retail_rough: 44100,
+          mileage_retail_xclean: 1200,
+          mileage_retail_clean: 1700,
+          mileage_retail_avg: 2200,
+          mileage_retail_rough: 2700,
+          regional_retail_xclean: 3006,
+          regional_retail_clean: 2916,
+          regional_retail_avg: 2778,
+          regional_retail_rough: 2646,
+          add_deduct_retail_xclean: 0,
+          add_deduct_retail_clean: 0,
+          add_deduct_retail_avg: 0,
+          add_deduct_retail_rough: 0,
+          adjusted_retail_xclean: 54306,
+          adjusted_retail_clean: 53216,
+          adjusted_retail_avg: 51278,
+          adjusted_retail_rough: 49446,
+          kilometer_adjustments: {
+            xclean_km_threshold: 136000,
+            clean_km_threshold: 213000,
+            avg_km_threshold: 253000,
+            rough_km_threshold: 273000,
+            cents_per_kilometer: 0.1
+          },
+          loan_value: 41924,
+          region,
+          country,
+          input_kilometers: kilometers
+        }
+      ]
+    }
+  };
+}
