@@ -83,10 +83,32 @@ Create an OAuth Client ID:
 Application type: Web application
 ```
 
-Add authorized redirect URI from Supabase. Supabase shows it in the Google provider settings. It usually looks like:
+In Google Cloud, fill the OAuth fields like this.
+
+Authorized JavaScript origins must contain domains only. Do not include paths such as `/auth/v1/callback`.
+
+For production:
+
+```text
+https://blackbook-demo.vercel.app
+```
+
+For local testing:
+
+```text
+http://localhost:3000
+```
+
+Authorized redirect URIs must contain the full Supabase callback URL. Supabase shows it in the Google provider settings. It usually looks like:
 
 ```text
 https://YOUR_SUPABASE_PROJECT.supabase.co/auth/v1/callback
+```
+
+For this project, it is:
+
+```text
+https://nmxvqpuaupoygkqnhhwu.supabase.co/auth/v1/callback
 ```
 
 Then paste into Supabase:
@@ -95,6 +117,14 @@ Then paste into Supabase:
 Google Client ID
 Google Client Secret
 ```
+
+If Google shows this error:
+
+```text
+Invalid Origin: URIs must not contain a path or end with "/".
+```
+
+It means the Supabase callback URL was accidentally added under `Authorized JavaScript origins`. Move it to `Authorized redirect URIs`, and put only the domain in `Authorized JavaScript origins`.
 
 ## 4. Supabase Redirect URLs
 
