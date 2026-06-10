@@ -7,6 +7,7 @@ const valueBody = document.querySelector("#value-body");
 const tabs = document.querySelectorAll(".market-tabs button");
 const modeButtons = document.querySelectorAll(".lookup-mode");
 const choiceList = document.querySelector("#choice-list");
+const inlineChoiceList = document.querySelector("#inline-choice-list");
 const authTitle = document.querySelector("#auth-title");
 const authSubtitle = document.querySelector("#auth-subtitle");
 const logoutButton = document.querySelector("#logout");
@@ -88,6 +89,7 @@ searchBackdrop.addEventListener("click", closeSearchModal);
 searchClear.addEventListener("click", () => {
   freeForm.elements.searchText.value = "";
   choiceList.hidden = true;
+  inlineChoiceList.hidden = true;
   modalStatus.textContent = "Type a VIN or vehicle description, then press Enter.";
   freeForm.elements.searchText.focus();
 });
@@ -105,7 +107,7 @@ freeForm.addEventListener("submit", async (event) => {
   if (/^[A-HJ-NPR-Z0-9]{10,17}$/.test(vin)) {
     modalStatus.textContent = "Calling VIN lookup...";
     setValuationFields({ vin, uvc: "", year: "", make: "", model: "", series: "", style: "" });
-    return runValuation();
+    return runValuation({}, { choicesInModal: true });
   }
 
   modalStatus.textContent = "Searching vehicles...";
@@ -115,7 +117,7 @@ freeForm.addEventListener("submit", async (event) => {
     modalStatus.textContent = data.error || "Search failed.";
     return;
   }
-  renderChoices(data.items || []);
+  renderChoices(data.items || [], { modal: true });
 });
 
 drilldownForm.addEventListener("submit", async (event) => {
@@ -148,7 +150,7 @@ form.addEventListener("submit", async (event) => {
   await runValuation();
 });
 
-async function runValuation(extra = {}) {
+async function runValuation(extra = {}, options = {}) {
   if (!requireLogin()) return;
   if (!usageState) await loadUsage();
   if (!canUseValuation()) return;
@@ -192,8 +194,7 @@ async function runValuation(extra = {}) {
         : "Multiple matches found. Choose the correct trim.";
       statusEl.textContent = message;
       modalStatus.textContent = message;
-      openSearchModal(false);
-      renderChoices(data.choices);
+      renderChoices(data.choices, { modal: Boolean(options.choicesInModal) });
       return;
     }
 
@@ -225,6 +226,7 @@ async function searchVehicleChoices(payload) {
   statusEl.textContent = "Searching matching vehicles...";
   detailsEl.hidden = true;
   choiceList.hidden = true;
+  inlineChoiceList.hidden = true;
 
   try {
     const data = await fetchVehicleChoices(searchText);
@@ -234,7 +236,7 @@ async function searchVehicleChoices(payload) {
       return;
     }
 
-    renderChoices(data.items || []);
+    renderChoices(data.items || [], { modal: true });
     statusEl.textContent = data.items?.length
       ? "Choose the closest vehicle, then the valuation will be generated."
       : "No matching vehicles found. Try another model, series, or style.";
@@ -275,6 +277,7 @@ tabs.forEach((tab) => {
 
 function renderResult(data) {
   choiceList.hidden = true;
+  inlineChoiceList.hidden = true;
   detailsEl.hidden = false;
   document.querySelector("#vehicle-title").textContent = data.title;
   document.querySelector("#vehicle-vin").textContent = data.vin;
@@ -292,12 +295,21 @@ function renderResult(data) {
   detailsEl.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function renderChoices(items) {
-  openSearchModal(false);
+function renderChoices(items, options = {}) {
+  const useModal = options.modal !== false;
+  const target = useModal ? choiceList : inlineChoiceList;
+  const other = useModal ? inlineChoiceList : choiceList;
+
+  if (useModal) openSearchModal(false);
+  if (other) {
+    other.hidden = true;
+    other.innerHTML = "";
+  }
+
   detailsEl.hidden = true;
   if (!items.length) {
-    choiceList.hidden = false;
-    choiceList.innerHTML = `
+    target.hidden = false;
+    target.innerHTML = `
       <p>No vehicle matches found.</p>
       <p class="hint">Try a more specific description like "2024 Lexus NX350", or enter a full VIN and click Generate.</p>
     `;
@@ -306,10 +318,10 @@ function renderChoices(items) {
     return;
   }
 
-  choiceList.hidden = false;
+  target.hidden = false;
   modalStatus.textContent = "";
   const currentVin = form.elements.vin.value || "";
-  choiceList.innerHTML = `
+  target.innerHTML = `
     <div class="choice-grid">
       ${items.map((item, index) => `
         <button type="button" class="choice-card" data-index="${index}">
@@ -324,7 +336,7 @@ function renderChoices(items) {
     </div>
   `;
 
-  choiceList.querySelectorAll(".choice-card").forEach((button) => {
+  target.querySelectorAll(".choice-card").forEach((button) => {
     button.addEventListener("click", async () => {
       const item = items[Number(button.dataset.index)];
       setValuationFields({
@@ -336,6 +348,7 @@ function renderChoices(items) {
         series: item.series || "",
         style: item.style || ""
       });
+      target.hidden = true;
       await runValuation({ vin: currentVin, uvc: item.uvc || "" });
     });
   });
