@@ -635,7 +635,7 @@ function mockBlackBookResponse(vin, kilometers, region, country) {
 }
 
 function mockAutocomplete(query) {
-  return [
+  const items = [
     {
       uvc: "2017080342",
       year: "2017",
@@ -644,8 +644,28 @@ function mockAutocomplete(query) {
       series: "LX",
       style: "4D Wagon",
       title: "2017 Honda Odyssey LX 4D Wagon"
+    },
+    {
+      uvc: "2024500170",
+      year: "2024",
+      make: "Lexus",
+      model: "NX-Series",
+      series: "NX350 Premium",
+      style: "4D Utility AWD",
+      title: "2024 Lexus NX-Series NX350 Premium 4D Utility AWD"
+    },
+    {
+      uvc: "2024500163",
+      year: "2024",
+      make: "Lexus",
+      model: "NX-Series",
+      series: "NX350 Ultra Premium",
+      style: "4D Utility AWD",
+      title: "2024 Lexus NX-Series NX350 Ultra Premium 4D Utility AWD"
     }
-  ].filter((item) => item.title.toLowerCase().includes(query.toLowerCase().split(/\s+/).at(-1) || ""));
+  ];
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  return items.filter((item) => words.every((word) => item.title.toLowerCase().includes(word)));
 }
 
 function numberOrNull(value) {

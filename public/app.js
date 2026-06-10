@@ -193,7 +193,10 @@ function renderChoices(items) {
   detailsEl.hidden = true;
   if (!items.length) {
     choiceList.hidden = false;
-    choiceList.innerHTML = `<p>No vehicle matches found.</p>`;
+    choiceList.innerHTML = `
+      <p>No vehicle matches found.</p>
+      <p class="hint">Try a more specific description like "2024 Lexus NX350", or enter a full VIN and click Generate.</p>
+    `;
     statusEl.textContent = "No matches.";
     return;
   }

@@ -230,6 +230,16 @@ BLACKBOOK_BASE_URL=https://service.canadianblackbook.com
 BLACKBOOK_API_PATH=/UsedCarWS/CanUsedAPI
 ```
 
+Important checks:
+
+```text
+PUBLIC_SITE_URL must be https://blackbook-demo.vercel.app
+PUBLIC_SITE_URL must not be http://localhost:3000 in Production
+BLACKBOOK_USERNAME and BLACKBOOK_PASSWORD must be added to Production, not only Preview/Development
+```
+
+If Free Form search says `No matches` for known vehicles, first check whether Vercel has the Black Book credentials. Without them, the app runs in mock mode.
+
 After adding variables, redeploy:
 
 ```text
