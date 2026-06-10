@@ -38,32 +38,36 @@
             <form id="drilldown-form" class="lookup-form" hidden>
               <label>
                 <span>Year</span>
-                <input name="year" value="2017" list="year-options" inputmode="numeric" />
+                <select class="drill-select" data-field="year"></select>
+                <input class="manual-input" data-field="year" inputmode="numeric" hidden />
+                <input name="year" type="hidden" value="2017" />
               </label>
               <label>
                 <span>Make</span>
-                <input name="make" value="Honda" list="make-options" />
+                <select class="drill-select" data-field="make"></select>
+                <input class="manual-input" data-field="make" hidden />
+                <input name="make" type="hidden" value="Honda" />
               </label>
               <label>
                 <span>Model</span>
-                <input name="model" value="Odyssey" list="model-options" />
+                <select class="drill-select" data-field="model"></select>
+                <input class="manual-input" data-field="model" hidden />
+                <input name="model" type="hidden" value="Odyssey" />
               </label>
               <label>
                 <span>Series</span>
-                <input name="series" value="LX" list="series-options" />
+                <select class="drill-select" data-field="series"></select>
+                <input class="manual-input" data-field="series" hidden />
+                <input name="series" type="hidden" value="LX" />
               </label>
               <label>
                 <span>Style</span>
-                <input name="style" value="4D Wagon" list="style-options" />
+                <select class="drill-select" data-field="style"></select>
+                <input class="manual-input" data-field="style" hidden />
+                <input name="style" type="hidden" value="4D Wagon" />
               </label>
               <button type="submit">Find</button>
             </form>
-
-            <datalist id="year-options"></datalist>
-            <datalist id="make-options"></datalist>
-            <datalist id="model-options"></datalist>
-            <datalist id="series-options"></datalist>
-            <datalist id="style-options"></datalist>
 
             <form id="valuation-form" class="form-grid">
               <label>

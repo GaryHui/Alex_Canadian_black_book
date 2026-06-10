@@ -128,6 +128,10 @@ select {
   width: 100%;
 }
 
+.manual-input {
+  margin-top: 6px;
+}
+
 .form-grid button,
 .retail-market,
 .lookup-form button {

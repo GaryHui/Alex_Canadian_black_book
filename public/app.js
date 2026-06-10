@@ -88,8 +88,15 @@ drilldownForm.addEventListener("submit", async (event) => {
   await runValuation();
 });
 
-["make", "model"].forEach((name) => {
-  drilldownForm.elements[name].addEventListener("input", updateVehicleDatalists);
+drilldownForm.querySelectorAll(".drill-select").forEach((select) => {
+  select.addEventListener("change", () => handleDrillSelect(select));
+});
+
+drilldownForm.querySelectorAll(".manual-input").forEach((input) => {
+  input.addEventListener("input", () => {
+    drilldownForm.elements[input.dataset.field].value = input.value;
+    if (input.dataset.field === "make" || input.dataset.field === "model") updateVehicleDropdowns();
+  });
 });
 
 form.addEventListener("submit", async (event) => {
@@ -210,33 +217,73 @@ function setValuationFields(values) {
 }
 
 function initializeDatalists() {
-  setDatalist("year-options", Array.from({ length: 47 }, (_, index) => String(2027 - index)));
-  setDatalist("make-options", commonMakes);
-  setDatalist("model-options", Object.values(drilldownSuggestions).flatMap((item) => item.models));
-  setDatalist("series-options", ["LX", "EX", "EX-L", "SE", "Sport", "Touring", "Premium", "Ultra Premium"]);
-  setDatalist("style-options", commonStyles);
-  updateVehicleDatalists();
+  setSelectOptions("year", Array.from({ length: 47 }, (_, index) => String(2027 - index)), "2017");
+  setSelectOptions("make", commonMakes, "Honda");
+  setSelectOptions("model", Object.values(drilldownSuggestions).flatMap((item) => item.models), "Odyssey");
+  setSelectOptions("series", ["LX", "EX", "EX-L", "SE", "Sport", "Touring", "Premium", "Ultra Premium"], "LX");
+  setSelectOptions("style", commonStyles, "4D Wagon");
+  updateVehicleDropdowns();
 }
 
-function updateVehicleDatalists() {
+function updateVehicleDropdowns() {
   const make = drilldownForm.elements.make.value.trim();
   const model = drilldownForm.elements.model.value.trim();
   const makeData = drilldownSuggestions[make];
 
   if (makeData?.models?.length) {
-    setDatalist("model-options", makeData.models);
+    setSelectOptions("model", makeData.models, drilldownForm.elements.model.value || makeData.models[0]);
   }
 
   const series = makeData?.series?.[model];
   const styles = makeData?.styles?.[model];
-  setDatalist("series-options", series?.length ? series : ["LX", "EX", "EX-L", "SE", "Sport", "Touring", "Premium", "Ultra Premium"]);
-  setDatalist("style-options", styles?.length ? styles : commonStyles);
+  setSelectOptions("series", series?.length ? series : ["LX", "EX", "EX-L", "SE", "Sport", "Touring", "Premium", "Ultra Premium"], drilldownForm.elements.series.value || series?.[0]);
+  setSelectOptions("style", styles?.length ? styles : commonStyles, drilldownForm.elements.style.value || styles?.[0]);
 }
 
-function setDatalist(id, values) {
-  const list = document.querySelector(`#${id}`);
+function setSelectOptions(field, values, selectedValue = "") {
+  const select = drilldownForm.querySelector(`.drill-select[data-field="${field}"]`);
+  const manual = drilldownForm.querySelector(`.manual-input[data-field="${field}"]`);
+  const hidden = drilldownForm.elements[field];
   const unique = [...new Set(values.filter(Boolean))];
-  list.innerHTML = unique.map((value) => `<option value="${escapeHtml(value)}"></option>`).join("");
+  const hasSelected = unique.includes(selectedValue);
+  select.innerHTML = [
+    ...unique.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`),
+    `<option value="__manual__">Manual / Other...</option>`
+  ].join("");
+
+  if (hasSelected) {
+    select.value = selectedValue;
+    manual.hidden = true;
+    manual.value = "";
+    hidden.value = selectedValue;
+  } else if (selectedValue) {
+    select.value = "__manual__";
+    manual.hidden = false;
+    manual.value = selectedValue;
+    hidden.value = selectedValue;
+  } else {
+    select.value = unique[0] || "__manual__";
+    manual.hidden = select.value !== "__manual__";
+    hidden.value = unique[0] || "";
+  }
+}
+
+function handleDrillSelect(select) {
+  const field = select.dataset.field;
+  const manual = drilldownForm.querySelector(`.manual-input[data-field="${field}"]`);
+  const hidden = drilldownForm.elements[field];
+
+  if (select.value === "__manual__") {
+    manual.hidden = false;
+    manual.focus();
+    hidden.value = manual.value;
+  } else {
+    manual.hidden = true;
+    manual.value = "";
+    hidden.value = select.value;
+  }
+
+  if (field === "make" || field === "model") updateVehicleDropdowns();
 }
 
 function renderTable() {
