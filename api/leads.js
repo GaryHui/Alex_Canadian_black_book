@@ -1,4 +1,9 @@
 export default async function handler(req, res) {
+  if (req.method === "PATCH") {
+    const result = await updateLead(req.body || {});
+    return res.status(result.ok ? 200 : 400).json(result);
+  }
+
   if (req.method === "POST") {
     const lead = {
       created_at: new Date().toISOString(),
@@ -6,7 +11,8 @@ export default async function handler(req, res) {
       auth_user: sanitizeAuthUser(req.body?.user || {}),
       valuation: sanitizeValuation(req.body?.valuation || {}),
       status: "new",
-      notes: ""
+      notes: "",
+      owner_adjustment: {}
     };
 
     const saved = await saveToSupabase(lead);
@@ -24,7 +30,7 @@ export default async function handler(req, res) {
     return res.status(200).json(await listFromSupabase());
   }
 
-  res.setHeader("Allow", "GET, POST");
+  res.setHeader("Allow", "GET, POST, PATCH");
   return res.status(405).json({ ok: false, error: "Method not allowed" });
 }
 
@@ -64,6 +70,40 @@ async function listFromSupabase() {
   const leads = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: leads, leads: [] };
   return { ok: true, storage: "supabase", leads };
+}
+
+async function updateLead(body) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const id = String(body.id || "").trim();
+  if (!id) return { ok: false, error: "Lead id is required" };
+  if (!url || !key) return { ok: false, error: "Supabase is not configured" };
+
+  const patch = {
+    status: String(body.status || "reviewing").trim(),
+    notes: String(body.notes || "").trim(),
+    owner_adjustment: {
+      wholesale: numberOrNull(body.ownerWholesale),
+      retail: numberOrNull(body.ownerRetail),
+      reason: String(body.reason || "").trim(),
+      updated_at: new Date().toISOString()
+    }
+  };
+
+  const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(patch)
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+  return { ok: true, lead: data?.[0] || null };
 }
 
 function sanitizeLeadInput(input) {
@@ -108,4 +148,10 @@ function sanitizeValuation(valuation) {
 
 function cleanVin(value) {
   return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }

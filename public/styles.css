@@ -541,6 +541,43 @@ select {
   padding: 12px;
 }
 
+.owner-review {
+  border-top: 1px solid #eee;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.owner-review label {
+  min-width: 0;
+}
+
+.owner-review .review-notes {
+  grid-column: 1 / -1;
+}
+
+.owner-review textarea {
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  min-height: 80px;
+  padding: 10px 12px;
+  resize: vertical;
+  width: 100%;
+}
+
+.owner-review button {
+  background: var(--red);
+  border: 1px solid var(--red);
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
 @media (max-width: 900px) {
   .form-grid,
   .info-row,

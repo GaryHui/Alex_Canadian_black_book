@@ -2,7 +2,24 @@
 
 This guide explains how to configure Google login, Supabase lead storage, Black Book API credentials, and Vercel deployment.
 
-## 1. Supabase Project
+## Setup Order
+
+Follow this order:
+
+```text
+1. Create Supabase project.
+2. Run database SQL.
+3. Configure Google OAuth in Google Cloud.
+4. Enable Google provider in Supabase.
+5. Configure Supabase URL settings.
+6. Add environment variables in Vercel.
+7. Redeploy Vercel.
+8. Test Google login.
+9. Test vehicle lookup and lead capture.
+10. Check captured leads in admin page.
+```
+
+## 1. Create Supabase Project
 
 Create a Supabase project at:
 
@@ -38,6 +55,13 @@ Run the SQL from:
 
 ```text
 supabase.sql
+```
+
+If the table already exists, run `supabase.sql` again. It includes `alter table ... add column if not exists` for newer fields such as:
+
+```text
+auth_user
+owner_adjustment
 ```
 
 It creates:
@@ -194,6 +218,7 @@ Add:
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+PUBLIC_SITE_URL=https://blackbook-demo.vercel.app
 ```
 
 Add Black Book credentials:
@@ -269,9 +294,115 @@ AVG retail
 valuation summary
 ```
 
+The owner can also enter a second/manual review:
+
+```text
+status
+owner wholesale value
+owner retail value
+reason for adjustment
+admin notes
+```
+
+This supports cases where the owner believes the CBB value is too low or too high and wants to manually intervene before contacting the customer.
+
 Important: the current admin page is not yet protected by admin-only login. Before production, restrict it to admin users only.
 
-## 8. CRM Handoff
+## 8. How the Website Owner Gets User Data
+
+When a signed-in user completes a valuation, the app saves one row in Supabase:
+
+```text
+table: valuation_leads
+```
+
+The row includes:
+
+```text
+auth_user.email          Google login email
+input.email              customer email shown in the form
+input.phone              customer phone
+input.vin                VIN, if provided
+input.uvc                selected Black Book UVC, if selected
+input.year
+input.make
+input.model
+input.series
+input.style
+input.kilometers
+input.color
+input.region
+input.country
+valuation.values         CBB wholesale/retail result
+valuation.thresholds     kilometer thresholds
+status                   lead status
+notes                    admin notes
+owner_adjustment         owner's second/manual valuation
+```
+
+The owner can view these records in:
+
+```text
+https://blackbook-demo.vercel.app/admin.html
+```
+
+Or directly in Supabase:
+
+```text
+Supabase > Table Editor > valuation_leads
+```
+
+This is the data source for future CRM integration.
+
+## 9. Search vs Generate
+
+The app has two actions with different meanings.
+
+### Search
+
+Search is used to find or narrow down the vehicle.
+
+Examples:
+
+```text
+Free Form: "2017 Honda O"
+Year / Make / Model: 2017 Honda Odyssey LX 4D Wagon
+VIN: 2T2GGCEZ9RC032642
+```
+
+Search may call:
+
+```text
+Autocomplete
+UsedVehicle by VIN
+UsedVehicle by year/make/model
+```
+
+If CBB returns multiple possible vehicles, the app asks the user to choose the correct trim/UVC.
+
+### Generate
+
+Generate creates the actual valuation result after the vehicle is known.
+
+Generate saves:
+
+```text
+user contact info
+vehicle input
+selected UVC/VIN
+CBB valuation result
+thresholds
+lead status
+```
+
+In short:
+
+```text
+Search = find/identify the vehicle.
+Generate = create valuation and capture the lead.
+```
+
+## 10. CRM Handoff
 
 The current lead structure is ready for CRM sync:
 
@@ -303,7 +434,7 @@ sent_to_crm
 closed
 ```
 
-## 9. Production Checklist
+## 11. Production Checklist
 
 Before public launch:
 

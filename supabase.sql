@@ -5,8 +5,15 @@ create table if not exists valuation_leads (
   auth_user jsonb not null default '{}'::jsonb,
   valuation jsonb not null,
   status text not null default 'new',
-  notes text not null default ''
+  notes text not null default '',
+  owner_adjustment jsonb not null default '{}'::jsonb
 );
+
+alter table valuation_leads
+add column if not exists auth_user jsonb not null default '{}'::jsonb;
+
+alter table valuation_leads
+add column if not exists owner_adjustment jsonb not null default '{}'::jsonb;
 
 create index if not exists valuation_leads_created_at_idx
 on valuation_leads (created_at desc);

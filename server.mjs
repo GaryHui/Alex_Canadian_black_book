@@ -64,6 +64,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/api/leads") {
+      if (req.method === "PATCH") {
+        const body = await readJson(req);
+        return sendJson(res, 200, await updateLead(body));
+      }
       if (req.method === "POST") {
         const body = await readJson(req);
         const result = await saveLead(body);
@@ -282,7 +286,8 @@ async function saveLead(body) {
     auth_user: sanitizeAuthUser(body.user || {}),
     valuation: sanitizeValuation(body.valuation || {}),
     status: "new",
-    notes: ""
+    notes: "",
+    owner_adjustment: {}
   };
 
   const dataDir = path.join(__dirname, "data");
@@ -300,6 +305,31 @@ async function listLeads() {
     .map((line) => JSON.parse(line))
     .reverse();
   return { ok: true, leads };
+}
+
+async function updateLead(body) {
+  const filePath = path.join(__dirname, "data", "leads.jsonl");
+  if (!fs.existsSync(filePath)) return { ok: false, error: "No local leads file" };
+
+  const id = String(body.id || "").trim();
+  const leads = fs.readFileSync(filePath, "utf8")
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+  const lead = leads.find((item) => item.id === id);
+  if (!lead) return { ok: false, error: "Lead not found" };
+
+  lead.status = String(body.status || "reviewing").trim();
+  lead.notes = String(body.notes || "").trim();
+  lead.owner_adjustment = {
+    wholesale: numberOrNull(body.ownerWholesale),
+    retail: numberOrNull(body.ownerRetail),
+    reason: String(body.reason || "").trim(),
+    updated_at: new Date().toISOString()
+  };
+
+  fs.writeFileSync(filePath, leads.map((item) => JSON.stringify(item)).join("\n") + "\n");
+  return { ok: true, lead };
 }
 
 function sanitizeLeadInput(input) {
@@ -616,4 +646,10 @@ function mockAutocomplete(query) {
       title: "2017 Honda Odyssey LX 4D Wagon"
     }
   ].filter((item) => item.title.toLowerCase().includes(query.toLowerCase().split(/\s+/).at(-1) || ""));
+}
+
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
