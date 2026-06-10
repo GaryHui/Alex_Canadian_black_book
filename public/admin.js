@@ -3,14 +3,81 @@ const leadsEl = document.querySelector("#admin-leads");
 const usersStatusEl = document.querySelector("#users-status");
 const usersEl = document.querySelector("#admin-users");
 const reloadUsersButton = document.querySelector("#reload-users");
+const adminAuthStatus = document.querySelector("#admin-auth-status");
+const adminLoginButton = document.querySelector("#admin-login");
+const adminLogoutButton = document.querySelector("#admin-logout");
+const adminContent = document.querySelector("#admin-content");
 
-loadLeads();
-loadUsers();
+let supabaseClient = null;
+let adminSession = null;
 
 reloadUsersButton.addEventListener("click", loadUsers);
+adminLoginButton.addEventListener("click", signInAdmin);
+adminLogoutButton.addEventListener("click", signOutAdmin);
+
+initializeAdminAuth();
+
+async function initializeAdminAuth() {
+  const config = await fetch("/api/config").then((res) => res.json()).catch(() => ({}));
+  if (!config.supabaseUrl || !config.supabaseAnonKey || !window.supabase) {
+    adminAuthStatus.textContent = "Supabase login is not configured.";
+    adminLoginButton.hidden = true;
+    adminContent.hidden = true;
+    return;
+  }
+
+  supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      flowType: "pkce",
+      detectSessionInUrl: true,
+      persistSession: true
+    }
+  });
+
+  const { data } = await supabaseClient.auth.getSession();
+  if (window.location.hash.includes("access_token") || window.location.search.includes("code=")) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+  await setAdminSession(data.session);
+  supabaseClient.auth.onAuthStateChange((_event, session) => setAdminSession(session));
+}
+
+async function signInAdmin() {
+  if (!supabaseClient) return;
+  const redirectTo = `${window.location.origin}/admin.html`;
+  await supabaseClient.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo }
+  });
+}
+
+async function signOutAdmin() {
+  if (supabaseClient) await supabaseClient.auth.signOut();
+  await setAdminSession(null);
+}
+
+async function setAdminSession(session) {
+  adminSession = session;
+  adminLoginButton.hidden = !!session?.user;
+  adminLogoutButton.hidden = !session?.user;
+  adminContent.hidden = !session?.user;
+
+  if (!session?.user) {
+    adminAuthStatus.textContent = "Admin Google sign-in required.";
+    statusEl.textContent = "";
+    usersStatusEl.textContent = "";
+    leadsEl.innerHTML = "";
+    usersEl.innerHTML = "";
+    return;
+  }
+
+  adminAuthStatus.textContent = `Signed in as ${session.user.email}`;
+  await Promise.all([loadLeads(), loadUsers()]);
+}
 
 async function loadUsers() {
-  const response = await fetch("/api/user-limits");
+  if (!adminSession) return;
+  const response = await fetch("/api/user-limits", { headers: authHeaders() });
   const data = await response.json();
 
   if (!data.ok) {
@@ -53,7 +120,8 @@ function renderUser(user) {
 }
 
 async function loadLeads() {
-  const response = await fetch("/api/leads");
+  if (!adminSession) return;
+  const response = await fetch("/api/leads", { headers: authHeaders() });
   const data = await response.json();
 
   if (!data.ok) {
@@ -143,7 +211,7 @@ leadsEl.addEventListener("submit", async (event) => {
   };
   const response = await fetch("/api/leads", {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
   const data = await response.json();
@@ -163,7 +231,7 @@ usersEl.addEventListener("submit", async (event) => {
   };
   const response = await fetch("/api/user-limits", {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
   const data = await response.json();
@@ -173,6 +241,12 @@ usersEl.addEventListener("submit", async (event) => {
 
 function formatNumber(value) {
   return new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(Number(value));
+}
+
+function authHeaders() {
+  return {
+    Authorization: `Bearer ${adminSession?.access_token || ""}`
+  };
 }
 
 function escapeHtml(value) {

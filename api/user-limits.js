@@ -1,10 +1,16 @@
+import { requireAdmin } from "./_admin.js";
+
 export default async function handler(req, res) {
   if (req.method === "GET") {
+    const admin = await requireAdmin(req);
+    if (!admin.ok) return res.status(admin.status).json({ ok: false, error: admin.error });
     const result = await listUserLimits(Number(req.query.year || new Date().getFullYear()));
     return res.status(result.ok ? 200 : 500).json(result);
   }
 
   if (req.method === "PATCH") {
+    const admin = await requireAdmin(req);
+    if (!admin.ok) return res.status(admin.status).json({ ok: false, error: admin.error });
     const result = await updateUserLimit(req.body || {});
     return res.status(result.ok ? 200 : 400).json(result);
   }

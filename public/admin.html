@@ -13,8 +13,14 @@
           <p class="eyebrow">Internal</p>
           <h1>Captured valuation leads</h1>
         </div>
-        <a href="/">Back to demo</a>
+        <div class="admin-actions">
+          <span id="admin-auth-status">Checking admin sign-in...</span>
+          <button id="admin-login" type="button" hidden>Sign in with Google</button>
+          <button id="admin-logout" type="button" hidden>Sign out</button>
+          <a href="/">Back to demo</a>
+        </div>
       </header>
+      <section id="admin-content" hidden>
       <section class="admin-section">
         <div class="admin-section-head">
           <div>
@@ -36,7 +42,9 @@
       <p id="admin-status" class="status">Loading...</p>
       <div id="admin-leads" class="admin-leads"></div>
       </section>
+      </section>
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/admin.js"></script>
   </body>
 </html>

@@ -667,9 +667,34 @@ select {
   align-items: center;
   border-bottom: 1px solid #ddd;
   display: flex;
+  gap: 16px;
   justify-content: space-between;
   margin-bottom: 18px;
   padding-bottom: 12px;
+}
+
+.admin-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.admin-actions span {
+  color: #666;
+  font-size: 13px;
+}
+
+.admin-actions button {
+  background: var(--red);
+  border: 1px solid var(--red);
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 36px;
+  padding: 0 12px;
 }
 
 .admin-section {
@@ -850,7 +875,13 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .admin-head,
   .admin-section-head {
     flex-direction: column;
+  }
+
+  .admin-actions {
+    justify-content: flex-start;
+    width: 100%;
   }
 }

@@ -288,6 +288,20 @@ Open:
 https://blackbook-demo.vercel.app/admin.html
 ```
 
+The admin page requires Google login. Only emails listed in this Vercel environment variable can access admin APIs:
+
+```text
+ADMIN_EMAILS=owner@example.com,manager@example.com
+```
+
+Example for the current owner:
+
+```text
+ADMIN_EMAILS=touchdreamwork@gmail.com
+```
+
+Important: `/admin.html` is not protected by page secrecy alone. The protected data APIs also verify the Supabase session token and admin email.
+
 The admin page shows captured leads:
 
 ```text
@@ -316,7 +330,14 @@ admin notes
 
 This supports cases where the owner believes the CBB value is too low or too high and wants to manually intervene before contacting the customer.
 
-Important: the current admin page is not yet protected by admin-only login. Before production, restrict it to admin users only.
+If the admin page does not show data, check:
+
+```text
+1. ADMIN_EMAILS is set on Vercel and includes the Google email you used.
+2. SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set on Vercel.
+3. The latest supabase.sql has been run in Supabase SQL Editor.
+4. At least one valuation has been generated after Supabase storage was configured.
+```
 
 ## 7.1 Yearly Valuation Limits
 
