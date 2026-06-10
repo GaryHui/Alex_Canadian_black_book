@@ -86,6 +86,18 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, result);
     }
 
+    if (req.method === "GET" && url.pathname === "/api/drilldown") {
+      const result = await fetchDrilldown({
+        year: url.searchParams.get("year") || "",
+        make: url.searchParams.get("make") || "",
+        model: url.searchParams.get("model") || "",
+        series: url.searchParams.get("series") || "",
+        style: url.searchParams.get("style") || "",
+        country: url.searchParams.get("country") || "C"
+      });
+      return sendJson(res, result.ok ? 200 : 500, result);
+    }
+
     if (url.pathname === "/api/leads") {
       if (req.method === "PATCH") {
         const admin = await requireAdmin(req);
@@ -311,6 +323,49 @@ async function fetchAutocomplete(searchText) {
   }
 
   return { ok: true, source: "blackbook", items: normalizeAutocomplete(json), raw: json };
+}
+
+async function fetchDrilldown(input) {
+  const year = String(input.year || "").trim();
+  if (!year) return { ok: false, error: "Year is required" };
+
+  const username = process.env.BLACKBOOK_USERNAME;
+  const password = process.env.BLACKBOOK_PASSWORD;
+  if (!username || !password || password === "your_api_password_or_key") {
+    return { ok: true, source: "mock", ...mockDrilldown(input) };
+  }
+
+  const segments = ["Drilldown", "ALL", year, input.make, input.model, input.series, input.style]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .map(encodeURIComponent);
+  const endpoint = new URL(`${BASE_URL}${API_PATH}/${segments.join("/")}`);
+  endpoint.searchParams.set("drilldeep", "false");
+  endpoint.searchParams.set("getclass", "false");
+  endpoint.searchParams.set("country", input.country || "C");
+  endpoint.searchParams.set("customerid", "test");
+
+  const auth = Buffer.from(`${username}:${password}`).toString("base64");
+  const response = await fetch(endpoint, {
+    headers: {
+      Accept: "application/json",
+      Authorization: `Basic ${auth}`
+    }
+  });
+
+  const text = await response.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    json = { raw: text };
+  }
+
+  if (!response.ok) {
+    return { ok: false, status: response.status, error: `Black Book API returned ${response.status}`, raw: json };
+  }
+
+  return { ok: true, source: "blackbook", ...normalizeDrilldown(json, input), raw: json };
 }
 
 function valuationEndpoint({ vin, uvc, year, make }) {
@@ -748,6 +803,59 @@ function normalizeAutocomplete(raw) {
     .filter((item) => item.title && item.title !== "Vehicle ");
 }
 
+function normalizeDrilldown(raw, input = {}) {
+  const makes = collectNamedValues(raw, ["make", "name"], ["make_list", "makes"]);
+  const models = collectNamedValues(raw, ["model", "name"], ["model_list", "models"]);
+  const series = collectNamedValues(raw, ["series", "trim", "name"], ["series_list", "trim_list", "series"]);
+  const styles = collectNamedValues(raw, ["style", "body_style", "name"], ["style_list", "styles"]);
+  const vehicles = allVehicles(raw).map(vehicleChoice).filter((item) => item.title && item.title !== "Vehicle ");
+
+  return {
+    year: String(input.year || ""),
+    makes,
+    models,
+    series,
+    styles,
+    vehicles
+  };
+}
+
+function collectNamedValues(raw, valueKeys, containerKeys) {
+  const values = new Set();
+  visitMatchingContainers(raw, containerKeys, (item) => {
+    if (typeof item === "string" || typeof item === "number") {
+      values.add(String(item).trim());
+      return;
+    }
+    if (!item || typeof item !== "object") return;
+    for (const key of valueKeys) {
+      const direct = item[key] ?? item[key.toUpperCase()];
+      if (direct !== undefined && direct !== null && String(direct).trim()) {
+        values.add(String(direct).trim());
+        return;
+      }
+    }
+  });
+  return [...values].filter(Boolean).sort((a, b) => a.localeCompare(b));
+}
+
+function visitMatchingContainers(value, containerKeys, callback) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => visitMatchingContainers(item, containerKeys, callback));
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+
+  for (const [key, child] of Object.entries(value)) {
+    const normalizedKey = key.toLowerCase();
+    if (containerKeys.some((container) => normalizedKey === container || normalizedKey.endsWith(`_${container}`))) {
+      const items = Array.isArray(child) ? child : [child];
+      items.forEach(callback);
+    }
+    visitMatchingContainers(child, containerKeys, callback);
+  }
+}
+
 function collectArrays(value, arrays) {
   if (Array.isArray(value)) {
     arrays.push(value);
@@ -978,6 +1086,42 @@ function mockAutocomplete(query) {
   ];
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   return items.filter((item) => words.every((word) => item.title.toLowerCase().includes(word)));
+}
+
+function mockDrilldown(input = {}) {
+  const year = String(input.year || "");
+  const make = String(input.make || "");
+  const model = String(input.model || "");
+
+  const data = {
+    makes: commonMockMakes(),
+    models: {
+      Honda: ["Accord", "Civic", "CR-V", "Odyssey", "Pilot"],
+      Lexus: ["ES-Series", "IS-Series", "NX-Series", "RX-Series"],
+      Toyota: ["Camry", "Corolla", "RAV4", "Sienna"]
+    },
+    series: {
+      "Honda|Odyssey": ["LX", "EX", "EX-L", "Touring"],
+      "Lexus|NX-Series": ["NX250", "NX350 Premium", "NX350 Ultra Premium", "NX350h"]
+    },
+    styles: {
+      "Honda|Odyssey": ["4D Wagon"],
+      "Lexus|NX-Series": ["4D Utility AWD"]
+    }
+  };
+
+  return {
+    year,
+    makes: data.makes,
+    models: make ? data.models[make] || [] : [],
+    series: make && model ? data.series[`${make}|${model}`] || [] : [],
+    styles: make && model ? data.styles[`${make}|${model}`] || [] : [],
+    vehicles: []
+  };
+}
+
+function commonMockMakes() {
+  return ["Acura", "Audi", "BMW", "Ford", "Honda", "Lexus", "Mazda", "Mercedes-Benz", "Toyota", "Volkswagen"];
 }
 
 function numberOrNull(value) {

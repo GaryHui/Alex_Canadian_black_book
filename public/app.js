@@ -63,6 +63,7 @@ let currentMarket = "wholesale";
 let supabaseClient = null;
 let authSession = null;
 let usageState = null;
+let drilldownRequestId = 0;
 
 initializeDatalists();
 initializeAuth();
@@ -130,9 +131,9 @@ drilldownForm.querySelectorAll(".drill-select").forEach((select) => {
 });
 
 drilldownForm.querySelectorAll(".manual-input").forEach((input) => {
-  input.addEventListener("input", () => {
+  input.addEventListener("input", async () => {
     drilldownForm.elements[input.dataset.field].value = input.value;
-    if (input.dataset.field === "make" || input.dataset.field === "model") updateVehicleDropdowns();
+    if (input.dataset.field === "make" || input.dataset.field === "model") await updateVehicleDropdowns(input.dataset.field);
   });
 });
 
@@ -154,6 +155,12 @@ async function runValuation(extra = {}) {
     authUserId: authSession?.user?.id || "",
     authEmail: authSession?.user?.email || ""
   };
+
+  if (!payload.vin && !payload.uvc && payload.year && payload.make && (!payload.model || payload.model === unknownOption)) {
+    statusEl.textContent = "Choose a model first, or use Find to search matching vehicles.";
+    await searchVehicleChoices(payload);
+    return;
+  }
 
   try {
     const response = await fetch("/api/valuation", {
@@ -348,33 +355,75 @@ function vehicleSearchText(payload) {
     .join(" ");
 }
 
-function initializeDatalists() {
-  setSelectOptions("year", Array.from({ length: 47 }, (_, index) => String(2027 - index)), "2017");
-  setSelectOptions("make", commonMakes, "Honda");
-  setSelectOptions("model", Object.values(drilldownSuggestions).flatMap((item) => item.models), "Odyssey");
-  setSelectOptions("series", ["LX", "EX", "EX-L", "SE", "Sport", "Touring", "Premium", "Ultra Premium"], "LX");
-  setSelectOptions("style", commonStyles, "4D Wagon");
-  updateVehicleDropdowns("init");
+async function initializeDatalists() {
+  setSelectOptions("year", Array.from({ length: 47 }, (_, index) => String(2027 - index)), "2024");
+  setSelectOptions("make", commonMakes, "Lexus");
+  setSelectOptions("model", ["Not sure", ...Object.values(drilldownSuggestions).flatMap((item) => item.models)], "Not sure");
+  setSelectOptions("series", ["Not sure"], "Not sure");
+  setSelectOptions("style", ["Not sure"], "Not sure");
+  await updateVehicleDropdowns("init");
 }
 
-function updateVehicleDropdowns(changedField = "") {
+async function updateVehicleDropdowns(changedField = "") {
+  const requestId = ++drilldownRequestId;
+  const year = drilldownForm.elements.year.value.trim();
   const make = drilldownForm.elements.make.value.trim();
+  const model = drilldownForm.elements.model.value.trim();
   const makeData = drilldownSuggestions[make];
-  const shouldResetModel = changedField === "make";
+  const shouldResetModel = changedField === "year" || changedField === "make";
+  const shouldResetDetails = shouldResetModel || changedField === "model";
 
-  if (makeData?.models?.length) {
-    const nextModel = shouldResetModel ? makeData.models[0] : drilldownForm.elements.model.value || makeData.models[0];
-    setSelectOptions("model", makeData.models, nextModel);
+  if (changedField === "year") {
+    setSelectOptions("make", commonMakes, "");
+    setSelectOptions("model", ["Not sure"], "Not sure");
+    setSelectOptions("series", ["Not sure"], "Not sure");
+    setSelectOptions("style", ["Not sure"], "Not sure");
+  } else if (shouldResetModel) {
+    setSelectOptions("model", ["Not sure"], "Not sure");
+    setSelectOptions("series", ["Not sure"], "Not sure");
+    setSelectOptions("style", ["Not sure"], "Not sure");
+  } else if (shouldResetDetails) {
+    setSelectOptions("series", ["Not sure"], "Not sure");
+    setSelectOptions("style", ["Not sure"], "Not sure");
   }
 
-  const model = drilldownForm.elements.model.value.trim();
-  const series = makeData?.series?.[model];
-  const styles = makeData?.styles?.[model];
-  const shouldResetDetails = changedField === "make" || changedField === "model";
-  const seriesOptions = series?.length ? series : ["Not sure", "LX", "EX", "EX-L", "SE", "Sport", "Touring", "Premium", "Ultra Premium"];
-  const styleOptions = styles?.length ? styles : ["Not sure", ...commonStyles];
-  setSelectOptions("series", seriesOptions, shouldResetDetails ? seriesOptions[0] : drilldownForm.elements.series.value || seriesOptions[0]);
-  setSelectOptions("style", styleOptions, shouldResetDetails ? styleOptions[0] : drilldownForm.elements.style.value || styleOptions[0]);
+  if (!year) return;
+
+  const drilldown = await fetchDrilldown({
+    year,
+    make: changedField === "year" ? "" : make,
+    model: shouldResetModel ? "" : model
+  });
+  if (requestId !== drilldownRequestId || !drilldown.ok) return;
+
+  if (drilldown.makes?.length) {
+    setSelectOptions("make", drilldown.makes, drilldown.makes.includes(make) ? make : drilldown.makes[0]);
+  }
+
+  const activeMake = drilldownForm.elements.make.value.trim();
+  const localModels = drilldownSuggestions[activeMake]?.models || [];
+  const modelOptions = drilldown.models?.length ? drilldown.models : localModels;
+  if (modelOptions.length) {
+    const selectedModel = shouldResetModel ? "Not sure" : drilldownForm.elements.model.value || "Not sure";
+    setSelectOptions("model", modelOptions, selectedModel);
+  }
+
+  const activeModel = drilldownForm.elements.model.value.trim();
+  const localSeries = drilldownSuggestions[activeMake]?.series?.[activeModel] || [];
+  const localStyles = drilldownSuggestions[activeMake]?.styles?.[activeModel] || [];
+  const seriesOptions = drilldown.series?.length ? drilldown.series : localSeries;
+  const styleOptions = drilldown.styles?.length ? drilldown.styles : localStyles.length ? localStyles : commonStyles;
+  setSelectOptions("series", seriesOptions.length ? seriesOptions : ["Not sure"], shouldResetDetails ? "Not sure" : drilldownForm.elements.series.value || "Not sure");
+  setSelectOptions("style", styleOptions.length ? styleOptions : ["Not sure"], shouldResetDetails ? "Not sure" : drilldownForm.elements.style.value || "Not sure");
+}
+
+async function fetchDrilldown(params) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value && value !== unknownOption) query.set(key, value);
+  }
+  const response = await fetch(`/api/drilldown?${query.toString()}`);
+  return response.json();
 }
 
 function setSelectOptions(field, values, selectedValue = "") {
@@ -382,7 +431,9 @@ function setSelectOptions(field, values, selectedValue = "") {
   const manual = drilldownForm.querySelector(`.manual-input[data-field="${field}"]`);
   const hidden = drilldownForm.elements[field];
   const unique = [...new Set(values.filter(Boolean))];
-  const withUnknown = ["model", "series", "style"].includes(field) ? [unknownOption, ...unique] : unique;
+  const withUnknown = ["model", "series", "style"].includes(field)
+    ? [unknownOption, ...unique.filter((value) => value !== unknownOption)]
+    : unique;
   const hasSelected = withUnknown.includes(selectedValue);
   select.innerHTML = [
     ...withUnknown.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`),
@@ -406,7 +457,7 @@ function setSelectOptions(field, values, selectedValue = "") {
   }
 }
 
-function handleDrillSelect(select) {
+async function handleDrillSelect(select) {
   const field = select.dataset.field;
   const manual = drilldownForm.querySelector(`.manual-input[data-field="${field}"]`);
   const hidden = drilldownForm.elements[field];
@@ -421,7 +472,7 @@ function handleDrillSelect(select) {
     hidden.value = select.value;
   }
 
-  if (field === "make" || field === "model") updateVehicleDropdowns(field);
+  if (field === "year" || field === "make" || field === "model") await updateVehicleDropdowns(field);
 }
 
 function renderTable() {
