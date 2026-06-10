@@ -38,26 +38,32 @@
             <form id="drilldown-form" class="lookup-form" hidden>
               <label>
                 <span>Year</span>
-                <input name="year" type="number" value="2017" min="1981" max="2027" />
+                <input name="year" value="2017" list="year-options" inputmode="numeric" />
               </label>
               <label>
                 <span>Make</span>
-                <input name="make" value="Honda" />
+                <input name="make" value="Honda" list="make-options" />
               </label>
               <label>
                 <span>Model</span>
-                <input name="model" value="Odyssey" />
+                <input name="model" value="Odyssey" list="model-options" />
               </label>
               <label>
                 <span>Series</span>
-                <input name="series" value="LX" />
+                <input name="series" value="LX" list="series-options" />
               </label>
               <label>
                 <span>Style</span>
-                <input name="style" value="4D Wagon" />
+                <input name="style" value="4D Wagon" list="style-options" />
               </label>
               <button type="submit">Find</button>
             </form>
+
+            <datalist id="year-options"></datalist>
+            <datalist id="make-options"></datalist>
+            <datalist id="model-options"></datalist>
+            <datalist id="series-options"></datalist>
+            <datalist id="style-options"></datalist>
 
             <form id="valuation-form" class="form-grid">
               <label>

@@ -7,9 +7,49 @@ const valueBody = document.querySelector("#value-body");
 const tabs = document.querySelectorAll(".market-tabs button");
 const modeButtons = document.querySelectorAll(".lookup-mode");
 const choiceList = document.querySelector("#choice-list");
+const drilldownSuggestions = {
+  Honda: {
+    models: ["Accord", "Civic", "CR-V", "HR-V", "Odyssey", "Pilot", "Ridgeline"],
+    series: {
+      Odyssey: ["LX", "EX", "EX-L", "Touring", "Touring RES", "SE"],
+      Accord: ["LX", "Sport", "EX-L", "Touring"],
+      Civic: ["DX", "LX", "EX", "Sport", "Touring"],
+      "CR-V": ["LX", "EX", "EX-L", "Touring"]
+    },
+    styles: {
+      Odyssey: ["4D Wagon"],
+      Accord: ["2D Coupe", "4D Sedan"],
+      Civic: ["2D Coupe", "4D Hatchback", "4D Sedan"],
+      "CR-V": ["4D Utility AWD", "4D Utility FWD"]
+    }
+  },
+  Lexus: {
+    models: ["ES-Series", "IS-Series", "NX-Series", "RX-Series", "UX-Series"],
+    series: {
+      "NX-Series": ["NX250", "NX350 Premium", "NX350 Ultra Premium", "NX350h"]
+    },
+    styles: {
+      "NX-Series": ["4D Utility AWD"]
+    }
+  },
+  Toyota: {
+    models: ["Camry", "Corolla", "Highlander", "RAV4", "Sienna", "Tacoma"],
+    series: {},
+    styles: {}
+  },
+  Ford: {
+    models: ["Escape", "Explorer", "F150", "F250", "Mustang"],
+    series: {},
+    styles: {}
+  }
+};
+const commonMakes = ["Acura", "Audi", "BMW", "Chevrolet", "Ford", "Honda", "Hyundai", "Kia", "Lexus", "Mazda", "Mercedes-Benz", "Nissan", "Subaru", "Toyota", "Volkswagen"];
+const commonStyles = ["2D Coupe", "4D Hatchback", "4D Sedan", "4D Utility AWD", "4D Utility FWD", "4D Wagon"];
 
 let currentResult = null;
 let currentMarket = "wholesale";
+
+initializeDatalists();
 
 modeButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -46,6 +86,10 @@ drilldownForm.addEventListener("submit", async (event) => {
   const payload = Object.fromEntries(new FormData(drilldownForm).entries());
   setValuationFields({ vin: "", uvc: "", ...payload });
   await runValuation();
+});
+
+["make", "model"].forEach((name) => {
+  drilldownForm.elements[name].addEventListener("input", updateVehicleDatalists);
 });
 
 form.addEventListener("submit", async (event) => {
@@ -163,6 +207,36 @@ function setValuationFields(values) {
     const field = form.elements[key];
     if (field) field.value = value ?? "";
   }
+}
+
+function initializeDatalists() {
+  setDatalist("year-options", Array.from({ length: 47 }, (_, index) => String(2027 - index)));
+  setDatalist("make-options", commonMakes);
+  setDatalist("model-options", Object.values(drilldownSuggestions).flatMap((item) => item.models));
+  setDatalist("series-options", ["LX", "EX", "EX-L", "SE", "Sport", "Touring", "Premium", "Ultra Premium"]);
+  setDatalist("style-options", commonStyles);
+  updateVehicleDatalists();
+}
+
+function updateVehicleDatalists() {
+  const make = drilldownForm.elements.make.value.trim();
+  const model = drilldownForm.elements.model.value.trim();
+  const makeData = drilldownSuggestions[make];
+
+  if (makeData?.models?.length) {
+    setDatalist("model-options", makeData.models);
+  }
+
+  const series = makeData?.series?.[model];
+  const styles = makeData?.styles?.[model];
+  setDatalist("series-options", series?.length ? series : ["LX", "EX", "EX-L", "SE", "Sport", "Touring", "Premium", "Ultra Premium"]);
+  setDatalist("style-options", styles?.length ? styles : commonStyles);
+}
+
+function setDatalist(id, values) {
+  const list = document.querySelector(`#${id}`);
+  const unique = [...new Set(values.filter(Boolean))];
+  list.innerHTML = unique.map((value) => `<option value="${escapeHtml(value)}"></option>`).join("");
 }
 
 function renderTable() {
