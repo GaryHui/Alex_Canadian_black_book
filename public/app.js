@@ -122,6 +122,12 @@ drilldownForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!requireLogin()) return;
   const payload = Object.fromEntries(new FormData(drilldownForm).entries());
+  const exactVehicle = await findExactDrilldownVehicle(payload);
+  if (exactVehicle) {
+    setValuationFields({ vin: "", ...payload, uvc: exactVehicle.uvc || "" });
+    await runValuation({ vin: "", uvc: exactVehicle.uvc || "" });
+    return;
+  }
   setValuationFields({ vin: "", uvc: "", ...payload });
   await searchVehicleChoices(payload);
 });
@@ -160,6 +166,11 @@ async function runValuation(extra = {}) {
     statusEl.textContent = "Choose a model first, or use Find to search matching vehicles.";
     await searchVehicleChoices(payload);
     return;
+  }
+
+  if (!payload.vin && !payload.uvc && payload.year && payload.make && payload.model && payload.model !== unknownOption) {
+    const exactVehicle = await findExactDrilldownVehicle(payload);
+    if (exactVehicle?.uvc) payload.uvc = exactVehicle.uvc;
   }
 
   try {
@@ -424,6 +435,20 @@ async function fetchDrilldown(params) {
   }
   const response = await fetch(`/api/drilldown?${query.toString()}`);
   return response.json();
+}
+
+async function findExactDrilldownVehicle(payload) {
+  if (!payload.year || !payload.make || !payload.model || payload.model === unknownOption) return null;
+  const data = await fetchDrilldown(payload);
+  if (!data.ok || !data.vehicles?.length) return null;
+
+  const series = String(payload.series || "").trim();
+  const style = String(payload.style || "").trim();
+  const exactMatches = data.vehicles.filter((vehicle) =>
+    (!series || series === unknownOption || vehicle.series === series) &&
+    (!style || style === unknownOption || vehicle.style === style)
+  );
+  return exactMatches.length === 1 ? exactMatches[0] : null;
 }
 
 function setSelectOptions(field, values, selectedValue = "") {
