@@ -144,7 +144,9 @@ async function runValuation(extra = {}) {
     }
 
     if (data.choices?.length > 1 && !payload.uvc) {
-      statusEl.textContent = "Multiple matches found. Choose the correct trim.";
+      statusEl.textContent = payload.vin
+        ? "This VIN can match more than one trim. Choose the closest vehicle."
+        : "Multiple matches found. Choose the correct trim.";
       renderChoices(data.choices);
       return;
     }
@@ -251,8 +253,10 @@ function renderChoices(items) {
   }
 
   choiceList.hidden = false;
+  const currentVin = form.elements.vin.value || "";
   choiceList.innerHTML = `
     <h2>Choose a vehicle</h2>
+    <p class="hint">Some VINs identify the model but not the exact trim. Pick the closest match so the estimate uses the right UVC.</p>
     <div class="choice-grid">
       ${items.map((item, index) => `
         <button type="button" class="choice-card" data-index="${index}">
@@ -271,7 +275,7 @@ function renderChoices(items) {
     button.addEventListener("click", async () => {
       const item = items[Number(button.dataset.index)];
       setValuationFields({
-        vin: "",
+        vin: currentVin,
         uvc: item.uvc || "",
         year: item.year || "",
         make: item.make || "",
@@ -279,7 +283,7 @@ function renderChoices(items) {
         series: item.series || "",
         style: item.style || ""
       });
-      await runValuation({ uvc: item.uvc || "" });
+      await runValuation({ vin: currentVin, uvc: item.uvc || "" });
     });
   });
 }
