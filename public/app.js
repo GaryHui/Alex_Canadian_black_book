@@ -75,7 +75,7 @@ function renderTable() {
   ];
   const conditions = ["xclean", "clean", "avg", "rough"];
 
-  document.querySelector("#active-market-label").textContent = `AVG ${marketLabel(currentMarket).toUpperCase()}`;
+  document.querySelector("#active-market-label").textContent = averageMarketLabel(currentMarket, marketData);
 
   valueBody.innerHTML = rows.map(([label, key]) => {
     const cells = conditions.map((condition) => {
@@ -109,6 +109,14 @@ function marketHasValues(marketData) {
 function marketLabel(value) {
   if (value === "tradeIn") return "Trade-In";
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function averageMarketLabel(market, marketData) {
+  const avgValue = marketData.adjusted?.avg ?? marketData.base?.avg;
+  const label = `AVG ${marketLabel(market).toUpperCase()}`;
+  return avgValue === null || avgValue === undefined
+    ? label
+    : `${label} ${formatNumber(avgValue)}`;
 }
 
 function formatValue(value, rowKey) {
