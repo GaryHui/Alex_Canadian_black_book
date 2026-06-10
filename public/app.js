@@ -404,7 +404,13 @@ async function initializeAuth() {
     return;
   }
 
-  supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+  supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      flowType: "pkce",
+      detectSessionInUrl: true,
+      persistSession: true
+    }
+  });
   const { data } = await supabaseClient.auth.getSession();
   if (window.location.hash.includes("access_token")) {
     window.history.replaceState({}, document.title, window.location.pathname);

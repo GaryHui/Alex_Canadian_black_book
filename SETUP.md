@@ -140,6 +140,8 @@ Set Site URL:
 https://blackbook-demo.vercel.app
 ```
 
+Do not set the production Site URL to `http://localhost:3000`. If Site URL is localhost, Google login may return to localhost and fail when the local server is not running.
+
 Add Redirect URLs:
 
 ```text
@@ -169,6 +171,14 @@ https://blackbook-demo.vercel.app/login.html
 ```
 
 The app now uses a separate login page. Users who are not signed in are redirected to `/login.html` and cannot use valuation forms until Google login succeeds.
+
+In Vercel, add this optional but recommended environment variable:
+
+```text
+PUBLIC_SITE_URL=https://blackbook-demo.vercel.app
+```
+
+This ensures Google OAuth always returns to the production site during production testing.
 
 ## 5. Vercel Environment Variables
 

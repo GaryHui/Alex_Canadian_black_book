@@ -47,7 +47,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/config") {
       return sendJson(res, 200, {
         supabaseUrl: process.env.SUPABASE_URL || "",
-        supabaseAnonKey: process.env.SUPABASE_ANON_KEY || ""
+        supabaseAnonKey: process.env.SUPABASE_ANON_KEY || "",
+        siteUrl: process.env.PUBLIC_SITE_URL || "http://localhost:3000"
       });
     }
 
