@@ -9,6 +9,7 @@ loadEnv(path.join(__dirname, ".env.local"));
 const PORT = Number(process.env.PORT || 3000);
 const BASE_URL = process.env.BLACKBOOK_BASE_URL || "https://service.canadianblackbook.com";
 const API_PATH = process.env.BLACKBOOK_API_PATH || "/UsedCarWS/CanUsedAPI";
+const VALUATION_TEMPLATE = process.env.BLACKBOOK_TEMPLATE || "12";
 const LOG_FILE = path.join(__dirname, "server.log");
 
 process.on("uncaughtException", (error) => {
@@ -170,6 +171,7 @@ async function fetchValuation(input) {
   endpoint.searchParams.set("country", country);
   endpoint.searchParams.set("language", language);
   endpoint.searchParams.set("customerid", input.customerid || "test");
+  if (VALUATION_TEMPLATE) endpoint.searchParams.set("template", VALUATION_TEMPLATE);
   if (region) endpoint.searchParams.set("state", region);
   if (kilometers > 0) endpoint.searchParams.set("mileage", String(kilometers));
   if (model) endpoint.searchParams.set("model", model);
