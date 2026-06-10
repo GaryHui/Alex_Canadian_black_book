@@ -28,7 +28,7 @@ form.addEventListener("submit", async (event) => {
     }
 
     currentResult = data;
-    currentMarket = "wholesale";
+    currentMarket = firstAvailableMarket(data) || "wholesale";
     renderResult(data);
     statusEl.textContent = data.source === "mock"
       ? "Rendered with mock data. Add Black Book credentials to .env.local for live API calls."
@@ -58,7 +58,7 @@ function renderResult(data) {
     ? `Loan Value: ${formatNumber(data.loanValue)}`
     : "";
 
-  tabs.forEach((item) => item.classList.toggle("active", item.dataset.market === currentMarket));
+  renderTabs(data);
   renderTable();
   detailsEl.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -84,6 +84,26 @@ function renderTable() {
     }).join("");
     return `<tr class="${key === "adjusted" ? "adjusted" : ""}"><td>${label}</td>${cells}</tr>`;
   }).join("");
+}
+
+function renderTabs(data) {
+  tabs.forEach((item) => {
+    const available = marketHasValues(data.values[item.dataset.market]);
+    item.hidden = !available;
+    item.disabled = !available;
+    item.classList.toggle("active", item.dataset.market === currentMarket);
+  });
+}
+
+function firstAvailableMarket(data) {
+  return ["wholesale", "retail", "tradeIn"].find((market) => marketHasValues(data.values?.[market]));
+}
+
+function marketHasValues(marketData) {
+  if (!marketData) return false;
+  return Object.values(marketData).some((row) =>
+    Object.values(row || {}).some((value) => value !== null && value !== undefined)
+  );
 }
 
 function marketLabel(value) {

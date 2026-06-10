@@ -187,8 +187,7 @@ select {
 }
 
 .market-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
   margin: 10px auto 20px;
   max-width: 1080px;
 }
@@ -198,6 +197,7 @@ select {
   border: 1px solid var(--red);
   color: var(--red);
   cursor: pointer;
+  flex: 1 1 0;
   height: 31px;
 }
 
