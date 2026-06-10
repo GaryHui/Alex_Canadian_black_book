@@ -19,6 +19,10 @@ const modalStatus = document.querySelector("#modal-status");
 const quotaPanel = document.querySelector("#quota-panel");
 const quotaTitle = document.querySelector("#quota-title");
 const quotaSubtitle = document.querySelector("#quota-subtitle");
+const historyPanel = document.querySelector("#history-panel");
+const historyStatus = document.querySelector("#history-status");
+const historyList = document.querySelector("#history-list");
+const reloadHistoryButton = document.querySelector("#reload-history");
 const drilldownSuggestions = {
   Honda: {
     models: ["Accord", "Civic", "CR-V", "HR-V", "Odyssey", "Pilot", "Ridgeline"],
@@ -65,9 +69,12 @@ let supabaseClient = null;
 let authSession = null;
 let usageState = null;
 let drilldownRequestId = 0;
+let historyLeads = [];
 
 initializeDatalists();
 initializeAuth();
+
+reloadHistoryButton.addEventListener("click", loadHistory);
 
 logoutButton.addEventListener("click", async () => {
   if (supabaseClient) await supabaseClient.auth.signOut();
@@ -208,6 +215,7 @@ async function runValuation(extra = {}, options = {}) {
       statusEl.textContent = data.source === "mock"
         ? "Rendered with mock data and lead captured."
         : "Rendered from Black Book API and lead captured.";
+      await loadHistory();
     } else {
       statusEl.textContent = capture?.message || "Rendered, but lead storage is not configured yet.";
     }
@@ -638,6 +646,7 @@ function setSession(session) {
     logoutButton.hidden = false;
     emailField.value = email;
     loadUsage();
+    loadHistory();
   } else {
     if (supabaseClient) {
       window.location.replace("/login.html");
@@ -647,6 +656,9 @@ function setSession(session) {
     authSubtitle.textContent = "Add Supabase environment variables to enable Google login.";
     logoutButton.hidden = true;
     quotaPanel.hidden = true;
+    historyPanel.hidden = true;
+    historyList.innerHTML = "";
+    historyLeads = [];
     emailField.value = "";
   }
 }
@@ -684,6 +696,123 @@ async function loadUsage() {
     quotaSubtitle.textContent = error.message || "Unable to load usage";
   }
   return usageState;
+}
+
+async function loadHistory() {
+  if (!authSession?.access_token) return;
+
+  historyPanel.hidden = false;
+  historyStatus.textContent = "Loading quote history...";
+
+  try {
+    const response = await fetch("/api/my-leads", {
+      headers: {
+        Authorization: `Bearer ${authSession.access_token}`
+      }
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to load quote history");
+
+    historyLeads = data.leads || [];
+    renderHistory(historyLeads);
+  } catch (error) {
+    historyStatus.textContent = error.message || "Unable to load quote history";
+    historyList.innerHTML = "";
+  }
+}
+
+function renderHistory(leads) {
+  if (!leads.length) {
+    historyStatus.textContent = "No saved quotes yet. Generate a valuation and it will appear here.";
+    historyList.innerHTML = "";
+    return;
+  }
+
+  historyStatus.textContent = `${leads.length} saved quote${leads.length === 1 ? "" : "s"}.`;
+  historyList.innerHTML = leads.map((lead, index) => {
+    const input = lead.input || {};
+    const valuation = lead.valuation || {};
+    const title = valuation.title || historyVehicleTitle(input) || "Vehicle valuation";
+    const wholesaleAvg = historyMarketAverage(valuation, "wholesale");
+    const retailAvg = historyMarketAverage(valuation, "retail");
+    const tradeInAvg = historyMarketAverage(valuation, "tradeIn");
+
+    return `
+      <article class="history-card">
+        <div>
+          <strong>${escapeHtml(title)}</strong>
+          <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
+        </div>
+        <dl class="history-meta">
+          <div><dt>VIN</dt><dd>${escapeHtml(valuation.vin || input.vin || "-")}</dd></div>
+          <div><dt>UVC</dt><dd>${escapeHtml(input.uvc || "-")}</dd></div>
+          <div><dt>Kilometers</dt><dd>${input.kilometers ? formatNumber(input.kilometers) : "-"}</dd></div>
+          <div><dt>Region</dt><dd>${escapeHtml(valuation.region || input.region || "-")}</dd></div>
+          <div><dt>Color</dt><dd>${escapeHtml(input.color || "Not provided")}</dd></div>
+          <div><dt>Status</dt><dd>${escapeHtml(lead.status || "new")}</dd></div>
+        </dl>
+        <div class="history-values">
+          <span>Wholesale ${formatHistoryValue(wholesaleAvg)}</span>
+          <span>Retail ${formatHistoryValue(retailAvg)}</span>
+          <span>Trade-In ${formatHistoryValue(tradeInAvg)}</span>
+        </div>
+        <button type="button" data-history-index="${index}">View result</button>
+      </article>
+    `;
+  }).join("");
+
+  historyList.querySelectorAll("[data-history-index]").forEach((button) => {
+    button.addEventListener("click", () => showHistoryResult(historyLeads[Number(button.dataset.historyIndex)]));
+  });
+}
+
+function showHistoryResult(lead) {
+  if (!lead) return;
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+  const replay = {
+    ok: true,
+    title: valuation.title || historyVehicleTitle(input) || "Vehicle",
+    vin: valuation.vin || input.vin || "",
+    kilometers: input.kilometers || valuation.kilometers || 0,
+    region: valuation.region || input.region || "",
+    country: valuation.country || input.country || "C",
+    optionsSelected: valuation.optionsSelected || 0,
+    values: valuation.values || {},
+    loanValue: valuation.loanValue || null,
+    thresholds: valuation.thresholds || null,
+    input
+  };
+
+  currentResult = replay;
+  currentMarket = firstAvailableMarket(replay) || "wholesale";
+  renderResult(replay);
+}
+
+function historyVehicleTitle(input) {
+  return ["year", "make", "model", "series", "style"]
+    .map((key) => String(input?.[key] || "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+function historyMarketAverage(valuation, market) {
+  const marketData = valuation?.values?.[market] || {};
+  return marketData.adjusted?.avg ?? marketData.base?.avg ?? null;
+}
+
+function formatHistoryValue(value) {
+  return value === null || value === undefined ? "-" : formatNumber(value);
+}
+
+function formatDateTime(value) {
+  if (!value) return "Unknown date";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown date";
+  return new Intl.DateTimeFormat("en-CA", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(date);
 }
 
 function canUseValuation() {

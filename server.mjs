@@ -98,6 +98,13 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, result.ok ? 200 : 500, result);
     }
 
+    if (req.method === "GET" && url.pathname === "/api/my-leads") {
+      const auth = await requireUser(req);
+      if (!auth.ok) return sendJson(res, auth.status, { ok: false, error: auth.error });
+      const result = await listMyLeads(auth.user);
+      return sendJson(res, result.ok ? 200 : 500, result);
+    }
+
     if (url.pathname === "/api/leads") {
       if (req.method === "PATCH") {
         const admin = await requireAdmin(req);
@@ -216,6 +223,33 @@ async function requireAdmin(req) {
   }
 
   return { ok: true, user: { id: user.id, email } };
+}
+
+async function requireUser(req) {
+  const token = bearerToken(req);
+  if (!token) return { ok: false, status: 401, error: "Sign-in required" };
+
+  const url = process.env.SUPABASE_URL;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return { ok: false, status: 500, error: "Supabase auth is not configured" };
+
+  const response = await fetch(`${url}/auth/v1/user`, {
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const user = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: 401, error: "Invalid or expired session" };
+
+  return {
+    ok: true,
+    user: {
+      id: String(user?.id || "").trim(),
+      email: String(user?.email || "").trim().toLowerCase()
+    }
+  };
 }
 
 function bearerToken(req) {
@@ -449,6 +483,37 @@ async function listLeads() {
 
   const leads = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: leads, leads: [] };
+  return { ok: true, storage: "supabase", leads };
+}
+
+async function listMyLeads(user) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: true, storage: "not_configured", leads: [] };
+
+  const requests = [];
+  if (user.id) {
+    requests.push(fetchSupabaseJson(`${url}/rest/v1/valuation_leads?select=*&auth_user_id=eq.${encodeURIComponent(user.id)}&order=created_at.desc&limit=50`, key));
+  }
+  if (user.email) {
+    requests.push(fetchSupabaseJson(`${url}/rest/v1/valuation_leads?select=*&auth_email=eq.${encodeURIComponent(user.email)}&order=created_at.desc&limit=50`, key));
+  }
+
+  const results = await Promise.all(requests);
+  const failed = results.find((result) => !result.ok);
+  if (failed) return failed;
+
+  const rowsById = new Map();
+  for (const result of results) {
+    for (const row of result.data || []) {
+      rowsById.set(row.id || `${row.created_at}-${row.auth_email}`, row);
+    }
+  }
+
+  const leads = [...rowsById.values()]
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+    .slice(0, 50);
+
   return { ok: true, storage: "supabase", leads };
 }
 
