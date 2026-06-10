@@ -183,11 +183,15 @@ async function runValuation(extra = {}) {
     currentMarket = firstAvailableMarket(data) || "wholesale";
     renderResult(data);
     closeSearchModal();
-    await captureLead(payload, data);
+    const capture = await captureLead(payload, data);
     await loadUsage();
-    statusEl.textContent = data.source === "mock"
-      ? "Rendered with mock data and lead captured locally if available."
-      : "Rendered from Black Book API and lead captured.";
+    if (capture?.captured) {
+      statusEl.textContent = data.source === "mock"
+        ? "Rendered with mock data and lead captured."
+        : "Rendered from Black Book API and lead captured.";
+    } else {
+      statusEl.textContent = capture?.message || "Rendered, but lead storage is not configured yet.";
+    }
   } catch (error) {
     statusEl.textContent = error.message || "Unexpected error.";
   }
@@ -488,7 +492,7 @@ function formatNumber(value) {
 
 async function captureLead(input, valuation) {
   try {
-    await fetch("/api/leads", {
+    const response = await fetch("/api/leads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -501,8 +505,10 @@ async function captureLead(input, valuation) {
         }
       })
     });
+    return response.json();
   } catch (error) {
     console.warn("Lead capture failed", error);
+    return { ok: false, captured: false, message: error.message || "Lead capture failed." };
   }
 }
 
