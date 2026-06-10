@@ -1,18 +1,63 @@
 const form = document.querySelector("#valuation-form");
+const freeForm = document.querySelector("#free-form");
+const drilldownForm = document.querySelector("#drilldown-form");
 const statusEl = document.querySelector("#status");
 const detailsEl = document.querySelector("#details");
 const valueBody = document.querySelector("#value-body");
 const tabs = document.querySelectorAll(".market-tabs button");
+const modeButtons = document.querySelectorAll(".lookup-mode");
+const choiceList = document.querySelector("#choice-list");
 
 let currentResult = null;
 let currentMarket = "wholesale";
 
+modeButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    modeButtons.forEach((item) => item.classList.toggle("active", item === button));
+    const mode = button.dataset.mode;
+    freeForm.hidden = mode !== "free";
+    drilldownForm.hidden = mode !== "drilldown";
+  });
+});
+
+freeForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const searchText = new FormData(freeForm).get("searchText");
+  const vin = String(searchText || "").trim().toUpperCase();
+
+  if (/^[A-HJ-NPR-Z0-9]{10,17}$/.test(vin)) {
+    setValuationFields({ vin, uvc: "", year: "", make: "", model: "", series: "", style: "" });
+    return runValuation();
+  }
+
+  statusEl.textContent = "Searching vehicles...";
+  choiceList.hidden = true;
+  const response = await fetch(`/api/autocomplete?searchText=${encodeURIComponent(searchText)}`);
+  const data = await response.json();
+  if (!data.ok) {
+    statusEl.textContent = data.error || "Search failed.";
+    return;
+  }
+  renderChoices(data.items || []);
+});
+
+drilldownForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const payload = Object.fromEntries(new FormData(drilldownForm).entries());
+  setValuationFields({ vin: "", uvc: "", ...payload });
+  await runValuation();
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  await runValuation();
+});
+
+async function runValuation(extra = {}) {
   statusEl.textContent = "Calling valuation API...";
 
   const formData = new FormData(form);
-  const payload = Object.fromEntries(formData.entries());
+  const payload = { ...Object.fromEntries(formData.entries()), ...extra };
 
   try {
     const response = await fetch("/api/valuation", {
@@ -27,6 +72,12 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
+    if (data.choices?.length > 1 && !payload.uvc) {
+      statusEl.textContent = "Multiple matches found. Choose the correct trim.";
+      renderChoices(data.choices);
+      return;
+    }
+
     currentResult = data;
     currentMarket = firstAvailableMarket(data) || "wholesale";
     renderResult(data);
@@ -36,7 +87,7 @@ form.addEventListener("submit", async (event) => {
   } catch (error) {
     statusEl.textContent = error.message || "Unexpected error.";
   }
-});
+}
 
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
@@ -47,6 +98,7 @@ tabs.forEach((tab) => {
 });
 
 function renderResult(data) {
+  choiceList.hidden = true;
   detailsEl.hidden = false;
   document.querySelector("#vehicle-title").textContent = data.title;
   document.querySelector("#vehicle-vin").textContent = data.vin;
@@ -61,6 +113,56 @@ function renderResult(data) {
   renderTabs(data);
   renderTable();
   detailsEl.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderChoices(items) {
+  detailsEl.hidden = true;
+  if (!items.length) {
+    choiceList.hidden = false;
+    choiceList.innerHTML = `<p>No vehicle matches found.</p>`;
+    statusEl.textContent = "No matches.";
+    return;
+  }
+
+  choiceList.hidden = false;
+  choiceList.innerHTML = `
+    <h2>Choose a vehicle</h2>
+    <div class="choice-grid">
+      ${items.map((item, index) => `
+        <button type="button" class="choice-card" data-index="${index}">
+          <strong>${escapeHtml(item.title || "Vehicle match")}</strong>
+          <span>${[
+            item.uvc ? `UVC ${item.uvc}` : "",
+            item.adjustedWholesaleAvg ? `AVG Wholesale ${formatNumber(item.adjustedWholesaleAvg)}` : "",
+            item.adjustedRetailAvg ? `AVG Retail ${formatNumber(item.adjustedRetailAvg)}` : ""
+          ].filter(Boolean).join(" · ")}</span>
+        </button>
+      `).join("")}
+    </div>
+  `;
+
+  choiceList.querySelectorAll(".choice-card").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const item = items[Number(button.dataset.index)];
+      setValuationFields({
+        vin: "",
+        uvc: item.uvc || "",
+        year: item.year || "",
+        make: item.make || "",
+        model: item.model || "",
+        series: item.series || "",
+        style: item.style || ""
+      });
+      await runValuation({ uvc: item.uvc || "" });
+    });
+  });
+}
+
+function setValuationFields(values) {
+  for (const [key, value] of Object.entries(values)) {
+    const field = form.elements[key];
+    if (field) field.value = value ?? "";
+  }
 }
 
 function renderTable() {
@@ -127,4 +229,14 @@ function formatValue(value, rowKey) {
 
 function formatNumber(value) {
   return new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(Number(value));
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
 }

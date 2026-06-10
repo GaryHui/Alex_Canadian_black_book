@@ -51,9 +51,64 @@ h1 {
 
 .form-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr auto;
   gap: 12px;
   align-items: end;
+}
+
+.lookup-layout {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 320px 1fr;
+}
+
+.lookup-menu {
+  display: grid;
+  gap: 10px;
+}
+
+.lookup-mode {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 14px;
+  text-align: left;
+}
+
+.lookup-mode.active {
+  border-color: var(--red);
+}
+
+.lookup-mode strong {
+  display: block;
+  font-size: 24px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.lookup-mode span {
+  color: #333;
+}
+
+.lookup-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.lookup-form {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+
+.lookup-form[hidden] {
+  display: none;
+}
+
+.lookup-form#drilldown-form {
+  grid-template-columns: repeat(5, minmax(120px, 1fr)) auto;
 }
 
 label span {
@@ -74,7 +129,8 @@ select {
 }
 
 .form-grid button,
-.retail-market {
+.retail-market,
+.lookup-form button {
   background: #fff;
   border: 1px solid var(--red);
   border-radius: 4px;
@@ -90,9 +146,58 @@ select {
   color: #fff;
 }
 
+.lookup-form button {
+  background: var(--red);
+  color: #fff;
+}
+
 .status {
   color: #666;
   margin: 12px 0 0;
+}
+
+.choice-list {
+  background: #fff;
+  border-top: 4px solid #222;
+  margin-top: 20px;
+  padding: 18px 0 0;
+}
+
+.choice-list h2 {
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0 0 12px;
+}
+
+.choice-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.choice-card {
+  background: #fff;
+  border: 1px solid #d6d6d6;
+  border-radius: 4px;
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  text-align: left;
+}
+
+.choice-card:hover {
+  border-color: var(--red);
+}
+
+.choice-card strong {
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.choice-card span {
+  color: #777;
+  font-size: 13px;
 }
 
 .details {
@@ -294,7 +399,10 @@ select {
 
 @media (max-width: 900px) {
   .form-grid,
-  .info-row {
+  .info-row,
+  .lookup-layout,
+  .lookup-form,
+  .lookup-form#drilldown-form {
     grid-template-columns: 1fr;
   }
 

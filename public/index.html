@@ -10,17 +10,72 @@
     <main class="shell">
       <section class="search-panel">
         <div>
-          <p class="eyebrow">Canadian Black Book Demo</p>
-          <h1>Vehicle valuation test</h1>
+          <p class="eyebrow">Search Canadian Used Cars</p>
+          <h1>Black Book vehicle lookup</h1>
         </div>
-        <form id="valuation-form" class="form-grid">
-          <label>
-            <span>VIN</span>
-            <input name="vin" value="1FTFW1EF3EFC53488" required />
-          </label>
+
+        <div class="lookup-layout">
+          <div class="lookup-menu" aria-label="Lookup modes">
+            <button class="lookup-mode active" type="button" data-mode="free">
+              <strong>Free Form</strong>
+              <span>Search by vehicle description or VIN</span>
+            </button>
+            <button class="lookup-mode" type="button" data-mode="drilldown">
+              <strong>Year, Make & Model</strong>
+              <span>Drill down to a vehicle by year, make, model</span>
+            </button>
+          </div>
+
+          <div class="lookup-panel">
+            <form id="free-form" class="lookup-form">
+              <label>
+                <span>Vehicle description or VIN</span>
+                <input name="searchText" value="2017 Honda O" placeholder="2017 Honda Odyssey or VIN" />
+              </label>
+              <button type="submit">Search</button>
+            </form>
+
+            <form id="drilldown-form" class="lookup-form" hidden>
+              <label>
+                <span>Year</span>
+                <input name="year" type="number" value="2017" min="1981" max="2027" />
+              </label>
+              <label>
+                <span>Make</span>
+                <input name="make" value="Honda" />
+              </label>
+              <label>
+                <span>Model</span>
+                <input name="model" value="Odyssey" />
+              </label>
+              <label>
+                <span>Series</span>
+                <input name="series" value="LX" />
+              </label>
+              <label>
+                <span>Style</span>
+                <input name="style" value="4D Wagon" />
+              </label>
+              <button type="submit">Find</button>
+            </form>
+
+            <form id="valuation-form" class="form-grid">
+              <label>
+                <span>VIN</span>
+                <input name="vin" value="2T2GGCEZ9RC032642" />
+              </label>
+              <label>
+                <span>UVC</span>
+                <input name="uvc" placeholder="Optional selected UVC" />
+              </label>
+              <input name="year" type="hidden" />
+              <input name="make" type="hidden" />
+              <input name="model" type="hidden" />
+              <input name="series" type="hidden" />
+              <input name="style" type="hidden" />
           <label>
             <span>Kilometers</span>
-            <input name="kilometers" type="number" min="0" value="35000" required />
+            <input name="kilometers" type="number" min="0" value="37000" required />
           </label>
           <label>
             <span>Region</span>
@@ -41,8 +96,12 @@
             </select>
           </label>
           <button type="submit">Generate</button>
-        </form>
+            </form>
+          </div>
+        </div>
+
         <p id="status" class="status">Ready.</p>
+        <div id="choice-list" class="choice-list" hidden></div>
       </section>
 
       <section id="details" class="details" hidden>

@@ -42,6 +42,11 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, result);
     }
 
+    if (req.method === "GET" && url.pathname === "/api/autocomplete") {
+      const result = await fetchAutocomplete(url.searchParams.get("searchText") || "");
+      return sendJson(res, 200, result);
+    }
+
     sendJson(res, 404, { error: "Not found" });
   } catch (error) {
     sendJson(res, 500, { error: error.message || "Server error" });
@@ -109,12 +114,18 @@ function readJson(req) {
 
 async function fetchValuation(input) {
   const vin = cleanVin(input.vin);
+  const uvc = String(input.uvc || "").trim();
+  const year = String(input.year || "").trim();
+  const make = String(input.make || "").trim();
+  const model = String(input.model || "").trim();
+  const series = String(input.series || "").trim();
+  const style = String(input.style || "").trim();
   const kilometers = Number(input.kilometers || input.mileage || 0);
   const region = String(input.region || "ON").trim();
   const country = String(input.country || "C").trim();
   const language = String(input.language || "en").trim();
 
-  if (!vin) throw new Error("VIN is required");
+  if (!vin && !uvc && !(year && make)) throw new Error("VIN, UVC, or vehicle description is required");
   if (!Number.isFinite(kilometers) || kilometers < 0) throw new Error("Kilometers must be a positive number");
 
   const username = process.env.BLACKBOOK_USERNAME;
@@ -124,12 +135,15 @@ async function fetchValuation(input) {
     return buildDemoResponse(input, mockBlackBookResponse(vin, kilometers, region, country));
   }
 
-  const endpoint = new URL(`${BASE_URL}${API_PATH}/UsedVehicle/VIN/${encodeURIComponent(vin)}`);
+  const endpoint = valuationEndpoint({ vin, uvc, year, make });
   endpoint.searchParams.set("country", country);
   endpoint.searchParams.set("language", language);
   endpoint.searchParams.set("customerid", input.customerid || "test");
   if (region) endpoint.searchParams.set("state", region);
   if (kilometers > 0) endpoint.searchParams.set("mileage", String(kilometers));
+  if (model) endpoint.searchParams.set("model", model);
+  if (series) endpoint.searchParams.set("series", series);
+  if (style) endpoint.searchParams.set("style", style);
 
   const auth = Buffer.from(`${username}:${password}`).toString("base64");
   const response = await fetch(endpoint, {
@@ -160,8 +174,53 @@ async function fetchValuation(input) {
   return buildDemoResponse(input, json);
 }
 
+async function fetchAutocomplete(searchText) {
+  const query = String(searchText || "").trim();
+  if (query.length < 2) return { ok: true, items: [] };
+
+  const username = process.env.BLACKBOOK_USERNAME;
+  const password = process.env.BLACKBOOK_PASSWORD;
+  if (!username || !password || password === "your_api_password_or_key") {
+    return { ok: true, source: "mock", items: mockAutocomplete(query) };
+  }
+
+  const endpoint = new URL(`${BASE_URL}${API_PATH}/Autocomplete`);
+  endpoint.searchParams.set("searchText", query);
+  endpoint.searchParams.set("country", "C");
+  endpoint.searchParams.set("customerid", "test");
+
+  const auth = Buffer.from(`${username}:${password}`).toString("base64");
+  const response = await fetch(endpoint, {
+    headers: {
+      Accept: "application/json",
+      Authorization: `Basic ${auth}`
+    }
+  });
+
+  const text = await response.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    json = { raw: text };
+  }
+
+  if (!response.ok) {
+    return { ok: false, status: response.status, error: `Black Book API returned ${response.status}`, raw: json };
+  }
+
+  return { ok: true, source: "blackbook", items: normalizeAutocomplete(json), raw: json };
+}
+
+function valuationEndpoint({ vin, uvc, year, make }) {
+  if (uvc) return new URL(`${BASE_URL}${API_PATH}/UsedVehicle/UVC/${encodeURIComponent(uvc)}`);
+  if (year && make) return new URL(`${BASE_URL}${API_PATH}/UsedVehicle/${encodeURIComponent(year)}/${encodeURIComponent(make)}`);
+  return new URL(`${BASE_URL}${API_PATH}/UsedVehicle/VIN/${encodeURIComponent(vin)}`);
+}
+
 function buildDemoResponse(input, raw) {
-  const vehicle = firstVehicle(raw);
+  const vehicles = allVehicles(raw);
+  const vehicle = chooseVehicle(vehicles, input) || firstVehicle(raw);
   const values = extractValues(vehicle);
   const title = vehicleTitle(vehicle, input.vin);
   const vin = cleanVin(input.vin) || vehicle?.vin;
@@ -182,7 +241,49 @@ function buildDemoResponse(input, raw) {
     values,
     loanValue: findNumber(vehicle, ["loan_value", "finadv", "adjusted_finadv", "finance_advance_value"]),
     thresholds: vehicle?.kilometer_adjustments || null,
+    choices: vehicles.length > 1 ? vehicles.map(vehicleChoice) : [],
     raw
+  };
+}
+
+function allVehicles(raw) {
+  const candidates = [
+    raw?.used_vehicles?.used_vehicle_list,
+    raw?.used_vehicle?.used_vehicles,
+    raw?.used_vehicle?.usedvehicles,
+    raw?.usedvehicles?.usedvehicles,
+    raw?.usedvehicles,
+    raw?.used_vehicles,
+    raw?.vehicle_list,
+    raw?.vehicles
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+    if (candidate && typeof candidate === "object") return [candidate];
+  }
+
+  return raw?.vehicle ? [raw.vehicle] : [];
+}
+
+function chooseVehicle(vehicles, input) {
+  if (!vehicles.length) return null;
+  const uvc = String(input.uvc || "").trim();
+  if (uvc) return vehicles.find((vehicle) => String(vehicle.uvc || "") === uvc) || vehicles[0];
+  return vehicles[0];
+}
+
+function vehicleChoice(vehicle) {
+  return {
+    uvc: vehicle.uvc || "",
+    title: vehicleTitle(vehicle),
+    year: vehicle.model_year || vehicle.year || "",
+    make: vehicle.make || "",
+    model: vehicle.model || "",
+    series: vehicle.series || "",
+    style: vehicle.style || "",
+    adjustedWholesaleAvg: findMarketNumber(vehicle, ["adjusted"], ["whole"], "avg"),
+    adjustedRetailAvg: findMarketNumber(vehicle, ["adjusted"], ["retail"], "avg")
   };
 }
 
@@ -204,6 +305,36 @@ function firstVehicle(raw) {
   }
 
   return raw?.vehicle || raw;
+}
+
+function normalizeAutocomplete(raw) {
+  const arrays = [];
+  collectArrays(raw, arrays);
+  const best = arrays.sort((a, b) => b.length - a.length)[0] || [];
+  return best
+    .filter((item) => item && typeof item === "object")
+    .slice(0, 20)
+    .map((item) => ({
+      uvc: item.uvc || item.UVC || item.value || "",
+      year: item.model_year || item.year || "",
+      make: item.make || "",
+      model: item.model || "",
+      series: item.series || item.trim || "",
+      style: item.style || "",
+      title: item.description || item.vehicle_description || item.text || vehicleTitle(item)
+    }))
+    .filter((item) => item.title && item.title !== "Vehicle ");
+}
+
+function collectArrays(value, arrays) {
+  if (Array.isArray(value)) {
+    arrays.push(value);
+    value.forEach((item) => collectArrays(item, arrays));
+    return;
+  }
+  if (value && typeof value === "object") {
+    Object.values(value).forEach((item) => collectArrays(item, arrays));
+  }
 }
 
 function extractValues(vehicle = {}) {
@@ -375,4 +506,18 @@ function mockBlackBookResponse(vin, kilometers, region, country) {
       ]
     }
   };
+}
+
+function mockAutocomplete(query) {
+  return [
+    {
+      uvc: "2017080342",
+      year: "2017",
+      make: "Honda",
+      model: "Odyssey",
+      series: "LX",
+      style: "4D Wagon",
+      title: "2017 Honda Odyssey LX 4D Wagon"
+    }
+  ].filter((item) => item.title.toLowerCase().includes(query.toLowerCase().split(/\s+/).at(-1) || ""));
 }
