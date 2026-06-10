@@ -248,22 +248,27 @@ function initializeDatalists() {
   setSelectOptions("model", Object.values(drilldownSuggestions).flatMap((item) => item.models), "Odyssey");
   setSelectOptions("series", ["LX", "EX", "EX-L", "SE", "Sport", "Touring", "Premium", "Ultra Premium"], "LX");
   setSelectOptions("style", commonStyles, "4D Wagon");
-  updateVehicleDropdowns();
+  updateVehicleDropdowns("init");
 }
 
-function updateVehicleDropdowns() {
+function updateVehicleDropdowns(changedField = "") {
   const make = drilldownForm.elements.make.value.trim();
-  const model = drilldownForm.elements.model.value.trim();
   const makeData = drilldownSuggestions[make];
+  const shouldResetModel = changedField === "make";
 
   if (makeData?.models?.length) {
-    setSelectOptions("model", makeData.models, drilldownForm.elements.model.value || makeData.models[0]);
+    const nextModel = shouldResetModel ? makeData.models[0] : drilldownForm.elements.model.value || makeData.models[0];
+    setSelectOptions("model", makeData.models, nextModel);
   }
 
+  const model = drilldownForm.elements.model.value.trim();
   const series = makeData?.series?.[model];
   const styles = makeData?.styles?.[model];
-  setSelectOptions("series", series?.length ? series : ["LX", "EX", "EX-L", "SE", "Sport", "Touring", "Premium", "Ultra Premium"], drilldownForm.elements.series.value || series?.[0]);
-  setSelectOptions("style", styles?.length ? styles : commonStyles, drilldownForm.elements.style.value || styles?.[0]);
+  const shouldResetDetails = changedField === "make" || changedField === "model";
+  const seriesOptions = series?.length ? series : ["Not sure", "LX", "EX", "EX-L", "SE", "Sport", "Touring", "Premium", "Ultra Premium"];
+  const styleOptions = styles?.length ? styles : ["Not sure", ...commonStyles];
+  setSelectOptions("series", seriesOptions, shouldResetDetails ? seriesOptions[0] : drilldownForm.elements.series.value || seriesOptions[0]);
+  setSelectOptions("style", styleOptions, shouldResetDetails ? styleOptions[0] : drilldownForm.elements.style.value || styleOptions[0]);
 }
 
 function setSelectOptions(field, values, selectedValue = "") {
@@ -310,7 +315,7 @@ function handleDrillSelect(select) {
     hidden.value = select.value;
   }
 
-  if (field === "make" || field === "model") updateVehicleDropdowns();
+  if (field === "make" || field === "model") updateVehicleDropdowns(field);
 }
 
 function renderTable() {
