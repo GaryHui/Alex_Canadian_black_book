@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Black Book Valuation Demo</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="search-panel">
+        <div>
+          <p class="eyebrow">Canadian Black Book Demo</p>
+          <h1>Vehicle valuation test</h1>
+        </div>
+        <form id="valuation-form" class="form-grid">
+          <label>
+            <span>VIN</span>
+            <input name="vin" value="1FTFW1EF3EFC53488" required />
+          </label>
+          <label>
+            <span>Kilometers</span>
+            <input name="kilometers" type="number" min="0" value="35000" required />
+          </label>
+          <label>
+            <span>Region</span>
+            <select name="region">
+              <option value="BC">British Columbia</option>
+              <option value="ON">Ontario</option>
+              <option value="AB">Alberta</option>
+              <option value="QC">Quebec</option>
+              <option value="MB">Manitoba</option>
+              <option value="SK">Saskatchewan</option>
+            </select>
+          </label>
+          <label>
+            <span>Country</span>
+            <select name="country">
+              <option value="C">Canada</option>
+              <option value="U">United States</option>
+            </select>
+          </label>
+          <button type="submit">Generate</button>
+        </form>
+        <p id="status" class="status">Ready.</p>
+      </section>
+
+      <section id="details" class="details" hidden>
+        <header class="topbar">
+          <button class="back" type="button" aria-label="Back">‹</button>
+          <span>DETAILS</span>
+        </header>
+
+        <div class="vehicle-head">
+          <h2 id="vehicle-title"></h2>
+          <div class="vin-block">
+            <span>VIN</span>
+            <strong id="vehicle-vin"></strong>
+          </div>
+          <div class="info-row">
+            <div class="info-box">
+              <span>KILOMETERS</span>
+              <strong id="vehicle-km"></strong>
+            </div>
+            <div class="info-box">
+              <span>REGION</span>
+              <strong id="vehicle-region"></strong>
+            </div>
+            <div class="info-box">
+              <span>OPTIONS</span>
+              <strong id="vehicle-options">0 selected</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="market-ribbon">
+          <span id="active-market-label">AVG WHOLESALE</span>
+        </div>
+
+        <div class="market-tabs" role="tablist" aria-label="Market type">
+          <button class="active" type="button" data-market="wholesale">Wholesale</button>
+          <button type="button" data-market="retail">Retail</button>
+          <button type="button" data-market="tradeIn">Trade-In</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="value-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>XCLN</th>
+                <th>CLN</th>
+                <th>AVG</th>
+                <th>RGH</th>
+              </tr>
+            </thead>
+            <tbody id="value-body"></tbody>
+          </table>
+        </div>
+
+        <div class="loan" id="loan-value"></div>
+        <button class="retail-market" type="button">Retail Market</button>
+
+        <details class="thresholds">
+          <summary>Threshold details</summary>
+          <pre id="threshold-json"></pre>
+        </details>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
