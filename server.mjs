@@ -462,14 +462,139 @@ async function saveLead(body) {
   };
 
   const saved = await saveLeadToSupabase(lead);
-  if (saved.ok) return saved;
+  const googleForm = await submitLeadToGoogleForm({
+    ...lead,
+    id: saved.lead?.id || ""
+  });
+
+  if (saved.ok) return { ...saved, googleForm };
+
+  if (googleForm.submitted) {
+    return {
+      ok: true,
+      captured: true,
+      storage: "google_form",
+      googleForm,
+      message: "Lead sent to Google Form. Set Supabase env vars to also keep user history."
+    };
+  }
 
   return {
     ok: true,
     captured: false,
     storage: "not_configured",
+    googleForm,
     message: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on Vercel to persist leads."
   };
+}
+
+async function submitLeadToGoogleForm(lead) {
+  const actionUrl = googleFormActionUrl();
+  const fieldMap = parseGoogleFormFieldMap();
+  const jsonEntry = process.env.GOOGLE_FORM_JSON_ENTRY || "";
+
+  if (!actionUrl) return { submitted: false, skipped: true, reason: "GOOGLE_FORM_ACTION_URL is not configured" };
+  if (!Object.keys(fieldMap).length && !jsonEntry) {
+    return { submitted: false, skipped: true, reason: "GOOGLE_FORM_FIELD_MAP or GOOGLE_FORM_JSON_ENTRY is not configured" };
+  }
+
+  const values = googleFormValues(lead);
+  const params = new URLSearchParams();
+
+  for (const [key, entryName] of Object.entries(fieldMap)) {
+    if (!entryName || values[key] === undefined || values[key] === null) continue;
+    params.append(entryName, String(values[key]));
+  }
+
+  if (jsonEntry) {
+    params.append(jsonEntry, JSON.stringify({
+      id: lead.id || "",
+      created_at: lead.created_at,
+      input: lead.input,
+      valuation: lead.valuation,
+      auth_user: lead.auth_user
+    }, null, 2));
+  }
+
+  if (![...params.keys()].length) {
+    return { submitted: false, skipped: true, reason: "No Google Form fields matched this lead" };
+  }
+
+  try {
+    const response = await fetch(actionUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+      },
+      body: params.toString()
+    });
+
+    return {
+      submitted: response.ok,
+      status: response.status,
+      error: response.ok ? "" : `Google Form rejected the submission (${response.status})`
+    };
+  } catch (error) {
+    return { submitted: false, error: error.message || "Google Form submission failed" };
+  }
+}
+
+function googleFormActionUrl() {
+  const explicit = String(process.env.GOOGLE_FORM_ACTION_URL || "").trim();
+  if (explicit) return explicit;
+
+  const formId = String(process.env.GOOGLE_FORM_ID || "").trim();
+  return formId ? `https://docs.google.com/forms/d/${formId}/formResponse` : "";
+}
+
+function parseGoogleFormFieldMap() {
+  const raw = String(process.env.GOOGLE_FORM_FIELD_MAP || "").trim();
+  if (!raw) return {};
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .map(([key, value]) => [key, String(value || "").trim()])
+        .filter(([, value]) => /^entry\.\d+$/.test(value))
+    );
+  } catch {
+    return {};
+  }
+}
+
+function googleFormValues(lead) {
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+
+  return {
+    email: input.email || lead.auth_email || lead.auth_user?.email || "",
+    phone: input.phone || "",
+    vin: valuation.vin || input.vin || "",
+    uvc: input.uvc || "",
+    year: input.year || "",
+    make: input.make || "",
+    model: input.model || "",
+    series: input.series || "",
+    style: input.style || "",
+    kilometers: input.kilometers || "",
+    color: input.color || "",
+    region: valuation.region || input.region || "",
+    country: valuation.country || input.country || "",
+    wholesaleAvg: marketAverage(valuation, "wholesale"),
+    retailAvg: marketAverage(valuation, "retail"),
+    tradeInAvg: marketAverage(valuation, "tradeIn"),
+    cbbJson: JSON.stringify({
+      input,
+      valuation
+    }, null, 2)
+  };
+}
+
+function marketAverage(valuation, market) {
+  const marketData = valuation?.values?.[market] || {};
+  const value = marketData.adjusted?.avg ?? marketData.base?.avg ?? "";
+  return value === null || value === undefined ? "" : value;
 }
 
 async function listLeads() {
