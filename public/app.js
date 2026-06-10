@@ -9,7 +9,6 @@ const modeButtons = document.querySelectorAll(".lookup-mode");
 const choiceList = document.querySelector("#choice-list");
 const authTitle = document.querySelector("#auth-title");
 const authSubtitle = document.querySelector("#auth-subtitle");
-const googleLogin = document.querySelector("#google-login");
 const logoutButton = document.querySelector("#logout");
 const drilldownSuggestions = {
   Honda: {
@@ -59,20 +58,10 @@ let authSession = null;
 initializeDatalists();
 initializeAuth();
 
-googleLogin.addEventListener("click", async () => {
-  if (!supabaseClient) {
-    statusEl.textContent = "Supabase is not configured yet.";
-    return;
-  }
-  await supabaseClient.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: window.location.origin }
-  });
-});
-
 logoutButton.addEventListener("click", async () => {
   if (supabaseClient) await supabaseClient.auth.signOut();
   setSession(null);
+  window.location.replace("/login.html");
 });
 
 modeButtons.forEach((button) => {
@@ -412,14 +401,19 @@ async function initializeAuth() {
   if (!config.supabaseUrl || !config.supabaseAnonKey || !window.supabase) {
     authTitle.textContent = "Demo mode";
     authSubtitle.textContent = "Supabase Google login is not configured yet.";
-    googleLogin.disabled = true;
     return;
   }
 
   supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
   const { data } = await supabaseClient.auth.getSession();
+  if (window.location.hash.includes("access_token")) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
   setSession(data.session);
-  supabaseClient.auth.onAuthStateChange((_event, session) => setSession(session));
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    setSession(session);
+    if (!session?.user) window.location.replace("/login.html");
+  });
 }
 
 function setSession(session) {
@@ -430,14 +424,15 @@ function setSession(session) {
     const email = session.user.email || "";
     authTitle.textContent = `Signed in as ${email}`;
     authSubtitle.textContent = "Your valuation request will be saved for follow-up.";
-    googleLogin.hidden = true;
     logoutButton.hidden = false;
     emailField.value = email;
   } else {
-    authTitle.textContent = "Sign in required";
-    authSubtitle.textContent = "Use Google to save valuation requests for follow-up.";
-    googleLogin.hidden = false;
-    googleLogin.disabled = !supabaseClient;
+    if (supabaseClient) {
+      window.location.replace("/login.html");
+      return;
+    }
+    authTitle.textContent = "Login not configured";
+    authSubtitle.textContent = "Add Supabase environment variables to enable Google login.";
     logoutButton.hidden = true;
     emailField.value = "";
   }

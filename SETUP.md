@@ -147,7 +147,28 @@ https://blackbook-demo.vercel.app
 http://localhost:3000
 ```
 
-Use localhost only for local testing.
+Use `http://localhost:3000` only for local testing, and only when the local server is running.
+
+If Google redirects to:
+
+```text
+http://localhost:3000/#access_token=...
+```
+
+but the browser shows `ERR_CONNECTION_REFUSED`, the local server is not running. Start it first:
+
+```powershell
+cd E:\2026\Alex\blackbook-demo
+node server.mjs
+```
+
+For production testing, open and sign in from:
+
+```text
+https://blackbook-demo.vercel.app/login.html
+```
+
+The app now uses a separate login page. Users who are not signed in are redirected to `/login.html` and cannot use valuation forms until Google login succeeds.
 
 ## 5. Vercel Environment Variables
 
