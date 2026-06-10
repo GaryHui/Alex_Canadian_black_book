@@ -54,12 +54,25 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && url.pathname === "/api/usage") {
-      return sendJson(res, 200, localUsage(url));
+      const result = await getUsage({
+        userId: url.searchParams.get("userId") || "",
+        email: url.searchParams.get("email") || "",
+        year: Number(url.searchParams.get("year") || new Date().getFullYear())
+      });
+      return sendJson(res, result.ok ? 200 : 500, result);
     }
 
     if (url.pathname === "/api/user-limits") {
-      if (req.method === "GET") return sendJson(res, 200, { ok: true, storage: "not_configured", users: [] });
-      if (req.method === "PATCH") return sendJson(res, 400, { ok: false, error: "Supabase is required to manage user limits" });
+      const admin = await requireAdmin(req);
+      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+      if (req.method === "GET") {
+        const result = await listUserLimits(Number(url.searchParams.get("year") || new Date().getFullYear()));
+        return sendJson(res, result.ok ? 200 : 500, result);
+      }
+      if (req.method === "PATCH") {
+        const result = await updateUserLimit(await readJson(req));
+        return sendJson(res, result.ok ? 200 : 400, result);
+      }
     }
 
     if (req.method === "POST" && url.pathname === "/api/valuation") {
@@ -75,8 +88,11 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/api/leads") {
       if (req.method === "PATCH") {
+        const admin = await requireAdmin(req);
+        if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
         const body = await readJson(req);
-        return sendJson(res, 200, await updateLead(body));
+        const result = await updateLead(body);
+        return sendJson(res, result.ok ? 200 : 400, result);
       }
       if (req.method === "POST") {
         const body = await readJson(req);
@@ -84,6 +100,8 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, result);
       }
       if (req.method === "GET") {
+        const admin = await requireAdmin(req);
+        if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
         return sendJson(res, 200, await listLeads());
       }
     }
@@ -133,20 +151,6 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-function localUsage(url) {
-  const year = Number(url.searchParams.get("year") || new Date().getFullYear());
-  const annualLimit = Number(process.env.ANNUAL_VALUATION_LIMIT || 3);
-  return {
-    ok: true,
-    storage: "local",
-    year,
-    used: 0,
-    annualLimit,
-    remaining: annualLimit,
-    contact: process.env.OWNER_CONTACT || "Please contact the website owner for more valuations."
-  };
-}
-
 function readJson(req) {
   return new Promise((resolve, reject) => {
     let raw = "";
@@ -165,6 +169,47 @@ function readJson(req) {
       }
     });
   });
+}
+
+async function requireAdmin(req) {
+  const adminEmails = String(process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (!adminEmails.length) {
+    return { ok: false, status: 403, error: "Admin access is not configured. Set ADMIN_EMAILS on Vercel." };
+  }
+
+  const token = bearerToken(req);
+  if (!token) return { ok: false, status: 401, error: "Admin sign-in required" };
+
+  const url = process.env.SUPABASE_URL;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return { ok: false, status: 500, error: "Supabase auth is not configured" };
+
+  const response = await fetch(`${url}/auth/v1/user`, {
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const user = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: 401, error: "Invalid or expired admin session" };
+
+  const email = String(user?.email || "").toLowerCase();
+  if (!adminEmails.includes(email)) {
+    return { ok: false, status: 403, error: `This Google account is not an admin: ${email || "unknown"}` };
+  }
+
+  return { ok: true, user: { id: user.id, email } };
+}
+
+function bearerToken(req) {
+  const header = req.headers.authorization || req.headers.Authorization || "";
+  const match = String(header).match(/^Bearer\s+(.+)$/i);
+  return match?.[1] || "";
 }
 
 async function fetchValuation(input) {
@@ -315,7 +360,6 @@ function buildDemoResponse(input, raw) {
 
 async function saveLead(body) {
   const lead = {
-    id: crypto.randomUUID(),
     created_at: new Date().toISOString(),
     input: sanitizeLeadInput(body.input || {}),
     auth_user: sanitizeAuthUser(body.user || {}),
@@ -328,46 +372,260 @@ async function saveLead(body) {
     owner_adjustment: {}
   };
 
-  const dataDir = path.join(__dirname, "data");
-  fs.mkdirSync(dataDir, { recursive: true });
-  fs.appendFileSync(path.join(dataDir, "leads.jsonl"), `${JSON.stringify(lead)}\n`);
-  return { ok: true, id: lead.id, storage: "local-jsonl" };
+  const saved = await saveLeadToSupabase(lead);
+  if (saved.ok) return saved;
+
+  return {
+    ok: true,
+    captured: false,
+    storage: "not_configured",
+    message: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on Vercel to persist leads."
+  };
 }
 
 async function listLeads() {
-  const filePath = path.join(__dirname, "data", "leads.jsonl");
-  if (!fs.existsSync(filePath)) return { ok: true, leads: [] };
-  const leads = fs.readFileSync(filePath, "utf8")
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => JSON.parse(line))
-    .reverse();
-  return { ok: true, leads };
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: true, storage: "not_configured", leads: [] };
+
+  const response = await fetch(`${url}/rest/v1/valuation_leads?select=*&order=created_at.desc&limit=100`, {
+    headers: supabaseServiceHeaders(key)
+  });
+
+  const leads = await response.json().catch(() => []);
+  if (!response.ok) return { ok: false, status: response.status, error: leads, leads: [] };
+  return { ok: true, storage: "supabase", leads };
 }
 
 async function updateLead(body) {
-  const filePath = path.join(__dirname, "data", "leads.jsonl");
-  if (!fs.existsSync(filePath)) return { ok: false, error: "No local leads file" };
-
   const id = String(body.id || "").trim();
-  const leads = fs.readFileSync(filePath, "utf8")
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
-  const lead = leads.find((item) => item.id === id);
-  if (!lead) return { ok: false, error: "Lead not found" };
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!id) return { ok: false, error: "Lead id is required" };
+  if (!url || !key) return { ok: false, error: "Supabase is not configured" };
 
-  lead.status = String(body.status || "reviewing").trim();
-  lead.notes = String(body.notes || "").trim();
-  lead.owner_adjustment = {
-    wholesale: numberOrNull(body.ownerWholesale),
-    retail: numberOrNull(body.ownerRetail),
-    reason: String(body.reason || "").trim(),
-    updated_at: new Date().toISOString()
+  const patch = {
+    status: String(body.status || "reviewing").trim(),
+    notes: String(body.notes || "").trim(),
+    owner_adjustment: {
+      wholesale: numberOrNull(body.ownerWholesale),
+      retail: numberOrNull(body.ownerRetail),
+      reason: String(body.reason || "").trim(),
+      updated_at: new Date().toISOString()
+    }
   };
 
-  fs.writeFileSync(filePath, leads.map((item) => JSON.stringify(item)).join("\n") + "\n");
-  return { ok: true, lead };
+  const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(patch)
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+  return { ok: true, lead: data?.[0] || null };
+}
+
+async function saveLeadToSupabase(lead) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: false };
+
+  const result = await insertLead({ url, key, lead });
+  if (result.ok) return result;
+
+  const legacyLead = { ...lead };
+  delete legacyLead.auth_user_id;
+  delete legacyLead.auth_email;
+  delete legacyLead.valuation_year;
+  const legacyResult = await insertLead({ url, key, lead: legacyLead });
+  if (legacyResult.ok) return { ...legacyResult, legacyColumns: true };
+
+  return result;
+}
+
+async function insertLead({ url, key, lead }) {
+  const response = await fetch(`${url}/rest/v1/valuation_leads`, {
+    method: "POST",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(lead)
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+  return { ok: true, captured: true, storage: "supabase", lead: data?.[0] || null };
+}
+
+const DEFAULT_ANNUAL_LIMIT = Number(process.env.ANNUAL_VALUATION_LIMIT || 3);
+
+async function getUsage({ userId, email, year }) {
+  const normalizedUserId = String(userId || "").trim();
+  const normalizedEmail = String(email || "").trim();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!normalizedUserId && !normalizedEmail) {
+    return { ok: false, error: "userId or email is required" };
+  }
+
+  if (!url || !key) {
+    return {
+      ok: true,
+      storage: "not_configured",
+      year,
+      used: 0,
+      annualLimit: DEFAULT_ANNUAL_LIMIT,
+      remaining: DEFAULT_ANNUAL_LIMIT,
+      contact: process.env.OWNER_CONTACT || "Please contact the website owner for more valuations."
+    };
+  }
+
+  const annualLimit = await getAnnualLimit({ url, key, userId: normalizedUserId, year });
+  const used = await getUsedCount({ url, key, userId: normalizedUserId, email: normalizedEmail, year });
+
+  if (annualLimit.error || used.error) return { ok: false, error: annualLimit.error || used.error };
+
+  return {
+    ok: true,
+    storage: "supabase",
+    year,
+    used: used.count,
+    annualLimit: annualLimit.limit,
+    remaining: Math.max(0, annualLimit.limit - used.count),
+    contact: process.env.OWNER_CONTACT || "Please contact the website owner for more valuations."
+  };
+}
+
+async function getAnnualLimit({ url, key, userId, year }) {
+  if (!userId) return { limit: DEFAULT_ANNUAL_LIMIT };
+
+  const response = await fetch(`${url}/rest/v1/valuation_user_limits?select=annual_limit&user_id=eq.${encodeURIComponent(userId)}&valuation_year=eq.${year}&limit=1`, {
+    headers: supabaseServiceHeaders(key)
+  });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) return { error: `Unable to load valuation limit (${response.status})` };
+
+  return { limit: Number(rows?.[0]?.annual_limit || DEFAULT_ANNUAL_LIMIT) };
+}
+
+async function getUsedCount({ url, key, userId, email, year }) {
+  const filter = userId
+    ? `auth_user_id=eq.${encodeURIComponent(userId)}`
+    : `auth_email=eq.${encodeURIComponent(email)}`;
+  const response = await fetch(`${url}/rest/v1/valuation_leads?select=id&${filter}&valuation_year=eq.${year}`, {
+    headers: supabaseServiceHeaders(key)
+  });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) return { error: `Unable to load valuation usage (${response.status})` };
+
+  return { count: Array.isArray(rows) ? rows.length : 0 };
+}
+
+async function listUserLimits(year) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: true, storage: "not_configured", users: [] };
+
+  const [leadsResult, limitsResult] = await Promise.all([
+    fetchSupabaseJson(`${url}/rest/v1/valuation_leads?select=auth_user_id,auth_email&valuation_year=eq.${year}`, key),
+    fetchSupabaseJson(`${url}/rest/v1/valuation_user_limits?select=*&valuation_year=eq.${year}`, key)
+  ]);
+
+  if (!leadsResult.ok) return leadsResult;
+  if (!limitsResult.ok) return limitsResult;
+
+  const limitsByUser = new Map((limitsResult.data || []).map((limit) => [limit.user_id, limit]));
+  const usersById = new Map();
+
+  for (const lead of leadsResult.data || []) {
+    const userId = lead.auth_user_id || lead.auth_email;
+    if (!userId) continue;
+    const current = usersById.get(userId) || { userId, email: lead.auth_email || "", used: 0 };
+    current.used += 1;
+    if (!current.email && lead.auth_email) current.email = lead.auth_email;
+    usersById.set(userId, current);
+  }
+
+  for (const limit of limitsResult.data || []) {
+    const userId = limit.user_id;
+    if (!userId) continue;
+    const current = usersById.get(userId) || { userId, email: limit.email || "", used: 0 };
+    current.email = current.email || limit.email || "";
+    usersById.set(userId, current);
+  }
+
+  const users = [...usersById.values()]
+    .map((user) => {
+      const limit = limitsByUser.get(user.userId);
+      const annualLimit = Number(limit?.annual_limit || DEFAULT_ANNUAL_LIMIT);
+      return {
+        ...user,
+        year,
+        annualLimit,
+        remaining: Math.max(0, annualLimit - user.used)
+      };
+    })
+    .sort((a, b) => (a.email || a.userId).localeCompare(b.email || b.userId));
+
+  return { ok: true, storage: "supabase", year, users };
+}
+
+async function updateUserLimit(body) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: false, error: "Supabase is not configured" };
+
+  const userId = String(body.userId || "").trim();
+  const email = String(body.email || "").trim();
+  const year = Number(body.year || new Date().getFullYear());
+  const annualLimit = Number(body.annualLimit);
+
+  if (!userId) return { ok: false, error: "User id is required" };
+  if (!Number.isInteger(annualLimit) || annualLimit < 0) {
+    return { ok: false, error: "Annual limit must be 0 or more" };
+  }
+
+  const response = await fetch(`${url}/rest/v1/valuation_user_limits?on_conflict=user_id,valuation_year`, {
+    method: "POST",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=representation"
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      email,
+      valuation_year: year,
+      annual_limit: annualLimit,
+      updated_at: new Date().toISOString()
+    })
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+  return { ok: true, limit: data?.[0] || null };
+}
+
+async function fetchSupabaseJson(url, key) {
+  const response = await fetch(url, { headers: supabaseServiceHeaders(key) });
+  const data = await response.json().catch(() => []);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+  return { ok: true, data };
+}
+
+function supabaseServiceHeaders(key) {
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`
+  };
 }
 
 function sanitizeLeadInput(input) {

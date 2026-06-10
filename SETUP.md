@@ -339,6 +339,8 @@ If the admin page does not show data, check:
 4. At least one valuation has been generated after Supabase storage was configured.
 ```
 
+Note: Vercel runs this demo through `server.mjs`. Admin storage, user limits, and protected admin APIs must therefore be available in `server.mjs`, not only in the `api/` folder.
+
 ## 7.1 Yearly Valuation Limits
 
 The app supports a yearly valuation allowance per signed-in Google user.
