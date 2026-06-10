@@ -335,7 +335,7 @@ async function fetchDrilldown(input) {
     return { ok: true, source: "mock", ...mockDrilldown(input) };
   }
 
-  const segments = ["Drilldown", "ALL", year, input.make, input.model, input.series, input.style]
+  const segments = ["Drilldown", "ALL", year, input.make]
     .map((value) => String(value || "").trim())
     .filter(Boolean)
     .map(encodeURIComponent);
@@ -804,11 +804,40 @@ function normalizeAutocomplete(raw) {
 }
 
 function normalizeDrilldown(raw, input = {}) {
-  const makes = collectNamedValues(raw, ["make", "name"], ["make_list", "makes"]);
-  const models = collectNamedValues(raw, ["model", "name"], ["model_list", "models"]);
-  const series = collectNamedValues(raw, ["series", "trim", "name"], ["series_list", "trim_list", "series"]);
-  const styles = collectNamedValues(raw, ["style", "body_style", "name"], ["style_list", "styles"]);
-  const vehicles = allVehicles(raw).map(vehicleChoice).filter((item) => item.title && item.title !== "Vehicle ");
+  const selectedMake = String(input.make || "").trim();
+  const selectedModel = cleanUnknown(input.model);
+  const selectedSeries = cleanUnknown(input.series);
+  const makeNodes = collectListItems(raw, "make_list");
+  const activeMakeNodes = selectedMake
+    ? makeNodes.filter((node) => sameName(node?.name, selectedMake))
+    : makeNodes;
+  const modelNodes = activeMakeNodes.flatMap((make) => arrayOf(make?.model_list));
+  const activeModelNodes = selectedModel
+    ? modelNodes.filter((node) => sameName(node?.name, selectedModel))
+    : [];
+  const seriesNodes = activeModelNodes.flatMap((model) => arrayOf(model?.series_list));
+  const activeSeriesNodes = selectedSeries
+    ? seriesNodes.filter((node) => sameName(node?.name, selectedSeries))
+    : seriesNodes;
+  const styleNodes = activeSeriesNodes.flatMap((seriesItem) => arrayOf(seriesItem?.style_list));
+
+  const makes = selectedMake
+    ? uniqueSorted(activeMakeNodes.map((item) => item?.name))
+    : uniqueSorted(makeNodes.map((item) => item?.name));
+  const models = uniqueSorted(modelNodes.map((item) => item?.name));
+  const series = selectedModel ? uniqueSorted(seriesNodes.map((item) => item?.name)) : [];
+  const styles = selectedModel ? uniqueSorted(styleNodes.map((item) => item?.name)) : [];
+  const vehicles = selectedModel
+    ? styleNodes.map((style) => ({
+      uvc: style.uvc || "",
+      title: [input.year, selectedMake, selectedModel, selectedSeries || "", style.name || ""].filter(Boolean).join(" "),
+      year: String(input.year || ""),
+      make: selectedMake,
+      model: selectedModel,
+      series: selectedSeries || "",
+      style: style.name || ""
+    }))
+    : allVehicles(raw).map(vehicleChoice).filter((item) => item.title && item.title !== "Vehicle ");
 
   return {
     year: String(input.year || ""),
@@ -818,6 +847,37 @@ function normalizeDrilldown(raw, input = {}) {
     styles,
     vehicles
   };
+}
+
+function collectListItems(value, listKey, output = []) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectListItems(item, listKey, output));
+    return output;
+  }
+  if (!value || typeof value !== "object") return output;
+
+  for (const [key, child] of Object.entries(value)) {
+    if (key.toLowerCase() === listKey) {
+      output.push(...arrayOf(child));
+    }
+    collectListItems(child, listKey, output);
+  }
+
+  return output;
+}
+
+function arrayOf(value) {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function sameName(a, b) {
+  return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+}
+
+function uniqueSorted(values) {
+  return [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
 }
 
 function collectNamedValues(raw, valueKeys, containerKeys) {
