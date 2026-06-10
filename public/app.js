@@ -112,19 +112,19 @@ freeForm.addEventListener("submit", async (event) => {
   const vin = String(searchText || "").trim().toUpperCase();
 
   if (/^[A-HJ-NPR-Z0-9]{10,17}$/.test(vin)) {
-    modalStatus.textContent = "Calling VIN lookup...";
+    modalStatus.textContent = "Searching vehicle matches...";
     setValuationFields({ vin, uvc: "", year: "", make: "", model: "", series: "", style: "" });
-    return runValuation({}, { choicesInModal: true });
+  } else {
+    modalStatus.textContent = "Searching vehicles...";
   }
 
-  modalStatus.textContent = "Searching vehicles...";
   choiceList.hidden = true;
   const data = await fetchVehicleChoices(searchText);
   if (!data.ok) {
     modalStatus.textContent = data.error || "Search failed.";
     return;
   }
-  renderChoices(data.items || [], { modal: true });
+  renderChoices(data.items || [], { modal: true, selectOnly: true });
 });
 
 drilldownForm.addEventListener("submit", async (event) => {
@@ -244,9 +244,9 @@ async function searchVehicleChoices(payload) {
       return;
     }
 
-    renderChoices(data.items || [], { modal: true });
+    renderChoices(data.items || [], { modal: true, selectOnly: true });
     statusEl.textContent = data.items?.length
-      ? "Choose the closest vehicle, then the valuation will be generated."
+      ? "Choose the closest vehicle, then click Generate to create the valuation."
       : "No matching vehicles found. Try another model, series, or style.";
   } catch (error) {
     statusEl.textContent = error.message || "Search failed.";
@@ -305,6 +305,7 @@ function renderResult(data) {
 
 function renderChoices(items, options = {}) {
   const useModal = options.modal !== false;
+  const selectOnly = Boolean(options.selectOnly);
   const target = useModal ? choiceList : inlineChoiceList;
   const other = useModal ? inlineChoiceList : choiceList;
 
@@ -357,6 +358,12 @@ function renderChoices(items, options = {}) {
         style: item.style || ""
       });
       target.hidden = true;
+      if (selectOnly) {
+        closeSearchModal();
+        detailsEl.hidden = true;
+        statusEl.textContent = "Vehicle selected. Click Generate to create the valuation.";
+        return;
+      }
       await runValuation({ vin: currentVin, uvc: item.uvc || "" });
     });
   });
