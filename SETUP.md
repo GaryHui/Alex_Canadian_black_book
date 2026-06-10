@@ -444,7 +444,136 @@ sent_to_crm
 closed
 ```
 
-## 11. Production Checklist
+## 11. Canadian Trade Value API
+
+Trade-In values are not returned by the standard Used Car Web API response currently used by the demo.
+Canadian Black Book documents a separate Trade Value API that should be used together with the standard Used Car Web API.
+
+Base URI:
+
+```text
+https://tradevalue.blackbookcloud.com/api
+```
+
+Main workflow:
+
+```text
+1. Identify the vehicle with the standard Used Car Web API.
+2. Get a UVC for the selected vehicle.
+3. Get add/deduct options from UsedVehicle/UVC.
+4. Call Trade Value Questions to build the condition questionnaire.
+5. Optionally call Analytics after each completed question.
+6. Post answers to Trade Value Valuation to receive the trade value.
+```
+
+### Questions
+
+Returns the question list for the UI.
+
+```text
+GET /CanTradeValue/Questions/{versionID}
+```
+
+Optional vehicle parameters can be added when the question set needs damage ranges:
+
+```text
+vin
+uvc
+mileage
+state
+adcodes
+```
+
+Example:
+
+```text
+https://tradevalue.blackbookcloud.com/api/CanTradeValue/Questions/2?vin=2C4RDGBG1CR385500&uvc=2012240363&mileage=100000&state=NB&adcodes=08,N5
+```
+
+The response contains questions, parent/child relationships, input types, and valid answers.
+
+### Analytics
+
+Called each time the user completes a question.
+
+```text
+GET /CanTradeValue/Analytics/{versionID}/{visitorID}/{uvc}/{questionID}?answer={answerText}
+```
+
+Example:
+
+```text
+https://tradevalue.blackbookcloud.com/api/CanTradeValue/Analytics/2/a1b239/2012020080/1001000?answer=Y
+```
+
+Expected response:
+
+```text
+OK
+```
+
+### Valuation
+
+Returns the final trade value.
+
+```text
+POST /CanTradeValue/Valuation/{versionID}/{visitorID}
+```
+
+Request body shape:
+
+```json
+{
+  "vin": "",
+  "uvc": "2010020057",
+  "mileage": 30000,
+  "state": "NB",
+  "basevalue": 25000,
+  "adcodes": ["CH", "09"],
+  "answers": [
+    { "questionID": 1001000, "answerText": "1" },
+    { "questionID": 4001000, "answerText": "N" }
+  ]
+}
+```
+
+Response shape:
+
+```json
+{
+  "ResponseCode": 0,
+  "ResponseMessage": "Success",
+  "Valued": true,
+  "Value": 0
+}
+```
+
+### Current Test Result
+
+The current Used Car API credentials work for:
+
+```text
+https://service.canadianblackbook.com/UsedCarWS/CanUsedAPI
+```
+
+But the same credentials returned `401 Unauthorized` for:
+
+```text
+GET  https://tradevalue.blackbookcloud.com/api/CanTradeValue/Questions/2
+POST https://tradevalue.blackbookcloud.com/api/CanTradeValue/Valuation/2/a1b239
+```
+
+Ask Canadian Black Book to confirm:
+
+```text
+1. Enable Canadian Trade Value API for the API user.
+2. Confirm the versionID to use.
+3. Confirm authentication method: Basic Auth, query string credentials, IP allowlist, domain auth, or token auth.
+4. Provide the question/answer spreadsheet.
+5. Confirm whether Analytics is mandatory before Valuation.
+```
+
+## 12. Production Checklist
 
 Before public launch:
 
@@ -456,6 +585,6 @@ Add API logs.
 Add reCAPTCHA or Cloudflare Turnstile.
 Add privacy policy and terms.
 Confirm Black Book production API permissions.
-Confirm whether trade-in values require another endpoint/template/account permission.
+Confirm Canadian Trade Value API access and versionID.
 Enable Supabase backups.
 ```
