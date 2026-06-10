@@ -3,6 +3,7 @@ export default async function handler(req, res) {
     const lead = {
       created_at: new Date().toISOString(),
       input: sanitizeLeadInput(req.body?.input || {}),
+      auth_user: sanitizeAuthUser(req.body?.user || {}),
       valuation: sanitizeValuation(req.body?.valuation || {}),
       status: "new",
       notes: ""
@@ -80,6 +81,14 @@ function sanitizeLeadInput(input) {
     color: String(input.color || "").trim(),
     region: String(input.region || "").trim(),
     country: String(input.country || "").trim()
+  };
+}
+
+function sanitizeAuthUser(user) {
+  return {
+    id: String(user.id || "").trim(),
+    email: String(user.email || "").trim(),
+    name: String(user.name || "").trim()
   };
 }
 

@@ -7,6 +7,10 @@ const valueBody = document.querySelector("#value-body");
 const tabs = document.querySelectorAll(".market-tabs button");
 const modeButtons = document.querySelectorAll(".lookup-mode");
 const choiceList = document.querySelector("#choice-list");
+const authTitle = document.querySelector("#auth-title");
+const authSubtitle = document.querySelector("#auth-subtitle");
+const googleLogin = document.querySelector("#google-login");
+const logoutButton = document.querySelector("#logout");
 const drilldownSuggestions = {
   Honda: {
     models: ["Accord", "Civic", "CR-V", "HR-V", "Odyssey", "Pilot", "Ridgeline"],
@@ -49,8 +53,27 @@ const unknownOption = "Not sure";
 
 let currentResult = null;
 let currentMarket = "wholesale";
+let supabaseClient = null;
+let authSession = null;
 
 initializeDatalists();
+initializeAuth();
+
+googleLogin.addEventListener("click", async () => {
+  if (!supabaseClient) {
+    statusEl.textContent = "Supabase is not configured yet.";
+    return;
+  }
+  await supabaseClient.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: window.location.origin }
+  });
+});
+
+logoutButton.addEventListener("click", async () => {
+  if (supabaseClient) await supabaseClient.auth.signOut();
+  setSession(null);
+});
 
 modeButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -63,6 +86,7 @@ modeButtons.forEach((button) => {
 
 freeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!requireLogin()) return;
   const searchText = new FormData(freeForm).get("searchText");
   const vin = String(searchText || "").trim().toUpperCase();
 
@@ -84,6 +108,7 @@ freeForm.addEventListener("submit", async (event) => {
 
 drilldownForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!requireLogin()) return;
   const payload = Object.fromEntries(new FormData(drilldownForm).entries());
   setValuationFields({ vin: "", uvc: "", ...payload });
   await runValuation();
@@ -106,10 +131,16 @@ form.addEventListener("submit", async (event) => {
 });
 
 async function runValuation(extra = {}) {
+  if (!requireLogin()) return;
   statusEl.textContent = "Calling valuation API...";
 
   const formData = new FormData(form);
-  const payload = { ...Object.fromEntries(formData.entries()), ...extra };
+  const payload = {
+    ...Object.fromEntries(formData.entries()),
+    ...extra,
+    authUserId: authSession?.user?.id || "",
+    authEmail: authSession?.user?.email || ""
+  };
 
   try {
     const response = await fetch("/api/valuation", {
@@ -361,11 +392,65 @@ async function captureLead(input, valuation) {
     await fetch("/api/leads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input, valuation })
+      body: JSON.stringify({
+        input,
+        valuation,
+        user: {
+          id: authSession?.user?.id || "",
+          email: authSession?.user?.email || "",
+          name: authSession?.user?.user_metadata?.full_name || authSession?.user?.user_metadata?.name || ""
+        }
+      })
     });
   } catch (error) {
     console.warn("Lead capture failed", error);
   }
+}
+
+async function initializeAuth() {
+  const config = await fetch("/api/config").then((res) => res.json()).catch(() => ({}));
+  if (!config.supabaseUrl || !config.supabaseAnonKey || !window.supabase) {
+    authTitle.textContent = "Demo mode";
+    authSubtitle.textContent = "Supabase Google login is not configured yet.";
+    googleLogin.disabled = true;
+    return;
+  }
+
+  supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+  const { data } = await supabaseClient.auth.getSession();
+  setSession(data.session);
+  supabaseClient.auth.onAuthStateChange((_event, session) => setSession(session));
+}
+
+function setSession(session) {
+  authSession = session;
+  const emailField = form.elements.email;
+
+  if (session?.user) {
+    const email = session.user.email || "";
+    authTitle.textContent = `Signed in as ${email}`;
+    authSubtitle.textContent = "Your valuation request will be saved for follow-up.";
+    googleLogin.hidden = true;
+    logoutButton.hidden = false;
+    emailField.value = email;
+  } else {
+    authTitle.textContent = "Sign in required";
+    authSubtitle.textContent = "Use Google to save valuation requests for follow-up.";
+    googleLogin.hidden = false;
+    googleLogin.disabled = !supabaseClient;
+    logoutButton.hidden = true;
+    emailField.value = "";
+  }
+}
+
+function requireLogin() {
+  if (authSession?.user) return true;
+  if (!supabaseClient) {
+    statusEl.textContent = "Supabase Google login is not configured yet. Add Supabase env vars to enable this flow.";
+  } else {
+    statusEl.textContent = "Please sign in with Google first.";
+  }
+  return false;
 }
 
 function escapeHtml(value) {

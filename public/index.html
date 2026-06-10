@@ -14,6 +14,15 @@
           <h1>Black Book vehicle lookup</h1>
         </div>
 
+        <section class="auth-panel">
+          <div>
+            <strong id="auth-title">Sign in required</strong>
+            <span id="auth-subtitle">Use Google to save valuation requests for follow-up.</span>
+          </div>
+          <button id="google-login" type="button">Continue with Google</button>
+          <button id="logout" type="button" hidden>Sign out</button>
+        </section>
+
         <div class="lookup-layout">
           <div class="lookup-menu" aria-label="Lookup modes">
             <button class="lookup-mode active" type="button" data-mode="free">
@@ -72,7 +81,7 @@
             <form id="valuation-form" class="form-grid">
               <label>
                 <span>Email</span>
-                <input name="email" type="email" placeholder="customer@example.com" required />
+                <input name="email" type="email" placeholder="customer@example.com" required readonly />
               </label>
               <label>
                 <span>Phone</span>
@@ -194,6 +203,7 @@
       </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/app.js"></script>
   </body>
 </html>

@@ -36,6 +36,21 @@ const server = http.createServer(async (req, res) => {
       return sendFile(res, path.join(__dirname, "public", "app.js"), "application/javascript; charset=utf-8");
     }
 
+    if (req.method === "GET" && url.pathname === "/admin.js") {
+      return sendFile(res, path.join(__dirname, "public", "admin.js"), "application/javascript; charset=utf-8");
+    }
+
+    if (req.method === "GET" && url.pathname === "/admin.html") {
+      return sendFile(res, path.join(__dirname, "public", "admin.html"), "text/html; charset=utf-8");
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/config") {
+      return sendJson(res, 200, {
+        supabaseUrl: process.env.SUPABASE_URL || "",
+        supabaseAnonKey: process.env.SUPABASE_ANON_KEY || ""
+      });
+    }
+
     if (req.method === "POST" && url.pathname === "/api/valuation") {
       const body = await readJson(req);
       const result = await fetchValuation(body);
@@ -263,6 +278,7 @@ async function saveLead(body) {
     id: crypto.randomUUID(),
     created_at: new Date().toISOString(),
     input: sanitizeLeadInput(body.input || {}),
+    auth_user: sanitizeAuthUser(body.user || {}),
     valuation: sanitizeValuation(body.valuation || {}),
     status: "new",
     notes: ""
@@ -300,6 +316,14 @@ function sanitizeLeadInput(input) {
     color: String(input.color || "").trim(),
     region: String(input.region || "").trim(),
     country: String(input.country || "").trim()
+  };
+}
+
+function sanitizeAuthUser(user) {
+  return {
+    id: String(user.id || "").trim(),
+    email: String(user.email || "").trim(),
+    name: String(user.name || "").trim()
   };
 }
 

@@ -23,6 +23,7 @@ async function loadLeads() {
 
 function renderLead(lead) {
   const input = lead.input || {};
+  const authUser = lead.auth_user || {};
   const valuation = lead.valuation || {};
   const wholesale = valuation.values?.wholesale?.adjusted?.avg;
   const retail = valuation.values?.retail?.adjusted?.avg;
@@ -34,6 +35,7 @@ function renderLead(lead) {
       </header>
       <div class="lead-grid">
         <span>Email</span><b>${escapeHtml(input.email || "-")}</b>
+        <span>Google user</span><b>${escapeHtml(authUser.email || "-")}</b>
         <span>Phone</span><b>${escapeHtml(input.phone || "-")}</b>
         <span>VIN</span><b>${escapeHtml(input.vin || valuation.vin || "-")}</b>
         <span>UVC</span><b>${escapeHtml(input.uvc || "-")}</b>
