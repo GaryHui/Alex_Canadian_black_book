@@ -71,6 +71,7 @@ h1 {
   border: 1px solid #ddd;
   border-radius: 4px;
   display: flex;
+  gap: 16px;
   justify-content: space-between;
   margin: 0 0 18px;
   padding: 14px;
@@ -101,6 +102,27 @@ h1 {
 .auth-panel button[disabled] {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.quota-panel {
+  border-left: 1px solid #ddd;
+  margin-left: auto;
+  min-width: 190px;
+  padding-left: 16px;
+}
+
+.quota-panel span,
+.quota-panel small {
+  color: #666;
+  display: block;
+  font-size: 12px;
+}
+
+.quota-panel strong {
+  color: var(--red);
+  display: block;
+  font-size: 20px;
+  margin: 2px 0;
 }
 
 .login-shell {
@@ -650,6 +672,67 @@ select {
   padding-bottom: 12px;
 }
 
+.admin-section {
+  border-bottom: 1px solid #eee;
+  margin-bottom: 22px;
+  padding-bottom: 22px;
+}
+
+.admin-section-head {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.admin-section-head h2 {
+  margin: 0 0 4px;
+}
+
+.admin-section-head p {
+  color: #666;
+  margin: 0;
+}
+
+.admin-section-head button,
+.user-limit-card button {
+  background: var(--red);
+  border: 1px solid var(--red);
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+.admin-users {
+  display: grid;
+  gap: 10px;
+}
+
+.user-limit-card {
+  align-items: end;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(240px, 1fr) 110px 110px 150px auto;
+  padding: 14px;
+}
+
+.user-limit-card strong,
+.user-limit-card span,
+.user-limit-card b {
+  display: block;
+}
+
+.user-limit-card span {
+  color: #777;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .admin-leads {
   display: grid;
   gap: 14px;
@@ -739,6 +822,18 @@ select {
     font-size: 22px;
   }
 
+  .auth-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .quota-panel {
+    border-left: 0;
+    border-top: 1px solid #ddd;
+    margin-left: 0;
+    padding: 12px 0 0;
+  }
+
   .search-modal {
     align-items: stretch;
     padding: 28px 12px;
@@ -747,5 +842,15 @@ select {
   .search-dialog {
     min-height: min(680px, calc(100vh - 56px));
     width: 100%;
+  }
+
+  .admin-section-head,
+  .user-limit-card {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-section-head {
+    flex-direction: column;
   }
 }

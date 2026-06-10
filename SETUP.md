@@ -318,6 +318,84 @@ This supports cases where the owner believes the CBB value is too low or too hig
 
 Important: the current admin page is not yet protected by admin-only login. Before production, restrict it to admin users only.
 
+## 7.1 Yearly Valuation Limits
+
+The app supports a yearly valuation allowance per signed-in Google user.
+
+Default behavior:
+
+```text
+Each logged-in user gets 3 successful valuations per year.
+```
+
+The default can be changed with this Vercel environment variable:
+
+```text
+ANNUAL_VALUATION_LIMIT=3
+```
+
+When a user signs in, the front end calls:
+
+```text
+GET /api/usage?userId=<supabase_user_id>&email=<email>
+```
+
+The main page displays:
+
+```text
+Annual valuations
+2 left
+1 used of 3 in 2026
+```
+
+If `remaining` is `0`, the app blocks valuation generation and shows a contact message.
+
+The contact text can be customized with:
+
+```text
+OWNER_CONTACT=Please call 604-000-0000 or email sales@example.com for more valuations.
+```
+
+### How The Owner Changes A User's Allowance
+
+Open:
+
+```text
+https://blackbook-demo.vercel.app/admin.html
+```
+
+The `User valuation limits` section shows:
+
+```text
+user email
+used count this year
+remaining count
+annual limit
+```
+
+The owner can change `Annual limit` and click `Save limit`.
+
+Example:
+
+```text
+User used 3 of 3.
+Owner changes Annual limit to 5.
+User now has 2 valuations left this year.
+```
+
+This uses:
+
+```text
+GET   /api/user-limits
+PATCH /api/user-limits
+```
+
+Data is stored in:
+
+```text
+valuation_user_limits
+```
+
 ## 8. How the Website Owner Gets User Data
 
 When a signed-in user completes a valuation, the app saves one row in Supabase:
@@ -348,6 +426,9 @@ valuation.thresholds     kilometer thresholds
 status                   lead status
 notes                    admin notes
 owner_adjustment         owner's second/manual valuation
+auth_user_id             Supabase Auth user ID for usage limits
+auth_email               user email for owner/admin lookup
+valuation_year           year used for annual count
 ```
 
 The owner can view these records in:

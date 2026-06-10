@@ -10,6 +10,9 @@ export default async function handler(req, res) {
       input: sanitizeLeadInput(req.body?.input || {}),
       auth_user: sanitizeAuthUser(req.body?.user || {}),
       valuation: sanitizeValuation(req.body?.valuation || {}),
+      auth_user_id: String(req.body?.user?.id || "").trim(),
+      auth_email: String(req.body?.user?.email || req.body?.input?.email || "").trim(),
+      valuation_year: new Date().getFullYear(),
       status: "new",
       notes: "",
       owner_adjustment: {}
@@ -39,6 +42,20 @@ async function saveToSupabase(lead) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return { ok: false };
 
+  const result = await insertLead({ url, key, lead });
+  if (result.ok) return result;
+
+  const legacyLead = { ...lead };
+  delete legacyLead.auth_user_id;
+  delete legacyLead.auth_email;
+  delete legacyLead.valuation_year;
+  const legacyResult = await insertLead({ url, key, lead: legacyLead });
+  if (legacyResult.ok) return { ...legacyResult, legacyColumns: true };
+
+  return result;
+}
+
+async function insertLead({ url, key, lead }) {
   const response = await fetch(`${url}/rest/v1/valuation_leads`, {
     method: "POST",
     headers: {

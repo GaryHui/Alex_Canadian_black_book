@@ -53,6 +53,15 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    if (req.method === "GET" && url.pathname === "/api/usage") {
+      return sendJson(res, 200, localUsage(url));
+    }
+
+    if (url.pathname === "/api/user-limits") {
+      if (req.method === "GET") return sendJson(res, 200, { ok: true, storage: "not_configured", users: [] });
+      if (req.method === "PATCH") return sendJson(res, 400, { ok: false, error: "Supabase is required to manage user limits" });
+    }
+
     if (req.method === "POST" && url.pathname === "/api/valuation") {
       const body = await readJson(req);
       const result = await fetchValuation(body);
@@ -122,6 +131,20 @@ function sendFile(res, filePath, contentType) {
 function sendJson(res, status, payload) {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
+}
+
+function localUsage(url) {
+  const year = Number(url.searchParams.get("year") || new Date().getFullYear());
+  const annualLimit = Number(process.env.ANNUAL_VALUATION_LIMIT || 3);
+  return {
+    ok: true,
+    storage: "local",
+    year,
+    used: 0,
+    annualLimit,
+    remaining: annualLimit,
+    contact: process.env.OWNER_CONTACT || "Please contact the website owner for more valuations."
+  };
 }
 
 function readJson(req) {
@@ -297,6 +320,9 @@ async function saveLead(body) {
     input: sanitizeLeadInput(body.input || {}),
     auth_user: sanitizeAuthUser(body.user || {}),
     valuation: sanitizeValuation(body.valuation || {}),
+    auth_user_id: String(body.user?.id || "").trim(),
+    auth_email: String(body.user?.email || body.input?.email || "").trim(),
+    valuation_year: new Date().getFullYear(),
     status: "new",
     notes: "",
     owner_adjustment: {}

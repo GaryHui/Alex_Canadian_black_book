@@ -15,6 +15,9 @@ const searchClose = document.querySelector("#search-close");
 const searchBackdrop = document.querySelector("#search-backdrop");
 const searchClear = document.querySelector("#search-clear");
 const modalStatus = document.querySelector("#modal-status");
+const quotaPanel = document.querySelector("#quota-panel");
+const quotaTitle = document.querySelector("#quota-title");
+const quotaSubtitle = document.querySelector("#quota-subtitle");
 const drilldownSuggestions = {
   Honda: {
     models: ["Accord", "Civic", "CR-V", "HR-V", "Odyssey", "Pilot", "Ridgeline"],
@@ -59,6 +62,7 @@ let currentResult = null;
 let currentMarket = "wholesale";
 let supabaseClient = null;
 let authSession = null;
+let usageState = null;
 
 initializeDatalists();
 initializeAuth();
@@ -139,6 +143,8 @@ form.addEventListener("submit", async (event) => {
 
 async function runValuation(extra = {}) {
   if (!requireLogin()) return;
+  if (!usageState) await loadUsage();
+  if (!canUseValuation()) return;
   statusEl.textContent = "Calling valuation API...";
 
   const formData = new FormData(form);
@@ -178,6 +184,7 @@ async function runValuation(extra = {}) {
     renderResult(data);
     closeSearchModal();
     await captureLead(payload, data);
+    await loadUsage();
     statusEl.textContent = data.source === "mock"
       ? "Rendered with mock data and lead captured locally if available."
       : "Rendered from Black Book API and lead captured.";
@@ -535,6 +542,7 @@ function setSession(session) {
     authSubtitle.textContent = "Your valuation request will be saved for follow-up.";
     logoutButton.hidden = false;
     emailField.value = email;
+    loadUsage();
   } else {
     if (supabaseClient) {
       window.location.replace("/login.html");
@@ -543,6 +551,7 @@ function setSession(session) {
     authTitle.textContent = "Login not configured";
     authSubtitle.textContent = "Add Supabase environment variables to enable Google login.";
     logoutButton.hidden = true;
+    quotaPanel.hidden = true;
     emailField.value = "";
   }
 }
@@ -554,6 +563,39 @@ function requireLogin() {
   } else {
     statusEl.textContent = "Please sign in with Google first.";
   }
+  return false;
+}
+
+async function loadUsage() {
+  if (!authSession?.user) return;
+
+  const userId = encodeURIComponent(authSession.user.id || "");
+  const email = encodeURIComponent(authSession.user.email || "");
+  quotaPanel.hidden = false;
+  quotaTitle.textContent = "Checking...";
+  quotaSubtitle.textContent = "";
+
+  try {
+    const response = await fetch(`/api/usage?userId=${userId}&email=${email}`);
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to load usage");
+
+    usageState = data;
+    quotaTitle.textContent = `${data.remaining} left`;
+    quotaSubtitle.textContent = `${data.used} used of ${data.annualLimit} in ${data.year}`;
+  } catch (error) {
+    usageState = null;
+    quotaTitle.textContent = "Unavailable";
+    quotaSubtitle.textContent = error.message || "Unable to load usage";
+  }
+  return usageState;
+}
+
+function canUseValuation() {
+  if (!usageState || usageState.remaining > 0) return true;
+  const message = `${usageState.year} valuation limit reached. ${usageState.contact || "Please contact the website owner for more valuations."}`;
+  statusEl.textContent = message;
+  modalStatus.textContent = message;
   return false;
 }
 

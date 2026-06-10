@@ -15,8 +15,27 @@
         </div>
         <a href="/">Back to demo</a>
       </header>
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <h2>User valuation limits</h2>
+            <p>View yearly usage and adjust how many successful valuations each user can run.</p>
+          </div>
+          <button id="reload-users" type="button">Reload users</button>
+        </div>
+        <p id="users-status" class="status">Loading users...</p>
+        <div id="admin-users" class="admin-users"></div>
+      </section>
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <h2>Captured leads</h2>
+            <p>Review submitted vehicle details and add owner second valuations.</p>
+          </div>
+        </div>
       <p id="admin-status" class="status">Loading...</p>
       <div id="admin-leads" class="admin-leads"></div>
+      </section>
     </main>
     <script src="/admin.js"></script>
   </body>
