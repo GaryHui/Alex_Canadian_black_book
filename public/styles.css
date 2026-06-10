@@ -19,6 +19,10 @@ body {
   letter-spacing: 0;
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
 button,
 input,
 select {
@@ -173,6 +177,118 @@ h1 {
   gap: 14px;
 }
 
+.search-modal[hidden] {
+  display: none;
+}
+
+.search-modal {
+  align-items: start;
+  display: grid;
+  inset: 0;
+  justify-items: center;
+  padding: 148px 20px 40px;
+  position: fixed;
+  z-index: 50;
+}
+
+.search-backdrop {
+  background: rgba(0, 0, 0, 0.42);
+  border: 0;
+  cursor: default;
+  inset: 0;
+  padding: 0;
+  position: fixed;
+}
+
+.search-dialog {
+  background: #fff;
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.34);
+  min-height: 600px;
+  position: relative;
+  width: min(600px, calc(100vw - 32px));
+  z-index: 1;
+}
+
+.search-dialog-head {
+  align-items: center;
+  border-bottom: 1px solid #d7d7d7;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12);
+  display: grid;
+  grid-template-columns: 56px 1fr 56px;
+  height: 56px;
+  text-align: center;
+}
+
+.search-dialog-head h2 {
+  color: #555;
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.dialog-back {
+  background: transparent;
+  border: 0;
+  color: #444;
+  cursor: pointer;
+  font-size: 34px;
+  height: 56px;
+  line-height: 1;
+}
+
+.modal-search-form {
+  padding: 20px 16px 0;
+}
+
+.modal-search-form label span {
+  color: #000;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.search-input-wrap {
+  align-items: center;
+  border: 1px solid #d3d3d3;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.14);
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  height: 44px;
+}
+
+.search-icon {
+  color: #555;
+  font-size: 28px;
+  line-height: 1;
+  text-align: center;
+}
+
+.search-input-wrap input {
+  border: 0;
+  border-radius: 0;
+  height: 42px;
+  padding: 0 8px;
+}
+
+.search-input-wrap input:focus {
+  outline: 0;
+}
+
+.search-clear {
+  background: transparent;
+  border: 0;
+  color: #222;
+  cursor: pointer;
+  font-size: 28px;
+  height: 42px;
+}
+
+.modal-status {
+  color: #777;
+  font-size: 13px;
+  margin: 12px 16px 0;
+}
+
 .lookup-form {
   display: grid;
   gap: 12px;
@@ -242,6 +358,38 @@ select {
   border-top: 4px solid #222;
   margin-top: 20px;
   padding: 18px 0 0;
+}
+
+.modal-choice-list {
+  border-top: 0;
+  margin: 18px 16px 0;
+  max-height: 410px;
+  overflow: auto;
+  padding: 0 0 18px;
+}
+
+.modal-choice-list .choice-grid {
+  gap: 0;
+}
+
+.modal-choice-list .choice-card {
+  border: 0;
+  border-radius: 0;
+  padding: 13px 0;
+}
+
+.modal-choice-list .choice-card:hover {
+  background: #f7f7f7;
+}
+
+.modal-choice-list .choice-card strong {
+  color: #111;
+  font-size: 17px;
+  font-weight: 400;
+}
+
+.modal-choice-list .choice-card span {
+  display: none;
 }
 
 .choice-list h2 {
@@ -589,5 +737,15 @@ select {
 
   .vehicle-head h2 {
     font-size: 22px;
+  }
+
+  .search-modal {
+    align-items: stretch;
+    padding: 28px 12px;
+  }
+
+  .search-dialog {
+    min-height: min(680px, calc(100vh - 56px));
+    width: 100%;
   }
 }

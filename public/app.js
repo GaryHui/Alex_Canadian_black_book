@@ -10,6 +10,11 @@ const choiceList = document.querySelector("#choice-list");
 const authTitle = document.querySelector("#auth-title");
 const authSubtitle = document.querySelector("#auth-subtitle");
 const logoutButton = document.querySelector("#logout");
+const searchModal = document.querySelector("#search-modal");
+const searchClose = document.querySelector("#search-close");
+const searchBackdrop = document.querySelector("#search-backdrop");
+const searchClear = document.querySelector("#search-clear");
+const modalStatus = document.querySelector("#modal-status");
 const drilldownSuggestions = {
   Honda: {
     models: ["Accord", "Civic", "CR-V", "HR-V", "Odyssey", "Pilot", "Ridgeline"],
@@ -68,9 +73,22 @@ modeButtons.forEach((button) => {
   button.addEventListener("click", () => {
     modeButtons.forEach((item) => item.classList.toggle("active", item === button));
     const mode = button.dataset.mode;
-    freeForm.hidden = mode !== "free";
+    if (mode === "free") openSearchModal();
     drilldownForm.hidden = mode !== "drilldown";
   });
+});
+
+searchClose.addEventListener("click", closeSearchModal);
+searchBackdrop.addEventListener("click", closeSearchModal);
+searchClear.addEventListener("click", () => {
+  freeForm.elements.searchText.value = "";
+  choiceList.hidden = true;
+  modalStatus.textContent = "Type a VIN or vehicle description, then press Enter.";
+  freeForm.elements.searchText.focus();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !searchModal.hidden) closeSearchModal();
 });
 
 freeForm.addEventListener("submit", async (event) => {
@@ -80,15 +98,16 @@ freeForm.addEventListener("submit", async (event) => {
   const vin = String(searchText || "").trim().toUpperCase();
 
   if (/^[A-HJ-NPR-Z0-9]{10,17}$/.test(vin)) {
+    modalStatus.textContent = "Calling VIN lookup...";
     setValuationFields({ vin, uvc: "", year: "", make: "", model: "", series: "", style: "" });
     return runValuation();
   }
 
-  statusEl.textContent = "Searching vehicles...";
+  modalStatus.textContent = "Searching vehicles...";
   choiceList.hidden = true;
   const data = await fetchVehicleChoices(searchText);
   if (!data.ok) {
-    statusEl.textContent = data.error || "Search failed.";
+    modalStatus.textContent = data.error || "Search failed.";
     return;
   }
   renderChoices(data.items || []);
@@ -144,9 +163,12 @@ async function runValuation(extra = {}) {
     }
 
     if (data.choices?.length > 1 && !payload.uvc) {
-      statusEl.textContent = payload.vin
+      const message = payload.vin
         ? "This VIN can match more than one trim. Choose the closest vehicle."
         : "Multiple matches found. Choose the correct trim.";
+      statusEl.textContent = message;
+      modalStatus.textContent = message;
+      openSearchModal(false);
       renderChoices(data.choices);
       return;
     }
@@ -154,6 +176,7 @@ async function runValuation(extra = {}) {
     currentResult = data;
     currentMarket = firstAvailableMarket(data) || "wholesale";
     renderResult(data);
+    closeSearchModal();
     await captureLead(payload, data);
     statusEl.textContent = data.source === "mock"
       ? "Rendered with mock data and lead captured locally if available."
@@ -241,6 +264,7 @@ function renderResult(data) {
 }
 
 function renderChoices(items) {
+  openSearchModal(false);
   detailsEl.hidden = true;
   if (!items.length) {
     choiceList.hidden = false;
@@ -249,14 +273,14 @@ function renderChoices(items) {
       <p class="hint">Try a more specific description like "2024 Lexus NX350", or enter a full VIN and click Generate.</p>
     `;
     statusEl.textContent = "No matches.";
+    modalStatus.textContent = "No matches found.";
     return;
   }
 
   choiceList.hidden = false;
+  modalStatus.textContent = "";
   const currentVin = form.elements.vin.value || "";
   choiceList.innerHTML = `
-    <h2>Choose a vehicle</h2>
-    <p class="hint">Some VINs identify the model but not the exact trim. Pick the closest match so the estimate uses the right UVC.</p>
     <div class="choice-grid">
       ${items.map((item, index) => `
         <button type="button" class="choice-card" data-index="${index}">
@@ -286,6 +310,17 @@ function renderChoices(items) {
       await runValuation({ vin: currentVin, uvc: item.uvc || "" });
     });
   });
+}
+
+function openSearchModal(focusInput = true) {
+  searchModal.hidden = false;
+  document.body.classList.add("modal-open");
+  if (focusInput) freeForm.elements.searchText.focus();
+}
+
+function closeSearchModal() {
+  searchModal.hidden = true;
+  document.body.classList.remove("modal-open");
 }
 
 function setValuationFields(values) {
