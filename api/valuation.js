@@ -20,9 +20,9 @@ async function fetchValuation(input) {
   const uvc = String(input.uvc || "").trim();
   const year = String(input.year || "").trim();
   const make = String(input.make || "").trim();
-  const model = String(input.model || "").trim();
-  const series = String(input.series || "").trim();
-  const style = String(input.style || "").trim();
+  const model = cleanUnknown(input.model);
+  const series = cleanUnknown(input.series);
+  const style = cleanUnknown(input.style);
   const kilometers = Number(input.kilometers || input.mileage || 0);
   const region = String(input.region || "ON").trim();
   const country = String(input.country || "C").trim();
@@ -86,6 +86,16 @@ function valuationEndpoint({ vin, uvc, year, make }) {
 function buildDemoResponse(input, raw) {
   const vehicles = allVehicles(raw);
   const vehicle = chooseVehicle(vehicles, input) || firstVehicle(raw);
+  if (!hasVehicleData(vehicle)) {
+    return {
+      ok: false,
+      source: raw?.mock ? "mock" : "blackbook",
+      error: "No vehicle matches found. Please search and choose a specific vehicle first.",
+      choices: [],
+      raw
+    };
+  }
+
   const values = extractValues(vehicle);
   const title = vehicleTitle(vehicle, input.vin);
   const vin = cleanVin(input.vin) || vehicle?.vin;
@@ -254,6 +264,22 @@ function vehicleTitle(vehicle = {}, fallbackVin = "") {
 
 function cleanVin(value) {
   return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function cleanUnknown(value) {
+  const text = String(value || "").trim();
+  return text.toLowerCase() === "not sure" ? "" : text;
+}
+
+function hasVehicleData(vehicle) {
+  if (!vehicle || typeof vehicle !== "object") return false;
+  if (vehicle.uvc || vehicle.vin || vehicle.model_year || vehicle.year || vehicle.make || vehicle.model) return true;
+  const values = extractValues(vehicle);
+  return ["wholesale", "retail", "tradeIn"].some((market) =>
+    Object.values(values[market] || {}).some((row) =>
+      Object.values(row || {}).some((value) => value !== null && value !== undefined)
+    )
+  );
 }
 
 function regionName(code) {

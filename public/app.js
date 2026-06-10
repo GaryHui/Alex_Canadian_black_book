@@ -86,8 +86,7 @@ freeForm.addEventListener("submit", async (event) => {
 
   statusEl.textContent = "Searching vehicles...";
   choiceList.hidden = true;
-  const response = await fetch(`/api/autocomplete?searchText=${encodeURIComponent(searchText)}`);
-  const data = await response.json();
+  const data = await fetchVehicleChoices(searchText);
   if (!data.ok) {
     statusEl.textContent = data.error || "Search failed.";
     return;
@@ -100,7 +99,7 @@ drilldownForm.addEventListener("submit", async (event) => {
   if (!requireLogin()) return;
   const payload = Object.fromEntries(new FormData(drilldownForm).entries());
   setValuationFields({ vin: "", uvc: "", ...payload });
-  await runValuation();
+  await searchVehicleChoices(payload);
 });
 
 drilldownForm.querySelectorAll(".drill-select").forEach((select) => {
@@ -160,6 +159,56 @@ async function runValuation(extra = {}) {
   } catch (error) {
     statusEl.textContent = error.message || "Unexpected error.";
   }
+}
+
+async function searchVehicleChoices(payload) {
+  const searchText = vehicleSearchText(payload);
+  if (!searchText) {
+    statusEl.textContent = "Choose at least year and make, or enter a VIN.";
+    return;
+  }
+
+  statusEl.textContent = "Searching matching vehicles...";
+  detailsEl.hidden = true;
+  choiceList.hidden = true;
+
+  try {
+    const data = await fetchVehicleChoices(searchText);
+    if (!data.ok) {
+      statusEl.textContent = data.error || "Search failed.";
+      console.error(data);
+      return;
+    }
+
+    renderChoices(data.items || []);
+    statusEl.textContent = data.items?.length
+      ? "Choose the closest vehicle, then the valuation will be generated."
+      : "No matching vehicles found. Try another model, series, or style.";
+  } catch (error) {
+    statusEl.textContent = error.message || "Search failed.";
+  }
+}
+
+async function fetchVehicleChoices(searchText) {
+  const primary = await fetchAutocomplete(searchText);
+  if (primary.items?.length || !needsSeriesFallback(searchText)) return primary;
+
+  const fallbackText = simplifySeriesName(searchText);
+  const fallback = await fetchAutocomplete(fallbackText);
+  return fallback.items?.length ? fallback : primary;
+}
+
+async function fetchAutocomplete(searchText) {
+  const response = await fetch(`/api/autocomplete?searchText=${encodeURIComponent(searchText)}`);
+  return response.json();
+}
+
+function needsSeriesFallback(searchText) {
+  return /-Series\b/i.test(String(searchText || ""));
+}
+
+function simplifySeriesName(searchText) {
+  return String(searchText || "").replace(/-Series\b/gi, "").replace(/\s+/g, " ").trim();
 }
 
 tabs.forEach((tab) => {
@@ -238,8 +287,15 @@ function renderChoices(items) {
 function setValuationFields(values) {
   for (const [key, value] of Object.entries(values)) {
     const field = form.elements[key];
-    if (field) field.value = value ?? "";
+    if (field) field.value = value === unknownOption ? "" : value ?? "";
   }
+}
+
+function vehicleSearchText(payload) {
+  return ["year", "make", "model", "series", "style"]
+    .map((key) => String(payload[key] || "").trim())
+    .filter((value) => value && value !== unknownOption)
+    .join(" ");
 }
 
 function initializeDatalists() {
