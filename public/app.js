@@ -45,6 +45,7 @@ const drilldownSuggestions = {
 };
 const commonMakes = ["Acura", "Audi", "BMW", "Chevrolet", "Ford", "Honda", "Hyundai", "Kia", "Lexus", "Mazda", "Mercedes-Benz", "Nissan", "Subaru", "Toyota", "Volkswagen"];
 const commonStyles = ["2D Coupe", "4D Hatchback", "4D Sedan", "4D Utility AWD", "4D Utility FWD", "4D Wagon"];
+const unknownOption = "Not sure";
 
 let currentResult = null;
 let currentMarket = "wholesale";
@@ -132,9 +133,10 @@ async function runValuation(extra = {}) {
     currentResult = data;
     currentMarket = firstAvailableMarket(data) || "wholesale";
     renderResult(data);
+    await captureLead(payload, data);
     statusEl.textContent = data.source === "mock"
-      ? "Rendered with mock data. Add Black Book credentials to .env.local for live API calls."
-      : "Rendered from Black Book API.";
+      ? "Rendered with mock data and lead captured locally if available."
+      : "Rendered from Black Book API and lead captured.";
   } catch (error) {
     statusEl.textContent = error.message || "Unexpected error.";
   }
@@ -156,6 +158,7 @@ function renderResult(data) {
   document.querySelector("#vehicle-km").textContent = formatNumber(data.kilometers);
   document.querySelector("#vehicle-region").textContent = data.region;
   document.querySelector("#vehicle-options").textContent = `${data.optionsSelected || 0} selected`;
+  document.querySelector("#vehicle-color").textContent = data.input?.color || "Not provided";
   document.querySelector("#threshold-json").textContent = JSON.stringify(data.thresholds || {}, null, 2);
   document.querySelector("#loan-value").textContent = data.loanValue
     ? `Loan Value: ${formatNumber(data.loanValue)}`
@@ -245,9 +248,10 @@ function setSelectOptions(field, values, selectedValue = "") {
   const manual = drilldownForm.querySelector(`.manual-input[data-field="${field}"]`);
   const hidden = drilldownForm.elements[field];
   const unique = [...new Set(values.filter(Boolean))];
-  const hasSelected = unique.includes(selectedValue);
+  const withUnknown = ["model", "series", "style"].includes(field) ? [unknownOption, ...unique] : unique;
+  const hasSelected = withUnknown.includes(selectedValue);
   select.innerHTML = [
-    ...unique.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`),
+    ...withUnknown.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`),
     `<option value="__manual__">Manual / Other...</option>`
   ].join("");
 
@@ -262,9 +266,9 @@ function setSelectOptions(field, values, selectedValue = "") {
     manual.value = selectedValue;
     hidden.value = selectedValue;
   } else {
-    select.value = unique[0] || "__manual__";
+    select.value = withUnknown[0] || "__manual__";
     manual.hidden = select.value !== "__manual__";
-    hidden.value = unique[0] || "";
+    hidden.value = withUnknown[0] || "";
   }
 }
 
@@ -350,6 +354,18 @@ function formatValue(value, rowKey) {
 
 function formatNumber(value) {
   return new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(Number(value));
+}
+
+async function captureLead(input, valuation) {
+  try {
+    await fetch("/api/leads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ input, valuation })
+    });
+  } catch (error) {
+    console.warn("Lead capture failed", error);
+  }
 }
 
 function escapeHtml(value) {

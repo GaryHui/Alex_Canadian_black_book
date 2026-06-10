@@ -47,6 +47,17 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, result);
     }
 
+    if (url.pathname === "/api/leads") {
+      if (req.method === "POST") {
+        const body = await readJson(req);
+        const result = await saveLead(body);
+        return sendJson(res, 200, result);
+      }
+      if (req.method === "GET") {
+        return sendJson(res, 200, await listLeads());
+      }
+    }
+
     sendJson(res, 404, { error: "Not found" });
   } catch (error) {
     sendJson(res, 500, { error: error.message || "Server error" });
@@ -242,7 +253,67 @@ function buildDemoResponse(input, raw) {
     loanValue: findNumber(vehicle, ["loan_value", "finadv", "adjusted_finadv", "finance_advance_value"]),
     thresholds: vehicle?.kilometer_adjustments || null,
     choices: vehicles.length > 1 ? vehicles.map(vehicleChoice) : [],
+    input: sanitizeLeadInput(input),
     raw
+  };
+}
+
+async function saveLead(body) {
+  const lead = {
+    id: crypto.randomUUID(),
+    created_at: new Date().toISOString(),
+    input: sanitizeLeadInput(body.input || {}),
+    valuation: sanitizeValuation(body.valuation || {}),
+    status: "new",
+    notes: ""
+  };
+
+  const dataDir = path.join(__dirname, "data");
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.appendFileSync(path.join(dataDir, "leads.jsonl"), `${JSON.stringify(lead)}\n`);
+  return { ok: true, id: lead.id, storage: "local-jsonl" };
+}
+
+async function listLeads() {
+  const filePath = path.join(__dirname, "data", "leads.jsonl");
+  if (!fs.existsSync(filePath)) return { ok: true, leads: [] };
+  const leads = fs.readFileSync(filePath, "utf8")
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+    .reverse();
+  return { ok: true, leads };
+}
+
+function sanitizeLeadInput(input) {
+  return {
+    email: String(input.email || "").trim(),
+    phone: String(input.phone || "").trim(),
+    vin: cleanVin(input.vin),
+    uvc: String(input.uvc || "").trim(),
+    year: String(input.year || "").trim(),
+    make: String(input.make || "").trim(),
+    model: String(input.model || "").trim(),
+    series: String(input.series || "").trim(),
+    style: String(input.style || "").trim(),
+    kilometers: Number(input.kilometers || input.mileage || 0),
+    color: String(input.color || "").trim(),
+    region: String(input.region || "").trim(),
+    country: String(input.country || "").trim()
+  };
+}
+
+function sanitizeValuation(valuation) {
+  return {
+    source: valuation.source,
+    title: valuation.title,
+    vin: valuation.vin,
+    region: valuation.region,
+    country: valuation.country,
+    values: valuation.values,
+    loanValue: valuation.loanValue,
+    thresholds: valuation.thresholds,
+    choices: valuation.choices || []
   };
 }
 

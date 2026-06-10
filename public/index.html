@@ -71,6 +71,14 @@
 
             <form id="valuation-form" class="form-grid">
               <label>
+                <span>Email</span>
+                <input name="email" type="email" placeholder="customer@example.com" required />
+              </label>
+              <label>
+                <span>Phone</span>
+                <input name="phone" type="tel" placeholder="604-000-0000" required />
+              </label>
+              <label>
                 <span>VIN</span>
                 <input name="vin" value="2T2GGCEZ9RC032642" />
               </label>
@@ -83,13 +91,17 @@
               <input name="model" type="hidden" />
               <input name="series" type="hidden" />
               <input name="style" type="hidden" />
-          <label>
-            <span>Kilometers</span>
-            <input name="kilometers" type="number" min="0" value="37000" required />
-          </label>
-          <label>
-            <span>Region</span>
-            <select name="region">
+              <label>
+                <span>Kilometers</span>
+                <input name="kilometers" type="number" min="0" value="37000" required />
+              </label>
+              <label>
+                <span>Color</span>
+                <input name="color" placeholder="White, Black, Silver..." />
+              </label>
+              <label>
+                <span>Region</span>
+                <select name="region">
               <option value="BC">British Columbia</option>
               <option value="ON">Ontario</option>
               <option value="AB">Alberta</option>
@@ -111,6 +123,7 @@
         </div>
 
         <p id="status" class="status">Ready.</p>
+        <p class="admin-link"><a href="/admin.html" target="_blank" rel="noreferrer">View captured leads</a></p>
         <div id="choice-list" class="choice-list" hidden></div>
       </section>
 
@@ -135,11 +148,15 @@
               <span>REGION</span>
               <strong id="vehicle-region"></strong>
             </div>
-            <div class="info-box">
-              <span>OPTIONS</span>
-              <strong id="vehicle-options">0 selected</strong>
-            </div>
+          <div class="info-box">
+            <span>OPTIONS</span>
+            <strong id="vehicle-options">0 selected</strong>
           </div>
+          <div class="info-box">
+            <span>COLOR</span>
+            <strong id="vehicle-color">Not provided</strong>
+          </div>
+        </div>
         </div>
 
         <div class="market-ribbon">

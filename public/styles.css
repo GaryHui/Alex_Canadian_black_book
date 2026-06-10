@@ -401,6 +401,69 @@ select {
   padding: 12px;
 }
 
+.admin-link {
+  margin: 6px 0 0;
+}
+
+.admin-link a,
+.admin-head a {
+  color: var(--red);
+}
+
+.admin-shell {
+  background: #fff;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.admin-head {
+  align-items: center;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+}
+
+.admin-leads {
+  display: grid;
+  gap: 14px;
+}
+
+.lead-card {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 16px;
+}
+
+.lead-card header {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.lead-card header span {
+  color: #777;
+  font-size: 13px;
+}
+
+.lead-grid {
+  display: grid;
+  gap: 8px 14px;
+  grid-template-columns: 160px 1fr;
+}
+
+.lead-grid span {
+  color: #777;
+}
+
+.lead-card pre {
+  background: #f6f6f6;
+  overflow: auto;
+  padding: 12px;
+}
+
 @media (max-width: 900px) {
   .form-grid,
   .info-row,
