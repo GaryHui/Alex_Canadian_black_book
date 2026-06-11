@@ -47,3 +47,26 @@ create table if not exists valuation_user_limits (
 
 create index if not exists valuation_user_limits_email_idx
 on valuation_user_limits (email);
+
+create table if not exists dealer_staff (
+  email text primary key,
+  active boolean not null default true,
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table dealer_staff
+add column if not exists active boolean not null default true;
+
+alter table dealer_staff
+add column if not exists created_by text;
+
+alter table dealer_staff
+add column if not exists created_at timestamptz not null default now();
+
+alter table dealer_staff
+add column if not exists updated_at timestamptz not null default now();
+
+create index if not exists dealer_staff_active_idx
+on dealer_staff (active);

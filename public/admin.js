@@ -133,7 +133,7 @@ async function loadDealers() {
   const data = await response.json();
 
   if (!data.ok) {
-    dealersStatusEl.textContent = data.error || "Unable to load dealer staff.";
+    dealersStatusEl.textContent = formatApiError(data, "Unable to load dealer staff.");
     dealersEl.innerHTML = "";
     return;
   }
@@ -180,7 +180,7 @@ async function addDealer(event) {
     body: JSON.stringify({ email })
   });
   const data = await response.json();
-  dealersStatusEl.textContent = data.ok ? "Dealer email saved." : (data.error || "Unable to save dealer email.");
+  dealersStatusEl.textContent = data.ok ? "Dealer email saved." : formatApiError(data, "Unable to save dealer email.");
   if (data.ok) {
     dealerStaffForm.reset();
     await loadDealers();
@@ -362,9 +362,23 @@ dealersEl.addEventListener("click", async (event) => {
     headers: authHeaders()
   });
   const data = await response.json();
-  dealersStatusEl.textContent = data.ok ? "Dealer email removed." : (data.error || "Unable to remove dealer email.");
+  dealersStatusEl.textContent = data.ok ? "Dealer email removed." : formatApiError(data, "Unable to remove dealer email.");
   await loadDealers();
 });
+
+function formatApiError(data, fallback) {
+  const value = data?.error || data?.details || data;
+  if (!value) return fallback;
+  if (typeof value === "string") return value;
+  if (value.message) return value.message;
+  if (value.error_description) return value.error_description;
+  if (value.details && typeof value.details === "string") return value.details;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return fallback;
+  }
+}
 
 function formatNumber(value) {
   return new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(Number(value));

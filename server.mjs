@@ -1057,7 +1057,7 @@ async function listDealerStaff() {
     return {
       ok: false,
       status: response.status,
-      error: "Unable to load dealer staff. Create the dealer_staff table in Supabase first.",
+      error: `Unable to load dealer staff. Create the dealer_staff table in Supabase first. ${supabaseErrorMessage(rows)}`,
       details: rows
     };
   }
@@ -1098,7 +1098,14 @@ async function addDealerStaff(body, adminUser) {
   });
 
   const data = await response.json().catch(() => null);
-  if (!response.ok) return { ok: false, status: response.status, error: data };
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      error: `Unable to save dealer email. Create the dealer_staff table in Supabase first. ${supabaseErrorMessage(data)}`,
+      details: data
+    };
+  }
   return { ok: true, staff: data?.[0] || null };
 }
 
@@ -1119,7 +1126,14 @@ async function deleteDealerStaff(emailValue) {
   });
 
   const data = await response.json().catch(() => null);
-  if (!response.ok) return { ok: false, status: response.status, error: data };
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      error: `Unable to remove dealer email. ${supabaseErrorMessage(data)}`,
+      details: data
+    };
+  }
   return { ok: true, deleted: data || [] };
 }
 
@@ -1145,6 +1159,12 @@ async function isDealerStaffEmail(emailValue) {
 function normalizeEmail(value) {
   const email = String(value || "").trim().toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
+}
+
+function supabaseErrorMessage(error) {
+  if (!error) return "";
+  if (typeof error === "string") return error;
+  return String(error.message || error.details || error.hint || "").trim();
 }
 
 async function fetchSupabaseJson(url, key) {
