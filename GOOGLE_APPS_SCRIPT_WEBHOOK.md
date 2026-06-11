@@ -56,6 +56,12 @@ Delete all existing code and paste this full script.
 
 This is the final recommended version. It uses `SpreadsheetApp.openById(...)` so the webhook always writes to the intended Google Sheet, even if Apps Script deployment context is confusing.
 
+It also keeps the main `Leads` sheet readable:
+
+- `Leads` only stores the fields that the owner reviews every day.
+- `CBB Raw` stores the full CBB JSON and raw payload.
+- Both sheets share `Lead ID`, so the owner can match a clean row to the raw technical record when needed.
+
 Before pasting, replace this value with the Google Sheet ID from the Sheet URL:
 
 ```javascript
@@ -78,9 +84,10 @@ then the Sheet ID is:
 
 ```javascript
 const SPREADSHEET_ID = "YOUR_GOOGLE_SHEET_ID";
-const SHEET_NAME = "Leads";
+const LEADS_SHEET_NAME = "Leads";
+const RAW_SHEET_NAME = "CBB Raw";
 
-const HEADERS = [
+const LEADS_HEADERS = [
   "Received At",
   "Customer Email",
   "Phone",
@@ -100,19 +107,29 @@ const HEADERS = [
   "Trade-In AVG",
   "Lead ID",
   "Auth Email",
-  "Status",
+  "Status"
+];
+
+const RAW_HEADERS = [
+  "Received At",
+  "Lead ID",
+  "VIN",
+  "UVC",
   "Full CBB JSON",
   "Raw Payload JSON"
 ];
 
 function doPost(e) {
-  const sheet = getLeadSheet_();
+  const leadsSheet = getOrCreateSheet_(LEADS_SHEET_NAME);
+  const rawSheet = getOrCreateSheet_(RAW_SHEET_NAME);
   installHeaders();
 
   const data = parsePayload_(e);
+  const receivedAt = new Date();
+  const rawPayload = JSON.stringify(data);
 
-  sheet.appendRow([
-    new Date(),
+  leadsSheet.appendRow([
+    receivedAt,
     data.email || "",
     data.phone || "",
     data.vin || "",
@@ -131,9 +148,16 @@ function doPost(e) {
     data.tradeInAvg || "",
     data.id || "",
     data.authEmail || "",
-    data.status || "",
+    data.status || ""
+  ]);
+
+  rawSheet.appendRow([
+    receivedAt,
+    data.id || "",
+    data.vin || "",
+    data.uvc || "",
     data.cbbJson || "",
-    JSON.stringify(data)
+    rawPayload
   ]);
 
   return ContentService
@@ -147,28 +171,42 @@ function doGet() {
       ok: true,
       message: "BlackBook lead webhook is running",
       spreadsheetId: SPREADSHEET_ID,
-      sheetName: getLeadSheet_().getName(),
-      lastRow: getLeadSheet_().getLastRow()
+      leadsSheetName: getOrCreateSheet_(LEADS_SHEET_NAME).getName(),
+      leadsLastRow: getOrCreateSheet_(LEADS_SHEET_NAME).getLastRow(),
+      rawSheetName: getOrCreateSheet_(RAW_SHEET_NAME).getName(),
+      rawLastRow: getOrCreateSheet_(RAW_SHEET_NAME).getLastRow()
     }))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
 function installHeaders() {
-  const sheet = getLeadSheet_();
-  sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
-  sheet.setFrozenRows(1);
+  const leadsSheet = getOrCreateSheet_(LEADS_SHEET_NAME);
+  leadsSheet.getRange(1, 1, 1, LEADS_HEADERS.length).setValues([LEADS_HEADERS]);
+  leadsSheet.setFrozenRows(1);
+  leadsSheet.autoResizeColumns(1, LEADS_HEADERS.length);
+
+  const rawSheet = getOrCreateSheet_(RAW_SHEET_NAME);
+  rawSheet.getRange(1, 1, 1, RAW_HEADERS.length).setValues([RAW_HEADERS]);
+  rawSheet.setFrozenRows(1);
+  rawSheet.autoResizeColumns(1, 4);
+  rawSheet.setColumnWidth(5, 320);
+  rawSheet.setColumnWidth(6, 320);
 }
 
 function testWrite() {
-  const sheet = getLeadSheet_();
+  const sheet = getOrCreateSheet_(LEADS_SHEET_NAME);
   sheet.getRange("A1").setValue("TEST HEADER WRITE");
 }
 
-function getLeadSheet_() {
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-  return spreadsheet.getSheetByName(SHEET_NAME) ||
-    spreadsheet.getSheetByName(SHEET_NAME.toLowerCase()) ||
-    spreadsheet.getSheets()[0];
+function getSpreadsheet_() {
+  return SpreadsheetApp.openById(SPREADSHEET_ID);
+}
+
+function getOrCreateSheet_(sheetName) {
+  const spreadsheet = getSpreadsheet_();
+  const sheet = spreadsheet.getSheetByName(sheetName);
+  if (sheet) return sheet;
+  return spreadsheet.insertSheet(sheetName);
 }
 
 function parsePayload_(e) {
@@ -224,8 +262,22 @@ Advanced > Go to ... unsafe > Allow
 Row 1 should now show:
 
 ```text
-Received At | Customer Email | Phone | VIN | UVC | Year | Make | Model | Series / Trim | Style | Kilometers | Color | Region | Country | Wholesale AVG | Retail AVG | Trade-In AVG | Lead ID | Auth Email | Status | Full CBB JSON | Raw Payload JSON
+Received At | Customer Email | Phone | VIN | UVC | Year | Make | Model | Series / Trim | Style | Kilometers | Color | Region | Country | Wholesale AVG | Retail AVG | Trade-In AVG | Lead ID | Auth Email | Status
 ```
+
+The file should also have a second tab named:
+
+```text
+CBB Raw
+```
+
+That tab stores:
+
+```text
+Received At | Lead ID | VIN | UVC | Full CBB JSON | Raw Payload JSON
+```
+
+Use `Lead ID` to match a clean row in `Leads` to its full technical JSON in `CBB Raw`.
 
 ## 5. If Headers Still Do Not Appear
 
@@ -346,7 +398,8 @@ npx vercel --prod --yes
 3. Select or search a vehicle.
 4. Click `Generate`.
 5. Go back to Google Sheet.
-6. A new row should appear under the header row.
+6. A new row should appear in `Leads`.
+7. A matching raw JSON row should appear in `CBB Raw`.
 
 If the quote appears in the website's `Quote history` but does not appear in Google Sheet:
 
@@ -363,8 +416,10 @@ Deploy > Manage deployments > Edit > Version: New version > Deploy
 {
   "ok": true,
   "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
-  "sheetName": "Leads",
-  "lastRow": 3
+  "leadsSheetName": "Leads",
+  "leadsLastRow": 3,
+  "rawSheetName": "CBB Raw",
+  "rawLastRow": 3
 }
 ```
 
