@@ -353,6 +353,33 @@ select:focus {
   outline: 3px solid rgba(22, 119, 210, 0.14);
 }
 
+.field-with-info {
+  position: relative;
+  display: block;
+}
+
+.field-with-info input {
+  padding-right: 48px;
+}
+
+.info-dot {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  color: #fff;
+  background: #9aa8b8;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: none;
+  transform: translateY(-50%);
+}
+
 input::placeholder {
   color: #8795a8;
 }

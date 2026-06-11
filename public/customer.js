@@ -125,6 +125,7 @@ const text = {
     authReady: "Signed in as",
     authReadyHelp: "Your email will be saved with the valuation for follow-up.",
     authMissing: "Google sign-in is not configured yet.",
+    authUnverified: "Please verify your email before generating a valuation.",
     loginButton: "Continue with Google",
     logoutButton: "Sign out",
     postalModalTitle: "Why do you need my postal code?",
@@ -145,6 +146,7 @@ const text = {
     saved: "Your valuation is ready and has been saved for follow-up.",
     saveIssue: "Your valuation is ready, but the lead receiver did not confirm saving.",
     pleaseLogin: "Please sign in with Google before generating a valuation.",
+    pleaseVerifyEmail: "Please verify your email first, then sign in again.",
     invalidVin: "Please enter a valid VIN.",
     required: "Please complete the required fields.",
     selectText: "Select this vehicle",
@@ -205,6 +207,7 @@ const text = {
     authReady: "Connecté avec",
     authReadyHelp: "Votre courriel sera enregistré avec l'évaluation pour le suivi.",
     authMissing: "La connexion Google n'est pas encore configurée.",
+    authUnverified: "Veuillez vérifier votre courriel avant de générer une évaluation.",
     loginButton: "Continuer avec Google",
     logoutButton: "Déconnexion",
     postalModalTitle: "Pourquoi demander mon code postal?",
@@ -225,6 +228,7 @@ const text = {
     saved: "Votre évaluation est prête et enregistrée pour le suivi.",
     saveIssue: "Votre évaluation est prête, mais l'enregistrement n'a pas été confirmé.",
     pleaseLogin: "Veuillez vous connecter avec Google avant de générer une évaluation.",
+    pleaseVerifyEmail: "Veuillez d'abord vérifier votre courriel, puis vous reconnecter.",
     invalidVin: "Veuillez entrer un NIV valide.",
     required: "Veuillez remplir les champs requis.",
     selectText: "Choisir ce véhicule",
@@ -340,14 +344,21 @@ function setCustomerSession(session) {
 
   if (session?.user) {
     customerAuthTitle.textContent = `${t("authReady")} ${email}`;
-    customerAuthSubtitle.textContent = t("authReadyHelp");
     form.elements.email.value = email;
     form.elements.email.readOnly = true;
+    if (!isEmailVerified(session.user)) {
+      customerAuthSubtitle.textContent = t("authUnverified");
+      setFormDisabled(true);
+      return;
+    }
+    customerAuthSubtitle.textContent = t("authReadyHelp");
+    setFormDisabled(false);
   } else {
     customerAuthTitle.textContent = t("authRequired");
     customerAuthSubtitle.textContent = t("authRequired");
     form.elements.email.value = "";
     form.elements.email.readOnly = false;
+    setFormDisabled(false);
   }
 }
 
@@ -382,6 +393,10 @@ async function handleSubmit(event) {
   event.preventDefault();
   if (!authSession?.user) {
     statusEl.textContent = t("pleaseLogin");
+    return;
+  }
+  if (!isEmailVerified(authSession.user)) {
+    statusEl.textContent = t("pleaseVerifyEmail");
     return;
   }
   selectedVehicle = null;
@@ -604,6 +619,22 @@ function setBusy(isBusy, message = "") {
   const button = document.querySelector("#continue-button");
   button.disabled = isBusy;
   if (message) statusEl.textContent = message;
+}
+
+function setFormDisabled(disabled) {
+  form.querySelectorAll("input, select, button").forEach((control) => {
+    if (control.id === "postal-help") return;
+    control.disabled = disabled;
+  });
+}
+
+function isEmailVerified(user) {
+  if (!user) return false;
+  if (user.email_confirmed_at || user.confirmed_at) return true;
+  const metadata = user.user_metadata || {};
+  if (metadata.email_verified === true) return true;
+  if (metadata.email_verified === "true") return true;
+  return false;
 }
 
 function provinceFromPostal(postalCode) {

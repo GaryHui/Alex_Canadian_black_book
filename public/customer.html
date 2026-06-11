@@ -113,16 +113,16 @@
             <fieldset class="mode-toggle">
               <legend class="sr-only">Lookup mode</legend>
               <label>
-                <input type="radio" name="mode" value="drilldown" checked />
+                <input type="radio" name="mode" value="drilldown" />
                 <span data-i18n="modeDrilldown">Year/Make/Model</span>
               </label>
               <label>
-                <input type="radio" name="mode" value="vin" />
+                <input type="radio" name="mode" value="vin" checked />
                 <span data-i18n="modeVin">VIN</span>
               </label>
             </fieldset>
 
-            <div class="mode-panel" data-panel="drilldown">
+            <div class="mode-panel" data-panel="drilldown" hidden>
               <label>
                 <span data-i18n="yearLabel">Year</span>
                 <select name="year" required></select>
@@ -142,7 +142,10 @@
             <div class="mode-panel" data-panel="vin" hidden>
               <label class="span-all">
                 <span data-i18n="vinLabel">VIN</span>
-                <input name="vin" maxlength="17" autocomplete="off" data-i18n-placeholder="vinPlaceholder" placeholder="17-character VIN" />
+                <span class="field-with-info">
+                  <input name="vin" maxlength="17" autocomplete="off" data-i18n-placeholder="vinPlaceholder" placeholder="17-character VIN" />
+                  <span class="info-dot" title="Vehicle Identification Number">i</span>
+                </span>
               </label>
             </div>
 
@@ -161,16 +164,8 @@
               Why do you need my postal code?
             </button>
 
-            <div class="split-row">
-              <label>
-                <span data-i18n="emailLabel">Email</span>
-                <input name="email" type="email" autocomplete="email" required data-i18n-placeholder="emailPlaceholder" placeholder="you@example.com" />
-              </label>
-              <label>
-                <span data-i18n="phoneLabel">Phone (optional)</span>
-                <input name="phone" autocomplete="tel" data-i18n-placeholder="phonePlaceholder" placeholder="604-000-0000" />
-              </label>
-            </div>
+            <input name="email" type="hidden" />
+            <input name="phone" type="hidden" />
 
             <label class="check-row">
               <input name="ownsVehicle" type="checkbox" />
