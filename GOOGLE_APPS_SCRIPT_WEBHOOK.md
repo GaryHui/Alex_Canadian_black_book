@@ -54,9 +54,32 @@ Important: open Apps Script from the Google Sheet. This makes it a bound script.
 
 Delete all existing code and paste this full script.
 
-This is the final tested version. `installHeaders` force-writes the header row to row 1. If A1 has a test value like `TEST HEADER WRITE`, it will be replaced by `Received At`.
+This is the final recommended version. It uses `SpreadsheetApp.openById(...)` so the webhook always writes to the intended Google Sheet, even if Apps Script deployment context is confusing.
+
+Before pasting, replace this value with the Google Sheet ID from the Sheet URL:
 
 ```javascript
+const SPREADSHEET_ID = "YOUR_GOOGLE_SHEET_ID";
+```
+
+For example, if the Sheet URL is:
+
+```text
+https://docs.google.com/spreadsheets/d/1BKerWbBFaJzXO9fWyfsKCGqKjoWq2jC5bd0W3940MIc/edit
+```
+
+then the Sheet ID is:
+
+```text
+1BKerWbBFaJzXO9fWyfsKCGqKjoWq2jC5bd0W3940MIc
+```
+
+`installHeaders` force-writes the header row to row 1. If A1 has a test value like `TEST HEADER WRITE`, it will be replaced by `Received At`.
+
+```javascript
+const SPREADSHEET_ID = "YOUR_GOOGLE_SHEET_ID";
+const SHEET_NAME = "Leads";
+
 const HEADERS = [
   "Received At",
   "Customer Email",
@@ -120,7 +143,13 @@ function doPost(e) {
 
 function doGet() {
   return ContentService
-    .createTextOutput(JSON.stringify({ ok: true, message: "BlackBook lead webhook is running" }))
+    .createTextOutput(JSON.stringify({
+      ok: true,
+      message: "BlackBook lead webhook is running",
+      spreadsheetId: SPREADSHEET_ID,
+      sheetName: getLeadSheet_().getName(),
+      lastRow: getLeadSheet_().getLastRow()
+    }))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -136,9 +165,9 @@ function testWrite() {
 }
 
 function getLeadSheet_() {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  return spreadsheet.getSheetByName("Leads") ||
-    spreadsheet.getSheetByName("leads") ||
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  return spreadsheet.getSheetByName(SHEET_NAME) ||
+    spreadsheet.getSheetByName(SHEET_NAME.toLowerCase()) ||
     spreadsheet.getSheets()[0];
 }
 
@@ -318,6 +347,28 @@ npx vercel --prod --yes
 4. Click `Generate`.
 5. Go back to Google Sheet.
 6. A new row should appear under the header row.
+
+If the quote appears in the website's `Quote history` but does not appear in Google Sheet:
+
+1. Confirm the Apps Script has the correct `SPREADSHEET_ID`.
+2. Confirm the Apps Script was redeployed with:
+
+```text
+Deploy > Manage deployments > Edit > Version: New version > Deploy
+```
+
+3. Open the Apps Script Web App URL in a browser. The response should show the target Sheet:
+
+```json
+{
+  "ok": true,
+  "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+  "sheetName": "Leads",
+  "lastRow": 3
+}
+```
+
+4. If `spreadsheetId` is different from the ID in the Sheet URL, the webhook is deployed from a different Apps Script project or using the wrong code.
 
 ## 10. Handoff To Website Owner
 
