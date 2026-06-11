@@ -341,6 +341,7 @@ function setCustomerSession(session) {
   const email = session?.user?.email || "";
   customerLoginButton.hidden = Boolean(session?.user);
   customerLogoutButton.hidden = !session?.user;
+  document.querySelector(".customer-auth")?.classList.toggle("is-signed-in", Boolean(session?.user));
 
   if (session?.user) {
     customerAuthTitle.textContent = `${t("authReady")} ${email}`;
