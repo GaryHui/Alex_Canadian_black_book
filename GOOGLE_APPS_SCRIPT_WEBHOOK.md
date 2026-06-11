@@ -1,61 +1,62 @@
-# Google Apps Script Webhook 操作文档
+# Google Apps Script Webhook Setup
 
-这个方案用于把网站上 `Generate` 成功后的客户资料、车辆资料和 CBB 报价结果写入网站拥有者的 Google Sheet。
+This document explains how to send successful Black Book valuation leads into a website owner's Google Sheet.
 
-推荐正式流程：
+The production flow is:
 
 ```text
-用户 Google 登录
-> 用户点击 Generate
-> 网站保存记录到 Supabase
-> 网站后端 POST 到 Apps Script Webhook
-> Apps Script 写入 Google Sheet
-> 网站拥有者在 Sheet 里查看和二次估价
+User clicks Generate
+> Website saves the valuation lead to Supabase
+> Website backend POSTs the same lead to Apps Script
+> Apps Script appends the lead to Google Sheet
+> Website owner reviews the lead and can do a second valuation manually
 ```
 
-Supabase 仍然是主数据库。Google Sheet 是给网站拥有者人工查看、跟进和二次报价用。
+Supabase is still the main database. Google Sheet is for owner review and manual follow-up.
 
-## 1. 创建 Google Sheet
+## 1. Create The Sheet
 
-1. 打开 Google Sheets。
-2. 新建一个表格。
-3. 表格文件名建议：
+1. Open Google Sheets.
+2. Create a new spreadsheet.
+3. Recommended spreadsheet name:
 
 ```text
 BlackBook Leads
 ```
 
-4. 底部 Sheet 名称必须改成：
+4. The bottom sheet tab can be named either:
 
 ```text
 Leads
 ```
 
-如果没有 `Leads` 这个工作表，下面的脚本会自动创建。
+or:
 
-## 2. 打开 Apps Script
+```text
+leads
+```
 
-在 Google Sheet 顶部菜单点击：
+The final script below uses the first sheet in the file, so the tab name is less fragile.
+
+## 2. Open Apps Script
+
+From the Google Sheet top menu:
 
 ```text
 Extensions > Apps Script
 ```
 
-中文界面通常是：
+If the UI is Chinese, use the same menu position: choose the localized version of `Extensions`, then choose `Apps Script`.
 
-```text
-扩展程序 > Apps Script
-```
+Important: open Apps Script from the Google Sheet. This makes it a bound script. If the script is not bound to the Sheet, it will not write to the Sheet you are looking at.
 
-## 3. 粘贴完整 Apps Script 代码
+## 3. Paste The Final Script
 
-删除默认代码，粘贴下面这一整段。
+Delete all existing code and paste this full script.
 
-这个版本会自动创建字段表头，所以 Sheet 第一行会显示每个字段代表什么。
+This is the final tested version. `installHeaders` force-writes the header row to row 1. If A1 has a test value like `TEST HEADER WRITE`, it will be replaced by `Received At`.
 
 ```javascript
-const SHEET_NAME = "Leads";
-
 const HEADERS = [
   "Received At",
   "Customer Email",
@@ -83,7 +84,7 @@ const HEADERS = [
 
 function doPost(e) {
   const sheet = getLeadSheet_();
-  ensureHeaders_(sheet);
+  installHeaders();
 
   const data = parsePayload_(e);
 
@@ -125,29 +126,20 @@ function doGet() {
 
 function installHeaders() {
   const sheet = getLeadSheet_();
-  ensureHeaders_(sheet);
+  sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+  sheet.setFrozenRows(1);
+}
+
+function testWrite() {
+  const sheet = getLeadSheet_();
+  sheet.getRange("A1").setValue("TEST HEADER WRITE");
 }
 
 function getLeadSheet_() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const exactMatch = spreadsheet.getSheetByName(SHEET_NAME);
-  if (exactMatch) return exactMatch;
-
-  const caseInsensitiveMatch = spreadsheet
-    .getSheets()
-    .find((sheet) => sheet.getName().toLowerCase() === SHEET_NAME.toLowerCase());
-
-  return caseInsensitiveMatch || spreadsheet.insertSheet(SHEET_NAME);
-}
-
-function ensureHeaders_(sheet) {
-  const existing = sheet.getRange(1, 1, 1, HEADERS.length).getValues()[0];
-  const hasHeaders = existing.some(Boolean);
-
-  if (!hasHeaders) {
-    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
-    sheet.setFrozenRows(1);
-  }
+  return spreadsheet.getSheetByName("Leads") ||
+    spreadsheet.getSheetByName("leads") ||
+    spreadsheet.getSheets()[0];
 }
 
 function parsePayload_(e) {
@@ -164,42 +156,87 @@ function parsePayload_(e) {
 }
 ```
 
-## 4. 第一次运行表头安装
+## 4. Save And Run installHeaders
 
-在 Apps Script 顶部函数下拉菜单选择：
+1. Press:
+
+```text
+Ctrl + S
+```
+
+2. Make sure the top bar no longer says:
+
+```text
+Unsaved changes
+```
+
+3. In the function dropdown at the top, select:
 
 ```text
 installHeaders
 ```
 
-然后点击运行。
-
-第一次会要求授权：
-
-1. 选择 Google 账号。
-2. 如果看到 `This app hasn't been verified by Google`，点击 `Advanced`。
-3. 点击 `Go to ... unsafe`。
-4. 点击 `Allow`。
-
-运行成功后，回到 Google Sheet，第一行应该已经有字段名。
-
-注意：Google Sheet 的工作表标签名称要和脚本里的 `SHEET_NAME` 对上。推荐把底部标签改成：
+4. Click:
 
 ```text
-Leads
+Run
 ```
 
-如果你的标签是 `leads` 小写，最新版脚本也能自动识别，但旧版脚本可能会写到另一个新建的 `Leads` 标签里。
+5. The first time, Google will ask for authorization.
 
-## 5. 部署 Web App
+If Google says the app has not been verified, this is normal because the website owner created the script privately:
 
-在 Apps Script 右上角点击：
+```text
+Advanced > Go to ... unsafe > Allow
+```
+
+6. Go back to Google Sheet and refresh.
+
+Row 1 should now show:
+
+```text
+Received At | Customer Email | Phone | VIN | UVC | Year | Make | Model | Series / Trim | Style | Kilometers | Color | Region | Country | Wholesale AVG | Retail AVG | Trade-In AVG | Lead ID | Auth Email | Status | Full CBB JSON | Raw Payload JSON
+```
+
+## 5. If Headers Still Do Not Appear
+
+Run this function from Apps Script:
+
+```text
+testWrite
+```
+
+Then refresh Google Sheet.
+
+If A1 changes to:
+
+```text
+TEST HEADER WRITE
+```
+
+the script is bound to the correct Sheet. Then run:
+
+```text
+installHeaders
+```
+
+If A1 does not change, the script is not bound to the Sheet. Open the Sheet again and use:
+
+```text
+Extensions > Apps Script
+```
+
+Then paste the script again.
+
+## 6. Deploy The Web App
+
+In Apps Script, click:
 
 ```text
 Deploy > New deployment
 ```
 
-设置：
+Choose:
 
 ```text
 Type: Web app
@@ -207,118 +244,108 @@ Execute as: Me
 Who has access: Anyone
 ```
 
-然后点击 `Deploy`。
+Click:
 
-部署成功后复制 Web App URL，格式类似：
+```text
+Deploy
+```
+
+Copy the Web App URL. It should look like:
 
 ```text
 https://script.google.com/macros/s/AKfycbxxxxxxxxxxxxxxxx/exec
 ```
 
-## 6. 配置 Vercel
+## 7. Update An Existing Deployment
 
-打开：
+If you changed the Apps Script code after deployment, update the deployment:
+
+```text
+Deploy > Manage deployments > Edit
+```
+
+Then select:
+
+```text
+Version: New version
+```
+
+Click:
+
+```text
+Deploy
+```
+
+If you do not create a new version, the website may still call the old script code.
+
+## 8. Configure Vercel
+
+Open:
 
 ```text
 Vercel > blackbook-demo > Settings > Environment Variables
 ```
 
-添加或替换：
+Add or replace:
 
 ```text
 LEAD_WEBHOOK_URL=https://script.google.com/macros/s/AKfycbxxxxxxxxxxxxxxxx/exec
 ```
 
-环境选择：
+Environment:
 
 ```text
 Production
 ```
 
-保存后必须重新部署：
+After changing this variable, redeploy production:
 
 ```text
 Vercel > Deployments > Redeploy
 ```
 
-或者使用 CLI：
+or:
 
 ```powershell
 npx vercel --prod --yes
 ```
 
-## 7. 如何测试
+## 9. Test From The Website
 
-测试方式一：在网站上真实测试。
+1. Open the website.
+2. Sign in with Google.
+3. Select or search a vehicle.
+4. Click `Generate`.
+5. Go back to Google Sheet.
+6. A new row should appear under the header row.
 
-1. 打开网站。
-2. Google 登录。
-3. 输入车辆信息。
-4. 点击 `Generate`。
-5. 回到 Google Sheet 查看是否新增一行。
+## 10. Handoff To Website Owner
 
-测试方式二：直接测试 Apps Script。
+When handing off to a new website owner:
 
-用 Postman 或命令 POST JSON 到 Web App URL：
+Owner steps:
 
-```json
-{
-  "email": "test@example.com",
-  "phone": "604-000-0000",
-  "vin": "TESTVIN",
-  "year": "2024",
-  "make": "Lexus",
-  "model": "NX",
-  "kilometers": 37000,
-  "wholesaleAvg": 44321,
-  "retailAvg": 47912,
-  "tradeInAvg": "",
-  "cbbJson": "manual test"
-}
-```
+1. Owner creates their own Google Sheet.
+2. Owner opens `Extensions > Apps Script` from that Sheet.
+3. Owner pastes the final script from this document.
+4. Owner saves the script.
+5. Owner runs `installHeaders`.
+6. Owner deploys the Apps Script as Web App.
+7. Owner sends the new `/exec` URL to the developer.
 
-成功时返回：
+Developer steps:
 
-```json
-{ "ok": true }
-```
+1. Open Vercel environment variables.
+2. Replace `LEAD_WEBHOOK_URL` with the owner's new `/exec` URL.
+3. Redeploy Production.
+4. Generate one test valuation and confirm the owner's Sheet receives it.
 
-## 8. 交付给网站拥有者时怎么替换 Sheet
+No website code changes are needed when only replacing the owner's Sheet.
 
-如果以后要交付给真正的网站拥有者，不需要改网站代码，只需要换 Apps Script Web App URL。
+## 11. Privacy Notes
 
-网站拥有者操作：
+Do not make the Google Sheet public.
 
-1. 网站拥有者用自己的 Google 账号新建 Google Sheet。
-2. Sheet 名称建议为 `BlackBook Leads`。
-3. 工作表名称改成 `Leads`。
-4. 打开 `Extensions > Apps Script`。
-5. 粘贴本文件第 3 节的完整代码。
-6. 运行 `installHeaders`，完成授权。
-7. `Deploy > New deployment > Web app`。
-8. `Execute as` 选择 `Me`。
-9. `Who has access` 选择 `Anyone`。
-10. 复制新的 `/exec` URL。
+The Apps Script URL can receive external POST requests, so keep it in the server-side Vercel environment variable only. Do not put the Apps Script URL in frontend JavaScript.
 
-开发者操作：
-
-1. 打开 Vercel 项目环境变量。
-2. 把 `LEAD_WEBHOOK_URL` 改成网站拥有者的新 `/exec` URL。
-3. 重新部署 Production。
-4. 用网站 Generate 一次，确认新 Sheet 收到记录。
-
-## 9. 权限和隐私说明
-
-Google Sheet 不要设置为公开分享。
-
-Apps Script 的 Web App URL 可以被外部 POST，所以不要把 URL 放到前端代码里。本项目是在服务器端使用 `LEAD_WEBHOOK_URL`，用户浏览器看不到这个 URL。
-
-如果担心垃圾提交，可以后续给 Apps Script 加一个 secret token，例如：
-
-```text
-LEAD_WEBHOOK_SECRET=some-long-random-value
-```
-
-然后网站后端请求时带 header，Apps Script 校验 header 后才写入 Sheet。
-
-当前阶段 Supabase 仍然保存主记录，即使 Google Sheet 暂时失败，后台数据库里仍然有客户报价记录。
+The website still saves the lead to Supabase first. If Apps Script or Google Sheet fails temporarily, the main customer record is still in Supabase.
