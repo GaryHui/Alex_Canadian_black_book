@@ -265,6 +265,12 @@ Vercel > Deployments > Redeploy
 
 This is the recommended owner workflow. Supabase remains the main database, and the webhook sends a clean copy of every successful `Generate` result to Google Apps Script, Google Sheet automation, Make/Zapier, or a CRM webhook.
 
+Detailed owner handoff steps and the header-aware Apps Script code are in:
+
+```text
+GOOGLE_APPS_SCRIPT_WEBHOOK.md
+```
+
 Vercel variable:
 
 ```text

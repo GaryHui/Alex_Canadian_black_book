@@ -17,3 +17,8 @@ Open:
 ```text
 http://localhost:3000
 ```
+
+## Setup Docs
+
+- `SETUP.md`: Supabase, Google OAuth, Vercel, admin, and deployment setup.
+- `GOOGLE_APPS_SCRIPT_WEBHOOK.md`: Google Sheet webhook setup, header-aware Apps Script code, and owner handoff steps.
