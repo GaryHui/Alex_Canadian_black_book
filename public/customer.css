@@ -205,94 +205,17 @@ h1 {
   box-shadow: 0 12px 32px rgba(20, 32, 51, 0.08);
 }
 
-.sun-disc {
+.hero-car-card {
   position: absolute;
-  right: 72px;
-  top: 42px;
-  width: 88px;
-  height: 88px;
-  background: var(--gold);
-  border-radius: 50%;
-  opacity: 0.34;
-}
-
-.road-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 64px;
-  height: 8px;
-  background: linear-gradient(90deg, transparent, var(--green), transparent);
-  opacity: 0.55;
-}
-
-.car-shape {
-  position: absolute;
-  left: 50%;
-  bottom: 54px;
-  width: min(470px, 82%);
-  height: 118px;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, #9fd4ff, #3c8fd8 64%, #2468a8);
-  border: 2px solid rgba(20, 32, 51, 0.16);
-  border-radius: 84px 112px 34px 34px;
-  box-shadow: 0 18px 25px rgba(20, 32, 51, 0.16);
-}
-
-.car-shape::before {
-  position: absolute;
-  left: 78px;
-  top: -54px;
-  width: 210px;
-  height: 76px;
-  content: "";
-  background: linear-gradient(135deg, #e9f7ff, #8fc6ef);
-  border: 2px solid rgba(20, 32, 51, 0.16);
-  border-radius: 80px 80px 10px 10px;
-}
-
-.car-window {
-  position: absolute;
-  left: 150px;
-  top: -38px;
-  width: 88px;
-  height: 48px;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 42px 42px 8px 8px;
-}
-
-.wheel {
-  position: absolute;
-  bottom: -28px;
-  width: 58px;
-  height: 58px;
-  background: var(--ink);
-  border: 10px solid #d8e4ef;
-  border-radius: 50%;
-}
-
-.wheel-one {
-  left: 76px;
-}
-
-.wheel-two {
-  right: 76px;
-}
-
-.price-tag {
-  position: absolute;
-  right: 74px;
-  top: 32px;
+  inset: 12px;
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 72px;
-  color: #fff;
-  background: var(--red);
-  border-radius: 8px;
-  font-size: 30px;
-  font-weight: 900;
-  transform: rotate(-6deg);
+}
+
+.hero-car-card svg {
+  display: block;
+  width: min(96%, 720px);
+  height: auto;
 }
 
 .valuation-card,
@@ -600,6 +523,10 @@ input::placeholder {
   display: grid;
   place-items: center;
   padding: 20px;
+}
+
+.modal-shell[hidden] {
+  display: none;
 }
 
 .modal-backdrop {
