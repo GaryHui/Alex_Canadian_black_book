@@ -14,6 +14,8 @@ const modal = document.querySelector("#modal");
 const startOver = document.querySelector("#start-over");
 const makeList = document.querySelector("#make-list");
 const modelList = document.querySelector("#model-list");
+const vinHelpButton = document.querySelector("#vin-help");
+const vinGuide = document.querySelector("#vin-guide");
 const customerAuthTitle = document.querySelector("#customer-auth-title");
 const customerAuthSubtitle = document.querySelector("#customer-auth-subtitle");
 const customerLoginButton = document.querySelector("#customer-login");
@@ -120,6 +122,18 @@ const text = {
     toolThreeText: "A dealer can review the saved quote and provide a second opinion.",
     toolFourTitle: "Customer history",
     toolFourText: "Logged-in customers can keep track of prior quotes on the dealer side.",
+    vinGuideEyebrow: "VIN help",
+    vinGuideTitle: "Where to find your VIN",
+    vinGuideIntro: "Your VIN is a 17-character vehicle ID. It helps match the estimate to the correct year, make, model, and trim.",
+    vinSpotOneTitle: "Driver-side dashboard",
+    vinSpotOneText: "Look through the windshield near the lower corner on the driver side.",
+    vinSpotTwoTitle: "Driver door label",
+    vinSpotTwoText: "Open the driver door and check the label on the door jamb or pillar.",
+    vinSpotThreeTitle: "Engine bay or front frame",
+    vinSpotThreeText: "Some vehicles show the VIN under the hood or on a front frame area.",
+    vinSpotFourTitle: "Registration or insurance",
+    vinSpotFourText: "If you cannot access the car, check your registration, insurance card, or bill of sale.",
+    vinGuideNote: "Tip: most modern VINs are 17 characters and do not use the letters I, O, or Q.",
     authChecking: "Checking sign-in...",
     authRequired: "Google sign-in is required before valuation.",
     authReady: "Signed in as",
@@ -202,6 +216,18 @@ const text = {
     toolThreeText: "Un concessionnaire peut revoir le devis enregistré et donner un second avis.",
     toolFourTitle: "Historique client",
     toolFourText: "Les clients connectés peuvent consulter leurs anciens devis côté concessionnaire.",
+    vinGuideEyebrow: "Aide NIV",
+    vinGuideTitle: "Où trouver votre NIV",
+    vinGuideIntro: "Le NIV est un identifiant de 17 caractères. Il aide à associer l'estimation à la bonne année, marque, modèle et version.",
+    vinSpotOneTitle: "Tableau de bord côté conducteur",
+    vinSpotOneText: "Regardez à travers le pare-brise, dans le coin inférieur du côté conducteur.",
+    vinSpotTwoTitle: "Étiquette de la porte conducteur",
+    vinSpotTwoText: "Ouvrez la porte conducteur et vérifiez l'étiquette sur le montant ou le cadre de porte.",
+    vinSpotThreeTitle: "Compartiment moteur ou cadre avant",
+    vinSpotThreeText: "Certains véhicules affichent le NIV sous le capot ou près d'une zone du cadre avant.",
+    vinSpotFourTitle: "Immatriculation ou assurance",
+    vinSpotFourText: "Si vous n'avez pas accès au véhicule, vérifiez l'immatriculation, l'assurance ou l'acte de vente.",
+    vinGuideNote: "Conseil : la plupart des NIV modernes comptent 17 caractères et n'utilisent pas les lettres I, O ou Q.",
     authChecking: "Vérification de la connexion...",
     authRequired: "Une connexion Google est requise avant l'évaluation.",
     authReady: "Connecté avec",
@@ -257,6 +283,9 @@ function initialize() {
   form.elements.mode.forEach((item) => item.addEventListener("change", updateMode));
   form.elements.make.addEventListener("input", syncModelList);
   languageToggle.addEventListener("click", () => setLanguage(language === "en" ? "fr" : "en"));
+  vinHelpButton.addEventListener("click", () => {
+    vinGuide.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
   postalHelp.addEventListener("click", openModal);
   modal.querySelectorAll("[data-close-modal]").forEach((item) => item.addEventListener("click", closeModal));
   startOver.addEventListener("click", resetCustomerFlow);

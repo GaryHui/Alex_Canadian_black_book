@@ -144,7 +144,7 @@
                 <span data-i18n="vinLabel">VIN</span>
                 <span class="field-with-info">
                   <input name="vin" maxlength="17" autocomplete="off" data-i18n-placeholder="vinPlaceholder" placeholder="17-character VIN" />
-                  <span class="info-dot" title="Vehicle Identification Number">i</span>
+                  <button id="vin-help" class="info-dot" type="button" title="Vehicle Identification Number">i</button>
                 </span>
               </label>
             </div>
@@ -177,6 +177,85 @@
 
           <p id="customer-status" class="status" role="status" aria-live="polite"></p>
         </section>
+      </section>
+
+      <section id="vin-guide" class="vin-guide-section">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="vinGuideEyebrow">VIN help</p>
+          <h2 data-i18n="vinGuideTitle">Where to find your VIN</h2>
+          <p data-i18n="vinGuideIntro">
+            Your VIN is a 17-character vehicle ID. It helps match the estimate to the correct year, make, model, and trim.
+          </p>
+        </div>
+        <div class="vin-guide-layout">
+          <div class="vin-car-map" aria-hidden="true">
+            <svg viewBox="0 0 720 360">
+              <defs>
+                <linearGradient id="vinBody" x1="0" x2="1">
+                  <stop offset="0" stop-color="#f7fbff" />
+                  <stop offset="1" stop-color="#dbeeff" />
+                </linearGradient>
+              </defs>
+              <path d="M82 248 C118 190 179 158 258 154 L316 92 C348 60 394 44 453 45 L545 47 C604 51 649 83 680 144 L702 228 C652 256 161 272 82 248Z" fill="url(#vinBody)" stroke="#b8c7d9" stroke-width="3" />
+              <path d="M285 151 L330 101 C354 76 388 66 431 67 L538 69 C579 72 613 95 635 133 L653 166 Z" fill="#93c5e8" opacity="0.78" />
+              <circle cx="220" cy="256" r="48" fill="#142033" />
+              <circle cx="220" cy="256" r="23" fill="#d9e1ec" />
+              <circle cx="574" cy="256" r="48" fill="#142033" />
+              <circle cx="574" cy="256" r="23" fill="#d9e1ec" />
+              <path d="M338 103 L323 168" stroke="#fff" stroke-width="7" opacity="0.76" />
+              <path d="M86 271 C210 296 488 300 686 272" stroke="#2f8f83" stroke-width="8" opacity="0.34" />
+              <g class="pin">
+                <circle cx="338" cy="178" r="15" />
+                <text x="338" y="183">1</text>
+              </g>
+              <g class="pin">
+                <circle cx="282" cy="204" r="15" />
+                <text x="282" y="209">2</text>
+              </g>
+              <g class="pin">
+                <circle cx="150" cy="194" r="15" />
+                <text x="150" y="199">3</text>
+              </g>
+              <g class="pin">
+                <circle cx="126" cy="232" r="15" />
+                <text x="126" y="237">4</text>
+              </g>
+            </svg>
+          </div>
+          <div class="vin-guide-list">
+            <article>
+              <span>1</span>
+              <div>
+                <h3 data-i18n="vinSpotOneTitle">Driver-side dashboard</h3>
+                <p data-i18n="vinSpotOneText">Look through the windshield near the lower corner on the driver side.</p>
+              </div>
+            </article>
+            <article>
+              <span>2</span>
+              <div>
+                <h3 data-i18n="vinSpotTwoTitle">Driver door label</h3>
+                <p data-i18n="vinSpotTwoText">Open the driver door and check the label on the door jamb or pillar.</p>
+              </div>
+            </article>
+            <article>
+              <span>3</span>
+              <div>
+                <h3 data-i18n="vinSpotThreeTitle">Engine bay or front frame</h3>
+                <p data-i18n="vinSpotThreeText">Some vehicles show the VIN under the hood or on a front frame area.</p>
+              </div>
+            </article>
+            <article>
+              <span>4</span>
+              <div>
+                <h3 data-i18n="vinSpotFourTitle">Registration or insurance</h3>
+                <p data-i18n="vinSpotFourText">If you cannot access the car, check your registration, insurance card, or bill of sale.</p>
+              </div>
+            </article>
+          </div>
+        </div>
+        <p class="vin-note" data-i18n="vinGuideNote">
+          Tip: most modern VINs are 17 characters and do not use the letters I, O, or Q.
+        </p>
       </section>
 
       <section id="choice-section" class="choice-section" hidden>

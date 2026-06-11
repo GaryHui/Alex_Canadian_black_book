@@ -383,6 +383,7 @@ select:focus {
   margin: 0;
   color: #fff;
   background: #9aa8b8;
+  border: 0;
   border-radius: 50%;
   font-size: 12px;
   font-weight: 900;
@@ -420,9 +421,105 @@ input::placeholder {
 
 .choice-section,
 .result-section,
+.vin-guide-section,
 .tools-section {
   margin: 0 0 64px;
   padding: clamp(22px, 4vw, 34px);
+}
+
+.vin-guide-section {
+  background: #fff;
+  border: 1px solid rgba(217, 225, 236, 0.9);
+  border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(20, 32, 51, 0.08);
+}
+
+.vin-guide-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 0.92fr);
+  gap: clamp(18px, 4vw, 38px);
+  align-items: center;
+  margin-top: 26px;
+}
+
+.vin-car-map {
+  min-height: 270px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 80% 16%, rgba(244, 185, 66, 0.2), transparent 25%),
+    linear-gradient(180deg, #f7fbff, #eef7ff);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.vin-car-map svg {
+  width: min(100%, 680px);
+  height: auto;
+}
+
+.pin circle {
+  fill: var(--red);
+  stroke: #fff;
+  stroke-width: 4;
+}
+
+.pin text {
+  fill: #fff;
+  font-size: 15px;
+  font-weight: 900;
+  text-anchor: middle;
+}
+
+.vin-guide-list {
+  display: grid;
+  gap: 12px;
+}
+
+.vin-guide-list article {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 12px;
+  padding: 14px;
+  background: #fbfdff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.vin-guide-list article > span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: #fff;
+  background: var(--blue);
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.vin-guide-list h3 {
+  margin: 0 0 5px;
+  font-size: 16px;
+}
+
+.vin-guide-list p,
+.vin-note {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.vin-guide-list p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.vin-note {
+  margin: 20px 0 0;
+  padding: 12px 14px;
+  background: #fff8e8;
+  border: 1px solid rgba(244, 185, 66, 0.42);
+  border-radius: 8px;
 }
 
 .choice-list {
@@ -655,6 +752,7 @@ input::placeholder {
   .mode-panel,
   .split-row,
   .value-cards,
+  .vin-guide-layout,
   .tool-grid {
     grid-template-columns: 1fr;
   }
