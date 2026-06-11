@@ -230,19 +230,10 @@ BLACKBOOK_BASE_URL=https://service.canadianblackbook.com
 BLACKBOOK_API_PATH=/UsedCarWS/CanUsedAPI
 ```
 
-Optional: send every successful Generate result to a Google Form:
+Send every successful Generate result to Google Sheet through Apps Script:
 
 ```text
 LEAD_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_APPS_SCRIPT_WEB_APP_ID/exec
-GOOGLE_FORM_ACTION_URL=https://docs.google.com/forms/d/e/YOUR_PUBLIC_FORM_ID/formResponse
-GOOGLE_FORM_FIELD_MAP={"email":"entry.111","phone":"entry.222","vin":"entry.333","year":"entry.444","make":"entry.555","model":"entry.666","series":"entry.777","style":"entry.888","kilometers":"entry.999","color":"entry.101","region":"entry.102","wholesaleAvg":"entry.103","retailAvg":"entry.104","tradeInAvg":"entry.105","cbbJson":"entry.106"}
-```
-
-For a quick test with only one Google Form paragraph question, use:
-
-```text
-GOOGLE_FORM_ACTION_URL=https://docs.google.com/forms/d/e/YOUR_PUBLIC_FORM_ID/formResponse
-GOOGLE_FORM_JSON_ENTRY=entry.111
 ```
 
 Important checks:
@@ -315,95 +306,7 @@ To change to another website owner's Google Sheet later:
 3. Replace `LEAD_WEBHOOK_URL` in Vercel Production.
 4. Redeploy Vercel.
 
-## 7. Google Form Lead Sync
-
-Google Form sync is optional. Supabase remains the main database. When configured, every successful `Generate` result is also submitted to the Google Form.
-
-Important: use the published form, not the edit form.
-
-The edit URL looks like:
-
-```text
-https://docs.google.com/forms/d/FORM_ID/edit
-```
-
-That is only for editing. The app needs the submit URL:
-
-```text
-https://docs.google.com/forms/d/e/PUBLIC_FORM_ID/formResponse
-```
-
-Setup steps:
-
-1. In Google Forms, create one short-answer or paragraph question for each field:
-
-```text
-Customer Email
-Phone
-VIN
-Year
-Make
-Model
-Series / Trim
-Style
-Kilometers
-Color
-Region
-Wholesale AVG
-Retail AVG
-Trade-In AVG
-Full CBB JSON
-```
-
-2. Click `Publish`.
-
-3. Open the published form link in a browser.
-
-4. Right click the page and choose `View page source`, then search for `entry.`.
-
-5. Copy each `entry.xxxxx` and map it to the matching field in `GOOGLE_FORM_FIELD_MAP`.
-
-Example:
-
-```text
-GOOGLE_FORM_FIELD_MAP={"email":"entry.111111","phone":"entry.222222","vin":"entry.333333","year":"entry.444444","make":"entry.555555","model":"entry.666666","series":"entry.777777","style":"entry.888888","kilometers":"entry.999999","color":"entry.101010","region":"entry.111222","wholesaleAvg":"entry.222333","retailAvg":"entry.333444","tradeInAvg":"entry.444555","cbbJson":"entry.555666"}
-```
-
-Supported map keys:
-
-```text
-email
-phone
-vin
-uvc
-year
-make
-model
-series
-style
-kilometers
-color
-region
-country
-wholesaleAvg
-retailAvg
-tradeInAvg
-cbbJson
-```
-
-Quick test option:
-
-If you do not want to create all fields yet, create one paragraph question named `Full Submission JSON`, publish the form, and set:
-
-```text
-GOOGLE_FORM_JSON_ENTRY=entry.111111
-```
-
-The app will submit the whole lead and valuation result as JSON to that one field.
-
-The current test form must be published before it can receive submissions. If the published form page says `This document is not published`, Google will reject the sync.
-
-## 8. Local Environment
+## 7. Local Environment
 
 For local testing, create:
 
@@ -422,8 +325,6 @@ SUPABASE_URL=your_supabase_project_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 LEAD_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_APPS_SCRIPT_WEB_APP_ID/exec
-GOOGLE_FORM_ACTION_URL=https://docs.google.com/forms/d/e/YOUR_PUBLIC_FORM_ID/formResponse
-GOOGLE_FORM_FIELD_MAP={"email":"entry.111","phone":"entry.222","vin":"entry.333","year":"entry.444","make":"entry.555","model":"entry.666","series":"entry.777","style":"entry.888","kilometers":"entry.999","color":"entry.101","region":"entry.102","wholesaleAvg":"entry.103","retailAvg":"entry.104","tradeInAvg":"entry.105","cbbJson":"entry.106"}
 PORT=3000
 ```
 
@@ -440,7 +341,7 @@ Open:
 http://localhost:3000
 ```
 
-## 9. Admin Page
+## 8. Admin Page
 
 Open:
 
