@@ -837,7 +837,10 @@ function renderHistory(leads) {
           <span>Retail ${formatHistoryValue(retailAvg)}</span>
           <span>Trade-In ${formatHistoryValue(tradeInAvg)}</span>
         </div>
-        <button type="button" data-history-index="${index}">View result</button>
+        <div class="history-actions">
+          <button type="button" data-history-index="${index}">View result</button>
+          <button class="danger" type="button" data-delete-lead-id="${escapeHtml(lead.id || "")}" data-delete-title="${escapeHtml(title)}">Delete</button>
+        </div>
       </article>
     `;
   }).join("");
@@ -845,6 +848,45 @@ function renderHistory(leads) {
   historyList.querySelectorAll("[data-history-index]").forEach((button) => {
     button.addEventListener("click", () => showHistoryResult(historyLeads[Number(button.dataset.historyIndex)]));
   });
+
+  historyList.querySelectorAll("[data-delete-lead-id]").forEach((button) => {
+    button.addEventListener("click", () => deleteHistoryLead(button));
+  });
+}
+
+async function deleteHistoryLead(button) {
+  const id = button.dataset.deleteLeadId || "";
+  const title = button.dataset.deleteTitle || "this quote";
+  if (!id || !authSession?.access_token) return;
+
+  const confirmed = window.confirm(
+    `Delete "${title}" from your quote history?\n\nThis cannot be undone and it will not restore your annual valuation allowance.`
+  );
+  if (!confirmed) return;
+
+  button.disabled = true;
+  button.textContent = "Deleting...";
+  historyStatus.textContent = "Deleting quote history item...";
+
+  try {
+    const response = await fetch(`/api/my-leads?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${authSession.access_token}`
+      }
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to delete quote");
+
+    historyLeads = historyLeads.filter((lead) => lead.id !== id);
+    renderHistory(historyLeads);
+    historyStatus.textContent = "Quote deleted. Annual valuation allowance was not restored.";
+    await loadUsage();
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = "Delete";
+    historyStatus.textContent = error.message || "Unable to delete quote";
+  }
 }
 
 function showHistoryResult(lead) {

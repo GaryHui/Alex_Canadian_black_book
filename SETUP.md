@@ -460,6 +460,26 @@ the user will see:
 2026 valuation limit reached. Please email sales@example.com for more valuations.
 ```
 
+### Quote History Deletion
+
+Users can delete items from their own `Quote history`.
+
+This deletion is intentionally irreversible from the customer UI and does not restore the user's yearly valuation allowance.
+
+Implementation detail:
+
+```text
+DELETE /api/my-leads?id=<lead_id>
+```
+
+The backend marks the lead status as:
+
+```text
+deleted
+```
+
+The row is hidden from the user's `Quote history`, but it remains in Supabase so the yearly usage count still includes the successful valuation.
+
 ### How The Owner Changes A User's Allowance
 
 Open:

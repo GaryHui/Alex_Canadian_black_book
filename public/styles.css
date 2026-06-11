@@ -758,6 +758,22 @@ select {
   justify-self: start;
 }
 
+.history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.history-actions .danger {
+  background: var(--red);
+  color: #fff;
+}
+
+.history-actions button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .admin-shell {
   background: #fff;
   min-height: 100vh;

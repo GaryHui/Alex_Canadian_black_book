@@ -105,6 +105,13 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, result.ok ? 200 : 500, result);
     }
 
+    if (req.method === "DELETE" && url.pathname === "/api/my-leads") {
+      const auth = await requireUser(req);
+      if (!auth.ok) return sendJson(res, auth.status, { ok: false, error: auth.error });
+      const result = await deleteMyLead(auth.user, url.searchParams.get("id") || "");
+      return sendJson(res, result.ok ? 200 : result.status || 400, result);
+    }
+
     if (url.pathname === "/api/leads") {
       if (req.method === "PATCH") {
         const admin = await requireAdmin(req);
@@ -677,10 +684,52 @@ async function listMyLeads(user) {
   }
 
   const leads = [...rowsById.values()]
+    .filter((lead) => String(lead.status || "").toLowerCase() !== "deleted")
     .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
     .slice(0, 50);
 
   return { ok: true, storage: "supabase", leads };
+}
+
+async function deleteMyLead(user, id) {
+  const leadId = String(id || "").trim();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!leadId) return { ok: false, status: 400, error: "Lead id is required" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const lookup = await fetch(`${url}/rest/v1/valuation_leads?select=id,auth_user_id,auth_email,status&id=eq.${encodeURIComponent(leadId)}&limit=1`, {
+    headers: supabaseServiceHeaders(key)
+  });
+  const rows = await lookup.json().catch(() => []);
+  if (!lookup.ok) return { ok: false, status: lookup.status, error: rows };
+
+  const lead = rows?.[0];
+  if (!lead) return { ok: false, status: 404, error: "Quote not found" };
+
+  const leadUserId = String(lead.auth_user_id || "").trim();
+  const leadEmail = String(lead.auth_email || "").trim().toLowerCase();
+  const userId = String(user.id || "").trim();
+  const email = String(user.email || "").trim().toLowerCase();
+  const ownsLead = (leadUserId && leadUserId === userId) || (leadEmail && leadEmail === email);
+  if (!ownsLead) return { ok: false, status: 403, error: "You can only delete your own quote history" };
+
+  const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify({
+      status: "deleted",
+      notes: "Deleted by customer from quote history. This does not restore valuation allowance."
+    })
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+  return { ok: true, lead: data?.[0] || null };
 }
 
 async function updateLead(body) {
