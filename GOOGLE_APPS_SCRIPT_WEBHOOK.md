@@ -393,6 +393,27 @@ Deploy
 
 If you do not create a new version, the website may still call the old script code.
 
+Important: running `installHeaders` is not enough after changing the script.
+
+`installHeaders` updates the spreadsheet layout only. The website calls the deployed `/exec` URL, and that URL keeps using the old code until you deploy a new version.
+
+If `Leads` still receives `Full CBB JSON` and `CBB Raw` stays empty, the deployed Web App is still old. Do this exact update:
+
+```text
+Deploy > Manage deployments > Edit pencil icon > Version: New version > Deploy
+```
+
+Then open the Web App `/exec` URL in a browser. The response must include:
+
+```json
+{
+  "leadsSheetName": "Leads",
+  "rawSheetName": "CBB Raw"
+}
+```
+
+If the response still says only `sheetName` and `lastRow`, you are still calling the old deployment.
+
 ## 8. Configure Vercel
 
 Open:
