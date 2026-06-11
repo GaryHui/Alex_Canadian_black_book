@@ -25,6 +25,9 @@ const customerAuthTitle = document.querySelector("#customer-auth-title");
 const customerAuthSubtitle = document.querySelector("#customer-auth-subtitle");
 const customerLoginButton = document.querySelector("#customer-login");
 const customerLogoutButton = document.querySelector("#customer-logout");
+const customerTurnstileWrap = document.querySelector("#customer-turnstile-wrap");
+const customerTurnstile = document.querySelector("#customer-turnstile");
+const customerTurnstileStatus = document.querySelector("#customer-turnstile-status");
 const quotaPanel = document.querySelector("#customer-quota");
 const quotaTitle = document.querySelector("#quota-title");
 const quotaSubtitle = document.querySelector("#quota-subtitle");
@@ -167,6 +170,9 @@ const text = {
     authMissing: "Google sign-in is not configured yet.",
     authUnverified: "Please verify your email before generating a valuation.",
     loginButton: "Continue with Google",
+    verifyHuman: "Please complete the human verification first.",
+    verifyHumanReady: "Human verification passed.",
+    verifyHumanFailed: "Human verification failed. Please try again.",
     logoutButton: "Sign out",
     quotaLabel: "Annual valuations",
     quotaChecking: "Checking...",
@@ -314,6 +320,9 @@ const text = {
     authMissing: "La connexion Google n'est pas encore configurée.",
     authUnverified: "Veuillez vérifier votre courriel avant de générer une évaluation.",
     loginButton: "Continuer avec Google",
+    verifyHuman: "Veuillez completer la verification humaine.",
+    verifyHumanReady: "Verification humaine reussie.",
+    verifyHumanFailed: "La verification humaine a echoue. Veuillez reessayer.",
     logoutButton: "Déconnexion",
     quotaLabel: "Évaluations annuelles",
     quotaChecking: "Vérification...",
@@ -404,6 +413,7 @@ let authSession = null;
 let usageState = null;
 let historyLeads = [];
 let siteUrl = window.location.origin;
+let customerTurnstileGate = null;
 
 const MAX_PHOTO_COUNT = 6;
 const MAX_PHOTO_EDGE = 1400;
@@ -487,6 +497,15 @@ async function initializeCustomerAuth() {
   }
 
   siteUrl = config.siteUrl || window.location.origin;
+  customerTurnstileGate = window.createTurnstileGate?.({
+    siteKey: config.turnstileSiteKey,
+    container: customerTurnstile,
+    button: customerLoginButton,
+    statusEl: customerTurnstileStatus,
+    waitingText: t("verifyHuman"),
+    readyText: t("verifyHumanReady"),
+    failedText: t("verifyHumanFailed")
+  }) || null;
   supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: {
       flowType: "pkce",
@@ -508,6 +527,7 @@ async function signInCustomer() {
     statusEl.textContent = t("authMissing");
     return;
   }
+  if (customerTurnstileGate && !customerTurnstileGate.canProceed()) return;
   await supabaseClient.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -527,6 +547,9 @@ function setCustomerSession(session) {
   const email = session?.user?.email || "";
   customerLoginButton.hidden = Boolean(session?.user);
   customerLogoutButton.hidden = !session?.user;
+  if (customerTurnstileWrap && customerTurnstileGate?.enabled) {
+    customerTurnstileWrap.hidden = Boolean(session?.user);
+  }
 
   if (session?.user) {
     customerAuthTitle.textContent = `${t("authReady")} ${email}`;

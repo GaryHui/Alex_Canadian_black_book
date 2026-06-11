@@ -261,6 +261,18 @@ h1 {
   line-height: 1.35;
 }
 
+.turnstile-wrap {
+  display: grid;
+  gap: 6px;
+  max-width: 320px;
+}
+
+.turnstile-wrap small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .customer-quota {
   min-width: 160px;
   padding-left: 18px;

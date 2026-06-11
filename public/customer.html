@@ -103,6 +103,10 @@
               <small id="quota-subtitle"></small>
             </div>
             <button id="customer-login" class="ghost-button" type="button" hidden data-i18n="loginButton">Continue with Google</button>
+            <div class="turnstile-wrap" id="customer-turnstile-wrap" hidden>
+              <div id="customer-turnstile"></div>
+              <small id="customer-turnstile-status"></small>
+            </div>
             <button id="customer-logout" class="ghost-button" type="button" hidden data-i18n="logoutButton">Sign out</button>
           </div>
 
@@ -495,6 +499,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/turnstile.js"></script>
     <script src="/customer.js"></script>
   </body>
 </html>

@@ -16,6 +16,10 @@
         <div class="admin-actions">
           <span id="admin-auth-status">Checking admin sign-in...</span>
           <button id="admin-login" type="button" hidden>Sign in with Google</button>
+          <div class="turnstile-wrap" id="admin-turnstile-wrap" hidden>
+            <div id="admin-turnstile"></div>
+            <small id="admin-turnstile-status"></small>
+          </div>
           <button id="admin-logout" type="button" hidden>Sign out</button>
           <a href="/">Back to demo</a>
         </div>
@@ -64,6 +68,7 @@
       </section>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/turnstile.js"></script>
     <script src="/admin.js"></script>
   </body>
 </html>

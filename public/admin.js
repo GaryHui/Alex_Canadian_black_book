@@ -12,9 +12,13 @@ const adminAuthStatus = document.querySelector("#admin-auth-status");
 const adminLoginButton = document.querySelector("#admin-login");
 const adminLogoutButton = document.querySelector("#admin-logout");
 const adminContent = document.querySelector("#admin-content");
+const adminTurnstileWrap = document.querySelector("#admin-turnstile-wrap");
+const adminTurnstile = document.querySelector("#admin-turnstile");
+const adminTurnstileStatus = document.querySelector("#admin-turnstile-status");
 
 let supabaseClient = null;
 let adminSession = null;
+let adminTurnstileGate = null;
 
 reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", loadLeads);
@@ -34,6 +38,15 @@ async function initializeAdminAuth() {
     return;
   }
 
+  adminTurnstileGate = window.createTurnstileGate?.({
+    siteKey: config.turnstileSiteKey,
+    container: adminTurnstile,
+    button: adminLoginButton,
+    statusEl: adminTurnstileStatus,
+    waitingText: "Complete the human verification first.",
+    readyText: "Human verification passed.",
+    failedText: "Human verification failed. Please try again."
+  }) || null;
   supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: {
       flowType: "pkce",
@@ -52,6 +65,7 @@ async function initializeAdminAuth() {
 
 async function signInAdmin() {
   if (!supabaseClient) return;
+  if (adminTurnstileGate && !adminTurnstileGate.canProceed()) return;
   const redirectTo = `${window.location.origin}/admin.html`;
   await supabaseClient.auth.signInWithOAuth({
     provider: "google",
@@ -69,6 +83,9 @@ async function setAdminSession(session) {
   adminLoginButton.hidden = !!session?.user;
   adminLogoutButton.hidden = !session?.user;
   adminContent.hidden = !session?.user;
+  if (adminTurnstileWrap && adminTurnstileGate?.enabled) {
+    adminTurnstileWrap.hidden = Boolean(session?.user);
+  }
 
   if (!session?.user) {
     adminAuthStatus.textContent = "Admin Google sign-in required.";

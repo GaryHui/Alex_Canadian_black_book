@@ -37,6 +37,10 @@ const server = http.createServer(async (req, res) => {
       return sendFile(res, path.join(__dirname, "public", "customer.html"), "text/html; charset=utf-8");
     }
 
+    if (req.method === "GET" && url.pathname === "/login.html") {
+      return sendFile(res, path.join(__dirname, "public", "login.html"), "text/html; charset=utf-8");
+    }
+
     if (req.method === "GET" && url.pathname === "/styles.css") {
       return sendFile(res, path.join(__dirname, "public", "styles.css"), "text/css; charset=utf-8");
     }
@@ -53,6 +57,14 @@ const server = http.createServer(async (req, res) => {
       return sendFile(res, path.join(__dirname, "public", "customer.js"), "application/javascript; charset=utf-8");
     }
 
+    if (req.method === "GET" && url.pathname === "/login.js") {
+      return sendFile(res, path.join(__dirname, "public", "login.js"), "application/javascript; charset=utf-8");
+    }
+
+    if (req.method === "GET" && url.pathname === "/turnstile.js") {
+      return sendFile(res, path.join(__dirname, "public", "turnstile.js"), "application/javascript; charset=utf-8");
+    }
+
     if (req.method === "GET" && url.pathname === "/admin.js") {
       return sendFile(res, path.join(__dirname, "public", "admin.js"), "application/javascript; charset=utf-8");
     }
@@ -65,8 +77,14 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, {
         supabaseUrl: process.env.SUPABASE_URL || "",
         supabaseAnonKey: process.env.SUPABASE_ANON_KEY || "",
-        siteUrl: process.env.PUBLIC_SITE_URL || "http://localhost:3000"
+        siteUrl: process.env.PUBLIC_SITE_URL || "http://localhost:3000",
+        turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || ""
       });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/turnstile-verify") {
+      const body = await readJson(req);
+      return sendJson(res, 200, await verifyTurnstile(body, req));
     }
 
     if (req.method === "GET" && url.pathname === "/api/usage") {
@@ -241,6 +259,34 @@ function readJson(req) {
       }
     });
   });
+}
+
+async function verifyTurnstile(body, req) {
+  const secret = process.env.TURNSTILE_SECRET_KEY || "";
+  if (!secret) return { ok: true, skipped: true };
+
+  const token = String(body?.token || "").trim();
+  if (!token) return { ok: false, error: "Human verification token is missing." };
+
+  const form = new URLSearchParams();
+  form.set("secret", secret);
+  form.set("response", token);
+  const ip = req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"];
+  if (ip) form.set("remoteip", String(ip).split(",")[0].trim());
+
+  try {
+    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      body: form
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!data.success) {
+      return { ok: false, error: "Human verification failed.", codes: data["error-codes"] || [] };
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error.message || "Human verification failed." };
+  }
 }
 
 async function requireAdmin(req) {

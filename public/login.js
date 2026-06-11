@@ -1,7 +1,11 @@
 const loginButton = document.querySelector("#google-login");
 const statusEl = document.querySelector("#login-status");
+const turnstileWrap = document.querySelector("#login-turnstile-wrap");
+const turnstileContainer = document.querySelector("#login-turnstile");
+const turnstileStatus = document.querySelector("#login-turnstile-status");
 let client = null;
 let siteUrl = window.location.origin;
+let turnstileGate = null;
 const nextPath = safeNextPath(new URLSearchParams(window.location.search).get("next") || "/");
 
 initializeLogin();
@@ -13,6 +17,10 @@ loginButton.addEventListener("click", async () => {
   }
 
   statusEl.textContent = "Redirecting to Google...";
+  if (turnstileGate && !turnstileGate.canProceed()) {
+    statusEl.textContent = "Complete the human verification first.";
+    return;
+  }
   await client.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -30,6 +38,16 @@ async function initializeLogin() {
   }
 
   siteUrl = config.siteUrl || window.location.origin;
+  turnstileGate = window.createTurnstileGate?.({
+    siteKey: config.turnstileSiteKey,
+    container: turnstileContainer,
+    button: loginButton,
+    statusEl: turnstileStatus,
+    waitingText: "Complete the human verification first.",
+    readyText: "Human verification passed.",
+    failedText: "Human verification failed. Please try again."
+  }) || null;
+  if (turnstileWrap && turnstileGate?.enabled) turnstileWrap.hidden = false;
   client = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: {
       flowType: "pkce",

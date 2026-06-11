@@ -104,6 +104,18 @@ h1 {
   opacity: 0.5;
 }
 
+.turnstile-wrap {
+  display: grid;
+  gap: 6px;
+  max-width: 320px;
+}
+
+.turnstile-wrap small {
+  color: #666;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .quota-panel {
   border-left: 1px solid #ddd;
   margin-left: auto;

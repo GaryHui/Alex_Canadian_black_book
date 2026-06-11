@@ -13,10 +13,11 @@ Follow this order:
 4. Enable Google provider in Supabase.
 5. Configure Supabase URL settings.
 6. Add environment variables in Vercel.
-7. Redeploy Vercel.
-8. Test Google login.
-9. Test vehicle lookup and lead capture.
-10. Check captured leads in admin page.
+7. Optional: add Cloudflare Turnstile human verification.
+8. Redeploy Vercel.
+9. Test Google login.
+10. Test vehicle lookup and lead capture.
+11. Check captured leads in admin page.
 ```
 
 ## 1. Create Supabase Project
@@ -221,6 +222,15 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 PUBLIC_SITE_URL=https://blackbook-demo.vercel.app
 ```
 
+Optional human verification before Google login:
+
+```text
+TURNSTILE_SITE_KEY=your_cloudflare_turnstile_site_key
+TURNSTILE_SECRET_KEY=your_cloudflare_turnstile_secret_key
+```
+
+If these two Turnstile variables are empty, Google login works exactly as before and no verification box is shown.
+
 Add Black Book credentials:
 
 ```text
@@ -252,7 +262,72 @@ After adding variables, redeploy:
 Vercel > Deployments > Redeploy
 ```
 
-## 6. Apps Script / CRM Webhook Lead Sync
+## 6. Optional Human Verification Before Google Login
+
+Google OAuth already has Google's own risk checks. Cloudflare Turnstile adds a website-level human verification step before the user can click `Continue with Google`.
+
+Create Turnstile keys:
+
+```text
+Cloudflare Dashboard > Turnstile > Add site
+```
+
+Use the production domain:
+
+```text
+blackbook-demo.vercel.app
+```
+
+For local testing, also allow:
+
+```text
+localhost
+```
+
+Copy:
+
+```text
+Site Key
+Secret Key
+```
+
+Add them in Vercel:
+
+```text
+TURNSTILE_SITE_KEY=...
+TURNSTILE_SECRET_KEY=...
+```
+
+Then redeploy Vercel.
+
+How it works:
+
+```text
+1. User opens the customer login, dealer login, admin login, or /login.html.
+2. If TURNSTILE_SITE_KEY is configured, the page shows a human verification widget.
+3. The Google login button stays disabled until Turnstile is completed.
+4. The browser sends the Turnstile token to /api/turnstile-verify.
+5. The server verifies the token using TURNSTILE_SECRET_KEY.
+6. Only after verification passes does the page allow the Google OAuth redirect.
+```
+
+If the widget does not appear:
+
+```text
+Check TURNSTILE_SITE_KEY in Vercel.
+Redeploy Vercel after changing the variable.
+Check the domain is allowed in Cloudflare Turnstile.
+```
+
+If the widget appears but login stays disabled:
+
+```text
+Check TURNSTILE_SECRET_KEY in Vercel.
+Redeploy Vercel.
+Try completing the widget again.
+```
+
+## 7. Apps Script / CRM Webhook Lead Sync
 
 This is the recommended owner workflow. Supabase remains the main database, and the webhook sends a clean copy of every successful `Generate` result to Google Apps Script, Google Sheet automation, Make/Zapier, or a CRM webhook.
 
@@ -316,7 +391,7 @@ To change to another website owner's Google Sheet later:
 
 If `Full CBB JSON` appears in `Leads` again, the website is still calling an old Apps Script deployment or Vercel was not redeployed after changing `LEAD_WEBHOOK_URL`.
 
-## 7. Local Environment
+## 8. Local Environment
 
 For local testing, create:
 
@@ -335,6 +410,8 @@ SUPABASE_URL=your_supabase_project_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 LEAD_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_APPS_SCRIPT_WEB_APP_ID/exec
+TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
 PORT=3000
 ```
 
@@ -351,7 +428,7 @@ Open:
 http://localhost:3000
 ```
 
-## 8. Admin Page
+## 9. Admin Page
 
 Open:
 

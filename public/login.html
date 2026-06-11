@@ -13,10 +13,15 @@
         <h1>Sign in to continue</h1>
         <p>Use Google before submitting a valuation request. Dealer tools are restricted to approved admin emails.</p>
         <button id="google-login" type="button">Continue with Google</button>
+        <div class="turnstile-wrap" id="login-turnstile-wrap" hidden>
+          <div id="login-turnstile"></div>
+          <small id="login-turnstile-status"></small>
+        </div>
         <p id="login-status" class="status">Checking login...</p>
       </section>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/turnstile.js"></script>
     <script src="/login.js"></script>
   </body>
 </html>
