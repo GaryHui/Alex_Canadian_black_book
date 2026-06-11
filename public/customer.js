@@ -1,0 +1,678 @@
+const form = document.querySelector("#customer-form");
+const statusEl = document.querySelector("#customer-status");
+const choiceSection = document.querySelector("#choice-section");
+const choiceList = document.querySelector("#choice-list");
+const resultSection = document.querySelector("#result-section");
+const resultTitle = document.querySelector("#result-title");
+const resultMeta = document.querySelector("#result-meta");
+const wholesaleValue = document.querySelector("#wholesale-value");
+const retailValue = document.querySelector("#retail-value");
+const tradeInValue = document.querySelector("#tradein-value");
+const languageToggle = document.querySelector("#language-toggle");
+const postalHelp = document.querySelector("#postal-help");
+const modal = document.querySelector("#modal");
+const startOver = document.querySelector("#start-over");
+const makeList = document.querySelector("#make-list");
+const modelList = document.querySelector("#model-list");
+const customerAuthTitle = document.querySelector("#customer-auth-title");
+const customerAuthSubtitle = document.querySelector("#customer-auth-subtitle");
+const customerLoginButton = document.querySelector("#customer-login");
+const customerLogoutButton = document.querySelector("#customer-logout");
+
+const commonMakes = [
+  "Acura",
+  "Audi",
+  "BMW",
+  "Buick",
+  "Cadillac",
+  "Chevrolet",
+  "Chrysler",
+  "Dodge",
+  "Ford",
+  "Genesis",
+  "GMC",
+  "Honda",
+  "Hyundai",
+  "Infiniti",
+  "Jeep",
+  "Kia",
+  "Land Rover",
+  "Lexus",
+  "Mazda",
+  "Mercedes-Benz",
+  "MINI",
+  "Mitsubishi",
+  "Nissan",
+  "Porsche",
+  "Ram",
+  "Subaru",
+  "Tesla",
+  "Toyota",
+  "Volkswagen",
+  "Volvo"
+];
+
+const commonModels = {
+  Acura: ["ILX", "Integra", "MDX", "RDX", "TLX"],
+  Audi: ["A3", "A4", "A5", "Q3", "Q5", "Q7"],
+  BMW: ["3-Series", "4-Series", "5-Series", "X1", "X3", "X5"],
+  Chevrolet: ["Colorado", "Equinox", "Malibu", "Silverado", "Tahoe", "Traverse"],
+  Ford: ["Bronco", "Escape", "Explorer", "F150", "Mustang"],
+  Honda: ["Accord", "Civic", "CR-V", "HR-V", "Odyssey", "Pilot", "Ridgeline"],
+  Hyundai: ["Elantra", "Kona", "Palisade", "Santa Fe", "Sonata", "Tucson"],
+  Kia: ["Forte", "Seltos", "Sorento", "Soul", "Sportage", "Telluride"],
+  Lexus: ["ES-Series", "IS-Series", "NX-Series", "RX-Series", "UX-Series"],
+  Mazda: ["CX-3", "CX-30", "CX-5", "CX-9", "Mazda3"],
+  "Mercedes-Benz": ["C-Class", "E-Class", "GLA-Class", "GLC-Class", "GLE-Class"],
+  Nissan: ["Altima", "Kicks", "Murano", "Pathfinder", "Rogue", "Sentra"],
+  Subaru: ["Ascent", "Crosstrek", "Forester", "Impreza", "Outback"],
+  Toyota: ["Camry", "Corolla", "Highlander", "RAV4", "Sienna", "Tacoma", "Tundra"],
+  Volkswagen: ["Atlas", "Golf", "Jetta", "Taos", "Tiguan"]
+};
+
+const text = {
+  en: {
+    dealerLink: "Dealer portal",
+    toolsLink: "Tools",
+    eyebrow: "Canadian vehicle valuation",
+    headline: "What could your car be worth?",
+    subhead: "Get a clear market estimate before you trade, sell, or plan your next vehicle.",
+    trustOneTitle: "Fast",
+    trustOneText: "Most estimates take under two minutes.",
+    trustTwoTitle: "Canadian",
+    trustTwoText: "Values are built for Canadian vehicle data.",
+    trustThreeTitle: "Follow-up ready",
+    trustThreeText: "A specialist can review your result if needed.",
+    cardTitle: "Tell us about the car",
+    cardSubtitle: "Get a free value in less than 2 minutes.",
+    stepLabel: "Step 1",
+    modeDrilldown: "Year/Make/Model",
+    modeVin: "VIN",
+    yearLabel: "Year",
+    makeLabel: "Make",
+    modelLabel: "Model",
+    vinLabel: "VIN",
+    postalLabel: "Postal code",
+    odometerLabel: "Odometer",
+    emailLabel: "Email",
+    phoneLabel: "Phone (optional)",
+    postalHelp: "Why do you need my postal code?",
+    ownVehicle: "I own this vehicle",
+    continueButton: "Continue",
+    chooseEyebrow: "Confirm vehicle",
+    chooseTitle: "Choose the closest match",
+    chooseText: "Some vehicles can match more than one trim. Pick the option that best fits your car.",
+    resultEyebrow: "Estimated value",
+    startOver: "Start over",
+    wholesaleAvg: "Wholesale AVG",
+    retailAvg: "Retail AVG",
+    tradeInAvg: "Trade-In AVG",
+    resultNote: "This is an estimate. A dealer may adjust it after reviewing condition, options, and photos.",
+    toolsEyebrow: "Useful tools",
+    toolsTitle: "Plan the next step with confidence",
+    toolsIntro: "These tools help visitors prepare for a trade-in conversation without overwhelming them.",
+    toolOneTitle: "Vehicle value estimate",
+    toolOneText: "Search by VIN or by year, make, and model to get a value range.",
+    toolTwoTitle: "Trade-in preparation",
+    toolTwoText: "Capture mileage, region, ownership, and contact details for follow-up.",
+    toolThreeTitle: "Dealer review",
+    toolThreeText: "A dealer can review the saved quote and provide a second opinion.",
+    toolFourTitle: "Customer history",
+    toolFourText: "Logged-in customers can keep track of prior quotes on the dealer side.",
+    authChecking: "Checking sign-in...",
+    authRequired: "Google sign-in is required before valuation.",
+    authReady: "Signed in as",
+    authReadyHelp: "Your email will be saved with the valuation for follow-up.",
+    authMissing: "Google sign-in is not configured yet.",
+    loginButton: "Continue with Google",
+    logoutButton: "Sign out",
+    postalModalTitle: "Why do you need my postal code?",
+    postalModalText: "Market pricing changes by region. Your postal code helps estimate values near your area.",
+    gotIt: "Got it",
+    makePlaceholder: "Make",
+    modelPlaceholder: "Model",
+    vinPlaceholder: "17-character VIN",
+    postalPlaceholder: "A1A 1A1",
+    odometerPlaceholder: "Kilometers",
+    emailPlaceholder: "you@example.com",
+    phonePlaceholder: "604-000-0000",
+    searching: "Searching vehicle matches...",
+    noMatches: "No matching vehicle was found. Try VIN or add more vehicle details.",
+    chooseRequired: "Choose a vehicle match to continue.",
+    valuing: "Generating your valuation...",
+    saving: "Saving your request for follow-up...",
+    saved: "Your valuation is ready and has been saved for follow-up.",
+    saveIssue: "Your valuation is ready, but the lead receiver did not confirm saving.",
+    pleaseLogin: "Please sign in with Google before generating a valuation.",
+    invalidVin: "Please enter a valid VIN.",
+    required: "Please complete the required fields.",
+    selectText: "Select this vehicle",
+    sourceText: "Source",
+    valueUnavailable: "Not available"
+  },
+  fr: {
+    dealerLink: "Portail concessionnaire",
+    toolsLink: "Outils",
+    eyebrow: "Évaluation automobile canadienne",
+    headline: "Combien vaut votre voiture?",
+    subhead: "Obtenez une estimation claire avant un échange, une vente ou votre prochain achat.",
+    trustOneTitle: "Rapide",
+    trustOneText: "La plupart des estimations prennent moins de deux minutes.",
+    trustTwoTitle: "Canada",
+    trustTwoText: "Les valeurs sont adaptées aux données automobiles canadiennes.",
+    trustThreeTitle: "Suivi possible",
+    trustThreeText: "Un spécialiste peut revoir le résultat au besoin.",
+    cardTitle: "Parlez-nous du véhicule",
+    cardSubtitle: "Obtenez une valeur gratuite en moins de 2 minutes.",
+    stepLabel: "Étape 1",
+    modeDrilldown: "Année/Marque/Modèle",
+    modeVin: "NIV",
+    yearLabel: "Année",
+    makeLabel: "Marque",
+    modelLabel: "Modèle",
+    vinLabel: "NIV",
+    postalLabel: "Code postal",
+    odometerLabel: "Odomètre",
+    emailLabel: "Courriel",
+    phoneLabel: "Téléphone (optionnel)",
+    postalHelp: "Pourquoi demander mon code postal?",
+    ownVehicle: "Je suis propriétaire de ce véhicule",
+    continueButton: "Continuer",
+    chooseEyebrow: "Confirmer le véhicule",
+    chooseTitle: "Choisissez la meilleure correspondance",
+    chooseText: "Certains véhicules peuvent correspondre à plusieurs versions. Choisissez celle qui convient le mieux.",
+    resultEyebrow: "Valeur estimée",
+    startOver: "Recommencer",
+    wholesaleAvg: "Moyenne gros",
+    retailAvg: "Moyenne détail",
+    tradeInAvg: "Moyenne échange",
+    resultNote: "Il s'agit d'une estimation. Un concessionnaire peut l'ajuster après examen de l'état, des options et des photos.",
+    toolsEyebrow: "Outils utiles",
+    toolsTitle: "Planifiez la prochaine étape avec confiance",
+    toolsIntro: "Ces outils aident les visiteurs à préparer une discussion d'échange sans les submerger.",
+    toolOneTitle: "Estimation de valeur",
+    toolOneText: "Recherchez par NIV ou par année, marque et modèle pour obtenir une fourchette de valeur.",
+    toolTwoTitle: "Préparation à l'échange",
+    toolTwoText: "Recueillez le kilométrage, la région, la propriété et les coordonnées pour le suivi.",
+    toolThreeTitle: "Révision par le concessionnaire",
+    toolThreeText: "Un concessionnaire peut revoir le devis enregistré et donner un second avis.",
+    toolFourTitle: "Historique client",
+    toolFourText: "Les clients connectés peuvent consulter leurs anciens devis côté concessionnaire.",
+    authChecking: "Vérification de la connexion...",
+    authRequired: "Une connexion Google est requise avant l'évaluation.",
+    authReady: "Connecté avec",
+    authReadyHelp: "Votre courriel sera enregistré avec l'évaluation pour le suivi.",
+    authMissing: "La connexion Google n'est pas encore configurée.",
+    loginButton: "Continuer avec Google",
+    logoutButton: "Déconnexion",
+    postalModalTitle: "Pourquoi demander mon code postal?",
+    postalModalText: "Les prix changent selon la région. Le code postal aide à estimer les valeurs près de chez vous.",
+    gotIt: "Compris",
+    makePlaceholder: "Marque",
+    modelPlaceholder: "Modèle",
+    vinPlaceholder: "NIV de 17 caractères",
+    postalPlaceholder: "A1A 1A1",
+    odometerPlaceholder: "Kilomètres",
+    emailPlaceholder: "vous@exemple.com",
+    phonePlaceholder: "604-000-0000",
+    searching: "Recherche des correspondances...",
+    noMatches: "Aucun véhicule correspondant. Essayez le NIV ou ajoutez plus de détails.",
+    chooseRequired: "Choisissez un véhicule pour continuer.",
+    valuing: "Génération de votre évaluation...",
+    saving: "Enregistrement de votre demande pour le suivi...",
+    saved: "Votre évaluation est prête et enregistrée pour le suivi.",
+    saveIssue: "Votre évaluation est prête, mais l'enregistrement n'a pas été confirmé.",
+    pleaseLogin: "Veuillez vous connecter avec Google avant de générer une évaluation.",
+    invalidVin: "Veuillez entrer un NIV valide.",
+    required: "Veuillez remplir les champs requis.",
+    selectText: "Choisir ce véhicule",
+    sourceText: "Source",
+    valueUnavailable: "Non disponible"
+  }
+};
+
+let language = "en";
+let selectedVehicle = null;
+let pendingInput = null;
+let supabaseClient = null;
+let authSession = null;
+let siteUrl = window.location.origin;
+
+initialize();
+
+function initialize() {
+  populateYears();
+  populateDatalist(makeList, commonMakes);
+  syncModelList();
+  setLanguage(language);
+  updateMode();
+
+  form.addEventListener("submit", handleSubmit);
+  form.elements.mode.forEach((item) => item.addEventListener("change", updateMode));
+  form.elements.make.addEventListener("input", syncModelList);
+  languageToggle.addEventListener("click", () => setLanguage(language === "en" ? "fr" : "en"));
+  postalHelp.addEventListener("click", openModal);
+  modal.querySelectorAll("[data-close-modal]").forEach((item) => item.addEventListener("click", closeModal));
+  startOver.addEventListener("click", resetCustomerFlow);
+  customerLoginButton.addEventListener("click", signInCustomer);
+  customerLogoutButton.addEventListener("click", signOutCustomer);
+  initializeCustomerAuth();
+}
+
+function populateYears() {
+  const select = form.elements.year;
+  const currentYear = new Date().getFullYear() + 1;
+  for (let year = currentYear; year >= 1981; year -= 1) {
+    const option = document.createElement("option");
+    option.value = String(year);
+    option.textContent = String(year);
+    select.append(option);
+  }
+  select.value = String(Math.min(currentYear, new Date().getFullYear()));
+}
+
+function populateDatalist(list, values) {
+  list.replaceChildren(...values.map((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    return option;
+  }));
+}
+
+function syncModelList() {
+  const make = form.elements.make.value.trim();
+  populateDatalist(modelList, commonModels[make] || []);
+}
+
+async function initializeCustomerAuth() {
+  const config = await fetch("/api/config").then((res) => res.json()).catch(() => ({}));
+  if (!config.supabaseUrl || !config.supabaseAnonKey || !window.supabase) {
+    supabaseClient = null;
+    setCustomerSession(null);
+    customerAuthTitle.textContent = t("authMissing");
+    customerAuthSubtitle.textContent = t("authRequired");
+    return;
+  }
+
+  siteUrl = config.siteUrl || window.location.origin;
+  supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      flowType: "pkce",
+      detectSessionInUrl: true,
+      persistSession: true
+    }
+  });
+
+  const { data } = await supabaseClient.auth.getSession();
+  if (window.location.hash.includes("access_token") || window.location.search.includes("code=")) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+  setCustomerSession(data.session);
+  supabaseClient.auth.onAuthStateChange((_event, session) => setCustomerSession(session));
+}
+
+async function signInCustomer() {
+  if (!supabaseClient) {
+    statusEl.textContent = t("authMissing");
+    return;
+  }
+  await supabaseClient.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${siteUrl}/`
+    }
+  });
+}
+
+async function signOutCustomer() {
+  if (supabaseClient) await supabaseClient.auth.signOut();
+  setCustomerSession(null);
+  resetCustomerFlow();
+}
+
+function setCustomerSession(session) {
+  authSession = session;
+  const email = session?.user?.email || "";
+  customerLoginButton.hidden = Boolean(session?.user);
+  customerLogoutButton.hidden = !session?.user;
+
+  if (session?.user) {
+    customerAuthTitle.textContent = `${t("authReady")} ${email}`;
+    customerAuthSubtitle.textContent = t("authReadyHelp");
+    form.elements.email.value = email;
+    form.elements.email.readOnly = true;
+  } else {
+    customerAuthTitle.textContent = t("authRequired");
+    customerAuthSubtitle.textContent = t("authRequired");
+    form.elements.email.value = "";
+    form.elements.email.readOnly = false;
+  }
+}
+
+function setLanguage(nextLanguage) {
+  language = nextLanguage;
+  document.documentElement.lang = language === "fr" ? "fr-CA" : "en-CA";
+  languageToggle.textContent = language === "en" ? "FR" : "EN";
+
+  document.querySelectorAll("[data-i18n]").forEach((node) => {
+    const key = node.dataset.i18n;
+    if (text[language][key]) node.textContent = text[language][key];
+  });
+
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
+    const key = node.dataset.i18nPlaceholder;
+    if (text[language][key]) node.placeholder = text[language][key];
+  });
+
+  setCustomerSession(authSession);
+}
+
+function updateMode() {
+  const mode = form.elements.mode.value;
+  document.querySelectorAll(".mode-panel").forEach((panel) => {
+    panel.hidden = panel.dataset.panel !== mode;
+  });
+  selectedVehicle = null;
+  choiceSection.hidden = true;
+}
+
+async function handleSubmit(event) {
+  event.preventDefault();
+  if (!authSession?.user) {
+    statusEl.textContent = t("pleaseLogin");
+    return;
+  }
+  selectedVehicle = null;
+  resultSection.hidden = true;
+
+  const input = collectInput();
+  pendingInput = input;
+
+  if (!validateInput(input)) return;
+
+  setBusy(true, t("searching"));
+  try {
+    const choices = await searchVehicles(input);
+    if (!choices.length) {
+      statusEl.textContent = t("noMatches");
+      choiceSection.hidden = true;
+      return;
+    }
+
+    if (choices.length === 1) {
+      await generateForVehicle(choices[0], input);
+      return;
+    }
+
+    renderChoices(choices, input);
+    statusEl.textContent = t("chooseRequired");
+  } catch (error) {
+    statusEl.textContent = error.message || t("noMatches");
+  } finally {
+    setBusy(false);
+  }
+}
+
+function collectInput() {
+  const formData = new FormData(form);
+  const input = Object.fromEntries(formData.entries());
+  const vin = cleanVin(input.vin);
+  const postalCode = String(input.postalCode || "").trim().toUpperCase();
+  return {
+    mode: input.mode,
+    year: String(input.year || "").trim(),
+    make: String(input.make || "").trim(),
+    model: String(input.model || "").trim(),
+    vin,
+    postalCode,
+    kilometers: normalizeKilometers(input.kilometers),
+    email: String(input.email || "").trim(),
+    phone: String(input.phone || "").trim(),
+    region: provinceFromPostal(postalCode),
+    country: "C",
+    language: language === "fr" ? "fr" : "en",
+    ownsVehicle: Boolean(input.ownsVehicle)
+  };
+}
+
+function validateInput(input) {
+  const hasBasics = input.email && input.postalCode && input.kilometers;
+  const hasVehicle = input.mode === "vin"
+    ? input.vin.length >= 10
+    : input.year && input.make && input.model;
+
+  if (input.mode === "vin" && input.vin && input.vin.length < 10) {
+    statusEl.textContent = t("invalidVin");
+    return false;
+  }
+
+  if (!hasBasics || !hasVehicle) {
+    statusEl.textContent = t("required");
+    return false;
+  }
+
+  return true;
+}
+
+async function searchVehicles(input) {
+  const searchText = input.mode === "vin"
+    ? input.vin
+    : [input.year, input.make, input.model].filter(Boolean).join(" ");
+  const response = await fetch(`/api/autocomplete?searchText=${encodeURIComponent(searchText)}`);
+  const data = await response.json();
+  if (!data.ok) throw new Error(data.error || t("noMatches"));
+  return (data.items || []).filter((item) => item.title || item.uvc).slice(0, 8);
+}
+
+function renderChoices(choices, input) {
+  choiceList.replaceChildren(...choices.map((choice) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "choice-button";
+    button.innerHTML = `
+      <strong>${escapeHtml(choice.title || vehicleTitle(choice))}</strong>
+      <span>UVC ${escapeHtml(choice.uvc || "-")} · ${escapeHtml(choice.year || "")} ${escapeHtml(choice.make || "")} ${escapeHtml(choice.model || "")}</span>
+      <span>${t("selectText")}</span>
+    `;
+    button.addEventListener("click", async () => {
+      setBusy(true, t("valuing"));
+      try {
+        await generateForVehicle(choice, input);
+      } finally {
+        setBusy(false);
+      }
+    });
+    return button;
+  }));
+  choiceSection.hidden = false;
+  choiceSection.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function generateForVehicle(vehicle, baseInput) {
+  selectedVehicle = vehicle;
+  const payload = {
+    ...baseInput,
+    vin: baseInput.vin,
+    uvc: vehicle.uvc || "",
+    year: vehicle.year || baseInput.year,
+    make: vehicle.make || baseInput.make,
+    model: vehicle.model || baseInput.model,
+    series: vehicle.series || "",
+    style: vehicle.style || ""
+  };
+
+  statusEl.textContent = t("valuing");
+  const response = await fetch("/api/valuation", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const valuation = await response.json();
+  if (!valuation.ok) throw new Error(valuation.error || t("noMatches"));
+
+  if (valuation.choices?.length > 1 && !payload.uvc) {
+    renderChoices(valuation.choices, baseInput);
+    return;
+  }
+
+  renderResult(valuation, payload);
+  statusEl.textContent = t("saving");
+  const capture = await captureLead(payload, valuation);
+  statusEl.textContent = capture?.captured || capture?.webhook?.submitted || capture?.googleForm?.submitted
+    ? t("saved")
+    : t("saveIssue");
+  choiceSection.hidden = true;
+}
+
+async function captureLead(input, valuation) {
+  try {
+    const response = await fetch("/api/leads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        input,
+        valuation,
+        user: {
+          id: authSession?.user?.id || "",
+          email: authSession?.user?.email || input.email,
+          name: authSession?.user?.user_metadata?.full_name || authSession?.user?.user_metadata?.name || ""
+        }
+      })
+    });
+    return response.json();
+  } catch (error) {
+    console.warn(error);
+    return { ok: false, captured: false };
+  }
+}
+
+function renderResult(valuation, input) {
+  const wholesale = marketAverage(valuation, "wholesale");
+  const retail = marketAverage(valuation, "retail");
+  const tradeIn = marketAverage(valuation, "tradeIn");
+  resultTitle.textContent = valuation.title || selectedVehicle?.title || vehicleTitle(input);
+  resultMeta.textContent = [
+    valuation.vin || input.vin,
+    input.kilometers ? `${formatNumber(input.kilometers)} km` : "",
+    regionName(input.region)
+  ].filter(Boolean).join(" · ");
+  wholesaleValue.textContent = moneyOrDash(wholesale);
+  retailValue.textContent = moneyOrDash(retail);
+  tradeInValue.textContent = moneyOrDash(tradeIn);
+  resultSection.hidden = false;
+  resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function marketAverage(valuation, market) {
+  const values = valuation?.values?.[market] || {};
+  return values.adjusted?.avg ?? values.base?.avg ?? null;
+}
+
+function moneyOrDash(value) {
+  if (value === null || value === undefined || value === "") return t("valueUnavailable");
+  return new Intl.NumberFormat(language === "fr" ? "fr-CA" : "en-CA", {
+    style: "currency",
+    currency: "CAD",
+    maximumFractionDigits: 0
+  }).format(Number(value));
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat(language === "fr" ? "fr-CA" : "en-CA", {
+    maximumFractionDigits: 0
+  }).format(Number(value));
+}
+
+function vehicleTitle(vehicle = {}) {
+  return [vehicle.year, vehicle.make, vehicle.model, vehicle.series, vehicle.style]
+    .filter(Boolean)
+    .join(" ") || "Vehicle";
+}
+
+function resetCustomerFlow() {
+  selectedVehicle = null;
+  pendingInput = null;
+  choiceSection.hidden = true;
+  resultSection.hidden = true;
+  statusEl.textContent = "";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function setBusy(isBusy, message = "") {
+  const button = document.querySelector("#continue-button");
+  button.disabled = isBusy;
+  if (message) statusEl.textContent = message;
+}
+
+function provinceFromPostal(postalCode) {
+  const first = String(postalCode || "").trim().charAt(0).toUpperCase();
+  return {
+    A: "NL",
+    B: "NS",
+    C: "PE",
+    E: "NB",
+    G: "QC",
+    H: "QC",
+    J: "QC",
+    K: "ON",
+    L: "ON",
+    M: "ON",
+    N: "ON",
+    P: "ON",
+    R: "MB",
+    S: "SK",
+    T: "AB",
+    V: "BC",
+    X: "NT",
+    Y: "YT"
+  }[first] || "ON";
+}
+
+function regionName(code) {
+  const names = {
+    AB: language === "fr" ? "Alberta" : "Alberta",
+    BC: language === "fr" ? "Colombie-Britannique" : "British Columbia",
+    MB: "Manitoba",
+    NB: language === "fr" ? "Nouveau-Brunswick" : "New Brunswick",
+    NL: language === "fr" ? "Terre-Neuve-et-Labrador" : "Newfoundland and Labrador",
+    NS: language === "fr" ? "Nouvelle-Écosse" : "Nova Scotia",
+    NT: language === "fr" ? "Territoires du Nord-Ouest" : "Northwest Territories",
+    NU: "Nunavut",
+    ON: "Ontario",
+    PE: language === "fr" ? "Île-du-Prince-Édouard" : "Prince Edward Island",
+    QC: language === "fr" ? "Québec" : "Quebec",
+    SK: "Saskatchewan",
+    YT: "Yukon"
+  };
+  return names[code] || code || "Ontario";
+}
+
+function normalizeKilometers(value) {
+  const number = Number(String(value || "").replace(/[^0-9.]/g, ""));
+  return Number.isFinite(number) ? Math.round(number) : 0;
+}
+
+function cleanVin(value) {
+  return String(value || "").trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, "");
+}
+
+function openModal() {
+  modal.hidden = false;
+}
+
+function closeModal() {
+  modal.hidden = true;
+}
+
+function t(key) {
+  return text[language][key] || text.en[key] || key;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}

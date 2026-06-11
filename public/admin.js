@@ -73,8 +73,28 @@ async function setAdminSession(session) {
     return;
   }
 
+  const admin = await checkAdminAccess();
+  if (!admin.ok) {
+    adminContent.hidden = true;
+    adminAuthStatus.textContent = admin.error || `This Google account is not an admin: ${session.user.email}`;
+    statusEl.textContent = "Ask the site owner to add this email to ADMIN_EMAILS in Vercel.";
+    usersStatusEl.textContent = "";
+    leadsEl.innerHTML = "";
+    usersEl.innerHTML = "";
+    return;
+  }
+
   adminAuthStatus.textContent = `Signed in as ${session.user.email}`;
   await Promise.all([loadLeads(), loadUsers()]);
+}
+
+async function checkAdminAccess() {
+  try {
+    const response = await fetch("/api/admin-check", { headers: authHeaders() });
+    return response.json();
+  } catch (error) {
+    return { ok: false, error: error.message || "Unable to verify admin access." };
+  }
 }
 
 async function loadUsers() {

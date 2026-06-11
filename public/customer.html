@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HuanChe.ca | Vehicle Value</title>
+    <link rel="stylesheet" href="/customer.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="HuanChe.ca">
+        <span class="brand-mark">HC</span>
+        <span><strong>换车网</strong> HuanChe.ca</span>
+      </a>
+      <nav class="top-nav" aria-label="Primary">
+        <a href="#tools" data-i18n="toolsLink">Tools</a>
+        <a href="/dealer.html" data-i18n="dealerLink">Dealer portal</a>
+        <button id="language-toggle" class="ghost-button" type="button">FR</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow" data-i18n="eyebrow">Canadian vehicle valuation</p>
+          <h1 data-i18n="headline">What could your car be worth?</h1>
+          <p class="lead" data-i18n="subhead">
+            Get a clear market estimate before you trade, sell, or plan your next vehicle.
+          </p>
+
+          <div class="trust-grid" aria-label="Highlights">
+            <div>
+              <strong data-i18n="trustOneTitle">Fast</strong>
+              <span data-i18n="trustOneText">Most estimates take under two minutes.</span>
+            </div>
+            <div>
+              <strong data-i18n="trustTwoTitle">Canadian</strong>
+              <span data-i18n="trustTwoText">Values are built for Canadian vehicle data.</span>
+            </div>
+            <div>
+              <strong data-i18n="trustThreeTitle">Follow-up ready</strong>
+              <span data-i18n="trustThreeText">A specialist can review your result if needed.</span>
+            </div>
+          </div>
+
+          <div class="vehicle-visual" aria-hidden="true">
+            <div class="sun-disc"></div>
+            <div class="road-line"></div>
+            <div class="car-shape">
+              <div class="car-window"></div>
+              <div class="wheel wheel-one"></div>
+              <div class="wheel wheel-two"></div>
+              <div class="price-tag">$</div>
+            </div>
+          </div>
+        </div>
+
+        <section class="valuation-card" aria-labelledby="card-title">
+          <div class="customer-auth">
+            <div>
+              <strong id="customer-auth-title" data-i18n="authChecking">Checking sign-in...</strong>
+              <span id="customer-auth-subtitle" data-i18n="authRequired">Google sign-in is required before valuation.</span>
+            </div>
+            <button id="customer-login" class="ghost-button" type="button" hidden data-i18n="loginButton">Continue with Google</button>
+            <button id="customer-logout" class="ghost-button" type="button" hidden data-i18n="logoutButton">Sign out</button>
+          </div>
+
+          <div class="card-heading">
+            <div>
+              <h2 id="card-title" data-i18n="cardTitle">Tell us about the car</h2>
+              <p data-i18n="cardSubtitle">Get a free value in less than 2 minutes.</p>
+            </div>
+            <span class="step-pill" data-i18n="stepLabel">Step 1</span>
+          </div>
+
+          <form id="customer-form" class="customer-form">
+            <fieldset class="mode-toggle">
+              <legend class="sr-only">Lookup mode</legend>
+              <label>
+                <input type="radio" name="mode" value="drilldown" checked />
+                <span data-i18n="modeDrilldown">Year/Make/Model</span>
+              </label>
+              <label>
+                <input type="radio" name="mode" value="vin" />
+                <span data-i18n="modeVin">VIN</span>
+              </label>
+            </fieldset>
+
+            <div class="mode-panel" data-panel="drilldown">
+              <label>
+                <span data-i18n="yearLabel">Year</span>
+                <select name="year" required></select>
+              </label>
+              <label>
+                <span data-i18n="makeLabel">Make</span>
+                <input name="make" list="make-list" autocomplete="off" data-i18n-placeholder="makePlaceholder" placeholder="Make" />
+                <datalist id="make-list"></datalist>
+              </label>
+              <label>
+                <span data-i18n="modelLabel">Model</span>
+                <input name="model" list="model-list" autocomplete="off" data-i18n-placeholder="modelPlaceholder" placeholder="Model" />
+                <datalist id="model-list"></datalist>
+              </label>
+            </div>
+
+            <div class="mode-panel" data-panel="vin" hidden>
+              <label class="span-all">
+                <span data-i18n="vinLabel">VIN</span>
+                <input name="vin" maxlength="17" autocomplete="off" data-i18n-placeholder="vinPlaceholder" placeholder="17-character VIN" />
+              </label>
+            </div>
+
+            <div class="split-row">
+              <label>
+                <span data-i18n="postalLabel">Postal code</span>
+                <input name="postalCode" autocomplete="postal-code" required data-i18n-placeholder="postalPlaceholder" placeholder="A1A 1A1" />
+              </label>
+              <label>
+                <span data-i18n="odometerLabel">Odometer</span>
+                <input name="kilometers" inputmode="numeric" required data-i18n-placeholder="odometerPlaceholder" placeholder="Kilometers" />
+              </label>
+            </div>
+
+            <button id="postal-help" class="text-link" type="button" data-i18n="postalHelp">
+              Why do you need my postal code?
+            </button>
+
+            <div class="split-row">
+              <label>
+                <span data-i18n="emailLabel">Email</span>
+                <input name="email" type="email" autocomplete="email" required data-i18n-placeholder="emailPlaceholder" placeholder="you@example.com" />
+              </label>
+              <label>
+                <span data-i18n="phoneLabel">Phone (optional)</span>
+                <input name="phone" autocomplete="tel" data-i18n-placeholder="phonePlaceholder" placeholder="604-000-0000" />
+              </label>
+            </div>
+
+            <label class="check-row">
+              <input name="ownsVehicle" type="checkbox" />
+              <span data-i18n="ownVehicle">I own this vehicle</span>
+            </label>
+
+            <button id="continue-button" class="primary-button" type="submit" data-i18n="continueButton">Continue</button>
+          </form>
+
+          <p id="customer-status" class="status" role="status" aria-live="polite"></p>
+        </section>
+      </section>
+
+      <section id="choice-section" class="choice-section" hidden>
+        <div>
+          <p class="eyebrow" data-i18n="chooseEyebrow">Confirm vehicle</p>
+          <h2 data-i18n="chooseTitle">Choose the closest match</h2>
+          <p data-i18n="chooseText">Some vehicles can match more than one trim. Pick the option that best fits your car.</p>
+        </div>
+        <div id="choice-list" class="choice-list"></div>
+      </section>
+
+      <section id="result-section" class="result-section" hidden>
+        <div class="result-header">
+          <div>
+            <p class="eyebrow" data-i18n="resultEyebrow">Estimated value</p>
+            <h2 id="result-title">Vehicle</h2>
+            <p id="result-meta"></p>
+          </div>
+          <button id="start-over" class="ghost-button" type="button" data-i18n="startOver">Start over</button>
+        </div>
+        <div class="value-cards">
+          <article>
+            <span data-i18n="wholesaleAvg">Wholesale AVG</span>
+            <strong id="wholesale-value">-</strong>
+          </article>
+          <article>
+            <span data-i18n="retailAvg">Retail AVG</span>
+            <strong id="retail-value">-</strong>
+          </article>
+          <article>
+            <span data-i18n="tradeInAvg">Trade-In AVG</span>
+            <strong id="tradein-value">-</strong>
+          </article>
+        </div>
+        <p class="fine-print" data-i18n="resultNote">
+          This is an estimate. A dealer may adjust it after reviewing condition, options, and photos.
+        </p>
+      </section>
+
+      <section id="tools" class="tools-section">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="toolsEyebrow">Useful tools</p>
+          <h2 data-i18n="toolsTitle">Plan the next step with confidence</h2>
+          <p data-i18n="toolsIntro">
+            These tools help visitors prepare for a trade-in conversation without overwhelming them.
+          </p>
+        </div>
+        <div class="tool-grid">
+          <article>
+            <span class="tool-icon">01</span>
+            <h3 data-i18n="toolOneTitle">Vehicle value estimate</h3>
+            <p data-i18n="toolOneText">Search by VIN or by year, make, and model to get a value range.</p>
+          </article>
+          <article>
+            <span class="tool-icon">02</span>
+            <h3 data-i18n="toolTwoTitle">Trade-in preparation</h3>
+            <p data-i18n="toolTwoText">Capture mileage, region, ownership, and contact details for follow-up.</p>
+          </article>
+          <article>
+            <span class="tool-icon">03</span>
+            <h3 data-i18n="toolThreeTitle">Dealer review</h3>
+            <p data-i18n="toolThreeText">A dealer can review the saved quote and provide a second opinion.</p>
+          </article>
+          <article>
+            <span class="tool-icon">04</span>
+            <h3 data-i18n="toolFourTitle">Customer history</h3>
+            <p data-i18n="toolFourText">Logged-in customers can keep track of prior quotes on the dealer side.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <div id="modal" class="modal-shell" hidden>
+      <div class="modal-backdrop" data-close-modal></div>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <button class="close-button" type="button" data-close-modal aria-label="Close">x</button>
+        <h2 id="modal-title" data-i18n="postalModalTitle">Why do you need my postal code?</h2>
+        <p data-i18n="postalModalText">
+          Market pricing changes by region. Your postal code helps estimate values near your area.
+        </p>
+        <button class="primary-button compact" type="button" data-close-modal data-i18n="gotIt">Got it</button>
+      </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/customer.js"></script>
+  </body>
+</html>

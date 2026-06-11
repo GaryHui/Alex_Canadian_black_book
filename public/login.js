@@ -2,6 +2,7 @@ const loginButton = document.querySelector("#google-login");
 const statusEl = document.querySelector("#login-status");
 let client = null;
 let siteUrl = window.location.origin;
+const nextPath = safeNextPath(new URLSearchParams(window.location.search).get("next") || "/");
 
 initializeLogin();
 
@@ -15,7 +16,7 @@ loginButton.addEventListener("click", async () => {
   await client.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${siteUrl}/`
+      redirectTo: `${siteUrl}${nextPath}`
     }
   });
 });
@@ -38,9 +39,15 @@ async function initializeLogin() {
   });
   const { data } = await client.auth.getSession();
   if (data.session?.user) {
-    window.location.replace("/");
+    window.location.replace(nextPath);
     return;
   }
 
   statusEl.textContent = "Ready.";
+}
+
+function safeNextPath(value) {
+  const text = String(value || "/").trim();
+  if (!text.startsWith("/") || text.startsWith("//")) return "/";
+  return text;
 }

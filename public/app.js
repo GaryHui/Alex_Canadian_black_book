@@ -67,6 +67,7 @@ let currentResult = null;
 let currentMarket = "wholesale";
 let supabaseClient = null;
 let authSession = null;
+let dealerAdminAllowed = false;
 let usageState = null;
 let drilldownRequestId = 0;
 let historyLeads = [];
@@ -727,25 +728,38 @@ async function initializeAuth() {
   setSession(data.session);
   supabaseClient.auth.onAuthStateChange((_event, session) => {
     setSession(session);
-    if (!session?.user) window.location.replace("/login.html");
+    if (!session?.user) window.location.replace("/login.html?next=/dealer.html");
   });
 }
 
-function setSession(session) {
+async function setSession(session) {
   authSession = session;
   const emailField = form.elements.email;
+  dealerAdminAllowed = false;
 
   if (session?.user) {
     const email = session.user.email || "";
     authTitle.textContent = `Signed in as ${email}`;
-    authSubtitle.textContent = "Your valuation request will be saved for follow-up.";
     logoutButton.hidden = false;
     emailField.value = email;
+    const admin = await checkDealerAdmin();
+    if (!admin.ok) {
+      authTitle.textContent = "Dealer access denied";
+      authSubtitle.textContent = admin.error || `This Google account is not allowed: ${email}`;
+      disableDealerTools(true);
+      quotaPanel.hidden = true;
+      historyPanel.hidden = true;
+      statusEl.textContent = "Ask the site owner to add this email to ADMIN_EMAILS in Vercel.";
+      return;
+    }
+    dealerAdminAllowed = true;
+    authSubtitle.textContent = "Admin access confirmed. Dealer tools are available.";
+    disableDealerTools(false);
     loadUsage();
     loadHistory();
   } else {
     if (supabaseClient) {
-      window.location.replace("/login.html");
+      window.location.replace("/login.html?next=/dealer.html");
       return;
     }
     authTitle.textContent = "Login not configured";
@@ -756,17 +770,44 @@ function setSession(session) {
     historyList.innerHTML = "";
     historyLeads = [];
     emailField.value = "";
+    disableDealerTools(true);
   }
 }
 
 function requireLogin() {
-  if (authSession?.user) return true;
+  if (authSession?.user && dealerAdminAllowed) return true;
   if (!supabaseClient) {
     statusEl.textContent = "Supabase Google login is not configured yet. Add Supabase env vars to enable this flow.";
+  } else if (authSession?.user && !dealerAdminAllowed) {
+    statusEl.textContent = "Dealer access is restricted to admin emails.";
   } else {
     statusEl.textContent = "Please sign in with Google first.";
   }
   return false;
+}
+
+async function checkDealerAdmin() {
+  try {
+    const response = await fetch("/api/admin-check", {
+      headers: {
+        Authorization: `Bearer ${authSession?.access_token || ""}`
+      }
+    });
+    return response.json();
+  } catch (error) {
+    return { ok: false, error: error.message || "Unable to verify dealer access." };
+  }
+}
+
+function disableDealerTools(disabled) {
+  [form, freeForm, drilldownForm].forEach((item) => {
+    item.querySelectorAll("input, select, button").forEach((control) => {
+      control.disabled = disabled;
+    });
+  });
+  modeButtons.forEach((button) => {
+    button.disabled = disabled;
+  });
 }
 
 async function loadUsage() {

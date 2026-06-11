@@ -26,15 +26,31 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
 
     if (req.method === "GET" && url.pathname === "/") {
+      return sendFile(res, path.join(__dirname, "public", "customer.html"), "text/html; charset=utf-8");
+    }
+
+    if (req.method === "GET" && (url.pathname === "/dealer" || url.pathname === "/dealer.html")) {
       return sendFile(res, path.join(__dirname, "public", "index.html"), "text/html; charset=utf-8");
+    }
+
+    if (req.method === "GET" && (url.pathname === "/customer" || url.pathname === "/customer.html")) {
+      return sendFile(res, path.join(__dirname, "public", "customer.html"), "text/html; charset=utf-8");
     }
 
     if (req.method === "GET" && url.pathname === "/styles.css") {
       return sendFile(res, path.join(__dirname, "public", "styles.css"), "text/css; charset=utf-8");
     }
 
+    if (req.method === "GET" && url.pathname === "/customer.css") {
+      return sendFile(res, path.join(__dirname, "public", "customer.css"), "text/css; charset=utf-8");
+    }
+
     if (req.method === "GET" && url.pathname === "/app.js") {
       return sendFile(res, path.join(__dirname, "public", "app.js"), "application/javascript; charset=utf-8");
+    }
+
+    if (req.method === "GET" && url.pathname === "/customer.js") {
+      return sendFile(res, path.join(__dirname, "public", "customer.js"), "application/javascript; charset=utf-8");
     }
 
     if (req.method === "GET" && url.pathname === "/admin.js") {
@@ -73,6 +89,12 @@ const server = http.createServer(async (req, res) => {
         const result = await updateUserLimit(await readJson(req));
         return sendJson(res, result.ok ? 200 : 400, result);
       }
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/admin-check") {
+      const admin = await requireAdmin(req);
+      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+      return sendJson(res, 200, { ok: true, user: admin.user });
     }
 
     if (req.method === "POST" && url.pathname === "/api/valuation") {
