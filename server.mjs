@@ -954,14 +954,16 @@ async function listUserLimits(year) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return { ok: true, storage: "not_configured", users: [] };
 
-  const [leadsResult, limitsResult] = await Promise.all([
+  const [leadsResult, limitsResult, staffEmailsResult] = await Promise.all([
     fetchSupabaseJson(`${url}/rest/v1/valuation_leads?select=auth_user_id,auth_email&valuation_year=eq.${year}`, key),
-    fetchSupabaseJson(`${url}/rest/v1/valuation_user_limits?select=*&valuation_year=eq.${year}`, key)
+    fetchSupabaseJson(`${url}/rest/v1/valuation_user_limits?select=*&valuation_year=eq.${year}`, key),
+    dealerStaffEmailsForFiltering({ url, key })
   ]);
 
   if (!leadsResult.ok) return leadsResult;
   if (!limitsResult.ok) return limitsResult;
 
+  const staffEmails = staffEmailsResult.emails || new Set();
   const limitsByUser = new Map((limitsResult.data || []).map((limit) => [limit.user_id, limit]));
   const usersById = new Map();
 
@@ -982,7 +984,11 @@ async function listUserLimits(year) {
     usersById.set(userId, current);
   }
 
-  const users = [...usersById.values()]
+  const allUsers = [...usersById.values()];
+  const customers = allUsers.filter((user) => !isStaffEmail(user.email || user.userId, staffEmails));
+  const hiddenStaffCount = allUsers.length - customers.length;
+
+  const users = customers
     .map((user) => {
       const limit = limitsByUser.get(user.userId);
       const annualLimit = Number(limit?.annual_limit || DEFAULT_ANNUAL_LIMIT);
@@ -995,7 +1001,14 @@ async function listUserLimits(year) {
     })
     .sort((a, b) => (a.email || a.userId).localeCompare(b.email || b.userId));
 
-  return { ok: true, storage: "supabase", year, users };
+  return {
+    ok: true,
+    storage: "supabase",
+    year,
+    users,
+    hiddenStaffCount,
+    staffFilterWarning: staffEmailsResult.warning || ""
+  };
 }
 
 async function updateUserLimit(body) {
@@ -1072,6 +1085,36 @@ async function listDealerStaff() {
 
   const byEmail = new Map([...envDealers, ...dbStaff].map((staff) => [staff.email, staff]));
   return { ok: true, storage: "supabase", staff: [...byEmail.values()].sort((a, b) => a.email.localeCompare(b.email)) };
+}
+
+async function dealerStaffEmailsForFiltering({ url, key }) {
+  const emails = new Set([
+    ...configuredEmails(process.env.ADMIN_EMAILS),
+    ...configuredEmails(process.env.DEALER_EMAILS)
+  ]);
+
+  const response = await fetch(`${url}/rest/v1/dealer_staff?select=email,active&active=eq.true`, {
+    headers: supabaseServiceHeaders(key)
+  });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) {
+    return {
+      emails,
+      warning: "Dealer staff table could not be loaded, so only ADMIN_EMAILS and DEALER_EMAILS were excluded."
+    };
+  }
+
+  for (const row of rows || []) {
+    const email = normalizeEmail(row.email);
+    if (email) emails.add(email);
+  }
+
+  return { emails, warning: "" };
+}
+
+function isStaffEmail(value, staffEmails) {
+  const email = normalizeEmail(value);
+  return email ? staffEmails.has(email) : false;
 }
 
 async function addDealerStaff(body, adminUser) {

@@ -123,7 +123,11 @@ async function loadUsers() {
     return;
   }
 
-  usersStatusEl.textContent = `${data.users.length} user(s) with valuation activity in ${data.year}.`;
+  const hiddenText = data.hiddenStaffCount
+    ? ` ${data.hiddenStaffCount} staff/admin account(s) hidden from this customer list.`
+    : "";
+  const warningText = data.staffFilterWarning ? ` ${data.staffFilterWarning}` : "";
+  usersStatusEl.textContent = `${data.users.length} customer account(s) with valuation activity in ${data.year}.${hiddenText}${warningText}`;
   usersEl.innerHTML = data.users.map(renderUser).join("") || "<p>No user activity yet.</p>";
 }
 
