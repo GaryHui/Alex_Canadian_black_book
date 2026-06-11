@@ -262,6 +262,12 @@ Detailed owner handoff steps and the header-aware Apps Script code are in:
 GOOGLE_APPS_SCRIPT_WEBHOOK.md
 ```
 
+Future Google Drive photo/document upload setup is in:
+
+```text
+GOOGLE_DRIVE_UPLOADS.md
+```
+
 Vercel variable:
 
 ```text

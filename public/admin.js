@@ -3,6 +3,7 @@ const leadsEl = document.querySelector("#admin-leads");
 const usersStatusEl = document.querySelector("#users-status");
 const usersEl = document.querySelector("#admin-users");
 const reloadUsersButton = document.querySelector("#reload-users");
+const reloadLeadsButton = document.querySelector("#reload-leads");
 const adminAuthStatus = document.querySelector("#admin-auth-status");
 const adminLoginButton = document.querySelector("#admin-login");
 const adminLogoutButton = document.querySelector("#admin-logout");
@@ -12,6 +13,7 @@ let supabaseClient = null;
 let adminSession = null;
 
 reloadUsersButton.addEventListener("click", loadUsers);
+reloadLeadsButton.addEventListener("click", loadLeads);
 adminLoginButton.addEventListener("click", signInAdmin);
 adminLogoutButton.addEventListener("click", signOutAdmin);
 
@@ -145,53 +147,69 @@ function renderLead(lead) {
   const adjustment = lead.owner_adjustment || {};
   const wholesale = valuation.values?.wholesale?.adjusted?.avg;
   const retail = valuation.values?.retail?.adjusted?.avg;
+  const title = valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" ") || "Vehicle lead";
+  const customerEmail = input.email || authUser.email || lead.auth_email || "-";
+  const vin = input.vin || valuation.vin || "-";
+  const status = lead.status || "new";
   return `
     <article class="lead-card" data-id="${escapeHtml(lead.id || "")}">
-      <header>
-        <strong>${escapeHtml(valuation.title || "Vehicle lead")}</strong>
-        <span>${escapeHtml(lead.created_at || "")}</span>
+      <header class="lead-summary">
+        <div>
+          <strong>${escapeHtml(title)}</strong>
+          <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
+        </div>
+        <div class="lead-summary-metrics">
+          <span>${escapeHtml(customerEmail)}</span>
+          <span>VIN ${escapeHtml(vin)}</span>
+          <span>Wholesale ${wholesale ? formatNumber(wholesale) : "-"}</span>
+          <span>Retail ${retail ? formatNumber(retail) : "-"}</span>
+          <b class="status-pill">${escapeHtml(status)}</b>
+        </div>
       </header>
-      <div class="lead-grid">
-        <span>Email</span><b>${escapeHtml(input.email || "-")}</b>
-        <span>Google user</span><b>${escapeHtml(authUser.email || "-")}</b>
-        <span>Phone</span><b>${escapeHtml(input.phone || "-")}</b>
-        <span>VIN</span><b>${escapeHtml(input.vin || valuation.vin || "-")}</b>
-        <span>UVC</span><b>${escapeHtml(input.uvc || "-")}</b>
-        <span>Vehicle</span><b>${escapeHtml([input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" ") || "-")}</b>
-        <span>Kilometers</span><b>${formatNumber(input.kilometers || 0)}</b>
-        <span>Color</span><b>${escapeHtml(input.color || "-")}</b>
-        <span>Region</span><b>${escapeHtml(input.region || valuation.region || "-")}</b>
-        <span>AVG Wholesale</span><b>${wholesale ? formatNumber(wholesale) : "-"}</b>
-        <span>AVG Retail</span><b>${retail ? formatNumber(retail) : "-"}</b>
-      </div>
-      <form class="owner-review">
-        <label>
-          <span>Status</span>
-          <select name="status">
-            ${["new", "reviewing", "manual_adjustment", "contacted", "sent_to_crm", "closed"].map((status) =>
-              `<option value="${status}" ${lead.status === status ? "selected" : ""}>${status}</option>`
-            ).join("")}
-          </select>
-        </label>
-        <label>
-          <span>Owner wholesale</span>
-          <input name="ownerWholesale" type="number" value="${adjustment.wholesale ?? ""}" placeholder="Manual wholesale" />
-        </label>
-        <label>
-          <span>Owner retail</span>
-          <input name="ownerRetail" type="number" value="${adjustment.retail ?? ""}" placeholder="Manual retail" />
-        </label>
-        <label>
-          <span>Reason</span>
-          <input name="reason" value="${escapeHtml(adjustment.reason || "")}" placeholder="Why adjust this value?" />
-        </label>
-        <label class="review-notes">
-          <span>Admin notes</span>
-          <textarea name="notes" placeholder="Follow-up notes, CRM notes, customer preference...">${escapeHtml(lead.notes || "")}</textarea>
-        </label>
-        <button type="submit">Save owner review</button>
-      </form>
-      <details>
+      <details class="lead-manage">
+        <summary>Manage lead</summary>
+        <div class="lead-grid">
+          <span>Email</span><b>${escapeHtml(input.email || "-")}</b>
+          <span>Google user</span><b>${escapeHtml(authUser.email || "-")}</b>
+          <span>Phone</span><b>${escapeHtml(input.phone || "-")}</b>
+          <span>VIN</span><b>${escapeHtml(vin)}</b>
+          <span>UVC</span><b>${escapeHtml(input.uvc || "-")}</b>
+          <span>Vehicle</span><b>${escapeHtml([input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" ") || "-")}</b>
+          <span>Kilometers</span><b>${formatNumber(input.kilometers || 0)}</b>
+          <span>Color</span><b>${escapeHtml(input.color || "-")}</b>
+          <span>Region</span><b>${escapeHtml(input.region || valuation.region || "-")}</b>
+          <span>AVG Wholesale</span><b>${wholesale ? formatNumber(wholesale) : "-"}</b>
+          <span>AVG Retail</span><b>${retail ? formatNumber(retail) : "-"}</b>
+        </div>
+        <form class="owner-review">
+          <label>
+            <span>Status</span>
+            <select name="status">
+              ${["new", "reviewing", "manual_adjustment", "contacted", "sent_to_crm", "closed", "deleted"].map((item) =>
+                `<option value="${item}" ${status === item ? "selected" : ""}>${item}</option>`
+              ).join("")}
+            </select>
+          </label>
+          <label>
+            <span>Owner wholesale</span>
+            <input name="ownerWholesale" type="number" value="${adjustment.wholesale ?? ""}" placeholder="Manual wholesale" />
+          </label>
+          <label>
+            <span>Owner retail</span>
+            <input name="ownerRetail" type="number" value="${adjustment.retail ?? ""}" placeholder="Manual retail" />
+          </label>
+          <label>
+            <span>Reason</span>
+            <input name="reason" value="${escapeHtml(adjustment.reason || "")}" placeholder="Why adjust this value?" />
+          </label>
+          <label class="review-notes">
+            <span>Admin notes</span>
+            <textarea name="notes" placeholder="Follow-up notes, CRM notes, customer preference...">${escapeHtml(lead.notes || "")}</textarea>
+          </label>
+          <button type="submit">Save owner review</button>
+        </form>
+      </details>
+      <details class="lead-raw">
         <summary>Raw valuation summary</summary>
         <pre>${escapeHtml(JSON.stringify(valuation, null, 2))}</pre>
       </details>
@@ -241,6 +259,16 @@ usersEl.addEventListener("submit", async (event) => {
 
 function formatNumber(value) {
   return new Intl.NumberFormat("en-CA", { maximumFractionDigits: 0 }).format(Number(value));
+}
+
+function formatDateTime(value) {
+  if (!value) return "Unknown date";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown date";
+  return new Intl.DateTimeFormat("en-CA", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(date);
 }
 
 function authHeaders() {

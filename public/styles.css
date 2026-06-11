@@ -886,26 +886,74 @@ select {
   padding: 16px;
 }
 
-.lead-card header {
+.lead-summary {
+  align-items: flex-start;
   display: flex;
   gap: 12px;
   justify-content: space-between;
   margin-bottom: 12px;
 }
 
-.lead-card header span {
+.lead-summary > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.lead-summary strong {
+  font-size: 17px;
+}
+
+.lead-summary span {
   color: #777;
   font-size: 13px;
+}
+
+.lead-summary-metrics {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.lead-summary-metrics span,
+.status-pill {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  color: #444;
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+.status-pill {
+  background: #f4f4f4;
+  text-transform: capitalize;
 }
 
 .lead-grid {
   display: grid;
   gap: 8px 14px;
   grid-template-columns: 160px 1fr;
+  margin-top: 12px;
 }
 
 .lead-grid span {
   color: #777;
+}
+
+.lead-manage,
+.lead-raw {
+  border-top: 1px solid #eee;
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.lead-manage summary,
+.lead-raw summary {
+  color: var(--red);
+  cursor: pointer;
+  font-weight: 700;
 }
 
 .lead-card pre {
