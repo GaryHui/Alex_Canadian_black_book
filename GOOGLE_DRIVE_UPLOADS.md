@@ -215,6 +215,43 @@ After changing `LEAD_WEBHOOK_URL` in Vercel:
    - Raw JSON appears in `CBB Raw`.
    - Photos and PDF appear under the correct Google Drive folder.
 
+## Optional CRM Webhook
+
+The website also reserves a generic CRM webhook output. This is useful for AutoRaptor, Make, Zapier, or another dealer CRM after the CRM provider gives a real webhook/API endpoint.
+
+Add these Vercel environment variables only when a CRM endpoint is ready:
+
+```text
+CRM_WEBHOOK_URL=https://crm-or-automation-webhook.example.com/lead
+CRM_WEBHOOK_TOKEN=optional_secret_token
+```
+
+When `CRM_WEBHOOK_URL` is configured, the website sends a JSON payload after the Google Drive webhook finishes. The CRM payload includes:
+
+- customer email and phone
+- VIN, UVC, year, make, model, trim, style
+- kilometers, color, region, country
+- wholesale, retail, and trade-in average values
+- Google Drive folder URL
+- PDF URL
+- saved photo file URLs
+- raw input and valuation data
+
+If `CRM_WEBHOOK_TOKEN` is set, the request includes:
+
+```text
+Authorization: Bearer YOUR_TOKEN
+```
+
+For AutoRaptor specifically, the marketing page is not enough to connect directly. Ask AutoRaptor for one of these:
+
+- inbound lead webhook URL
+- REST API endpoint for creating leads
+- API token / bearer token
+- required field mapping
+
+After those are provided, put the endpoint in `CRM_WEBHOOK_URL`, put the token in `CRM_WEBHOOK_TOKEN`, redeploy Vercel, and run one test valuation.
+
 ## Final Apps Script
 
 Replace `SPREADSHEET_ID` and `DRIVE_ROOT_FOLDER_ID` before deployment.
@@ -250,7 +287,8 @@ const LEADS_HEADERS = [
   "Photo Count",
   "Photo Names",
   "Drive Folder",
-  "PDF"
+  "PDF",
+  "Spreadsheet"
 ];
 
 const RAW_HEADERS = [
@@ -311,7 +349,8 @@ function doPost(e) {
     data.photoCount || (data.files || []).length || "",
     data.photoNames || "",
     driveResult.leadFolderUrl || "",
-    driveResult.pdfUrl || ""
+    driveResult.pdfUrl || "",
+    driveResult.spreadsheetUrl || ""
   ]);
 
   rawSheet.appendRow([
@@ -328,6 +367,7 @@ function doPost(e) {
       ok: true,
       leadFolderUrl: driveResult.leadFolderUrl || "",
       pdfUrl: driveResult.pdfUrl || "",
+      spreadsheetUrl: driveResult.spreadsheetUrl || "",
       savedFiles: driveResult.files || []
     }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -353,11 +393,13 @@ function saveDriveFilesAndPdf_(data, receivedAt) {
   });
 
   const pdfFile = createVehiclePdf_(data, receivedAt, leadFolder, savedFiles);
+  const spreadsheetFile = createVehicleSpreadsheet_(data, receivedAt, leadFolder, savedFiles, pdfFile);
 
   return {
     customerFolderUrl: customerFolder.getUrl(),
     leadFolderUrl: leadFolder.getUrl(),
     pdfUrl: pdfFile.getUrl(),
+    spreadsheetUrl: spreadsheetFile.getUrl(),
     files: savedFiles
   };
 }
@@ -387,7 +429,13 @@ function createVehiclePdf_(data, receivedAt, leadFolder, savedFiles) {
   if (savedFiles.length) {
     body.appendParagraph("Uploaded Photos").setHeading(DocumentApp.ParagraphHeading.HEADING2);
     savedFiles.forEach(function(file) {
-      body.appendParagraph(file.name + ": " + file.url);
+      body.appendParagraph(file.name).setBold(true);
+      try {
+        const image = body.appendImage(DriveApp.getFileById(file.id).getBlob());
+        scaleImage_(image, 460);
+      } catch (error) {
+        body.appendParagraph("Photo could not be embedded: " + file.url);
+      }
     });
   }
 
@@ -398,6 +446,62 @@ function createVehiclePdf_(data, receivedAt, leadFolder, savedFiles) {
   const pdfFile = leadFolder.createFile(pdfBlob);
   docFile.setTrashed(true);
   return pdfFile;
+}
+
+function createVehicleSpreadsheet_(data, receivedAt, leadFolder, savedFiles, pdfFile) {
+  const spreadsheet = SpreadsheetApp.create(summaryFileName_(data, "sheet"));
+  const sheet = spreadsheet.getActiveSheet();
+  sheet.setName("Valuation Summary");
+
+  const rows = [
+    ["Received At", receivedAt],
+    ["Customer Email", data.email || data.authEmail || ""],
+    ["Phone", data.phone || ""],
+    ["VIN", data.vin || ""],
+    ["UVC", data.uvc || ""],
+    ["Vehicle", vehicleTitle_(data)],
+    ["Year", data.year || ""],
+    ["Make", data.make || ""],
+    ["Model", data.model || ""],
+    ["Series / Trim", data.series || ""],
+    ["Style", data.style || ""],
+    ["Kilometers", data.kilometers || ""],
+    ["Color", data.color || ""],
+    ["Region", data.region || ""],
+    ["Country", data.country || ""],
+    ["Wholesale AVG", data.wholesaleAvg || ""],
+    ["Retail AVG", data.retailAvg || ""],
+    ["Trade-In AVG", data.tradeInAvg || ""],
+    ["Condition Notes", data.conditionNotes || ""],
+    ["Drive Folder", leadFolder.getUrl()],
+    ["PDF", pdfFile.getUrl()]
+  ];
+
+  savedFiles.forEach(function(file, index) {
+    rows.push(["Photo " + (index + 1), file.name + " - " + file.url]);
+  });
+
+  sheet.getRange(1, 1, rows.length, 2).setValues(rows);
+  sheet.getRange(1, 1, rows.length, 1).setFontWeight("bold");
+  sheet.autoResizeColumns(1, 2);
+
+  const spreadsheetFile = DriveApp.getFileById(spreadsheet.getId());
+  leadFolder.addFile(spreadsheetFile);
+  try {
+    DriveApp.getRootFolder().removeFile(spreadsheetFile);
+  } catch (error) {
+    // If Drive root removal is unavailable, the file still exists in the lead folder.
+  }
+  return spreadsheetFile;
+}
+
+function scaleImage_(image, maxWidth) {
+  const width = image.getWidth();
+  const height = image.getHeight();
+  if (!width || width <= maxWidth) return;
+  const ratio = maxWidth / width;
+  image.setWidth(maxWidth);
+  image.setHeight(Math.round(height * ratio));
 }
 
 function getOrCreateSheet_(ss, name) {

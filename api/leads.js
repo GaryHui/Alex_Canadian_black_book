@@ -35,14 +35,16 @@ export default async function handler(req, res) {
     const saved = await saveToSupabase(lead);
     const savedLead = { ...lead, id: saved.lead?.id || "" };
     const webhook = await submitLeadToWebhook(savedLead, uploadFiles);
-    if (saved.ok) return res.status(200).json({ ...saved, webhook });
+    const crm = await submitLeadToCrm(savedLead, webhook);
+    if (saved.ok) return res.status(200).json({ ...saved, webhook, crm });
 
-    if (webhook.submitted) {
+    if (webhook.submitted || crm.submitted) {
       return res.status(200).json({
         ok: true,
         captured: true,
-        storage: "webhook",
+        storage: webhook.submitted ? "webhook" : "crm",
         webhook,
+        crm,
         message: "Lead sent to external lead receiver. Set Supabase env vars to also keep user history."
       });
     }
@@ -52,6 +54,7 @@ export default async function handler(req, res) {
       captured: false,
       storage: "not_configured",
       webhook,
+      crm,
       message: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on Vercel to persist leads."
     });
   }
@@ -100,6 +103,56 @@ async function submitLeadToWebhook(lead, uploadFiles = []) {
     };
   } catch (error) {
     return { submitted: false, error: error.message || "Lead webhook submission failed" };
+  }
+}
+
+async function submitLeadToCrm(lead, webhook = {}) {
+  const crmUrl = String(process.env.CRM_WEBHOOK_URL || "").trim();
+  if (!crmUrl) return { submitted: false, skipped: true, reason: "CRM_WEBHOOK_URL is not configured" };
+
+  const drivePayload = parseWebhookResponse(webhook.response);
+  const payload = {
+    source: "blackbook-demo",
+    lead: leadExportValues(lead),
+    drive: {
+      folderUrl: drivePayload.leadFolderUrl || "",
+      pdfUrl: drivePayload.pdfUrl || "",
+      savedFiles: drivePayload.savedFiles || []
+    },
+    raw: {
+      input: lead.input || {},
+      valuation: lead.valuation || {},
+      auth_user: lead.auth_user || {}
+    }
+  };
+
+  const headers = { "Content-Type": "application/json" };
+  const token = String(process.env.CRM_WEBHOOK_TOKEN || "").trim();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  try {
+    const response = await fetch(crmUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload)
+    });
+    const text = await response.text().catch(() => "");
+    return {
+      submitted: response.ok,
+      status: response.status,
+      response: text.slice(0, 500),
+      error: response.ok ? "" : `CRM webhook rejected the submission (${response.status})`
+    };
+  } catch (error) {
+    return { submitted: false, error: error.message || "CRM webhook submission failed" };
+  }
+}
+
+function parseWebhookResponse(value) {
+  try {
+    return value ? JSON.parse(value) : {};
+  } catch {
+    return {};
   }
 }
 
