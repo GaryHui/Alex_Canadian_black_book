@@ -233,6 +233,7 @@ BLACKBOOK_API_PATH=/UsedCarWS/CanUsedAPI
 Optional: send every successful Generate result to a Google Form:
 
 ```text
+LEAD_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_APPS_SCRIPT_WEB_APP_ID/exec
 GOOGLE_FORM_ACTION_URL=https://docs.google.com/forms/d/e/YOUR_PUBLIC_FORM_ID/formResponse
 GOOGLE_FORM_FIELD_MAP={"email":"entry.111","phone":"entry.222","vin":"entry.333","year":"entry.444","make":"entry.555","model":"entry.666","series":"entry.777","style":"entry.888","kilometers":"entry.999","color":"entry.101","region":"entry.102","wholesaleAvg":"entry.103","retailAvg":"entry.104","tradeInAvg":"entry.105","cbbJson":"entry.106"}
 ```
@@ -260,7 +261,55 @@ After adding variables, redeploy:
 Vercel > Deployments > Redeploy
 ```
 
-## 6. Google Form Lead Sync
+## 6. Apps Script / CRM Webhook Lead Sync
+
+This is the recommended owner workflow. Supabase remains the main database, and the webhook sends a clean copy of every successful `Generate` result to Google Apps Script, Google Sheet automation, Make/Zapier, or a CRM webhook.
+
+Vercel variable:
+
+```text
+LEAD_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_APPS_SCRIPT_WEB_APP_ID/exec
+```
+
+The app POSTs JSON like:
+
+```json
+{
+  "email": "customer@example.com",
+  "phone": "604-000-0000",
+  "vin": "2T2GGCEZ9RC032642",
+  "uvc": "2024500170",
+  "year": "2024",
+  "make": "Lexus",
+  "model": "NX-Series",
+  "series": "NX350 Premium",
+  "style": "4D Utility AWD",
+  "kilometers": 37000,
+  "color": "White",
+  "region": "British Columbia",
+  "country": "C",
+  "wholesaleAvg": 44321,
+  "retailAvg": 47912,
+  "tradeInAvg": "",
+  "cbbJson": "{...}",
+  "raw": {
+    "input": {},
+    "valuation": {},
+    "auth_user": {}
+  }
+}
+```
+
+For Google Apps Script, the Sheet webhook can read those properties and append them to a row. For a CRM, point `LEAD_WEBHOOK_URL` to the CRM webhook endpoint or to Make/Zapier.
+
+To change to another website owner's Google Sheet later:
+
+1. Deploy a new Apps Script Web App from that owner's Google Sheet.
+2. Copy the new `/exec` URL.
+3. Replace `LEAD_WEBHOOK_URL` in Vercel Production.
+4. Redeploy Vercel.
+
+## 7. Google Form Lead Sync
 
 Google Form sync is optional. Supabase remains the main database. When configured, every successful `Generate` result is also submitted to the Google Form.
 
@@ -348,7 +397,7 @@ The app will submit the whole lead and valuation result as JSON to that one fiel
 
 The current test form must be published before it can receive submissions. If the published form page says `This document is not published`, Google will reject the sync.
 
-## 7. Local Environment
+## 8. Local Environment
 
 For local testing, create:
 
@@ -366,6 +415,7 @@ BLACKBOOK_API_PATH=/UsedCarWS/CanUsedAPI
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+LEAD_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_APPS_SCRIPT_WEB_APP_ID/exec
 GOOGLE_FORM_ACTION_URL=https://docs.google.com/forms/d/e/YOUR_PUBLIC_FORM_ID/formResponse
 GOOGLE_FORM_FIELD_MAP={"email":"entry.111","phone":"entry.222","vin":"entry.333","year":"entry.444","make":"entry.555","model":"entry.666","series":"entry.777","style":"entry.888","kilometers":"entry.999","color":"entry.101","region":"entry.102","wholesaleAvg":"entry.103","retailAvg":"entry.104","tradeInAvg":"entry.105","cbbJson":"entry.106"}
 PORT=3000
@@ -384,7 +434,7 @@ Open:
 http://localhost:3000
 ```
 
-## 8. Admin Page
+## 9. Admin Page
 
 Open:
 

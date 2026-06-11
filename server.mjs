@@ -462,20 +462,23 @@ async function saveLead(body) {
   };
 
   const saved = await saveLeadToSupabase(lead);
-  const googleForm = await submitLeadToGoogleForm({
+  const savedLead = {
     ...lead,
     id: saved.lead?.id || ""
-  });
+  };
+  const webhook = await submitLeadToWebhook(savedLead);
+  const googleForm = await submitLeadToGoogleForm(savedLead);
 
-  if (saved.ok) return { ...saved, googleForm };
+  if (saved.ok) return { ...saved, webhook, googleForm };
 
-  if (googleForm.submitted) {
+  if (webhook.submitted || googleForm.submitted) {
     return {
       ok: true,
       captured: true,
-      storage: "google_form",
+      storage: webhook.submitted ? "webhook" : "google_form",
+      webhook,
       googleForm,
-      message: "Lead sent to Google Form. Set Supabase env vars to also keep user history."
+      message: "Lead sent to external lead receiver. Set Supabase env vars to also keep user history."
     };
   }
 
@@ -483,9 +486,47 @@ async function saveLead(body) {
     ok: true,
     captured: false,
     storage: "not_configured",
+    webhook,
     googleForm,
     message: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on Vercel to persist leads."
   };
+}
+
+async function submitLeadToWebhook(lead) {
+  const webhookUrl = String(process.env.LEAD_WEBHOOK_URL || "").trim();
+  if (!webhookUrl) return { submitted: false, skipped: true, reason: "LEAD_WEBHOOK_URL is not configured" };
+
+  const payload = leadExportValues(lead);
+  payload.id = lead.id || "";
+  payload.createdAt = lead.created_at || "";
+  payload.status = lead.status || "new";
+  payload.authUserId = lead.auth_user_id || lead.auth_user?.id || "";
+  payload.authEmail = lead.auth_email || lead.auth_user?.email || "";
+  payload.raw = {
+    input: lead.input || {},
+    valuation: lead.valuation || {},
+    auth_user: lead.auth_user || {}
+  };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const text = await response.text().catch(() => "");
+    return {
+      submitted: response.ok,
+      status: response.status,
+      response: text.slice(0, 500),
+      error: response.ok ? "" : `Webhook rejected the submission (${response.status})`
+    };
+  } catch (error) {
+    return { submitted: false, error: error.message || "Lead webhook submission failed" };
+  }
 }
 
 async function submitLeadToGoogleForm(lead) {
@@ -498,7 +539,7 @@ async function submitLeadToGoogleForm(lead) {
     return { submitted: false, skipped: true, reason: "GOOGLE_FORM_FIELD_MAP or GOOGLE_FORM_JSON_ENTRY is not configured" };
   }
 
-  const values = googleFormValues(lead);
+  const values = leadExportValues(lead);
   const params = new URLSearchParams();
 
   for (const [key, entryName] of Object.entries(fieldMap)) {
@@ -563,7 +604,7 @@ function parseGoogleFormFieldMap() {
   }
 }
 
-function googleFormValues(lead) {
+function leadExportValues(lead) {
   const input = lead.input || {};
   const valuation = lead.valuation || {};
 
