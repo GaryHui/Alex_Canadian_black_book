@@ -247,10 +247,6 @@ h1 {
   border-radius: 8px;
 }
 
-.customer-auth.is-signed-in {
-  display: none;
-}
-
 .customer-auth strong,
 .customer-auth span {
   display: block;
