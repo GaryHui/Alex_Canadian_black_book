@@ -267,6 +267,71 @@
         <div id="choice-list" class="choice-list"></div>
       </section>
 
+      <section id="vehicle-review" class="vehicle-review-section" hidden>
+        <div class="review-head">
+          <div>
+            <p class="eyebrow" data-i18n="reviewEyebrow">Vehicle check</p>
+            <h2 data-i18n="reviewTitle">Review the vehicle before valuation</h2>
+            <p data-i18n="reviewIntro">Confirm the vehicle details and add anything that may help the dealer review it later.</p>
+          </div>
+          <button id="change-vehicle" class="ghost-button" type="button" data-i18n="changeVehicle">Change vehicle</button>
+        </div>
+
+        <div class="review-grid">
+          <article class="selected-vehicle-card">
+            <h3 id="review-vehicle-title">Vehicle</h3>
+            <dl>
+              <div>
+                <dt>VIN</dt>
+                <dd id="review-vin">-</dd>
+              </div>
+              <div>
+                <dt>UVC</dt>
+                <dd id="review-uvc">-</dd>
+              </div>
+              <div>
+                <dt data-i18n="yearLabel">Year</dt>
+                <dd id="review-year">-</dd>
+              </div>
+              <div>
+                <dt data-i18n="makeLabel">Make</dt>
+                <dd id="review-make">-</dd>
+              </div>
+              <div>
+                <dt data-i18n="modelLabel">Model</dt>
+                <dd id="review-model">-</dd>
+              </div>
+              <div>
+                <dt data-i18n="seriesLabel">Series / Trim</dt>
+                <dd id="review-series">-</dd>
+              </div>
+              <div>
+                <dt data-i18n="styleLabel">Style</dt>
+                <dd id="review-style">-</dd>
+              </div>
+            </dl>
+          </article>
+
+          <form id="review-form" class="review-form">
+            <label>
+              <span data-i18n="colorLabel">Color</span>
+              <input name="color" autocomplete="off" data-i18n-placeholder="colorPlaceholder" placeholder="White, black, silver..." />
+            </label>
+            <label>
+              <span data-i18n="conditionLabel">Condition notes</span>
+              <textarea name="conditionNotes" rows="4" data-i18n-placeholder="conditionPlaceholder" placeholder="Any damage, warning lights, recent repairs, tire condition..."></textarea>
+            </label>
+            <label>
+              <span data-i18n="photoLabel">Vehicle photos</span>
+              <input id="photo-input" name="photos" type="file" accept="image/*" multiple />
+            </label>
+            <div id="photo-preview" class="photo-preview"></div>
+            <p class="photo-note" data-i18n="photoNote">Photos are previewed here and their filenames are saved with the lead. Drive upload can be connected next.</p>
+            <button id="generate-review" class="primary-button" type="submit" data-i18n="generateValuation">Generate valuation</button>
+          </form>
+        </div>
+      </section>
+
       <section id="result-section" class="result-section" hidden>
         <div class="result-header">
           <div>

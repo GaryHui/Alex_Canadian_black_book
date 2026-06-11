@@ -224,6 +224,7 @@ h1 {
 
 .valuation-card,
 .choice-section,
+.vehicle-review-section,
 .result-section {
   background: var(--panel);
   border: 1px solid rgba(185, 200, 219, 0.9);
@@ -420,6 +421,7 @@ input::placeholder {
 }
 
 .choice-section,
+.vehicle-review-section,
 .result-section,
 .vin-guide-section,
 .tools-section {
@@ -553,6 +555,141 @@ input::placeholder {
   margin-top: 4px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.review-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.review-head h2 {
+  margin-bottom: 8px;
+  font-size: clamp(28px, 4vw, 42px);
+}
+
+.review-head p:last-child {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.92fr) minmax(320px, 1.08fr);
+  gap: 18px;
+}
+
+.selected-vehicle-card,
+.review-form {
+  padding: 20px;
+  background: #fbfdff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.selected-vehicle-card h3 {
+  margin: 0 0 16px;
+  font-size: 22px;
+}
+
+.selected-vehicle-card dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.selected-vehicle-card dl div {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(217, 225, 236, 0.82);
+}
+
+.selected-vehicle-card dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.selected-vehicle-card dd {
+  margin: 0;
+  font-weight: 750;
+}
+
+.review-form {
+  display: grid;
+  gap: 14px;
+}
+
+.review-form label span {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0 0 6px;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+.review-form textarea {
+  width: 100%;
+  min-height: 110px;
+  padding: 13px 14px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #b8c7d9;
+  border-radius: 8px;
+  resize: vertical;
+}
+
+.review-form textarea:focus {
+  border-color: var(--blue);
+  outline: 3px solid rgba(22, 119, 210, 0.14);
+}
+
+.photo-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+
+.photo-preview figure {
+  margin: 0;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.photo-preview img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.photo-preview figcaption {
+  padding: 6px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.photo-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.review-form .primary-button {
+  justify-self: end;
 }
 
 .result-header h2 {
@@ -752,6 +889,7 @@ input::placeholder {
   .mode-panel,
   .split-row,
   .value-cards,
+  .review-grid,
   .vin-guide-layout,
   .tool-grid {
     grid-template-columns: 1fr;
@@ -759,6 +897,7 @@ input::placeholder {
 
   .card-heading,
   .result-header,
+  .review-head,
   .customer-auth {
     display: block;
   }

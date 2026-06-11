@@ -142,6 +142,14 @@ function sanitizeLeadInput(input) {
     style: String(input.style || "").trim(),
     kilometers: Number(input.kilometers || input.mileage || 0),
     color: String(input.color || "").trim(),
+    conditionNotes: String(input.conditionNotes || "").trim(),
+    photoCount: Number(input.photoCount || 0),
+    photoNames: Array.isArray(input.photoNames) ? input.photoNames.map((name) => String(name || "").trim()).filter(Boolean) : [],
+    photoMetadata: Array.isArray(input.photoMetadata) ? input.photoMetadata.map((photo) => ({
+      name: String(photo?.name || "").trim(),
+      size: numberOrNull(photo?.size),
+      type: String(photo?.type || "").trim()
+    })) : [],
     region: String(input.region || "").trim(),
     country: String(input.country || "").trim()
   };

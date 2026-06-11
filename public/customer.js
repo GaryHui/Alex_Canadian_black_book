@@ -2,6 +2,11 @@ const form = document.querySelector("#customer-form");
 const statusEl = document.querySelector("#customer-status");
 const choiceSection = document.querySelector("#choice-section");
 const choiceList = document.querySelector("#choice-list");
+const vehicleReviewSection = document.querySelector("#vehicle-review");
+const reviewForm = document.querySelector("#review-form");
+const changeVehicleButton = document.querySelector("#change-vehicle");
+const photoInput = document.querySelector("#photo-input");
+const photoPreview = document.querySelector("#photo-preview");
 const resultSection = document.querySelector("#result-section");
 const resultTitle = document.querySelector("#result-title");
 const resultMeta = document.querySelector("#result-meta");
@@ -155,6 +160,20 @@ const text = {
     searching: "Searching vehicle matches...",
     noMatches: "No matching vehicle was found. Try VIN or add more vehicle details.",
     chooseRequired: "Choose a vehicle match to continue.",
+    reviewEyebrow: "Vehicle check",
+    reviewTitle: "Review the vehicle before valuation",
+    reviewIntro: "Confirm the vehicle details and add anything that may help the dealer review it later.",
+    changeVehicle: "Change vehicle",
+    seriesLabel: "Series / Trim",
+    styleLabel: "Style",
+    colorLabel: "Color",
+    colorPlaceholder: "White, black, silver...",
+    conditionLabel: "Condition notes",
+    conditionPlaceholder: "Any damage, warning lights, recent repairs, tire condition...",
+    photoLabel: "Vehicle photos",
+    photoNote: "Photos are previewed here and their filenames are saved with the lead. Drive upload can be connected next.",
+    generateValuation: "Generate valuation",
+    vehicleReady: "Vehicle found. Please review the details before generating a valuation.",
     valuing: "Generating your valuation...",
     saving: "Saving your request for follow-up...",
     saved: "Your valuation is ready and has been saved for follow-up.",
@@ -266,6 +285,7 @@ const text = {
 let language = "en";
 let selectedVehicle = null;
 let pendingInput = null;
+let selectedPhotos = [];
 let supabaseClient = null;
 let authSession = null;
 let siteUrl = window.location.origin;
@@ -280,6 +300,13 @@ function initialize() {
   updateMode();
 
   form.addEventListener("submit", handleSubmit);
+  reviewForm.addEventListener("submit", handleReviewSubmit);
+  changeVehicleButton.addEventListener("click", () => {
+    vehicleReviewSection.hidden = true;
+    choiceSection.hidden = false;
+    choiceSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  photoInput.addEventListener("change", renderPhotoPreview);
   form.elements.mode.forEach((item) => item.addEventListener("change", updateMode));
   form.elements.make.addEventListener("input", syncModelList);
   languageToggle.addEventListener("click", () => setLanguage(language === "en" ? "fr" : "en"));
@@ -415,7 +442,9 @@ function updateMode() {
     panel.hidden = panel.dataset.panel !== mode;
   });
   selectedVehicle = null;
+  pendingInput = null;
   choiceSection.hidden = true;
+  vehicleReviewSection.hidden = true;
 }
 
 async function handleSubmit(event) {
@@ -429,6 +458,7 @@ async function handleSubmit(event) {
     return;
   }
   selectedVehicle = null;
+  vehicleReviewSection.hidden = true;
   resultSection.hidden = true;
 
   const input = collectInput();
@@ -446,7 +476,7 @@ async function handleSubmit(event) {
     }
 
     if (choices.length === 1) {
-      await generateForVehicle(choices[0], input);
+      renderVehicleReview(choices[0], input);
       return;
     }
 
@@ -520,18 +550,94 @@ function renderChoices(choices, input) {
       <span>UVC ${escapeHtml(choice.uvc || "-")} · ${escapeHtml(choice.year || "")} ${escapeHtml(choice.make || "")} ${escapeHtml(choice.model || "")}</span>
       <span>${t("selectText")}</span>
     `;
-    button.addEventListener("click", async () => {
-      setBusy(true, t("valuing"));
-      try {
-        await generateForVehicle(choice, input);
-      } finally {
-        setBusy(false);
-      }
-    });
+    button.addEventListener("click", () => renderVehicleReview(choice, input));
     return button;
   }));
   choiceSection.hidden = false;
+  vehicleReviewSection.hidden = true;
   choiceSection.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderVehicleReview(vehicle, input) {
+  selectedVehicle = vehicle;
+  pendingInput = input;
+  selectedPhotos = [];
+  reviewForm.reset();
+  photoPreview.replaceChildren();
+
+  choiceSection.hidden = true;
+  resultSection.hidden = true;
+  vehicleReviewSection.hidden = false;
+
+  const title = vehicle.title || vehicleTitle({
+    year: vehicle.year || input.year,
+    make: vehicle.make || input.make,
+    model: vehicle.model || input.model,
+    series: vehicle.series,
+    style: vehicle.style
+  });
+
+  setText("#review-vehicle-title", title || "Vehicle");
+  setText("#review-vin", input.vin || vehicle.vin || "-");
+  setText("#review-uvc", vehicle.uvc || "-");
+  setText("#review-year", vehicle.year || input.year || "-");
+  setText("#review-make", vehicle.make || input.make || "-");
+  setText("#review-model", vehicle.model || input.model || "-");
+  setText("#review-series", vehicle.series || "-");
+  setText("#review-style", vehicle.style || "-");
+
+  statusEl.textContent = t("vehicleReady");
+  vehicleReviewSection.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function handleReviewSubmit(event) {
+  event.preventDefault();
+  if (!selectedVehicle || !pendingInput) {
+    statusEl.textContent = t("chooseRequired");
+    return;
+  }
+
+  const extraInput = collectReviewInput();
+  setBusy(true, t("valuing"));
+  try {
+    await generateForVehicle(selectedVehicle, { ...pendingInput, ...extraInput });
+  } catch (error) {
+    statusEl.textContent = error.message || t("noMatches");
+  } finally {
+    setBusy(false);
+  }
+}
+
+function collectReviewInput() {
+  const formData = new FormData(reviewForm);
+  return {
+    color: String(formData.get("color") || "").trim(),
+    conditionNotes: String(formData.get("conditionNotes") || "").trim(),
+    photoCount: selectedPhotos.length,
+    photoNames: selectedPhotos.map((photo) => photo.name),
+    photoMetadata: selectedPhotos
+  };
+}
+
+function renderPhotoPreview() {
+  const files = Array.from(photoInput.files || []).slice(0, 8);
+  selectedPhotos = files.map((file) => ({
+    name: file.name,
+    size: file.size,
+    type: file.type
+  }));
+
+  photoPreview.replaceChildren(...files.map((file) => {
+    const figure = document.createElement("figure");
+    const image = document.createElement("img");
+    const caption = document.createElement("figcaption");
+    image.alt = file.name;
+    image.src = URL.createObjectURL(file);
+    image.addEventListener("load", () => URL.revokeObjectURL(image.src), { once: true });
+    caption.textContent = file.name;
+    figure.append(image, caption);
+    return figure;
+  }));
 }
 
 async function generateForVehicle(vehicle, baseInput) {
@@ -568,6 +674,7 @@ async function generateForVehicle(vehicle, baseInput) {
     ? t("saved")
     : t("saveIssue");
   choiceSection.hidden = true;
+  vehicleReviewSection.hidden = true;
 }
 
 async function captureLead(input, valuation) {
@@ -638,15 +745,21 @@ function vehicleTitle(vehicle = {}) {
 function resetCustomerFlow() {
   selectedVehicle = null;
   pendingInput = null;
+  selectedPhotos = [];
   choiceSection.hidden = true;
+  vehicleReviewSection.hidden = true;
   resultSection.hidden = true;
+  reviewForm.reset();
+  photoPreview.replaceChildren();
   statusEl.textContent = "";
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function setBusy(isBusy, message = "") {
   const button = document.querySelector("#continue-button");
+  const reviewButton = document.querySelector("#generate-review");
   button.disabled = isBusy;
+  if (reviewButton) reviewButton.disabled = isBusy;
   if (message) statusEl.textContent = message;
 }
 
@@ -655,6 +768,14 @@ function setFormDisabled(disabled) {
     if (control.id === "postal-help") return;
     control.disabled = disabled;
   });
+  reviewForm.querySelectorAll("input, textarea, button").forEach((control) => {
+    control.disabled = disabled;
+  });
+}
+
+function setText(selector, value) {
+  const node = document.querySelector(selector);
+  if (node) node.textContent = value;
 }
 
 function isEmailVerified(user) {
