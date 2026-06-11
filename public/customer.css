@@ -225,7 +225,8 @@ h1 {
 .valuation-card,
 .choice-section,
 .vehicle-review-section,
-.result-section {
+.result-section,
+.history-panel {
   background: var(--panel);
   border: 1px solid rgba(185, 200, 219, 0.9);
   border-radius: 8px;
@@ -260,8 +261,30 @@ h1 {
   line-height: 1.35;
 }
 
+.customer-quota {
+  min-width: 160px;
+  padding-left: 18px;
+  border-left: 1px solid var(--line);
+}
+
+.customer-quota span,
+.customer-quota small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.customer-quota strong {
+  display: block;
+  margin: 2px 0;
+  color: var(--red);
+  font-size: 22px;
+  line-height: 1.1;
+}
+
 .card-heading,
-.result-header {
+.result-header,
+.history-head {
   display: flex;
   justify-content: space-between;
   gap: 18px;
@@ -274,7 +297,8 @@ h1 {
 }
 
 .card-heading p,
-.result-header p {
+.result-header p,
+.history-head p {
   color: var(--muted);
 }
 
@@ -423,6 +447,7 @@ input::placeholder {
 .choice-section,
 .vehicle-review-section,
 .result-section,
+.history-panel,
 .vin-guide-section,
 .tools-section {
   margin: 0 0 64px;
@@ -697,6 +722,97 @@ input::placeholder {
   font-size: clamp(28px, 4vw, 42px);
 }
 
+.history-head {
+  margin-bottom: 20px;
+}
+
+.history-head h2 {
+  margin-bottom: 8px;
+  font-size: clamp(28px, 4vw, 40px);
+}
+
+.history-list {
+  display: grid;
+  gap: 14px;
+}
+
+.history-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  background: #fbfdff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.history-card > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.history-card strong {
+  font-size: 18px;
+}
+
+.history-card time {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.history-meta {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.history-meta dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.history-meta dd {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.history-values,
+.history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.history-values span {
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.history-actions button {
+  min-height: 38px;
+  padding: 0 14px;
+  color: var(--blue-dark);
+  background: #fff;
+  border: 1px solid var(--blue);
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.history-actions .danger {
+  color: var(--red);
+  border-color: rgba(215, 38, 61, 0.55);
+}
+
+.history-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .value-cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -897,14 +1013,26 @@ input::placeholder {
 
   .card-heading,
   .result-header,
+  .history-head,
   .review-head,
   .customer-auth {
     display: block;
   }
 
+  .customer-quota {
+    margin: 14px 0;
+    padding: 12px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
   .customer-auth button {
     width: 100%;
     margin-top: 12px;
+  }
+
+  .history-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .step-pill {

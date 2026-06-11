@@ -25,6 +25,13 @@ const customerAuthTitle = document.querySelector("#customer-auth-title");
 const customerAuthSubtitle = document.querySelector("#customer-auth-subtitle");
 const customerLoginButton = document.querySelector("#customer-login");
 const customerLogoutButton = document.querySelector("#customer-logout");
+const quotaPanel = document.querySelector("#customer-quota");
+const quotaTitle = document.querySelector("#quota-title");
+const quotaSubtitle = document.querySelector("#quota-subtitle");
+const historyPanel = document.querySelector("#history-panel");
+const historyStatus = document.querySelector("#history-status");
+const historyList = document.querySelector("#history-list");
+const reloadHistoryButton = document.querySelector("#reload-history");
 
 const commonMakes = [
   "Acura",
@@ -147,6 +154,25 @@ const text = {
     authUnverified: "Please verify your email before generating a valuation.",
     loginButton: "Continue with Google",
     logoutButton: "Sign out",
+    quotaLabel: "Annual valuations",
+    quotaChecking: "Checking...",
+    quotaUnavailable: "Unavailable",
+    quotaSummary: "used of",
+    quotaLeft: "left",
+    historyEyebrow: "My valuations",
+    historyTitle: "Quote history",
+    historyIntro: "Your saved valuations stay here so you and the dealer can review them later.",
+    reloadHistory: "Reload",
+    historyLoading: "Loading quote history...",
+    historyEmpty: "No saved quotes yet. Generate a valuation and it will appear here.",
+    historySaved: "saved quote",
+    historyView: "View result",
+    historyDelete: "Delete",
+    historyDeleting: "Deleting...",
+    historyDeleted: "Quote deleted. Annual valuation allowance was not restored.",
+    historyDeleteConfirm: "Delete this quote from your history? This cannot be undone and it will not restore your annual valuation allowance.",
+    historyDeleteError: "Unable to delete quote",
+    limitReached: "valuation limit reached.",
     postalModalTitle: "Why do you need my postal code?",
     postalModalText: "Market pricing changes by region. Your postal code helps estimate values near your area.",
     gotIt: "Got it",
@@ -255,6 +281,25 @@ const text = {
     authUnverified: "Veuillez vérifier votre courriel avant de générer une évaluation.",
     loginButton: "Continuer avec Google",
     logoutButton: "Déconnexion",
+    quotaLabel: "Évaluations annuelles",
+    quotaChecking: "Vérification...",
+    quotaUnavailable: "Indisponible",
+    quotaSummary: "utilisées sur",
+    quotaLeft: "restantes",
+    historyEyebrow: "Mes évaluations",
+    historyTitle: "Historique des devis",
+    historyIntro: "Vos évaluations enregistrées restent ici pour révision avec le concessionnaire.",
+    reloadHistory: "Recharger",
+    historyLoading: "Chargement de l'historique...",
+    historyEmpty: "Aucun devis enregistré. Générez une évaluation et elle apparaîtra ici.",
+    historySaved: "devis enregistré",
+    historyView: "Voir le résultat",
+    historyDelete: "Supprimer",
+    historyDeleting: "Suppression...",
+    historyDeleted: "Devis supprimé. La limite annuelle n'a pas été restaurée.",
+    historyDeleteConfirm: "Supprimer ce devis de votre historique? Cette action est définitive et ne restaure pas votre limite annuelle.",
+    historyDeleteError: "Impossible de supprimer le devis",
+    limitReached: "limite d'évaluations atteinte.",
     postalModalTitle: "Pourquoi demander mon code postal?",
     postalModalText: "Les prix changent selon la région. Le code postal aide à estimer les valeurs près de chez vous.",
     gotIt: "Compris",
@@ -288,6 +333,8 @@ let pendingInput = null;
 let selectedPhotos = [];
 let supabaseClient = null;
 let authSession = null;
+let usageState = null;
+let historyLeads = [];
 let siteUrl = window.location.origin;
 
 initialize();
@@ -318,6 +365,7 @@ function initialize() {
   startOver.addEventListener("click", resetCustomerFlow);
   customerLoginButton.addEventListener("click", signInCustomer);
   customerLogoutButton.addEventListener("click", signOutCustomer);
+  reloadHistoryButton.addEventListener("click", loadHistory);
   initializeCustomerAuth();
 }
 
@@ -404,16 +452,28 @@ function setCustomerSession(session) {
     form.elements.email.readOnly = true;
     if (!isEmailVerified(session.user)) {
       customerAuthSubtitle.textContent = t("authUnverified");
+      usageState = null;
+      historyLeads = [];
+      quotaPanel.hidden = true;
+      historyPanel.hidden = true;
       setFormDisabled(true);
       return;
     }
     customerAuthSubtitle.textContent = t("authReadyHelp");
     setFormDisabled(false);
+    void loadUsage();
+    void loadHistory();
   } else {
     customerAuthTitle.textContent = t("authRequired");
     customerAuthSubtitle.textContent = t("authRequired");
     form.elements.email.value = "";
     form.elements.email.readOnly = false;
+    usageState = null;
+    historyLeads = [];
+    quotaPanel.hidden = true;
+    historyPanel.hidden = true;
+    historyList.replaceChildren();
+    historyStatus.textContent = "";
     setFormDisabled(false);
   }
 }
@@ -641,6 +701,9 @@ function renderPhotoPreview() {
 }
 
 async function generateForVehicle(vehicle, baseInput) {
+  if (!usageState) await loadUsage();
+  if (!canUseValuation()) return;
+
   selectedVehicle = vehicle;
   const payload = {
     ...baseInput,
@@ -675,6 +738,8 @@ async function generateForVehicle(vehicle, baseInput) {
     : t("saveIssue");
   choiceSection.hidden = true;
   vehicleReviewSection.hidden = true;
+  await loadUsage();
+  await loadHistory();
 }
 
 async function captureLead(input, valuation) {
@@ -697,6 +762,169 @@ async function captureLead(input, valuation) {
     console.warn(error);
     return { ok: false, captured: false };
   }
+}
+
+async function loadUsage() {
+  if (!authSession?.user) return null;
+
+  const userId = encodeURIComponent(authSession.user.id || "");
+  const email = encodeURIComponent(authSession.user.email || "");
+  quotaPanel.hidden = false;
+  quotaTitle.textContent = t("quotaChecking");
+  quotaSubtitle.textContent = "";
+
+  try {
+    const response = await fetch(`/api/usage?userId=${userId}&email=${email}`);
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || t("quotaUnavailable"));
+
+    usageState = data;
+    quotaTitle.textContent = `${data.remaining} ${t("quotaLeft")}`;
+    quotaSubtitle.textContent = `${data.used} ${t("quotaSummary")} ${data.annualLimit} in ${data.year}`;
+    if (data.remaining <= 0) {
+      statusEl.textContent = `${data.year} ${t("limitReached")} ${data.contact || "Please contact the website owner for more valuations."}`;
+    }
+  } catch (error) {
+    usageState = null;
+    quotaTitle.textContent = t("quotaUnavailable");
+    quotaSubtitle.textContent = error.message || t("quotaUnavailable");
+  }
+
+  return usageState;
+}
+
+async function loadHistory() {
+  if (!authSession?.access_token) return;
+
+  historyPanel.hidden = false;
+  historyStatus.textContent = t("historyLoading");
+
+  try {
+    const response = await fetch("/api/my-leads", {
+      headers: {
+        Authorization: `Bearer ${authSession.access_token}`
+      }
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || t("historyEmpty"));
+
+    historyLeads = data.leads || [];
+    renderHistory(historyLeads);
+  } catch (error) {
+    historyLeads = [];
+    historyStatus.textContent = error.message || t("historyEmpty");
+    historyList.replaceChildren();
+  }
+}
+
+function renderHistory(leads) {
+  if (!leads.length) {
+    historyStatus.textContent = t("historyEmpty");
+    historyList.replaceChildren();
+    return;
+  }
+
+  historyStatus.textContent = `${leads.length} ${t("historySaved")}${leads.length === 1 ? "" : "s"}.`;
+  historyList.innerHTML = leads.map((lead, index) => {
+    const input = lead.input || {};
+    const valuation = lead.valuation || {};
+    const title = valuation.title || vehicleTitle(input) || "Vehicle valuation";
+    const wholesaleAvg = marketAverage(valuation, "wholesale");
+    const retailAvg = marketAverage(valuation, "retail");
+    const tradeInAvg = marketAverage(valuation, "tradeIn");
+
+    return `
+      <article class="history-card">
+        <div>
+          <strong>${escapeHtml(title)}</strong>
+          <time>${escapeHtml(formatDateTime(lead.created_at))}</time>
+        </div>
+        <dl class="history-meta">
+          <div><dt>VIN</dt><dd>${escapeHtml(valuation.vin || input.vin || "-")}</dd></div>
+          <div><dt>UVC</dt><dd>${escapeHtml(input.uvc || "-")}</dd></div>
+          <div><dt>${escapeHtml(t("odometerLabel"))}</dt><dd>${input.kilometers ? formatNumber(input.kilometers) : "-"}</dd></div>
+          <div><dt>${escapeHtml(t("postalLabel"))}</dt><dd>${escapeHtml(valuation.region || input.region || "-")}</dd></div>
+          <div><dt>${escapeHtml(t("colorLabel"))}</dt><dd>${escapeHtml(input.color || "Not provided")}</dd></div>
+          <div><dt>Status</dt><dd>${escapeHtml(lead.status || "new")}</dd></div>
+        </dl>
+        <div class="history-values">
+          <span>${escapeHtml(t("wholesaleAvg"))} ${formatHistoryValue(wholesaleAvg)}</span>
+          <span>${escapeHtml(t("retailAvg"))} ${formatHistoryValue(retailAvg)}</span>
+          <span>${escapeHtml(t("tradeInAvg"))} ${formatHistoryValue(tradeInAvg)}</span>
+        </div>
+        <div class="history-actions">
+          <button type="button" data-history-index="${index}">${escapeHtml(t("historyView"))}</button>
+          <button class="danger" type="button" data-delete-lead-id="${escapeHtml(lead.id || "")}">${escapeHtml(t("historyDelete"))}</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  historyList.querySelectorAll("[data-history-index]").forEach((button) => {
+    button.addEventListener("click", () => showHistoryResult(historyLeads[Number(button.dataset.historyIndex)]));
+  });
+
+  historyList.querySelectorAll("[data-delete-lead-id]").forEach((button) => {
+    button.addEventListener("click", () => deleteHistoryLead(button));
+  });
+}
+
+async function deleteHistoryLead(button) {
+  const id = button.dataset.deleteLeadId || "";
+  if (!id || !authSession?.access_token) return;
+
+  const confirmed = window.confirm(t("historyDeleteConfirm"));
+  if (!confirmed) return;
+
+  button.disabled = true;
+  button.textContent = t("historyDeleting");
+  historyStatus.textContent = t("historyDeleting");
+
+  try {
+    const response = await fetch(`/api/my-leads?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${authSession.access_token}`
+      }
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || t("historyDeleteError"));
+
+    historyLeads = historyLeads.filter((lead) => lead.id !== id);
+    renderHistory(historyLeads);
+    historyStatus.textContent = t("historyDeleted");
+    await loadUsage();
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = t("historyDelete");
+    historyStatus.textContent = error.message || t("historyDeleteError");
+  }
+}
+
+function showHistoryResult(lead) {
+  if (!lead) return;
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+  selectedVehicle = {
+    title: valuation.title || vehicleTitle(input),
+    uvc: input.uvc || "",
+    year: input.year || "",
+    make: input.make || "",
+    model: input.model || "",
+    series: input.series || "",
+    style: input.style || ""
+  };
+  renderResult({
+    ok: true,
+    title: valuation.title || vehicleTitle(input) || "Vehicle",
+    vin: valuation.vin || input.vin || "",
+    kilometers: input.kilometers || valuation.kilometers || 0,
+    region: valuation.region || input.region || "",
+    country: valuation.country || input.country || "C",
+    values: valuation.values || {},
+    loanValue: valuation.loanValue || null,
+    thresholds: valuation.thresholds || null
+  }, input);
 }
 
 function renderResult(valuation, input) {
@@ -736,10 +964,31 @@ function formatNumber(value) {
   }).format(Number(value));
 }
 
+function formatHistoryValue(value) {
+  return value === null || value === undefined ? "-" : formatNumber(value);
+}
+
+function formatDateTime(value) {
+  if (!value) return "Unknown date";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown date";
+  return new Intl.DateTimeFormat(language === "fr" ? "fr-CA" : "en-CA", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(date);
+}
+
 function vehicleTitle(vehicle = {}) {
   return [vehicle.year, vehicle.make, vehicle.model, vehicle.series, vehicle.style]
     .filter(Boolean)
     .join(" ") || "Vehicle";
+}
+
+function canUseValuation() {
+  if (!usageState || usageState.remaining > 0) return true;
+  const message = `${usageState.year} ${t("limitReached")} ${usageState.contact || "Please contact the website owner for more valuations."}`;
+  statusEl.textContent = message;
+  return false;
 }
 
 function resetCustomerFlow() {

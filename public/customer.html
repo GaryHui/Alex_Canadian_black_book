@@ -97,6 +97,11 @@
               <strong id="customer-auth-title" data-i18n="authChecking">Checking sign-in...</strong>
               <span id="customer-auth-subtitle" data-i18n="authRequired">Google sign-in is required before valuation.</span>
             </div>
+            <div id="customer-quota" class="customer-quota" hidden>
+              <span data-i18n="quotaLabel">Annual valuations</span>
+              <strong id="quota-title">-</strong>
+              <small id="quota-subtitle"></small>
+            </div>
             <button id="customer-login" class="ghost-button" type="button" hidden data-i18n="loginButton">Continue with Google</button>
             <button id="customer-logout" class="ghost-button" type="button" hidden data-i18n="logoutButton">Sign out</button>
           </div>
@@ -358,6 +363,19 @@
         <p class="fine-print" data-i18n="resultNote">
           This is an estimate. A dealer may adjust it after reviewing condition, options, and photos.
         </p>
+      </section>
+
+      <section id="history-panel" class="history-panel" hidden>
+        <div class="history-head">
+          <div>
+            <p class="eyebrow" data-i18n="historyEyebrow">My valuations</p>
+            <h2 data-i18n="historyTitle">Quote history</h2>
+            <p data-i18n="historyIntro">Your saved valuations stay here so you and the dealer can review them later.</p>
+          </div>
+          <button id="reload-history" class="ghost-button" type="button" data-i18n="reloadHistory">Reload</button>
+        </div>
+        <p id="history-status" class="status" role="status" aria-live="polite"></p>
+        <div id="history-list" class="history-list"></div>
       </section>
 
       <section id="tools" class="tools-section">
