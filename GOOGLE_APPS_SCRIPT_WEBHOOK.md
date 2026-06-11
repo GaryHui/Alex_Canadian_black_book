@@ -1,5 +1,9 @@
 # Google Apps Script Webhook Setup
 
+> Current recommendation: use `GOOGLE_DRIVE_UPLOADS.md` for the final working setup.
+> That newer document includes Google Drive photo upload, per-customer folders, vehicle PDF creation, `DRIVE_ROOT_FOLDER_ID`, and the current `LEAD_WEBHOOK_URL` deployment order.
+> This file is kept only for the older Sheet-only webhook reference.
+
 This document explains how to send successful Black Book valuation leads into a website owner's Google Sheet.
 
 The production flow is:

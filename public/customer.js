@@ -67,6 +67,20 @@ const commonMakes = [
   "Volvo"
 ];
 
+const commonColors = [
+  "White",
+  "Black",
+  "Silver",
+  "Gray",
+  "Blue",
+  "Red",
+  "Brown",
+  "Green",
+  "Gold",
+  "Beige",
+  "Other / not listed"
+];
+
 const commonModels = {
   Acura: ["ILX", "Integra", "MDX", "RDX", "TLX"],
   Audi: ["A3", "A4", "A5", "Q3", "Q5", "Q7"],
@@ -693,6 +707,7 @@ function renderVehicleReview(vehicle, input) {
   setText("#review-region", regionName(input.region));
   setText("#review-postal", input.postalCode || "-");
   populateReviewSelects(vehicle);
+  populateColorOptions(input.color || vehicle.color || "");
 
   statusEl.textContent = t("vehicleReady");
   vehicleReviewSection.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -700,31 +715,55 @@ function renderVehicleReview(vehicle, input) {
 
 function populateReviewSelects(vehicle = {}) {
   const inferred = inferVehicleDetails(vehicle);
-  setReviewOptions("series", inferred.series, t("seriesLabel"));
-  setReviewOptions("engine", inferred.engine, t("engineLabel"));
-  setReviewOptions("drivetrain", inferred.drivetrain, t("drivetrainLabel"));
-  setReviewOptions("transmission", inferred.transmission, t("transmissionLabel"));
-  setReviewOptions("style", inferred.style, t("styleLabel"));
+  setReviewFieldOptions("series", inferred.series);
+  setReviewFieldOptions("engine", inferred.engine);
+  setReviewFieldOptions("drivetrain", inferred.drivetrain, ["Not sure", "AWD", "FWD", "RWD", "4WD", "4X4"]);
+  setTransmissionOptions(inferred.transmission);
+  setReviewFieldOptions("style", inferred.style);
 }
 
-function setReviewOptions(name, values, label) {
-  const select = reviewForm.elements[name];
+function setReviewFieldOptions(name, values, fallbackValues = ["Not sure"]) {
+  const field = reviewForm.elements[name];
+  const datalist = document.querySelector(`#${name}-options`);
+  if (!field) return;
+
+  const uniqueValues = uniqueReviewValues([...values, ...fallbackValues]);
+  field.value = uniqueReviewValues(values)[0] || "Not sure";
+
+  if (datalist) {
+    datalist.innerHTML = uniqueValues
+      .map((value) => `<option value="${escapeHtml(value)}"></option>`)
+      .join("");
+  }
+}
+
+function setTransmissionOptions(values = []) {
+  const select = reviewForm.elements.transmission;
   if (!select) return;
-  const uniqueValues = [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))];
-  const options = uniqueValues.length ? uniqueValues : [`- Select ${label} -`, "Not sure"];
-  select.innerHTML = options.map((value, index) => {
-    const disabled = !uniqueValues.length && index === 0 ? " disabled selected" : "";
-    return `<option value="${escapeHtml(value)}"${disabled}>${escapeHtml(value)}</option>`;
-  }).join("");
+  const inferred = uniqueReviewValues(values);
+  const matched = inferred.find((value) => /manual/i.test(value))
+    ? "Manual"
+    : inferred.find((value) => /auto|automatic|cvt/i.test(value))
+      ? "Automatic"
+      : "Not sure";
+
+  select.innerHTML = ["Not sure", "Automatic", "Manual"]
+    .map((value) => `<option value="${escapeHtml(value)}"${value === matched ? " selected" : ""}>${escapeHtml(value)}</option>`)
+    .join("");
+}
+
+function uniqueReviewValues(values = []) {
+  return [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))];
 }
 
 function inferVehicleDetails(vehicle = {}) {
   const title = String(vehicle.title || "");
   return {
-    series: [vehicle.series, vehicle.trim].filter(Boolean),
+    series: [vehicle.series, vehicle.trim, vehicle.series_description].filter(Boolean),
     engine: [
       vehicle.engine,
       vehicle.engine_description,
+      vehicle.engine_size,
       findTitleDetail(title, /\b\d(?:\.\d)?L\b[^,]*/i),
       findTitleDetail(title, /\b(?:V6|V8|I4|Hybrid|Electric|Turbo|Supercharged)[^,]*/i)
     ].filter(Boolean),
@@ -739,8 +778,24 @@ function inferVehicleDetails(vehicle = {}) {
       vehicle.transmission_description,
       findTitleDetail(title, /\b(?:Automatic|Manual|CVT)\b/i)
     ].filter(Boolean),
-    style: [vehicle.style, vehicle.body_style].filter(Boolean)
+    style: [vehicle.style, vehicle.body_style, vehicle.body].filter(Boolean)
   };
+}
+
+function populateColorOptions(selectedColor = "") {
+  const select = reviewForm.elements.color;
+  if (!select) return;
+  const selected = String(selectedColor || "").trim();
+  const options = selected && !commonColors.includes(selected)
+    ? [selected, ...commonColors]
+    : ["", ...commonColors];
+
+  select.innerHTML = options.map((value, index) => {
+    const label = value || t("colorPlaceholder");
+    const selectedAttr = selected && value === selected ? " selected" : "";
+    const disabled = index === 0 && !value ? ` disabled${selected ? "" : " selected"}` : "";
+    return `<option value="${escapeHtml(value)}"${selectedAttr}${disabled}>${escapeHtml(label)}</option>`;
+  }).join("");
 }
 
 function findTitleDetail(title, pattern) {

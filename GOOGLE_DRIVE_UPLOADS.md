@@ -75,13 +75,58 @@ const DRIVE_ROOT_FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID";
 ```
 
 5. Click `Run`, choose `installHeaders`, and authorize it.
-6. Click `Deploy > New deployment`.
-7. Type: `Web app`.
-8. Execute as: `Me`.
-9. Who has access: `Anyone`.
-10. Copy the `/exec` URL.
-11. Put that URL into Vercel `LEAD_WEBHOOK_URL`.
-12. Redeploy Vercel.
+6. Confirm the `Leads` and `CBB Raw` sheet tabs now have clean headers.
+7. Click `Deploy > New deployment`.
+8. Type: `Web app`.
+9. Execute as: `Me`.
+10. Who has access: `Anyone`.
+11. Copy the `/exec` URL.
+12. Put that URL into Vercel `LEAD_WEBHOOK_URL`.
+13. Redeploy Vercel.
+
+## Full Setup Order For A New Owner
+
+Use this order when handing the system to a website owner:
+
+1. In Google Drive, create one root folder, for example:
+
+```text
+BlackBook Leads
+```
+
+2. Open that folder and copy the folder ID from the browser URL.
+3. Open the Google Sheet that will receive leads.
+4. Copy the Google Sheet ID from the browser URL.
+5. In the Google Sheet, open `Extensions > Apps Script`.
+6. Replace the old script with the final script in this document.
+7. Fill in both constants:
+
+```javascript
+const SPREADSHEET_ID = "PASTE_GOOGLE_SHEET_ID_HERE";
+const DRIVE_ROOT_FOLDER_ID = "PASTE_GOOGLE_DRIVE_FOLDER_ID_HERE";
+```
+
+8. Save the script.
+9. In Apps Script, select `installHeaders` from the function dropdown.
+10. Click `Run`.
+11. Approve Google permissions if prompted.
+12. Check the Google Sheet:
+    - `Leads` should have readable columns.
+    - `CBB Raw` should exist for raw JSON.
+13. Click `Deploy > New deployment`.
+14. Select `Web app`.
+15. Set `Execute as` to `Me`.
+16. Set `Who has access` to `Anyone`.
+17. Deploy and copy the new `/exec` URL.
+18. In Vercel, set:
+
+```text
+LEAD_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
+```
+
+19. Redeploy Vercel.
+
+Important: Apps Script and Vercel are separate deployments. Changing Apps Script code does not automatically update Vercel. If the Apps Script `/exec` URL changes, Vercel must be updated and redeployed.
 
 ## How To Get IDs
 
@@ -98,6 +143,53 @@ Google Drive folder ID:
 https://drive.google.com/drive/folders/1abcDEFghiJKLmnop
                                       ^ this part is the folder ID
 ```
+
+Step-by-step for the Drive folder ID:
+
+1. Open [Google Drive](https://drive.google.com/).
+2. Create or open the root folder, for example `BlackBook Leads`.
+3. Look at the browser address bar.
+4. The URL normally looks like this:
+
+```text
+https://drive.google.com/drive/folders/1AbCDefGhijkLmNoPQRstuVwxyz123456
+```
+
+5. Copy only the part after `/folders/`:
+
+```text
+1AbCDefGhijkLmNoPQRstuVwxyz123456
+```
+
+6. Paste it into Apps Script:
+
+```javascript
+const DRIVE_ROOT_FOLDER_ID = "1AbCDefGhijkLmNoPQRstuVwxyz123456";
+```
+
+Do not paste the full Google Drive URL into `DRIVE_ROOT_FOLDER_ID`. Paste only the ID string.
+
+## When To Update Vercel `LEAD_WEBHOOK_URL`
+
+You only need to change Vercel `LEAD_WEBHOOK_URL` when the Apps Script Web App `/exec` URL changes.
+
+Usually the `/exec` URL changes when:
+
+- You create a brand-new Apps Script project.
+- You create a brand-new Web App deployment instead of editing the existing deployment.
+- The website owner replaces the Google Sheet and creates a new script.
+
+If you only edit code inside the same Apps Script project and update the existing deployment, the URL may stay the same. Still, always confirm the latest `/exec` URL after deployment.
+
+After changing `LEAD_WEBHOOK_URL` in Vercel:
+
+1. Save the environment variable.
+2. Redeploy the Vercel project.
+3. Run a test valuation.
+4. Confirm:
+   - One readable row appears in `Leads`.
+   - Raw JSON appears in `CBB Raw`.
+   - Photos and PDF appear under the correct Google Drive folder.
 
 ## Final Apps Script
 

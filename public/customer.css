@@ -669,36 +669,57 @@ input::placeholder {
   border: 0;
 }
 
-.review-select-stack select {
+.review-select-stack select,
+.review-select-stack input {
   min-height: 46px;
   font-size: 16px;
 }
 
+.review-select-stack input {
+  width: 100%;
+  padding: 13px 14px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #b8c7d9;
+  border-radius: 8px;
+}
+
+.review-select-stack input:focus {
+  border-color: var(--blue);
+  outline: 3px solid rgba(22, 119, 210, 0.14);
+}
+
 .review-summary {
-  padding: 12px 14px;
+  padding: 14px 16px;
   background: #fbfdff;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
 
-.review-summary summary {
-  cursor: pointer;
+.review-summary h3 {
+  margin: 0 0 12px;
   color: var(--blue-dark);
+  font-size: 18px;
   font-weight: 850;
 }
 
 .review-summary dl {
   display: grid;
-  gap: 10px;
-  margin: 14px 0 0;
+  gap: 0;
+  margin: 0;
 }
 
 .review-summary dl div {
   display: grid;
   grid-template-columns: 120px 1fr;
   gap: 12px;
-  padding-bottom: 10px;
+  padding: 10px 0;
   border-bottom: 1px solid rgba(217, 225, 236, 0.82);
+}
+
+.review-summary dl div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 
 .review-summary dt {
@@ -716,8 +737,6 @@ input::placeholder {
 .review-extras {
   display: grid;
   gap: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
 }
 
 .review-extras label span {
@@ -730,17 +749,27 @@ input::placeholder {
   white-space: normal;
 }
 
+.review-extras select,
 .review-form textarea {
   width: 100%;
-  min-height: 110px;
   padding: 13px 14px;
   color: var(--ink);
   background: #fff;
   border: 1px solid #b8c7d9;
   border-radius: 8px;
+}
+
+.review-extras select {
+  min-height: 46px;
+  font-size: 16px;
+}
+
+.review-form textarea {
+  min-height: 110px;
   resize: vertical;
 }
 
+.review-extras select:focus,
 .review-form textarea:focus {
   border-color: var(--blue);
   outline: 3px solid rgba(22, 119, 210, 0.14);

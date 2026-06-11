@@ -289,15 +289,18 @@
           <div class="review-select-stack">
             <label>
               <span data-i18n="seriesLabel">Series / Trim</span>
-              <select name="series" data-review-select="series"></select>
+              <input name="series" data-review-field="series" list="series-options" autocomplete="off" />
+              <datalist id="series-options"></datalist>
             </label>
             <label>
               <span data-i18n="engineLabel">Engine</span>
-              <select name="engine" data-review-select="engine"></select>
+              <input name="engine" data-review-field="engine" list="engine-options" autocomplete="off" />
+              <datalist id="engine-options"></datalist>
             </label>
             <label>
               <span data-i18n="drivetrainLabel">Drivetrain</span>
-              <select name="drivetrain" data-review-select="drivetrain"></select>
+              <input name="drivetrain" data-review-field="drivetrain" list="drivetrain-options" autocomplete="off" />
+              <datalist id="drivetrain-options"></datalist>
             </label>
             <label>
               <span data-i18n="transmissionLabel">Transmission</span>
@@ -305,12 +308,13 @@
             </label>
             <label>
               <span data-i18n="styleLabel">Style</span>
-              <select name="style" data-review-select="style"></select>
+              <input name="style" data-review-field="style" list="style-options" autocomplete="off" />
+              <datalist id="style-options"></datalist>
             </label>
           </div>
 
-          <details class="review-summary">
-            <summary data-i18n="reviewSummary">Vehicle data</summary>
+          <section class="review-summary" aria-labelledby="review-summary-title">
+            <h3 id="review-summary-title" data-i18n="reviewSummary">Vehicle data</h3>
             <dl>
               <div>
                 <dt>VIN</dt>
@@ -341,12 +345,12 @@
                 <dd id="review-postal">-</dd>
               </div>
             </dl>
-          </details>
+          </section>
 
           <div class="review-extras">
             <label>
               <span data-i18n="colorLabel">Color</span>
-              <input name="color" autocomplete="off" data-i18n-placeholder="colorPlaceholder" placeholder="White, black, silver..." />
+              <select name="color" data-review-color></select>
             </label>
             <label>
               <span data-i18n="conditionLabel">Condition notes</span>
