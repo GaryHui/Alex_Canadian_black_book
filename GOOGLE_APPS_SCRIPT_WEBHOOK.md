@@ -183,14 +183,35 @@ function installHeaders() {
   const leadsSheet = getOrCreateSheet_(LEADS_SHEET_NAME);
   leadsSheet.getRange(1, 1, 1, LEADS_HEADERS.length).setValues([LEADS_HEADERS]);
   leadsSheet.setFrozenRows(1);
+  leadsSheet.getDataRange().setWrap(false);
   leadsSheet.autoResizeColumns(1, LEADS_HEADERS.length);
+  cleanupOldJsonColumns_(leadsSheet);
+  normalizeLeadRowHeights_(leadsSheet);
 
   const rawSheet = getOrCreateSheet_(RAW_SHEET_NAME);
   rawSheet.getRange(1, 1, 1, RAW_HEADERS.length).setValues([RAW_HEADERS]);
   rawSheet.setFrozenRows(1);
+  rawSheet.getDataRange().setWrap(false);
   rawSheet.autoResizeColumns(1, 4);
   rawSheet.setColumnWidth(5, 320);
   rawSheet.setColumnWidth(6, 320);
+}
+
+function cleanupOldJsonColumns_(sheet) {
+  const firstExtraColumn = LEADS_HEADERS.length + 1;
+  const extraColumnCount = sheet.getMaxColumns() - LEADS_HEADERS.length;
+  if (extraColumnCount <= 0) return;
+
+  sheet
+    .getRange(1, firstExtraColumn, sheet.getMaxRows(), extraColumnCount)
+    .clearContent();
+  sheet.hideColumns(firstExtraColumn, extraColumnCount);
+}
+
+function normalizeLeadRowHeights_(sheet) {
+  const rowCount = Math.max(1, sheet.getMaxRows() - 1);
+  sheet.setRowHeight(1, 28);
+  sheet.setRowHeights(2, rowCount, 28);
 }
 
 function testWrite() {
@@ -278,6 +299,19 @@ Received At | Lead ID | VIN | UVC | Full CBB JSON | Raw Payload JSON
 ```
 
 Use `Lead ID` to match a clean row in `Leads` to its full technical JSON in `CBB Raw`.
+
+If `Leads` still shows old columns like:
+
+```text
+Full CBB JSON | Raw Payload JSON
+```
+
+run `installHeaders` again after pasting this script. The function will:
+
+1. clear old JSON columns after `Status`;
+2. hide the extra old columns;
+3. turn off text wrapping in `Leads`;
+4. reset row heights so the table is easy to scan.
 
 ## 5. If Headers Still Do Not Appear
 
