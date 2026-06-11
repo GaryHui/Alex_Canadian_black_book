@@ -416,7 +416,7 @@ If the response still says only `sheetName` and `lastRow`, you are still calling
 
 ## 8. Configure Vercel
 
-Open:
+Open the Vercel dashboard:
 
 ```text
 Vercel > blackbook-demo > Settings > Environment Variables
@@ -434,6 +434,16 @@ Environment:
 Production
 ```
 
+If an old `LEAD_WEBHOOK_URL` already exists, replace it with the new `/exec` URL from the Apps Script deployment.
+
+CLI equivalent:
+
+```powershell
+npx vercel env rm LEAD_WEBHOOK_URL production --yes
+$env:LEAD_WEBHOOK_VALUE='https://script.google.com/macros/s/AKfycbxxxxxxxxxxxxxxxx/exec'
+$env:LEAD_WEBHOOK_VALUE | npx vercel env add LEAD_WEBHOOK_URL production
+```
+
 After changing this variable, redeploy production:
 
 ```text
@@ -445,6 +455,37 @@ or:
 ```powershell
 npx vercel --prod --yes
 ```
+
+Important: updating the environment variable alone is not enough. Vercel must be redeployed before the website starts using the new URL.
+
+### Verify Vercel Is Pointing To The New Apps Script
+
+Open the new Apps Script `/exec` URL directly in a browser.
+
+The current optimized script returns:
+
+```json
+{
+  "ok": true,
+  "leadsSheetName": "Leads",
+  "rawSheetName": "CBB Raw"
+}
+```
+
+If the URL returns this, the Apps Script deployment is new enough.
+
+Then generate one quote from the website. Expected result:
+
+```text
+Leads: receives only clean owner-review fields
+CBB Raw: receives Full CBB JSON and Raw Payload JSON
+```
+
+If `Leads` gets `Full CBB JSON` again and `CBB Raw` stays empty, one of these is still wrong:
+
+1. Apps Script was not deployed as `Version: New version`.
+2. Vercel `LEAD_WEBHOOK_URL` still points to the old `/exec`.
+3. Vercel was not redeployed after the environment variable changed.
 
 ## 9. Test From The Website
 

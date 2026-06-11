@@ -305,6 +305,10 @@ To change to another website owner's Google Sheet later:
 2. Copy the new `/exec` URL.
 3. Replace `LEAD_WEBHOOK_URL` in Vercel Production.
 4. Redeploy Vercel.
+5. Open the `/exec` URL and confirm it returns `leadsSheetName` and `rawSheetName`.
+6. Generate one website quote and confirm `Leads` receives clean fields while `CBB Raw` receives full JSON.
+
+If `Full CBB JSON` appears in `Leads` again, the website is still calling an old Apps Script deployment or Vercel was not redeployed after changing `LEAD_WEBHOOK_URL`.
 
 ## 7. Local Environment
 
