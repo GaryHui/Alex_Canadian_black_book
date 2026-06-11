@@ -1,5 +1,13 @@
 import { requireAdmin } from "./_admin.js";
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "10mb"
+    }
+  }
+};
+
 export default async function handler(req, res) {
   if (req.method === "PATCH") {
     const admin = await requireAdmin(req);
@@ -9,13 +17,15 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "POST") {
+    const rawInput = req.body?.input || {};
+    const uploadFiles = sanitizePhotoFiles(rawInput.photoFiles || []);
     const lead = {
       created_at: new Date().toISOString(),
-      input: sanitizeLeadInput(req.body?.input || {}),
+      input: sanitizeLeadInput(rawInput),
       auth_user: sanitizeAuthUser(req.body?.user || {}),
       valuation: sanitizeValuation(req.body?.valuation || {}),
       auth_user_id: String(req.body?.user?.id || "").trim(),
-      auth_email: String(req.body?.user?.email || req.body?.input?.email || "").trim(),
+      auth_email: String(req.body?.user?.email || rawInput.email || "").trim(),
       valuation_year: new Date().getFullYear(),
       status: "new",
       notes: "",
@@ -23,12 +33,25 @@ export default async function handler(req, res) {
     };
 
     const saved = await saveToSupabase(lead);
-    if (saved.ok) return res.status(200).json(saved);
+    const savedLead = { ...lead, id: saved.lead?.id || "" };
+    const webhook = await submitLeadToWebhook(savedLead, uploadFiles);
+    if (saved.ok) return res.status(200).json({ ...saved, webhook });
+
+    if (webhook.submitted) {
+      return res.status(200).json({
+        ok: true,
+        captured: true,
+        storage: "webhook",
+        webhook,
+        message: "Lead sent to external lead receiver. Set Supabase env vars to also keep user history."
+      });
+    }
 
     return res.status(200).json({
       ok: true,
       captured: false,
       storage: "not_configured",
+      webhook,
       message: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on Vercel to persist leads."
     });
   }
@@ -41,6 +64,77 @@ export default async function handler(req, res) {
 
   res.setHeader("Allow", "GET, POST, PATCH");
   return res.status(405).json({ ok: false, error: "Method not allowed" });
+}
+
+async function submitLeadToWebhook(lead, uploadFiles = []) {
+  const webhookUrl = String(process.env.LEAD_WEBHOOK_URL || "").trim();
+  if (!webhookUrl) return { submitted: false, skipped: true, reason: "LEAD_WEBHOOK_URL is not configured" };
+
+  const payload = leadExportValues(lead);
+  payload.files = uploadFiles;
+  payload.photoCount = lead.input?.photoCount || uploadFiles.length || "";
+  payload.photoNames = Array.isArray(lead.input?.photoNames) ? lead.input.photoNames.join(", ") : "";
+  payload.id = lead.id || "";
+  payload.createdAt = lead.created_at || "";
+  payload.status = lead.status || "new";
+  payload.authUserId = lead.auth_user_id || lead.auth_user?.id || "";
+  payload.authEmail = lead.auth_email || lead.auth_user?.email || "";
+  payload.raw = {
+    input: lead.input || {},
+    valuation: lead.valuation || {},
+    auth_user: lead.auth_user || {}
+  };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const text = await response.text().catch(() => "");
+    return {
+      submitted: response.ok,
+      status: response.status,
+      response: text.slice(0, 500),
+      error: response.ok ? "" : `Webhook rejected the submission (${response.status})`
+    };
+  } catch (error) {
+    return { submitted: false, error: error.message || "Lead webhook submission failed" };
+  }
+}
+
+function leadExportValues(lead) {
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+
+  return {
+    email: input.email || lead.auth_email || lead.auth_user?.email || "",
+    phone: input.phone || "",
+    vin: valuation.vin || input.vin || "",
+    uvc: input.uvc || "",
+    year: input.year || "",
+    make: input.make || "",
+    model: input.model || "",
+    series: input.series || "",
+    style: input.style || "",
+    kilometers: input.kilometers || "",
+    color: input.color || "",
+    conditionNotes: input.conditionNotes || "",
+    photoCount: input.photoCount || "",
+    photoNames: Array.isArray(input.photoNames) ? input.photoNames.join(", ") : "",
+    region: valuation.region || input.region || "",
+    country: valuation.country || input.country || "",
+    wholesaleAvg: marketAverage(valuation, "wholesale"),
+    retailAvg: marketAverage(valuation, "retail"),
+    tradeInAvg: marketAverage(valuation, "tradeIn"),
+    cbbJson: JSON.stringify({ input, valuation }, null, 2)
+  };
+}
+
+function marketAverage(valuation, market) {
+  const marketData = valuation?.values?.[market] || {};
+  const value = marketData.adjusted?.avg ?? marketData.base?.avg ?? "";
+  return value === null || value === undefined ? "" : value;
 }
 
 async function saveToSupabase(lead) {
@@ -148,11 +242,49 @@ function sanitizeLeadInput(input) {
     photoMetadata: Array.isArray(input.photoMetadata) ? input.photoMetadata.map((photo) => ({
       name: String(photo?.name || "").trim(),
       size: numberOrNull(photo?.size),
-      type: String(photo?.type || "").trim()
+      type: String(photo?.type || photo?.mimeType || "").trim(),
+      width: numberOrNull(photo?.width),
+      height: numberOrNull(photo?.height)
     })) : [],
     region: String(input.region || "").trim(),
     country: String(input.country || "").trim()
   };
+}
+
+function sanitizePhotoFiles(files) {
+  if (!Array.isArray(files)) return [];
+
+  return files
+    .slice(0, 6)
+    .map((file, index) => {
+      const mimeType = String(file?.mimeType || file?.type || "image/jpeg").trim();
+      const base64 = String(file?.base64 || "")
+        .replace(/^data:[^,]+,/, "")
+        .replace(/\s/g, "");
+
+      if (!base64 || !/^image\/(jpeg|jpg|png|webp)$/i.test(mimeType)) return null;
+
+      return {
+        name: sanitizeFileName(file?.name || `vehicle-photo-${index + 1}.jpg`),
+        originalName: String(file?.originalName || "").trim(),
+        mimeType: mimeType.replace(/image\/jpg/i, "image/jpeg"),
+        size: numberOrNull(file?.size),
+        width: numberOrNull(file?.width),
+        height: numberOrNull(file?.height),
+        base64
+      };
+    })
+    .filter(Boolean);
+}
+
+function sanitizeFileName(value) {
+  const cleaned = String(value || "vehicle-photo.jpg")
+    .replace(/[\\/:*?"<>|#%{}~&]/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 120);
+  return cleaned || "vehicle-photo.jpg";
 }
 
 function sanitizeAuthUser(user) {

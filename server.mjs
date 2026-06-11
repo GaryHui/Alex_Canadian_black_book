@@ -204,7 +204,7 @@ function readJson(req) {
     let raw = "";
     req.on("data", (chunk) => {
       raw += chunk;
-      if (raw.length > 1_000_000) {
+      if (raw.length > 10_000_000) {
         reject(new Error("Request body too large"));
         req.destroy();
       }
@@ -477,13 +477,15 @@ function buildDemoResponse(input, raw) {
 }
 
 async function saveLead(body) {
+  const rawInput = body.input || {};
+  const uploadFiles = sanitizePhotoFiles(rawInput.photoFiles || []);
   const lead = {
     created_at: new Date().toISOString(),
-    input: sanitizeLeadInput(body.input || {}),
+    input: sanitizeLeadInput(rawInput),
     auth_user: sanitizeAuthUser(body.user || {}),
     valuation: sanitizeValuation(body.valuation || {}),
     auth_user_id: String(body.user?.id || "").trim(),
-    auth_email: String(body.user?.email || body.input?.email || "").trim(),
+    auth_email: String(body.user?.email || rawInput.email || "").trim(),
     valuation_year: new Date().getFullYear(),
     status: "new",
     notes: "",
@@ -495,7 +497,7 @@ async function saveLead(body) {
     ...lead,
     id: saved.lead?.id || ""
   };
-  const webhook = await submitLeadToWebhook(savedLead);
+  const webhook = await submitLeadToWebhook(savedLead, uploadFiles);
   const googleForm = await submitLeadToGoogleForm(savedLead);
 
   if (saved.ok) return { ...saved, webhook, googleForm };
@@ -521,11 +523,14 @@ async function saveLead(body) {
   };
 }
 
-async function submitLeadToWebhook(lead) {
+async function submitLeadToWebhook(lead, uploadFiles = []) {
   const webhookUrl = String(process.env.LEAD_WEBHOOK_URL || "").trim();
   if (!webhookUrl) return { submitted: false, skipped: true, reason: "LEAD_WEBHOOK_URL is not configured" };
 
   const payload = leadExportValues(lead);
+  payload.files = uploadFiles;
+  payload.photoCount = lead.input?.photoCount || uploadFiles.length || "";
+  payload.photoNames = Array.isArray(lead.input?.photoNames) ? lead.input.photoNames.join(", ") : "";
   payload.id = lead.id || "";
   payload.createdAt = lead.created_at || "";
   payload.status = lead.status || "new";
@@ -649,6 +654,9 @@ function leadExportValues(lead) {
     style: input.style || "",
     kilometers: input.kilometers || "",
     color: input.color || "",
+    conditionNotes: input.conditionNotes || "",
+    photoCount: input.photoCount || "",
+    photoNames: Array.isArray(input.photoNames) ? input.photoNames.join(", ") : "",
     region: valuation.region || input.region || "",
     country: valuation.country || input.country || "",
     wholesaleAvg: marketAverage(valuation, "wholesale"),
@@ -1017,11 +1025,49 @@ function sanitizeLeadInput(input) {
     photoMetadata: Array.isArray(input.photoMetadata) ? input.photoMetadata.map((photo) => ({
       name: String(photo?.name || "").trim(),
       size: numberOrNull(photo?.size),
-      type: String(photo?.type || "").trim()
+      type: String(photo?.type || photo?.mimeType || "").trim(),
+      width: numberOrNull(photo?.width),
+      height: numberOrNull(photo?.height)
     })) : [],
     region: String(input.region || "").trim(),
     country: String(input.country || "").trim()
   };
+}
+
+function sanitizePhotoFiles(files) {
+  if (!Array.isArray(files)) return [];
+
+  return files
+    .slice(0, 6)
+    .map((file, index) => {
+      const mimeType = String(file?.mimeType || file?.type || "image/jpeg").trim();
+      const base64 = String(file?.base64 || "")
+        .replace(/^data:[^,]+,/, "")
+        .replace(/\s/g, "");
+
+      if (!base64 || !/^image\/(jpeg|jpg|png|webp)$/i.test(mimeType)) return null;
+
+      return {
+        name: sanitizeFileName(file?.name || `vehicle-photo-${index + 1}.jpg`),
+        originalName: String(file?.originalName || "").trim(),
+        mimeType: mimeType.replace(/image\/jpg/i, "image/jpeg"),
+        size: numberOrNull(file?.size),
+        width: numberOrNull(file?.width),
+        height: numberOrNull(file?.height),
+        base64
+      };
+    })
+    .filter(Boolean);
+}
+
+function sanitizeFileName(value) {
+  const cleaned = String(value || "vehicle-photo.jpg")
+    .replace(/[\\/:*?"<>|#%{}~&]/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 120);
+  return cleaned || "vehicle-photo.jpg";
 }
 
 function sanitizeAuthUser(user) {

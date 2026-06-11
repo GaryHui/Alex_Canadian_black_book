@@ -339,6 +339,10 @@ let usageState = null;
 let historyLeads = [];
 let siteUrl = window.location.origin;
 
+const MAX_PHOTO_COUNT = 6;
+const MAX_PHOTO_EDGE = 1400;
+const PHOTO_JPEG_QUALITY = 0.78;
+
 initialize();
 
 function initialize() {
@@ -682,29 +686,74 @@ function collectReviewInput() {
     conditionNotes: String(formData.get("conditionNotes") || "").trim(),
     photoCount: selectedPhotos.length,
     photoNames: selectedPhotos.map((photo) => photo.name),
-    photoMetadata: selectedPhotos
+    photoMetadata: selectedPhotos.map(({ base64, ...photo }) => photo),
+    photoFiles: selectedPhotos
   };
 }
 
-function renderPhotoPreview() {
-  const files = Array.from(photoInput.files || []).slice(0, 8);
-  selectedPhotos = files.map((file) => ({
-    name: file.name,
-    size: file.size,
-    type: file.type
-  }));
+async function renderPhotoPreview() {
+  const files = Array.from(photoInput.files || [])
+    .filter((file) => /^image\//.test(file.type))
+    .slice(0, MAX_PHOTO_COUNT);
 
-  photoPreview.replaceChildren(...files.map((file) => {
+  selectedPhotos = [];
+  photoPreview.replaceChildren();
+
+  for (const file of files) {
+    const photo = await compressPhoto(file);
+    selectedPhotos.push(photo);
+
     const figure = document.createElement("figure");
     const image = document.createElement("img");
     const caption = document.createElement("figcaption");
-    image.alt = file.name;
-    image.src = URL.createObjectURL(file);
-    image.addEventListener("load", () => URL.revokeObjectURL(image.src), { once: true });
-    caption.textContent = file.name;
+    image.alt = photo.name;
+    image.src = `data:${photo.mimeType};base64,${photo.base64}`;
+    caption.textContent = `${photo.name} (${Math.round(photo.size / 1024)} KB)`;
     figure.append(image, caption);
-    return figure;
-  }));
+    photoPreview.append(figure);
+  }
+}
+
+function compressPhoto(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Unable to read photo"));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error("Unable to process photo"));
+      image.onload = () => {
+        const scale = Math.min(1, MAX_PHOTO_EDGE / Math.max(image.width, image.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const context = canvas.getContext("2d");
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY);
+        const base64 = dataUrl.split(",")[1] || "";
+        resolve({
+          name: normalizePhotoName(file.name),
+          originalName: file.name,
+          mimeType: "image/jpeg",
+          size: Math.round(base64.length * 0.75),
+          width: canvas.width,
+          height: canvas.height,
+          base64
+        });
+      };
+      image.src = String(reader.result || "");
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function normalizePhotoName(name) {
+  const base = String(name || "vehicle-photo")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-z0-9-_]+/gi, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80) || "vehicle-photo";
+  return `${base}.jpg`;
 }
 
 async function generateForVehicle(vehicle, baseInput) {
