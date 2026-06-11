@@ -22,24 +22,45 @@ Create one root folder in the owner's Google Drive:
 BlackBook Leads
 ```
 
-Every customer lead gets its own subfolder.
+Every customer email gets one folder.
 
-Recommended folder name:
+Inside each email folder, every valuation/upload gets one subfolder.
+
+Recommended structure:
 
 ```text
-<date> - <customer email> - <VIN or UVC>
+BlackBook Leads
+└── customer@example.com
+    ├── 2026-06-11 - 2T2GGCEZ9RC032642 - 2024 Lexus NX-Series
+    └── 2026-07-02 - JTHFN48Y020031764 - 2002 Lexus SC430
+```
+
+If there is no VIN, use UVC or Lead ID:
+
+```text
+BlackBook Leads
+└── customer@example.com
+    └── 2026-06-11 - 2024500170 - 2024 Lexus NX-Series
+```
+
+This keeps all files from the same customer together.
+
+Recommended customer folder name:
+
+```text
+<customer email>
+```
+
+Recommended lead subfolder name:
+
+```text
+<date> - <VIN or UVC or Lead ID> - <vehicle title>
 ```
 
 Example:
 
 ```text
-2026-06-11 - customer@example.com - 2T2GGCEZ9RC032642
-```
-
-If there is no VIN:
-
-```text
-2026-06-11 - customer@example.com - 2024500170
+2026-06-11 - 2T2GGCEZ9RC032642 - 2024 Lexus NX-Series NX350 Premium
 ```
 
 ## What The Website Should Send
@@ -102,7 +123,7 @@ Folder ID:
 
 ## Apps Script Upload Example
 
-This is a separate Apps Script Web App from the Google Sheet lead webhook, or it can be added to the same Apps Script project if preferred.
+This can be a separate Apps Script Web App from the Google Sheet lead webhook, or it can be added to the same Apps Script project if preferred.
 
 Replace:
 
@@ -118,13 +139,13 @@ const DRIVE_ROOT_FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID";
 function doPost(e) {
   const data = JSON.parse(e.postData.contents || "{}");
   const root = DriveApp.getFolderById(DRIVE_ROOT_FOLDER_ID);
-  const folderName = buildFolderName_(data);
-  const folder = root.createFolder(folderName);
+  const customerFolder = getOrCreateChildFolder_(root, buildCustomerFolderName_(data));
+  const leadFolder = getOrCreateChildFolder_(customerFolder, buildLeadFolderName_(data));
 
   const files = (data.files || []).map(function(file) {
     const bytes = Utilities.base64Decode(file.base64 || "");
     const blob = Utilities.newBlob(bytes, file.mimeType || "application/octet-stream", file.name || "upload");
-    const driveFile = folder.createFile(blob);
+    const driveFile = leadFolder.createFile(blob);
     return {
       name: driveFile.getName(),
       id: driveFile.getId(),
@@ -135,19 +156,39 @@ function doPost(e) {
   return ContentService
     .createTextOutput(JSON.stringify({
       ok: true,
-      folderName: folder.getName(),
-      folderId: folder.getId(),
-      folderUrl: folder.getUrl(),
+      customerFolderName: customerFolder.getName(),
+      customerFolderId: customerFolder.getId(),
+      customerFolderUrl: customerFolder.getUrl(),
+      leadFolderName: leadFolder.getName(),
+      leadFolderId: leadFolder.getId(),
+      leadFolderUrl: leadFolder.getUrl(),
       files: files
     }))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function buildFolderName_(data) {
+function buildCustomerFolderName_(data) {
+  return sanitize_(data.email || "unknown-email");
+}
+
+function buildLeadFolderName_(data) {
   const date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
-  const email = sanitize_(data.email || "unknown-email");
   const vehicleId = sanitize_(data.vin || data.uvc || data.leadId || "unknown-vehicle");
-  return date + " - " + email + " - " + vehicleId;
+  const title = sanitize_([
+    data.year,
+    data.make,
+    data.model,
+    data.series,
+    data.style
+  ].filter(Boolean).join(" "));
+  return [date, vehicleId, title].filter(Boolean).join(" - ");
+}
+
+function getOrCreateChildFolder_(parent, folderName) {
+  const safeName = sanitize_(folderName || "unknown");
+  const folders = parent.getFoldersByName(safeName);
+  if (folders.hasNext()) return folders.next();
+  return parent.createFolder(safeName);
 }
 
 function sanitize_(value) {
@@ -158,6 +199,35 @@ function sanitize_(value) {
     .slice(0, 120);
 }
 ```
+
+## How This Works
+
+For each upload:
+
+1. Apps Script opens the root folder `BlackBook Leads`.
+2. It checks whether a folder already exists for the customer's email.
+3. If the email folder does not exist, it creates it.
+4. It creates or reuses a lead/vehicle subfolder under that email folder.
+5. It saves uploaded photos/files into that lead subfolder.
+6. It returns the Drive URLs to the website.
+
+Example response:
+
+```json
+{
+  "ok": true,
+  "customerFolderUrl": "https://drive.google.com/drive/folders/...",
+  "leadFolderUrl": "https://drive.google.com/drive/folders/...",
+  "files": [
+    {
+      "name": "front.jpg",
+      "url": "https://drive.google.com/file/d/..."
+    }
+  ]
+}
+```
+
+The website should save `customerFolderUrl`, `leadFolderUrl`, and `files` into the Supabase lead record. The admin page can then show a `View Drive folder` link.
 
 ## Privacy Notes
 
@@ -198,4 +268,3 @@ Second version:
 1. Add upload fields to the website.
 2. Send files to Google Drive through Apps Script.
 3. Save Drive folder URL in Supabase and show it in admin.
-
