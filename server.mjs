@@ -1322,6 +1322,8 @@ function sanitizePhotoFiles(files) {
       return {
         name: sanitizeFileName(file?.name || `vehicle-photo-${index + 1}.jpg`),
         originalName: String(file?.originalName || "").trim(),
+        role: String(file?.role || "").trim(),
+        angle: String(file?.angle || "").trim(),
         mimeType: mimeType.replace(/image\/jpg/i, "image/jpeg"),
         size: numberOrNull(file?.size),
         width: numberOrNull(file?.width),

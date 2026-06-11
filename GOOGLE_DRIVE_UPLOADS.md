@@ -60,6 +60,30 @@ Max long edge: 1400 px
 Format sent to Apps Script: JPEG
 ```
 
+The customer page asks for these six photo angles:
+
+```text
+Front exterior
+Rear exterior
+Driver side
+Passenger side
+Odometer
+Interior
+```
+
+Each uploaded photo is automatically renamed before it is sent to Google Drive. Examples:
+
+```text
+front-exterior-original-name.jpg
+rear-exterior-original-name.jpg
+driver-side-original-name.jpg
+passenger-side-original-name.jpg
+odometer-original-name.jpg
+interior-original-name.jpg
+```
+
+This makes the Drive folder easier for the dealer to review without opening every image.
+
 Supabase stores only photo metadata, not the base64 photo content. The real photos are stored in Google Drive.
 
 ## Apps Script Setup

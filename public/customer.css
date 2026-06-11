@@ -775,13 +775,47 @@ input::placeholder {
   outline: 3px solid rgba(22, 119, 210, 0.14);
 }
 
-.photo-preview {
+.photo-upload-section {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
-.photo-preview figure {
+.photo-upload-section h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.photo-slots {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.photo-slot {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  background: #fbfdff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.photo-slot span {
+  margin: 0;
+  font-weight: 850;
+}
+
+.photo-slot small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.photo-slot input {
+  width: 100%;
+}
+
+.photo-slot figure {
+  min-height: 0;
   margin: 0;
   overflow: hidden;
   background: #fff;
@@ -789,14 +823,18 @@ input::placeholder {
   border-radius: 8px;
 }
 
-.photo-preview img {
+.photo-slot figure:empty {
+  display: none;
+}
+
+.photo-slot img {
   display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
 }
 
-.photo-preview figcaption {
+.photo-slot figcaption {
   padding: 6px 8px;
   color: var(--muted);
   font-size: 11px;
@@ -1117,6 +1155,7 @@ input::placeholder {
   .value-cards,
   .review-grid,
   .vin-guide-layout,
+  .photo-slots,
   .tool-grid {
     grid-template-columns: 1fr;
   }

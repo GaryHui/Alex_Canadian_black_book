@@ -5,8 +5,7 @@ const choiceList = document.querySelector("#choice-list");
 const vehicleReviewSection = document.querySelector("#vehicle-review");
 const reviewForm = document.querySelector("#review-form");
 const changeVehicleButton = document.querySelector("#change-vehicle");
-const photoInput = document.querySelector("#photo-input");
-const photoPreview = document.querySelector("#photo-preview");
+const photoInputs = [...document.querySelectorAll("[data-photo-role]")];
 const resultSection = document.querySelector("#result-section");
 const resultTitle = document.querySelector("#result-title");
 const resultMeta = document.querySelector("#result-meta");
@@ -219,7 +218,19 @@ const text = {
     conditionLabel: "Condition notes",
     conditionPlaceholder: "Any damage, warning lights, recent repairs, tire condition...",
     photoLabel: "Vehicle photos",
-    photoNote: "Photos are previewed here and uploaded to the owner's Google Drive after the valuation is saved.",
+    photoNote: "Upload the requested angles. Each photo is automatically renamed by angle before it is saved to Google Drive.",
+    photoFront: "Front exterior",
+    photoFrontHelp: "Stand in front and show the whole vehicle.",
+    photoRear: "Rear exterior",
+    photoRearHelp: "Stand behind and show the whole vehicle.",
+    photoDriverSide: "Driver side",
+    photoDriverSideHelp: "Show the full driver side profile.",
+    photoPassengerSide: "Passenger side",
+    photoPassengerSideHelp: "Show the full passenger side profile.",
+    photoOdometer: "Odometer",
+    photoOdometerHelp: "Show the mileage clearly on the cluster.",
+    photoInterior: "Interior",
+    photoInteriorHelp: "Show front seats, dashboard, and center console.",
     generateValuation: "Get Value Range",
     vehicleReady: "Vehicle found. Please review the details before generating a valuation.",
     odometerTooLow: "Please enter an odometer value greater than 500 km.",
@@ -354,7 +365,19 @@ const text = {
     conditionLabel: "Notes sur l'état",
     conditionPlaceholder: "Dommages, voyants, réparations récentes, pneus...",
     photoLabel: "Photos du véhicule",
-    photoNote: "Les photos sont prévisualisées ici et téléversées dans le Google Drive du propriétaire après l'enregistrement.",
+    photoNote: "Téléversez les angles demandés. Chaque photo est renommée automatiquement selon l'angle avant l'enregistrement dans Google Drive.",
+    photoFront: "Avant extérieur",
+    photoFrontHelp: "Placez-vous devant le véhicule et montrez-le au complet.",
+    photoRear: "Arrière extérieur",
+    photoRearHelp: "Placez-vous derrière le véhicule et montrez-le au complet.",
+    photoDriverSide: "Côté conducteur",
+    photoDriverSideHelp: "Montrez le profil complet côté conducteur.",
+    photoPassengerSide: "Côté passager",
+    photoPassengerSideHelp: "Montrez le profil complet côté passager.",
+    photoOdometer: "Odomètre",
+    photoOdometerHelp: "Montrez clairement le kilométrage au tableau de bord.",
+    photoInterior: "Intérieur",
+    photoInteriorHelp: "Montrez les sièges avant, le tableau de bord et la console.",
     generateValuation: "Obtenir la fourchette",
     vehicleReady: "Véhicule trouvé. Vérifiez les détails avant de générer une évaluation.",
     odometerTooLow: "Veuillez entrer un odomètre supérieur à 500 km.",
@@ -375,7 +398,7 @@ const text = {
 let language = "en";
 let selectedVehicle = null;
 let pendingInput = null;
-let selectedPhotos = [];
+const selectedPhotos = new Map();
 let supabaseClient = null;
 let authSession = null;
 let usageState = null;
@@ -405,7 +428,7 @@ function initialize() {
     vehicleReviewSection.hidden = true;
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
-  photoInput.addEventListener("change", renderPhotoPreview);
+  photoInputs.forEach((input) => input.addEventListener("change", renderPhotoPreview));
   form.elements.mode.forEach((item) => item.addEventListener("change", updateMode));
   form.elements.make.addEventListener("input", syncModelList);
   languageToggle.addEventListener("click", () => setLanguage(language === "en" ? "fr" : "en"));
@@ -682,9 +705,8 @@ function renderChoices(choices, input) {
 function renderVehicleReview(vehicle, input) {
   selectedVehicle = vehicle;
   pendingInput = input;
-  selectedPhotos = [];
+  clearSelectedPhotos();
   reviewForm.reset();
-  photoPreview.replaceChildren();
 
   choiceSection.hidden = true;
   resultSection.hidden = true;
@@ -821,6 +843,7 @@ async function handleReviewSubmit(event) {
 
 function collectReviewInput() {
   const formData = new FormData(reviewForm);
+  const photos = [...selectedPhotos.values()];
   return {
     series: cleanReviewValue(formData.get("series")),
     engine: cleanReviewValue(formData.get("engine")),
@@ -829,10 +852,10 @@ function collectReviewInput() {
     style: cleanReviewValue(formData.get("style")),
     color: String(formData.get("color") || "").trim(),
     conditionNotes: String(formData.get("conditionNotes") || "").trim(),
-    photoCount: selectedPhotos.length,
-    photoNames: selectedPhotos.map((photo) => photo.name),
-    photoMetadata: selectedPhotos.map(({ base64, ...photo }) => photo),
-    photoFiles: selectedPhotos
+    photoCount: photos.length,
+    photoNames: photos.map((photo) => photo.name),
+    photoMetadata: photos.map(({ base64, ...photo }) => photo),
+    photoFiles: photos
   };
 }
 
@@ -841,30 +864,31 @@ function cleanReviewValue(value) {
   return text.startsWith("- Select ") || text === "Not sure" ? "" : text;
 }
 
-async function renderPhotoPreview() {
-  const files = Array.from(photoInput.files || [])
-    .filter((file) => /^image\//.test(file.type))
-    .slice(0, MAX_PHOTO_COUNT);
+async function renderPhotoPreview(event) {
+  const input = event.currentTarget;
+  const role = input.dataset.photoRole || "vehicle-photo";
+  const label = input.dataset.photoLabel || role;
+  const file = Array.from(input.files || []).find((item) => /^image\//.test(item.type));
+  const preview = document.querySelector(`[data-photo-preview="${cssEscape(role)}"]`);
 
-  selectedPhotos = [];
-  photoPreview.replaceChildren();
+  selectedPhotos.delete(role);
+  if (preview) preview.replaceChildren();
+  if (!file) return;
 
-  for (const file of files) {
-    const photo = await compressPhoto(file);
-    selectedPhotos.push(photo);
+  const photo = await compressPhoto(file, { role, label });
+  selectedPhotos.set(role, photo);
 
-    const figure = document.createElement("figure");
+  if (preview) {
     const image = document.createElement("img");
     const caption = document.createElement("figcaption");
     image.alt = photo.name;
     image.src = `data:${photo.mimeType};base64,${photo.base64}`;
-    caption.textContent = `${photo.name} (${Math.round(photo.size / 1024)} KB)`;
-    figure.append(image, caption);
-    photoPreview.append(figure);
+    caption.textContent = `${label}: ${photo.name}`;
+    preview.append(image, caption);
   }
 }
 
-function compressPhoto(file) {
+function compressPhoto(file, photoRole = {}) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("Unable to read photo"));
@@ -881,8 +905,10 @@ function compressPhoto(file) {
         const dataUrl = canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY);
         const base64 = dataUrl.split(",")[1] || "";
         resolve({
-          name: normalizePhotoName(file.name),
+          name: normalizePhotoName(file.name, photoRole.role),
           originalName: file.name,
+          angle: photoRole.label || photoRole.role || "",
+          role: photoRole.role || "",
           mimeType: "image/jpeg",
           size: Math.round(base64.length * 0.75),
           width: canvas.width,
@@ -896,14 +922,34 @@ function compressPhoto(file) {
   });
 }
 
-function normalizePhotoName(name) {
+function normalizePhotoName(name, role = "") {
+  const prefix = String(role || "vehicle-photo")
+    .replace(/[^a-z0-9-_]+/gi, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase() || "vehicle-photo";
   const base = String(name || "vehicle-photo")
     .replace(/\.[^.]+$/, "")
     .replace(/[^a-z0-9-_]+/gi, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
-    .slice(0, 80) || "vehicle-photo";
-  return `${base}.jpg`;
+    .slice(0, 70) || "photo";
+  return `${prefix}-${base}.jpg`;
+}
+
+function clearSelectedPhotos() {
+  selectedPhotos.clear();
+  photoInputs.forEach((input) => {
+    input.value = "";
+    const role = input.dataset.photoRole || "";
+    const preview = document.querySelector(`[data-photo-preview="${cssEscape(role)}"]`);
+    if (preview) preview.replaceChildren();
+  });
+}
+
+function cssEscape(value) {
+  if (window.CSS?.escape) return CSS.escape(value);
+  return String(value || "").replace(/["\\]/g, "\\$&");
 }
 
 async function generateForVehicle(vehicle, baseInput) {
@@ -1240,12 +1286,11 @@ function canUseValuation() {
 function resetCustomerFlow() {
   selectedVehicle = null;
   pendingInput = null;
-  selectedPhotos = [];
+  clearSelectedPhotos();
   choiceSection.hidden = true;
   vehicleReviewSection.hidden = true;
   resultSection.hidden = true;
   reviewForm.reset();
-  photoPreview.replaceChildren();
   statusEl.textContent = "";
   window.scrollTo({ top: 0, behavior: "smooth" });
 }

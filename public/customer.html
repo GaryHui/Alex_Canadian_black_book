@@ -357,12 +357,48 @@
               <span data-i18n="conditionLabel">Condition notes</span>
               <textarea name="conditionNotes" rows="4" data-i18n-placeholder="conditionPlaceholder" placeholder="Any damage, warning lights, recent repairs, tire condition..."></textarea>
             </label>
-            <label>
-              <span data-i18n="photoLabel">Vehicle photos</span>
-              <input id="photo-input" name="photos" type="file" accept="image/*" multiple />
-            </label>
-            <div id="photo-preview" class="photo-preview"></div>
-            <p class="photo-note" data-i18n="photoNote">Photos are previewed here and their filenames are saved with the lead. Drive upload can be connected next.</p>
+            <section class="photo-upload-section" aria-labelledby="photo-upload-title">
+              <h3 id="photo-upload-title" data-i18n="photoLabel">Vehicle photos</h3>
+              <p class="photo-note" data-i18n="photoNote">Upload the requested angles. Each photo is automatically renamed by angle before it is saved to Google Drive.</p>
+              <div class="photo-slots">
+                <label class="photo-slot">
+                  <span data-i18n="photoFront">Front exterior</span>
+                  <small data-i18n="photoFrontHelp">Stand in front and show the whole vehicle.</small>
+                  <input name="photo-front" type="file" accept="image/*" data-photo-role="front-exterior" data-photo-label="Front exterior" />
+                  <figure data-photo-preview="front-exterior"></figure>
+                </label>
+                <label class="photo-slot">
+                  <span data-i18n="photoRear">Rear exterior</span>
+                  <small data-i18n="photoRearHelp">Stand behind and show the whole vehicle.</small>
+                  <input name="photo-rear" type="file" accept="image/*" data-photo-role="rear-exterior" data-photo-label="Rear exterior" />
+                  <figure data-photo-preview="rear-exterior"></figure>
+                </label>
+                <label class="photo-slot">
+                  <span data-i18n="photoDriverSide">Driver side</span>
+                  <small data-i18n="photoDriverSideHelp">Show the full driver side profile.</small>
+                  <input name="photo-driver-side" type="file" accept="image/*" data-photo-role="driver-side" data-photo-label="Driver side" />
+                  <figure data-photo-preview="driver-side"></figure>
+                </label>
+                <label class="photo-slot">
+                  <span data-i18n="photoPassengerSide">Passenger side</span>
+                  <small data-i18n="photoPassengerSideHelp">Show the full passenger side profile.</small>
+                  <input name="photo-passenger-side" type="file" accept="image/*" data-photo-role="passenger-side" data-photo-label="Passenger side" />
+                  <figure data-photo-preview="passenger-side"></figure>
+                </label>
+                <label class="photo-slot">
+                  <span data-i18n="photoOdometer">Odometer</span>
+                  <small data-i18n="photoOdometerHelp">Show the mileage clearly on the cluster.</small>
+                  <input name="photo-odometer" type="file" accept="image/*" data-photo-role="odometer" data-photo-label="Odometer" />
+                  <figure data-photo-preview="odometer"></figure>
+                </label>
+                <label class="photo-slot">
+                  <span data-i18n="photoInterior">Interior</span>
+                  <small data-i18n="photoInteriorHelp">Show front seats, dashboard, and center console.</small>
+                  <input name="photo-interior" type="file" accept="image/*" data-photo-role="interior" data-photo-label="Interior" />
+                  <figure data-photo-preview="interior"></figure>
+                </label>
+              </div>
+            </section>
           </div>
 
           <div class="review-actions">
