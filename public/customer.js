@@ -192,6 +192,7 @@ const text = {
     changeVehicle: "Change vehicle",
     seriesLabel: "Series / Trim",
     styleLabel: "Style",
+    regionLabel: "Region",
     colorLabel: "Color",
     colorPlaceholder: "White, black, silver...",
     conditionLabel: "Condition notes",
@@ -509,11 +510,7 @@ function updateMode() {
 
 async function handleSubmit(event) {
   event.preventDefault();
-  if (!authSession?.user) {
-    statusEl.textContent = t("pleaseLogin");
-    return;
-  }
-  if (!isEmailVerified(authSession.user)) {
+  if (authSession?.user && !isEmailVerified(authSession.user)) {
     statusEl.textContent = t("pleaseVerifyEmail");
     return;
   }
@@ -562,7 +559,7 @@ function collectInput() {
     vin,
     postalCode,
     kilometers: normalizeKilometers(input.kilometers),
-    email: String(input.email || "").trim(),
+    email: authSession?.user?.email || String(input.email || "").trim(),
     phone: String(input.phone || "").trim(),
     region: provinceFromPostal(postalCode),
     country: "C",
@@ -572,7 +569,7 @@ function collectInput() {
 }
 
 function validateInput(input) {
-  const hasBasics = input.email && input.postalCode && input.kilometers;
+  const hasBasics = input.postalCode && input.kilometers;
   const hasVehicle = input.mode === "vin"
     ? input.vin.length >= 10
     : input.year && input.make && input.model;
@@ -645,6 +642,8 @@ function renderVehicleReview(vehicle, input) {
   setText("#review-model", vehicle.model || input.model || "-");
   setText("#review-series", vehicle.series || "-");
   setText("#review-style", vehicle.style || "-");
+  setText("#review-region", regionName(input.region));
+  setText("#review-postal", input.postalCode || "-");
 
   statusEl.textContent = t("vehicleReady");
   vehicleReviewSection.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -701,6 +700,16 @@ function renderPhotoPreview() {
 }
 
 async function generateForVehicle(vehicle, baseInput) {
+  if (!authSession?.user) {
+    statusEl.textContent = t("pleaseLogin");
+    customerAuthTitle.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  if (!isEmailVerified(authSession.user)) {
+    statusEl.textContent = t("pleaseVerifyEmail");
+    customerAuthTitle.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
   if (!usageState) await loadUsage();
   if (!canUseValuation()) return;
 

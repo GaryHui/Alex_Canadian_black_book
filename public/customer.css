@@ -434,6 +434,11 @@ input::placeholder {
   justify-self: end;
   min-width: 122px;
   margin-top: 16px;
+  background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+  box-shadow: 0 10px 22px rgba(22, 119, 210, 0.22);
+}
+
+.customer-form .primary-button:disabled {
   background: #98d0f6;
   box-shadow: none;
 }
