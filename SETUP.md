@@ -434,10 +434,30 @@ Annual valuations
 
 If `remaining` is `0`, the app blocks valuation generation and shows a contact message.
 
-The contact text can be customized with:
+The contact text is controlled in this order:
+
+1. `OWNER_CONTACT`
+2. `OWNER_EMAIL`
+3. the first email in `ADMIN_EMAILS`
+4. fallback text: `Please contact the website owner for more valuations.`
+
+Recommended Vercel environment variables:
 
 ```text
+OWNER_EMAIL=sales@example.com
 OWNER_CONTACT=Please call 604-000-0000 or email sales@example.com for more valuations.
+```
+
+If you only set:
+
+```text
+OWNER_EMAIL=sales@example.com
+```
+
+the user will see:
+
+```text
+2026 valuation limit reached. Please email sales@example.com for more valuations.
 ```
 
 ### How The Owner Changes A User's Allowance

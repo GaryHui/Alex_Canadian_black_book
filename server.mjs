@@ -752,6 +752,19 @@ async function insertLead({ url, key, lead }) {
 
 const DEFAULT_ANNUAL_LIMIT = Number(process.env.ANNUAL_VALUATION_LIMIT || 3);
 
+function ownerContactMessage() {
+  const configuredContact = String(process.env.OWNER_CONTACT || "").trim();
+  if (configuredContact) return configuredContact;
+
+  const ownerEmail = String(process.env.OWNER_EMAIL || process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean)[0];
+
+  if (ownerEmail) return `Please email ${ownerEmail} for more valuations.`;
+  return "Please contact the website owner for more valuations.";
+}
+
 async function getUsage({ userId, email, year }) {
   const normalizedUserId = String(userId || "").trim();
   const normalizedEmail = String(email || "").trim();
@@ -770,7 +783,7 @@ async function getUsage({ userId, email, year }) {
       used: 0,
       annualLimit: DEFAULT_ANNUAL_LIMIT,
       remaining: DEFAULT_ANNUAL_LIMIT,
-      contact: process.env.OWNER_CONTACT || "Please contact the website owner for more valuations."
+      contact: ownerContactMessage()
     };
   }
 
@@ -786,7 +799,7 @@ async function getUsage({ userId, email, year }) {
     used: used.count,
     annualLimit: annualLimit.limit,
     remaining: Math.max(0, annualLimit.limit - used.count),
-    contact: process.env.OWNER_CONTACT || "Please contact the website owner for more valuations."
+    contact: ownerContactMessage()
   };
 }
 
