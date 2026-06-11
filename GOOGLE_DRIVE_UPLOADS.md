@@ -511,6 +511,44 @@ Expected result after a successful test:
 - The customer email folder contains a vehicle/lead folder.
 - The vehicle/lead folder contains the uploaded photos and PDF summary.
 
+### Quick Webhook Response Check
+
+You can tell whether the Apps Script `/exec` URL is running the final Drive/PDF script by checking its response after a valuation.
+
+Final Drive/PDF script response should look like this:
+
+```json
+{
+  "ok": true,
+  "leadFolderUrl": "https://drive.google.com/...",
+  "pdfUrl": "https://drive.google.com/...",
+  "savedFiles": []
+}
+```
+
+If the response is only:
+
+```json
+{ "ok": true }
+```
+
+then the `/exec` URL is still running an old Sheet-only script. That old script can write rows to Google Sheet, but it cannot create Drive folders, save photos, or generate PDFs.
+
+To fix this:
+
+1. Open the Apps Script project.
+2. Confirm the code is replaced with the final Drive/PDF script in this document.
+3. Click `Deploy > Manage deployments`.
+4. Click the pencil/edit icon on the Web App deployment.
+5. Under `Version`, choose `New version`.
+6. Confirm:
+   - Execute as: `Me`
+   - Who has access: `Anyone`
+7. Click `Deploy`.
+8. Copy the `/exec` URL shown after deployment.
+9. If the URL changed, update Vercel `LEAD_WEBHOOK_URL`.
+10. Redeploy Vercel.
+
 ## Privacy Notes
 
 - Do not make the Drive root folder public.
