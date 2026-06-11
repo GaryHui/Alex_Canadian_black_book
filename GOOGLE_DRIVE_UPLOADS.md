@@ -466,6 +466,51 @@ After deployment:
 5. Open the Drive folder and confirm the photo and PDF were created.
 6. Open `CBB Raw` and confirm raw JSON is there, while the readable `Leads` sheet is not stretched by raw JSON.
 
+## Troubleshooting: Sheet Row Exists But Drive Folder/PDF/Photos Are Missing
+
+If a valuation row appears in `Leads`, but no customer folder, no vehicle folder, no photos, or no PDF appears in Google Drive, check these items in order:
+
+1. Confirm Vercel `LEAD_WEBHOOK_URL` points to the newest Apps Script `/exec` URL.
+   - Old Sheet-only scripts can still write rows, but they cannot create Drive folders or PDFs.
+   - If the Apps Script deployment URL changed, update `LEAD_WEBHOOK_URL` in Vercel and redeploy Vercel.
+
+2. Confirm Apps Script contains the final Drive script from this document.
+   - The final script must include `DRIVE_ROOT_FOLDER_ID`.
+   - It must include `saveDriveFilesAndPdf_`.
+   - It must include `createVehiclePdf_`.
+
+3. Confirm `DRIVE_ROOT_FOLDER_ID` is only the folder ID, not the full Drive URL.
+
+```javascript
+// Correct
+const DRIVE_ROOT_FOLDER_ID = "1AbCDefGhijkLmNoPQRstuVwxyz123456";
+
+// Wrong
+const DRIVE_ROOT_FOLDER_ID = "https://drive.google.com/drive/folders/1AbCDefGhijkLmNoPQRstuVwxyz123456";
+```
+
+4. Confirm the Apps Script Web App is deployed as:
+   - Execute as: `Me`
+   - Who has access: `Anyone`
+
+5. Confirm you tested from the live Vercel site after redeploying Vercel.
+   - Editing Apps Script alone is not enough if Vercel still has the old webhook URL.
+   - Editing Vercel environment variables is not enough until Vercel is redeployed.
+
+6. Use one small image first.
+   - The website compresses images before sending them.
+   - Very large or unsupported files may be skipped.
+   - Supported image types are JPG, PNG, and WebP.
+
+Expected result after a successful test:
+
+- `Leads` has a readable row.
+- `Drive Folder` column has a Google Drive folder URL.
+- `PDF` column has a PDF file URL.
+- The Drive root folder contains a customer email folder.
+- The customer email folder contains a vehicle/lead folder.
+- The vehicle/lead folder contains the uploaded photos and PDF summary.
+
 ## Privacy Notes
 
 - Do not make the Drive root folder public.

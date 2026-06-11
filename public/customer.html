@@ -350,7 +350,8 @@
           <div class="review-extras">
             <label>
               <span data-i18n="colorLabel">Color</span>
-              <select name="color" data-review-color></select>
+              <input name="color" data-review-color list="color-options" autocomplete="off" data-i18n-placeholder="colorPlaceholder" placeholder="White, black, silver..." />
+              <datalist id="color-options"></datalist>
             </label>
             <label>
               <span data-i18n="conditionLabel">Condition notes</span>

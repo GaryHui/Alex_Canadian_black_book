@@ -219,7 +219,7 @@ const text = {
     conditionLabel: "Condition notes",
     conditionPlaceholder: "Any damage, warning lights, recent repairs, tire condition...",
     photoLabel: "Vehicle photos",
-    photoNote: "Photos are previewed here and their filenames are saved with the lead. Drive upload can be connected next.",
+    photoNote: "Photos are previewed here and uploaded to the owner's Google Drive after the valuation is saved.",
     generateValuation: "Get Value Range",
     vehicleReady: "Vehicle found. Please review the details before generating a valuation.",
     odometerTooLow: "Please enter an odometer value greater than 500 km.",
@@ -354,7 +354,7 @@ const text = {
     conditionLabel: "Notes sur l'état",
     conditionPlaceholder: "Dommages, voyants, réparations récentes, pneus...",
     photoLabel: "Photos du véhicule",
-    photoNote: "Les photos sont téléversées avec la demande et enregistrées pour le suivi.",
+    photoNote: "Les photos sont prévisualisées ici et téléversées dans le Google Drive du propriétaire après l'enregistrement.",
     generateValuation: "Obtenir la fourchette",
     vehicleReady: "Véhicule trouvé. Vérifiez les détails avant de générer une évaluation.",
     odometerTooLow: "Veuillez entrer un odomètre supérieur à 500 km.",
@@ -783,19 +783,17 @@ function inferVehicleDetails(vehicle = {}) {
 }
 
 function populateColorOptions(selectedColor = "") {
-  const select = reviewForm.elements.color;
-  if (!select) return;
+  const field = reviewForm.elements.color;
+  const datalist = document.querySelector("#color-options");
+  if (!field) return;
   const selected = String(selectedColor || "").trim();
-  const options = selected && !commonColors.includes(selected)
-    ? [selected, ...commonColors]
-    : ["", ...commonColors];
+  field.value = selected;
 
-  select.innerHTML = options.map((value, index) => {
-    const label = value || t("colorPlaceholder");
-    const selectedAttr = selected && value === selected ? " selected" : "";
-    const disabled = index === 0 && !value ? ` disabled${selected ? "" : " selected"}` : "";
-    return `<option value="${escapeHtml(value)}"${selectedAttr}${disabled}>${escapeHtml(label)}</option>`;
-  }).join("");
+  if (datalist) {
+    datalist.innerHTML = commonColors
+      .map((value) => `<option value="${escapeHtml(value)}"></option>`)
+      .join("");
+  }
 }
 
 function findTitleDetail(title, pattern) {
