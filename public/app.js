@@ -131,7 +131,7 @@ drilldownForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!requireLogin()) return;
   const payload = Object.fromEntries(new FormData(drilldownForm).entries());
-  const vinSearch = findVinInPayload(payload);
+  const vinSearch = findVinInDrilldownForm(payload);
   if (vinSearch) {
     modalStatus.textContent = "Searching vehicle matches...";
     setValuationFields({ vin: vinSearch, uvc: "", year: "", make: "", model: "", series: "", style: "" });
@@ -166,6 +166,7 @@ drilldownForm.querySelectorAll(".drill-select").forEach((select) => {
 drilldownForm.querySelectorAll(".manual-input").forEach((input) => {
   input.addEventListener("input", async () => {
     drilldownForm.elements[input.dataset.field].value = input.value;
+    if (isVinLike(cleanVinText(input.value))) return;
     if (input.dataset.field === "make" || input.dataset.field === "model") await updateVehicleDropdowns(input.dataset.field);
   });
 });
@@ -454,6 +455,20 @@ function vehicleSearchText(payload) {
 
 function findVinInPayload(payload) {
   for (const value of Object.values(payload)) {
+    const vin = cleanVinText(value);
+    if (isVinLike(vin)) return vin;
+  }
+  return "";
+}
+
+function findVinInDrilldownForm(payload) {
+  const values = [
+    ...Object.values(payload),
+    ...[...drilldownForm.querySelectorAll(".manual-input, .drill-select")]
+      .map((field) => field.value)
+  ];
+
+  for (const value of values) {
     const vin = cleanVinText(value);
     if (isVinLike(vin)) return vin;
   }
