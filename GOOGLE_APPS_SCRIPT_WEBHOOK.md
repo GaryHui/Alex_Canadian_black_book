@@ -130,7 +130,14 @@ function installHeaders() {
 
 function getLeadSheet_() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  return spreadsheet.getSheetByName(SHEET_NAME) || spreadsheet.insertSheet(SHEET_NAME);
+  const exactMatch = spreadsheet.getSheetByName(SHEET_NAME);
+  if (exactMatch) return exactMatch;
+
+  const caseInsensitiveMatch = spreadsheet
+    .getSheets()
+    .find((sheet) => sheet.getName().toLowerCase() === SHEET_NAME.toLowerCase());
+
+  return caseInsensitiveMatch || spreadsheet.insertSheet(SHEET_NAME);
 }
 
 function ensureHeaders_(sheet) {
@@ -175,6 +182,14 @@ installHeaders
 4. 点击 `Allow`。
 
 运行成功后，回到 Google Sheet，第一行应该已经有字段名。
+
+注意：Google Sheet 的工作表标签名称要和脚本里的 `SHEET_NAME` 对上。推荐把底部标签改成：
+
+```text
+Leads
+```
+
+如果你的标签是 `leads` 小写，最新版脚本也能自动识别，但旧版脚本可能会写到另一个新建的 `Leads` 标签里。
 
 ## 5. 部署 Web App
 
