@@ -161,7 +161,7 @@
               </label>
               <label>
                 <span data-i18n="odometerLabel">Odometer</span>
-                <input name="kilometers" inputmode="numeric" required data-i18n-placeholder="odometerPlaceholder" placeholder="Kilometers" />
+                <input name="kilometers" type="number" inputmode="numeric" min="501" required data-i18n-placeholder="odometerPlaceholder" placeholder="Kilometers" />
               </label>
             </div>
 
@@ -274,18 +274,43 @@
       </section>
 
       <section id="vehicle-review" class="vehicle-review-section" hidden>
-        <div class="review-head">
-          <div>
-            <p class="eyebrow" data-i18n="reviewEyebrow">Vehicle check</p>
-            <h2 data-i18n="reviewTitle">Review the vehicle before valuation</h2>
-            <p data-i18n="reviewIntro">Confirm the vehicle details and add anything that may help the dealer review it later.</p>
+        <form id="review-form" class="review-form">
+          <div class="review-head">
+            <div>
+              <p class="review-kicker">
+                <span id="review-vehicle-title">Vehicle</span>
+                <button id="change-vehicle" class="edit-link" type="button" data-i18n="editVehicle">Edit</button>
+              </p>
+              <h2 data-i18n="reviewTitle">Confirm a few more details about the car</h2>
+              <p data-i18n="reviewIntro">This will help us provide a more accurate value.</p>
+            </div>
           </div>
-          <button id="change-vehicle" class="ghost-button" type="button" data-i18n="changeVehicle">Change vehicle</button>
-        </div>
 
-        <div class="review-grid">
-          <article class="selected-vehicle-card">
-            <h3 id="review-vehicle-title">Vehicle</h3>
+          <div class="review-select-stack">
+            <label>
+              <span data-i18n="seriesLabel">Series / Trim</span>
+              <select name="series" data-review-select="series"></select>
+            </label>
+            <label>
+              <span data-i18n="engineLabel">Engine</span>
+              <select name="engine" data-review-select="engine"></select>
+            </label>
+            <label>
+              <span data-i18n="drivetrainLabel">Drivetrain</span>
+              <select name="drivetrain" data-review-select="drivetrain"></select>
+            </label>
+            <label>
+              <span data-i18n="transmissionLabel">Transmission</span>
+              <select name="transmission" data-review-select="transmission"></select>
+            </label>
+            <label>
+              <span data-i18n="styleLabel">Style</span>
+              <select name="style" data-review-select="style"></select>
+            </label>
+          </div>
+
+          <details class="review-summary">
+            <summary data-i18n="reviewSummary">Vehicle data</summary>
             <dl>
               <div>
                 <dt>VIN</dt>
@@ -308,14 +333,6 @@
                 <dd id="review-model">-</dd>
               </div>
               <div>
-                <dt data-i18n="seriesLabel">Series / Trim</dt>
-                <dd id="review-series">-</dd>
-              </div>
-              <div>
-                <dt data-i18n="styleLabel">Style</dt>
-                <dd id="review-style">-</dd>
-              </div>
-              <div>
                 <dt data-i18n="regionLabel">Region</dt>
                 <dd id="review-region">-</dd>
               </div>
@@ -324,9 +341,9 @@
                 <dd id="review-postal">-</dd>
               </div>
             </dl>
-          </article>
+          </details>
 
-          <form id="review-form" class="review-form">
+          <div class="review-extras">
             <label>
               <span data-i18n="colorLabel">Color</span>
               <input name="color" autocomplete="off" data-i18n-placeholder="colorPlaceholder" placeholder="White, black, silver..." />
@@ -341,9 +358,13 @@
             </label>
             <div id="photo-preview" class="photo-preview"></div>
             <p class="photo-note" data-i18n="photoNote">Photos are previewed here and their filenames are saved with the lead. Drive upload can be connected next.</p>
-            <button id="generate-review" class="primary-button" type="submit" data-i18n="generateValuation">Generate valuation</button>
-          </form>
-        </div>
+          </div>
+
+          <div class="review-actions">
+            <button class="ghost-button" type="button" data-review-back data-i18n="goBack">Go Back</button>
+            <button id="generate-review" class="primary-button" type="submit" data-i18n="generateValuation">Get Value Range</button>
+          </div>
+        </form>
       </section>
 
       <section id="result-section" class="result-section" hidden>

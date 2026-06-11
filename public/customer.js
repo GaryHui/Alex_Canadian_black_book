@@ -120,9 +120,9 @@ const text = {
     chooseText: "Some vehicles can match more than one trim. Pick the option that best fits your car.",
     resultEyebrow: "Estimated value",
     startOver: "Start over",
-    wholesaleAvg: "Wholesale AVG",
-    retailAvg: "Retail AVG",
-    tradeInAvg: "Trade-In AVG",
+    wholesaleAvg: "Estimated Wholesale Range",
+    retailAvg: "Estimated Private Range",
+    tradeInAvg: "Estimated Trade-In Range",
     resultNote: "This is an estimate. A dealer may adjust it after reviewing condition, options, and photos.",
     toolsEyebrow: "Useful tools",
     toolsTitle: "Plan the next step with confidence",
@@ -188,10 +188,16 @@ const text = {
     noMatches: "No matching vehicle was found. Try VIN or add more vehicle details.",
     chooseRequired: "Choose a vehicle match to continue.",
     reviewEyebrow: "Vehicle check",
-    reviewTitle: "Review the vehicle before valuation",
-    reviewIntro: "Confirm the vehicle details and add anything that may help the dealer review it later.",
+    reviewTitle: "Confirm a few more details about the car",
+    reviewIntro: "This will help us provide a more accurate value.",
+    reviewSummary: "Vehicle data",
+    editVehicle: "Edit",
+    goBack: "Go Back",
     changeVehicle: "Change vehicle",
     seriesLabel: "Series / Trim",
+    engineLabel: "Engine",
+    drivetrainLabel: "Drivetrain",
+    transmissionLabel: "Transmission",
     styleLabel: "Style",
     regionLabel: "Region",
     colorLabel: "Color",
@@ -200,8 +206,9 @@ const text = {
     conditionPlaceholder: "Any damage, warning lights, recent repairs, tire condition...",
     photoLabel: "Vehicle photos",
     photoNote: "Photos are previewed here and their filenames are saved with the lead. Drive upload can be connected next.",
-    generateValuation: "Generate valuation",
+    generateValuation: "Get Value Range",
     vehicleReady: "Vehicle found. Please review the details before generating a valuation.",
+    odometerTooLow: "Please enter an odometer value greater than 500 km.",
     valuing: "Generating your valuation...",
     saving: "Saving your request for follow-up...",
     saved: "Your valuation is ready and has been saved for follow-up.",
@@ -248,9 +255,9 @@ const text = {
     chooseText: "Certains véhicules peuvent correspondre à plusieurs versions. Choisissez celle qui convient le mieux.",
     resultEyebrow: "Valeur estimée",
     startOver: "Recommencer",
-    wholesaleAvg: "Moyenne gros",
-    retailAvg: "Moyenne détail",
-    tradeInAvg: "Moyenne échange",
+    wholesaleAvg: "Fourchette gros estimée",
+    retailAvg: "Fourchette privée estimée",
+    tradeInAvg: "Fourchette échange estimée",
     resultNote: "Il s'agit d'une estimation. Un concessionnaire peut l'ajuster après examen de l'état, des options et des photos.",
     toolsEyebrow: "Outils utiles",
     toolsTitle: "Planifiez la prochaine étape avec confiance",
@@ -315,6 +322,28 @@ const text = {
     searching: "Recherche des correspondances...",
     noMatches: "Aucun véhicule correspondant. Essayez le NIV ou ajoutez plus de détails.",
     chooseRequired: "Choisissez un véhicule pour continuer.",
+    reviewEyebrow: "Vérification du véhicule",
+    reviewTitle: "Confirmez quelques détails sur le véhicule",
+    reviewIntro: "Ces renseignements nous aident à fournir une valeur plus précise.",
+    reviewSummary: "Données du véhicule",
+    editVehicle: "Modifier",
+    goBack: "Retour",
+    changeVehicle: "Changer de véhicule",
+    seriesLabel: "Version / finition",
+    engineLabel: "Moteur",
+    drivetrainLabel: "Motricité",
+    transmissionLabel: "Transmission",
+    styleLabel: "Carrosserie",
+    regionLabel: "Région",
+    colorLabel: "Couleur",
+    colorPlaceholder: "Blanc, noir, argent...",
+    conditionLabel: "Notes sur l'état",
+    conditionPlaceholder: "Dommages, voyants, réparations récentes, pneus...",
+    photoLabel: "Photos du véhicule",
+    photoNote: "Les photos sont téléversées avec la demande et enregistrées pour le suivi.",
+    generateValuation: "Obtenir la fourchette",
+    vehicleReady: "Véhicule trouvé. Vérifiez les détails avant de générer une évaluation.",
+    odometerTooLow: "Veuillez entrer un odomètre supérieur à 500 km.",
     valuing: "Génération de votre évaluation...",
     saving: "Enregistrement de votre demande pour le suivi...",
     saved: "Votre évaluation est prête et enregistrée pour le suivi.",
@@ -356,8 +385,11 @@ function initialize() {
   reviewForm.addEventListener("submit", handleReviewSubmit);
   changeVehicleButton.addEventListener("click", () => {
     vehicleReviewSection.hidden = true;
-    choiceSection.hidden = false;
-    choiceSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  document.querySelector("[data-review-back]")?.addEventListener("click", () => {
+    vehicleReviewSection.hidden = true;
+    window.scrollTo({ top: 0, behavior: "smooth" });
   });
   photoInput.addEventListener("change", renderPhotoPreview);
   form.elements.mode.forEach((item) => item.addEventListener("change", updateMode));
@@ -591,6 +623,12 @@ function validateInput(input) {
     return false;
   }
 
+  if (input.kilometers <= 500) {
+    statusEl.textContent = t("odometerTooLow");
+    form.elements.kilometers.focus();
+    return false;
+  }
+
   if (!hasBasics || !hasVehicle) {
     statusEl.textContent = t("required");
     return false;
@@ -652,13 +690,62 @@ function renderVehicleReview(vehicle, input) {
   setText("#review-year", vehicle.year || input.year || "-");
   setText("#review-make", vehicle.make || input.make || "-");
   setText("#review-model", vehicle.model || input.model || "-");
-  setText("#review-series", vehicle.series || "-");
-  setText("#review-style", vehicle.style || "-");
   setText("#review-region", regionName(input.region));
   setText("#review-postal", input.postalCode || "-");
+  populateReviewSelects(vehicle);
 
   statusEl.textContent = t("vehicleReady");
   vehicleReviewSection.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function populateReviewSelects(vehicle = {}) {
+  const inferred = inferVehicleDetails(vehicle);
+  setReviewOptions("series", inferred.series, t("seriesLabel"));
+  setReviewOptions("engine", inferred.engine, t("engineLabel"));
+  setReviewOptions("drivetrain", inferred.drivetrain, t("drivetrainLabel"));
+  setReviewOptions("transmission", inferred.transmission, t("transmissionLabel"));
+  setReviewOptions("style", inferred.style, t("styleLabel"));
+}
+
+function setReviewOptions(name, values, label) {
+  const select = reviewForm.elements[name];
+  if (!select) return;
+  const uniqueValues = [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))];
+  const options = uniqueValues.length ? uniqueValues : [`- Select ${label} -`, "Not sure"];
+  select.innerHTML = options.map((value, index) => {
+    const disabled = !uniqueValues.length && index === 0 ? " disabled selected" : "";
+    return `<option value="${escapeHtml(value)}"${disabled}>${escapeHtml(value)}</option>`;
+  }).join("");
+}
+
+function inferVehicleDetails(vehicle = {}) {
+  const title = String(vehicle.title || "");
+  return {
+    series: [vehicle.series, vehicle.trim].filter(Boolean),
+    engine: [
+      vehicle.engine,
+      vehicle.engine_description,
+      findTitleDetail(title, /\b\d(?:\.\d)?L\b[^,]*/i),
+      findTitleDetail(title, /\b(?:V6|V8|I4|Hybrid|Electric|Turbo|Supercharged)[^,]*/i)
+    ].filter(Boolean),
+    drivetrain: [
+      vehicle.drivetrain,
+      vehicle.drive_train,
+      vehicle.drive,
+      findTitleDetail(title, /\b(?:AWD|FWD|RWD|4WD|4X4)\b/i)
+    ].filter(Boolean),
+    transmission: [
+      vehicle.transmission,
+      vehicle.transmission_description,
+      findTitleDetail(title, /\b(?:Automatic|Manual|CVT)\b/i)
+    ].filter(Boolean),
+    style: [vehicle.style, vehicle.body_style].filter(Boolean)
+  };
+}
+
+function findTitleDetail(title, pattern) {
+  const match = String(title || "").match(pattern);
+  return match?.[0]?.trim() || "";
 }
 
 async function handleReviewSubmit(event) {
@@ -682,6 +769,11 @@ async function handleReviewSubmit(event) {
 function collectReviewInput() {
   const formData = new FormData(reviewForm);
   return {
+    series: cleanReviewValue(formData.get("series")),
+    engine: cleanReviewValue(formData.get("engine")),
+    drivetrain: cleanReviewValue(formData.get("drivetrain")),
+    transmission: cleanReviewValue(formData.get("transmission")),
+    style: cleanReviewValue(formData.get("style")),
     color: String(formData.get("color") || "").trim(),
     conditionNotes: String(formData.get("conditionNotes") || "").trim(),
     photoCount: selectedPhotos.length,
@@ -689,6 +781,11 @@ function collectReviewInput() {
     photoMetadata: selectedPhotos.map(({ base64, ...photo }) => photo),
     photoFiles: selectedPhotos
   };
+}
+
+function cleanReviewValue(value) {
+  const text = String(value || "").trim();
+  return text.startsWith("- Select ") || text === "Not sure" ? "" : text;
 }
 
 async function renderPhotoPreview() {
@@ -778,8 +875,11 @@ async function generateForVehicle(vehicle, baseInput) {
     year: vehicle.year || baseInput.year,
     make: vehicle.make || baseInput.make,
     model: vehicle.model || baseInput.model,
-    series: vehicle.series || "",
-    style: vehicle.style || ""
+    series: baseInput.series || vehicle.series || "",
+    engine: baseInput.engine || vehicle.engine || "",
+    drivetrain: baseInput.drivetrain || vehicle.drivetrain || vehicle.drive_train || "",
+    transmission: baseInput.transmission || vehicle.transmission || "",
+    style: baseInput.style || vehicle.style || ""
   };
 
   statusEl.textContent = t("valuing");
@@ -999,18 +1099,19 @@ function showHistoryResult(lead) {
 }
 
 function renderResult(valuation, input) {
-  const wholesale = marketAverage(valuation, "wholesale");
-  const retail = marketAverage(valuation, "retail");
-  const tradeIn = marketAverage(valuation, "tradeIn");
+  const wholesale = marketRange(valuation, "wholesale");
+  const retail = marketRange(valuation, "retail");
+  const tradeIn = marketRange(valuation, "tradeIn");
   resultTitle.textContent = valuation.title || selectedVehicle?.title || vehicleTitle(input);
   resultMeta.textContent = [
-    valuation.vin || input.vin,
+    [input.style, input.engine, input.transmission, input.drivetrain].filter(Boolean).join(", "),
     input.kilometers ? `${formatNumber(input.kilometers)} km` : "",
     regionName(input.region)
   ].filter(Boolean).join(" · ");
-  wholesaleValue.textContent = moneyOrDash(wholesale);
-  retailValue.textContent = moneyOrDash(retail);
-  tradeInValue.textContent = moneyOrDash(tradeIn);
+  resultMeta.textContent = resultMeta.textContent.replace(/\s+[^\w\s.,-]+\s+/g, " | ");
+  wholesaleValue.textContent = moneyRangeOrDash(wholesale);
+  retailValue.textContent = moneyRangeOrDash(retail);
+  tradeInValue.textContent = moneyRangeOrDash(tradeIn);
   resultSection.hidden = false;
   resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -1018,6 +1119,26 @@ function renderResult(valuation, input) {
 function marketAverage(valuation, market) {
   const values = valuation?.values?.[market] || {};
   return values.adjusted?.avg ?? values.base?.avg ?? null;
+}
+
+function marketRange(valuation, market) {
+  const values = valuation?.values?.[market] || {};
+  const row = values.adjusted || values.base || {};
+  const numbers = ["rough", "avg", "clean", "xclean"]
+    .map((key) => row[key])
+    .filter((value) => Number.isFinite(Number(value)))
+    .map(Number);
+  if (!numbers.length) return null;
+  return {
+    min: Math.min(...numbers),
+    max: Math.max(...numbers)
+  };
+}
+
+function moneyRangeOrDash(range) {
+  if (!range) return t("valueUnavailable");
+  if (range.min === range.max) return moneyOrDash(range.min);
+  return `${moneyOrDash(range.min)} - ${moneyOrDash(range.max)}`;
 }
 
 function moneyOrDash(value) {

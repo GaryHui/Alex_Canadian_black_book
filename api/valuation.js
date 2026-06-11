@@ -30,7 +30,7 @@ async function fetchValuation(input) {
   const language = String(input.language || "en").trim();
 
   if (!vin && !uvc && !(year && make)) throw new Error("VIN, UVC, or vehicle description is required");
-  if (!Number.isFinite(kilometers) || kilometers < 0) throw new Error("Kilometers must be a positive number");
+  if (!Number.isFinite(kilometers) || kilometers <= 500) throw new Error("Please enter an odometer value greater than 500 km");
 
   const username = process.env.BLACKBOOK_USERNAME;
   const password = process.env.BLACKBOOK_PASSWORD;
