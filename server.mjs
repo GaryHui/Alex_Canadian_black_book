@@ -597,10 +597,12 @@ async function submitLeadToWebhook(lead, uploadFiles = []) {
     });
 
     const text = await response.text().catch(() => "");
+    const data = parseJson(text);
     return {
       submitted: response.ok,
       status: response.status,
-      response: text.slice(0, 500),
+      data,
+      response: text.slice(0, 1000),
       error: response.ok ? "" : `Webhook rejected the submission (${response.status})`
     };
   } catch (error) {
@@ -612,7 +614,7 @@ async function submitLeadToCrm(lead, webhook = {}) {
   const crmUrl = String(process.env.CRM_WEBHOOK_URL || "").trim();
   if (!crmUrl) return { submitted: false, skipped: true, reason: "CRM_WEBHOOK_URL is not configured" };
 
-  const drivePayload = parseWebhookResponse(webhook.response);
+  const drivePayload = webhook.data || parseJson(webhook.response);
   const payload = {
     source: "blackbook-demo",
     lead: leadExportValues(lead),
@@ -650,7 +652,7 @@ async function submitLeadToCrm(lead, webhook = {}) {
   }
 }
 
-function parseWebhookResponse(value) {
+function parseJson(value) {
   try {
     return value ? JSON.parse(value) : {};
   } catch {
