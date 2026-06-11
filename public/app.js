@@ -385,6 +385,43 @@ function setValuationFields(values) {
     const field = form.elements[key];
     if (field) field.value = value === unknownOption ? "" : value ?? "";
   }
+  setDrilldownFields(values);
+}
+
+function setDrilldownFields(values) {
+  if (!drilldownForm) return;
+  for (const key of ["year", "make", "model", "series", "style"]) {
+    if (!(key in values)) continue;
+    const value = values[key] === unknownOption ? "" : String(values[key] ?? "").trim();
+    const hidden = drilldownForm.elements[key];
+    const select = drilldownForm.querySelector(`.drill-select[data-field="${key}"]`);
+    const manual = drilldownForm.querySelector(`.manual-input[data-field="${key}"]`);
+    if (!hidden || !select || !manual) continue;
+
+    if (!value) {
+      hidden.value = "";
+      if ([...select.options].some((option) => option.value === unknownOption)) {
+        select.value = unknownOption;
+      }
+      manual.hidden = true;
+      manual.value = "";
+      continue;
+    }
+
+    const options = [...select.options].map((option) => option.value);
+    if (!options.includes(value)) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value;
+      const manualOption = [...select.options].find((item) => item.value === "__manual__");
+      select.insertBefore(option, manualOption || null);
+    }
+
+    select.value = value;
+    manual.hidden = true;
+    manual.value = "";
+    hidden.value = value;
+  }
 }
 
 function vehicleSearchText(payload) {

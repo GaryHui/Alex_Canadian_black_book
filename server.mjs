@@ -1022,16 +1022,50 @@ function normalizeAutocomplete(raw) {
   return best
     .filter((item) => item && typeof item === "object")
     .slice(0, 20)
-    .map((item) => ({
-      uvc: item.uvc || item.UVC || item.value || "",
-      year: item.model_year || item.year || "",
-      make: item.make || "",
-      model: item.model || "",
-      series: item.series || item.trim || "",
-      style: item.style || "",
-      title: item.description || item.vehicle_description || item.text || vehicleTitle(item)
-    }))
+    .map((item) =>
+      completeVehicleChoice({
+        uvc: item.uvc || item.UVC || item.value || "",
+        year: item.model_year || item.year || "",
+        make: item.make || "",
+        model: item.model || "",
+        series: item.series || item.trim || "",
+        style: item.style || "",
+        title: item.description || item.vehicle_description || item.text || vehicleTitle(item)
+      })
+    )
     .filter((item) => item.title && item.title !== "Vehicle ");
+}
+
+function completeVehicleChoice(item) {
+  const parsed = parseVehicleTitle(item.title);
+  return {
+    ...item,
+    year: item.year || parsed.year,
+    make: item.make || parsed.make,
+    model: item.model || parsed.model,
+    series: item.series || parsed.series,
+    style: item.style || parsed.style
+  };
+}
+
+function parseVehicleTitle(title = "") {
+  const parts = String(title).trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2 || !/^\d{4}$/.test(parts[0])) {
+    return { year: "", make: "", model: "", series: "", style: "" };
+  }
+
+  const styleIndex = parts.findIndex((part) => /^\dD$/i.test(part));
+  const detailParts = parts.slice(3);
+  const seriesParts = styleIndex > 3 ? parts.slice(3, styleIndex) : [];
+  const styleParts = styleIndex > -1 ? parts.slice(styleIndex) : [];
+
+  return {
+    year: parts[0] || "",
+    make: parts[1] || "",
+    model: parts[2] || "",
+    series: seriesParts.join(" "),
+    style: styleParts.length ? styleParts.join(" ") : detailParts.join(" ")
+  };
 }
 
 function normalizeDrilldown(raw, input = {}) {
