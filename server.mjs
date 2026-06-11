@@ -992,9 +992,11 @@ async function listUserLimits(year) {
     usersById.set(userId, current);
   }
 
-  const users = [...usersById.values()]
+  const mergedUsers = mergeUsersByEmail([...usersById.values()]);
+  const users = mergedUsers
     .map((user) => {
-      const limit = limitsByUser.get(user.userId);
+      const emailKey = normalizeEmail(user.email);
+      const limit = limitsByUser.get(user.userId) || limitsByUser.get(emailKey);
       const annualLimit = Number(limit?.annual_limit ?? DEFAULT_ANNUAL_LIMIT);
       const role = user.role || roleByEmail.get(normalizeEmail(user.email || user.userId)) || "customer";
       return {
@@ -1019,6 +1021,50 @@ async function listUserLimits(year) {
     users,
     staffFilterWarning: accessRoleResult.warning || ""
   };
+}
+
+function mergeUsersByEmail(users) {
+  const byEmail = new Map();
+  const withoutEmail = [];
+  for (const user of users) {
+    const email = normalizeEmail(user.email || (String(user.userId || "").includes("@") ? user.userId : ""));
+    if (!email) {
+      withoutEmail.push(user);
+      continue;
+    }
+
+    const current = byEmail.get(email);
+    if (!current) {
+      byEmail.set(email, { ...user, email });
+      continue;
+    }
+
+    const preferredUserId = preferUserId(current.userId, user.userId);
+    byEmail.set(email, {
+      ...current,
+      ...user,
+      userId: preferredUserId,
+      email,
+      used: Number(current.used || 0) + Number(user.used || 0),
+      role: preferredRole(current.role, user.role)
+    });
+  }
+  return [...byEmail.values(), ...withoutEmail];
+}
+
+function preferUserId(a, b) {
+  if (looksLikeUuid(a)) return a;
+  if (looksLikeUuid(b)) return b;
+  return a || b;
+}
+
+function looksLikeUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ""));
+}
+
+function preferredRole(a, b) {
+  const order = { admin: 0, dealer: 1, customer: 2 };
+  return (order[a] ?? 9) <= (order[b] ?? 9) ? a : b;
 }
 
 async function updateUserLimit(body) {

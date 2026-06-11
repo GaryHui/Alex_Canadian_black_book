@@ -62,20 +62,63 @@ async function listUserLimits(year) {
     usersById.set(userId, current);
   }
 
-  const users = [...usersById.values()]
+  const users = mergeUsersByEmail([...usersById.values()])
     .map((user) => {
-      const limit = limitsByUser.get(user.userId);
-      const annualLimit = Number(limit?.annual_limit || DEFAULT_LIMIT);
+      const emailKey = normalizeEmail(user.email);
+      const limit = limitsByUser.get(user.userId) || limitsByUser.get(emailKey);
+      const annualLimit = Number(limit?.annual_limit ?? DEFAULT_LIMIT);
       return {
         ...user,
         year,
         annualLimit,
-        remaining: Math.max(0, annualLimit - user.used)
+        unlimited: annualLimit < 0,
+        remaining: annualLimit < 0 ? null : Math.max(0, annualLimit - user.used)
       };
     })
     .sort((a, b) => (a.email || a.userId).localeCompare(b.email || b.userId));
 
   return { ok: true, storage: "supabase", year, users };
+}
+
+function mergeUsersByEmail(users) {
+  const byEmail = new Map();
+  const withoutEmail = [];
+  for (const user of users) {
+    const email = normalizeEmail(user.email || (String(user.userId || "").includes("@") ? user.userId : ""));
+    if (!email) {
+      withoutEmail.push(user);
+      continue;
+    }
+
+    const current = byEmail.get(email);
+    if (!current) {
+      byEmail.set(email, { ...user, email });
+      continue;
+    }
+
+    byEmail.set(email, {
+      ...current,
+      ...user,
+      userId: preferUserId(current.userId, user.userId),
+      email,
+      used: Number(current.used || 0) + Number(user.used || 0)
+    });
+  }
+  return [...byEmail.values(), ...withoutEmail];
+}
+
+function preferUserId(a, b) {
+  if (looksLikeUuid(a)) return a;
+  if (looksLikeUuid(b)) return b;
+  return a || b;
+}
+
+function looksLikeUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ""));
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 async function updateUserLimit(body) {
@@ -89,7 +132,9 @@ async function updateUserLimit(body) {
   const annualLimit = Number(body.annualLimit);
 
   if (!userId) return { ok: false, error: "User id is required" };
-  if (!Number.isInteger(annualLimit) || annualLimit < 0) return { ok: false, error: "Annual limit must be 0 or more" };
+  if (!Number.isInteger(annualLimit) || annualLimit < -1) {
+    return { ok: false, error: "Annual limit must be -1 for unlimited, or 0 or more" };
+  }
 
   const response = await fetch(`${url}/rest/v1/valuation_user_limits?on_conflict=user_id,valuation_year`, {
     method: "POST",
