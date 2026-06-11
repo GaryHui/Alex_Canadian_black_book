@@ -845,9 +845,14 @@ async function loadUsage() {
     if (!data.ok) throw new Error(data.error || t("quotaUnavailable"));
 
     usageState = data;
-    quotaTitle.textContent = `${data.remaining} ${t("quotaLeft")}`;
-    quotaSubtitle.textContent = `${data.used} ${t("quotaSummary")} ${data.annualLimit} in ${data.year}`;
-    if (data.remaining <= 0) {
+    if (data.unlimited || Number(data.annualLimit) < 0) {
+      quotaTitle.textContent = "Unlimited";
+      quotaSubtitle.textContent = `${data.used} ${t("quotaSummary")} unlimited in ${data.year}`;
+    } else {
+      quotaTitle.textContent = `${data.remaining} ${t("quotaLeft")}`;
+      quotaSubtitle.textContent = `${data.used} ${t("quotaSummary")} ${data.annualLimit} in ${data.year}`;
+    }
+    if (!data.unlimited && data.remaining <= 0) {
       statusEl.textContent = `${data.year} ${t("limitReached")} ${data.contact || "Please contact the website owner for more valuations."}`;
     }
   } catch (error) {
@@ -1051,6 +1056,7 @@ function vehicleTitle(vehicle = {}) {
 }
 
 function canUseValuation() {
+  if (usageState?.unlimited || Number(usageState?.annualLimit) < 0) return true;
   if (!usageState || usageState.remaining > 0) return true;
   const message = `${usageState.year} ${t("limitReached")} ${usageState.contact || "Please contact the website owner for more valuations."}`;
   statusEl.textContent = message;

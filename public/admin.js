@@ -123,11 +123,8 @@ async function loadUsers() {
     return;
   }
 
-  const hiddenText = data.hiddenStaffCount
-    ? ` ${data.hiddenStaffCount} staff/admin account(s) hidden from this customer list.`
-    : "";
   const warningText = data.staffFilterWarning ? ` ${data.staffFilterWarning}` : "";
-  usersStatusEl.textContent = `${data.users.length} customer account(s) with valuation activity in ${data.year}.${hiddenText}${warningText}`;
+  usersStatusEl.textContent = `${data.users.length} account(s) with valuation access or activity in ${data.year}.${warningText}`;
   usersEl.innerHTML = data.users.map(renderUser).join("") || "<p>No user activity yet.</p>";
 }
 
@@ -192,11 +189,13 @@ async function addDealer(event) {
 }
 
 function renderUser(user) {
+  const unlimited = user.unlimited || Number(user.annualLimit) < 0;
   return `
     <form class="user-limit-card" data-user-id="${escapeHtml(user.userId)}" data-email="${escapeHtml(user.email || "")}" data-year="${user.year}">
       <div>
         <strong>${escapeHtml(user.email || user.userId)}</strong>
         <span>${escapeHtml(user.userId)}</span>
+        <b class="role-pill role-${escapeHtml(user.role || "customer")}">${escapeHtml(roleLabel(user.role))}</b>
       </div>
       <div>
         <span>Used</span>
@@ -204,11 +203,15 @@ function renderUser(user) {
       </div>
       <div>
         <span>Remaining</span>
-        <b>${formatNumber(user.remaining)}</b>
+        <b>${unlimited ? "Unlimited" : formatNumber(user.remaining)}</b>
       </div>
       <label>
         <span>Annual limit</span>
-        <input name="annualLimit" type="number" min="0" step="1" value="${user.annualLimit}" />
+        <input name="annualLimit" type="number" min="-1" step="1" value="${unlimited ? -1 : user.annualLimit}" />
+      </label>
+      <label class="inline-check">
+        <input name="unlimited" type="checkbox" ${unlimited ? "checked" : ""} />
+        <span>Unlimited</span>
       </label>
       <button type="submit">Save limit</button>
     </form>
@@ -341,6 +344,7 @@ usersEl.addEventListener("submit", async (event) => {
     year: Number(form.dataset.year),
     ...Object.fromEntries(new FormData(form).entries())
   };
+  if (form.elements.unlimited?.checked) payload.annualLimit = -1;
   const response = await fetch("/api/user-limits", {
     method: "PATCH",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
@@ -350,6 +354,12 @@ usersEl.addEventListener("submit", async (event) => {
   usersStatusEl.textContent = data.ok ? "User valuation limit saved." : (data.error || "Unable to save user limit.");
   if (data.ok) await loadUsers();
 });
+
+function roleLabel(role) {
+  if (role === "admin") return "Admin";
+  if (role === "dealer") return "Dealer";
+  return "Customer";
+}
 
 dealersEl.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-remove-dealer]");

@@ -919,7 +919,8 @@ async function getUsage({ userId, email, year }) {
     year,
     used: used.count,
     annualLimit: annualLimit.limit,
-    remaining: Math.max(0, annualLimit.limit - used.count),
+    unlimited: annualLimit.limit < 0,
+    remaining: annualLimit.limit < 0 ? null : Math.max(0, annualLimit.limit - used.count),
     contact: ownerContactMessage()
   };
 }
@@ -933,7 +934,7 @@ async function getAnnualLimit({ url, key, userId, year }) {
   const rows = await response.json().catch(() => []);
   if (!response.ok) return { error: `Unable to load valuation limit (${response.status})` };
 
-  return { limit: Number(rows?.[0]?.annual_limit || DEFAULT_ANNUAL_LIMIT) };
+  return { limit: Number(rows?.[0]?.annual_limit ?? DEFAULT_ANNUAL_LIMIT) };
 }
 
 async function getUsedCount({ url, key, userId, email, year }) {
@@ -954,16 +955,16 @@ async function listUserLimits(year) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return { ok: true, storage: "not_configured", users: [] };
 
-  const [leadsResult, limitsResult, staffEmailsResult] = await Promise.all([
+  const [leadsResult, limitsResult, accessRoleResult] = await Promise.all([
     fetchSupabaseJson(`${url}/rest/v1/valuation_leads?select=auth_user_id,auth_email&valuation_year=eq.${year}`, key),
     fetchSupabaseJson(`${url}/rest/v1/valuation_user_limits?select=*&valuation_year=eq.${year}`, key),
-    dealerStaffEmailsForFiltering({ url, key })
+    accessRolesForDisplay({ url, key })
   ]);
 
   if (!leadsResult.ok) return leadsResult;
   if (!limitsResult.ok) return limitsResult;
 
-  const staffEmails = staffEmailsResult.emails || new Set();
+  const roleByEmail = accessRoleResult.roleByEmail || new Map();
   const limitsByUser = new Map((limitsResult.data || []).map((limit) => [limit.user_id, limit]));
   const usersById = new Map();
 
@@ -976,38 +977,47 @@ async function listUserLimits(year) {
     usersById.set(userId, current);
   }
 
+  for (const [email, role] of roleByEmail.entries()) {
+    const current = usersById.get(email) || { userId: email, email, used: 0, role };
+    current.role = role;
+    usersById.set(email, current);
+  }
+
   for (const limit of limitsResult.data || []) {
     const userId = limit.user_id;
     if (!userId) continue;
     const current = usersById.get(userId) || { userId, email: limit.email || "", used: 0 };
     current.email = current.email || limit.email || "";
+    current.role = current.role || roleByEmail.get(normalizeEmail(current.email || userId)) || "customer";
     usersById.set(userId, current);
   }
 
-  const allUsers = [...usersById.values()];
-  const customers = allUsers.filter((user) => !isStaffEmail(user.email || user.userId, staffEmails));
-  const hiddenStaffCount = allUsers.length - customers.length;
-
-  const users = customers
+  const users = [...usersById.values()]
     .map((user) => {
       const limit = limitsByUser.get(user.userId);
-      const annualLimit = Number(limit?.annual_limit || DEFAULT_ANNUAL_LIMIT);
+      const annualLimit = Number(limit?.annual_limit ?? DEFAULT_ANNUAL_LIMIT);
+      const role = user.role || roleByEmail.get(normalizeEmail(user.email || user.userId)) || "customer";
       return {
         ...user,
+        role,
         year,
         annualLimit,
-        remaining: Math.max(0, annualLimit - user.used)
+        unlimited: annualLimit < 0,
+        remaining: annualLimit < 0 ? null : Math.max(0, annualLimit - user.used)
       };
     })
-    .sort((a, b) => (a.email || a.userId).localeCompare(b.email || b.userId));
+    .sort((a, b) => {
+      const roleOrder = { admin: 0, dealer: 1, customer: 2 };
+      const roleCompare = (roleOrder[a.role] ?? 9) - (roleOrder[b.role] ?? 9);
+      return roleCompare || (a.email || a.userId).localeCompare(b.email || b.userId);
+    });
 
   return {
     ok: true,
     storage: "supabase",
     year,
     users,
-    hiddenStaffCount,
-    staffFilterWarning: staffEmailsResult.warning || ""
+    staffFilterWarning: accessRoleResult.warning || ""
   };
 }
 
@@ -1022,8 +1032,8 @@ async function updateUserLimit(body) {
   const annualLimit = Number(body.annualLimit);
 
   if (!userId) return { ok: false, error: "User id is required" };
-  if (!Number.isInteger(annualLimit) || annualLimit < 0) {
-    return { ok: false, error: "Annual limit must be 0 or more" };
+  if (!Number.isInteger(annualLimit) || annualLimit < -1) {
+    return { ok: false, error: "Annual limit must be -1 for unlimited, or 0 or more" };
   }
 
   const response = await fetch(`${url}/rest/v1/valuation_user_limits?on_conflict=user_id,valuation_year`, {
@@ -1087,11 +1097,14 @@ async function listDealerStaff() {
   return { ok: true, storage: "supabase", staff: [...byEmail.values()].sort((a, b) => a.email.localeCompare(b.email)) };
 }
 
-async function dealerStaffEmailsForFiltering({ url, key }) {
-  const emails = new Set([
-    ...configuredEmails(process.env.ADMIN_EMAILS),
-    ...configuredEmails(process.env.DEALER_EMAILS)
-  ]);
+async function accessRolesForDisplay({ url, key }) {
+  const roleByEmail = new Map();
+  for (const email of configuredEmails(process.env.ADMIN_EMAILS)) {
+    roleByEmail.set(email, "admin");
+  }
+  for (const email of configuredEmails(process.env.DEALER_EMAILS)) {
+    if (!roleByEmail.has(email)) roleByEmail.set(email, "dealer");
+  }
 
   const response = await fetch(`${url}/rest/v1/dealer_staff?select=email,active&active=eq.true`, {
     headers: supabaseServiceHeaders(key)
@@ -1099,22 +1112,17 @@ async function dealerStaffEmailsForFiltering({ url, key }) {
   const rows = await response.json().catch(() => []);
   if (!response.ok) {
     return {
-      emails,
-      warning: "Dealer staff table could not be loaded, so only ADMIN_EMAILS and DEALER_EMAILS were excluded."
+      roleByEmail,
+      warning: "Dealer staff table could not be loaded, so only ADMIN_EMAILS and DEALER_EMAILS were shown as staff roles."
     };
   }
 
   for (const row of rows || []) {
     const email = normalizeEmail(row.email);
-    if (email) emails.add(email);
+    if (email && !roleByEmail.has(email)) roleByEmail.set(email, "dealer");
   }
 
-  return { emails, warning: "" };
-}
-
-function isStaffEmail(value, staffEmails) {
-  const email = normalizeEmail(value);
-  return email ? staffEmails.has(email) : false;
+  return { roleByEmail, warning: "" };
 }
 
 async function addDealerStaff(body, adminUser) {

@@ -825,8 +825,13 @@ async function loadUsage() {
     if (!data.ok) throw new Error(data.error || "Unable to load usage");
 
     usageState = data;
-    quotaTitle.textContent = `${data.remaining} left`;
-    quotaSubtitle.textContent = `${data.used} used of ${data.annualLimit} in ${data.year}`;
+    if (data.unlimited || Number(data.annualLimit) < 0) {
+      quotaTitle.textContent = "Unlimited";
+      quotaSubtitle.textContent = `${data.used} used in ${data.year}`;
+    } else {
+      quotaTitle.textContent = `${data.remaining} left`;
+      quotaSubtitle.textContent = `${data.used} used of ${data.annualLimit} in ${data.year}`;
+    }
   } catch (error) {
     usageState = null;
     quotaTitle.textContent = "Unavailable";
@@ -995,6 +1000,7 @@ function formatDateTime(value) {
 }
 
 function canUseValuation() {
+  if (usageState?.unlimited || Number(usageState?.annualLimit) < 0) return true;
   if (!usageState || usageState.remaining > 0) return true;
   const message = `${usageState.year} valuation limit reached. ${usageState.contact || "Please contact the website owner for more valuations."}`;
   statusEl.textContent = message;
