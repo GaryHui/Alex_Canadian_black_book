@@ -21,6 +21,7 @@ const makeList = document.querySelector("#make-list");
 const modelList = document.querySelector("#model-list");
 const vinHelpButton = document.querySelector("#vin-help");
 const vinGuide = document.querySelector("#vin-guide");
+const vinGuideClose = document.querySelector("#vin-guide-close");
 const customerAuthTitle = document.querySelector("#customer-auth-title");
 const customerAuthSubtitle = document.querySelector("#customer-auth-subtitle");
 const customerLoginButton = document.querySelector("#customer-login");
@@ -359,10 +360,17 @@ function initialize() {
   form.elements.make.addEventListener("input", syncModelList);
   languageToggle.addEventListener("click", () => setLanguage(language === "en" ? "fr" : "en"));
   vinHelpButton.addEventListener("click", () => {
-    vinGuide.scrollIntoView({ behavior: "smooth", block: "start" });
+    openVinGuide();
   });
+  vinGuideClose.addEventListener("click", closeVinGuide);
   postalHelp.addEventListener("click", openModal);
   modal.querySelectorAll("[data-close-modal]").forEach((item) => item.addEventListener("click", closeModal));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeModal();
+      closeVinGuide();
+    }
+  });
   startOver.addEventListener("click", resetCustomerFlow);
   customerLoginButton.addEventListener("click", signInCustomer);
   customerLogoutButton.addEventListener("click", signOutCustomer);
@@ -1103,6 +1111,14 @@ function openModal() {
 
 function closeModal() {
   modal.hidden = true;
+}
+
+function openVinGuide() {
+  vinGuide.hidden = false;
+}
+
+function closeVinGuide() {
+  vinGuide.hidden = true;
 }
 
 function t(key) {
