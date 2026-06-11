@@ -131,13 +131,31 @@ drilldownForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!requireLogin()) return;
   const payload = Object.fromEntries(new FormData(drilldownForm).entries());
-  const exactVehicle = await findExactDrilldownVehicle(payload);
-  if (exactVehicle) {
-    setValuationFields({ vin: "", ...payload, uvc: exactVehicle.uvc || "" });
-    await runValuation({ vin: "", uvc: exactVehicle.uvc || "" });
+  const vinSearch = findVinInPayload(payload);
+  if (vinSearch) {
+    modalStatus.textContent = "Searching vehicle matches...";
+    setValuationFields({ vin: vinSearch, uvc: "", year: "", make: "", model: "", series: "", style: "" });
+    await searchVehicleChoices({ vin: vinSearch });
     return;
   }
-  setValuationFields({ vin: "", uvc: "", ...payload });
+
+  const exactVehicle = await findExactDrilldownVehicle(payload);
+  if (exactVehicle) {
+    setValuationFields({
+      vin: form.elements.vin.value || "",
+      ...payload,
+      year: exactVehicle.year || payload.year || "",
+      make: exactVehicle.make || payload.make || "",
+      model: exactVehicle.model || payload.model || "",
+      series: exactVehicle.series || payload.series || "",
+      style: exactVehicle.style || payload.style || "",
+      uvc: exactVehicle.uvc || ""
+    });
+    detailsEl.hidden = true;
+    statusEl.textContent = "Vehicle selected. Click Generate to create the valuation.";
+    return;
+  }
+  setValuationFields({ vin: form.elements.vin.value || "", uvc: "", ...payload });
   await searchVehicleChoices(payload);
 });
 
@@ -425,10 +443,29 @@ function setDrilldownFields(values) {
 }
 
 function vehicleSearchText(payload) {
+  const vin = cleanVinText(payload.vin);
+  if (isVinLike(vin)) return vin;
+
   return ["year", "make", "model", "series", "style"]
     .map((key) => String(payload[key] || "").trim())
     .filter((value) => value && value !== unknownOption)
     .join(" ");
+}
+
+function findVinInPayload(payload) {
+  for (const value of Object.values(payload)) {
+    const vin = cleanVinText(value);
+    if (isVinLike(vin)) return vin;
+  }
+  return "";
+}
+
+function cleanVinText(value) {
+  return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function isVinLike(value) {
+  return /^[A-HJ-NPR-Z0-9]{10,17}$/.test(String(value || ""));
 }
 
 async function initializeDatalists() {
