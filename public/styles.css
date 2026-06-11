@@ -853,6 +853,28 @@ select {
   gap: 10px;
 }
 
+.dealer-staff-form {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(260px, 420px) auto;
+  margin: 14px 0;
+}
+
+.dealer-staff-form label,
+.user-limit-card label {
+  display: grid;
+  gap: 6px;
+}
+
+.dealer-staff-form input,
+.user-limit-card input {
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
 .user-limit-card {
   align-items: end;
   border: 1px solid #ddd;
@@ -861,6 +883,10 @@ select {
   gap: 12px;
   grid-template-columns: minmax(240px, 1fr) 110px 110px 150px auto;
   padding: 14px;
+}
+
+.dealer-staff-card {
+  grid-template-columns: minmax(240px, 1fr) 120px minmax(160px, 220px) auto;
 }
 
 .user-limit-card strong,

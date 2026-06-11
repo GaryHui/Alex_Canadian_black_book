@@ -742,18 +742,18 @@ async function setSession(session) {
     authTitle.textContent = `Signed in as ${email}`;
     logoutButton.hidden = false;
     emailField.value = email;
-    const admin = await checkDealerAdmin();
-    if (!admin.ok) {
+    const dealer = await checkDealerAccess();
+    if (!dealer.ok) {
       authTitle.textContent = "Dealer access denied";
-      authSubtitle.textContent = admin.error || `This Google account is not allowed: ${email}`;
+      authSubtitle.textContent = dealer.error || `This Google account is not allowed: ${email}`;
       disableDealerTools(true);
       quotaPanel.hidden = true;
       historyPanel.hidden = true;
-      statusEl.textContent = "Ask the site owner to add this email to ADMIN_EMAILS in Vercel.";
+      statusEl.textContent = "Ask the site owner to add this email in Admin > Dealer portal access.";
       return;
     }
     dealerAdminAllowed = true;
-    authSubtitle.textContent = "Admin access confirmed. Dealer tools are available.";
+    authSubtitle.textContent = "Dealer access confirmed. Dealer tools are available.";
     disableDealerTools(false);
     loadUsage();
     loadHistory();
@@ -779,16 +779,16 @@ function requireLogin() {
   if (!supabaseClient) {
     statusEl.textContent = "Supabase Google login is not configured yet. Add Supabase env vars to enable this flow.";
   } else if (authSession?.user && !dealerAdminAllowed) {
-    statusEl.textContent = "Dealer access is restricted to admin emails.";
+    statusEl.textContent = "Dealer access is restricted to approved dealer emails.";
   } else {
     statusEl.textContent = "Please sign in with Google first.";
   }
   return false;
 }
 
-async function checkDealerAdmin() {
+async function checkDealerAccess() {
   try {
-    const response = await fetch("/api/admin-check", {
+    const response = await fetch("/api/dealer-check", {
       headers: {
         Authorization: `Bearer ${authSession?.access_token || ""}`
       }

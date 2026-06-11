@@ -24,6 +24,24 @@
       <section class="admin-section">
         <div class="admin-section-head">
           <div>
+            <h2>Dealer portal access</h2>
+            <p>Add or remove Google emails that can sign in to the dealer portal.</p>
+          </div>
+          <button id="reload-dealers" type="button">Reload dealers</button>
+        </div>
+        <form id="dealer-staff-form" class="dealer-staff-form">
+          <label>
+            <span>Dealer email</span>
+            <input name="email" type="email" placeholder="sales@example.com" required />
+          </label>
+          <button type="submit">Add dealer</button>
+        </form>
+        <p id="dealers-status" class="status">Loading dealer access...</p>
+        <div id="admin-dealers" class="admin-users"></div>
+      </section>
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
             <h2>User valuation limits</h2>
             <p>View yearly usage and adjust how many successful valuations each user can run.</p>
           </div>

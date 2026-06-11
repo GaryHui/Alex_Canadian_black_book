@@ -2,6 +2,10 @@ const statusEl = document.querySelector("#admin-status");
 const leadsEl = document.querySelector("#admin-leads");
 const usersStatusEl = document.querySelector("#users-status");
 const usersEl = document.querySelector("#admin-users");
+const dealersStatusEl = document.querySelector("#dealers-status");
+const dealersEl = document.querySelector("#admin-dealers");
+const dealerStaffForm = document.querySelector("#dealer-staff-form");
+const reloadDealersButton = document.querySelector("#reload-dealers");
 const reloadUsersButton = document.querySelector("#reload-users");
 const reloadLeadsButton = document.querySelector("#reload-leads");
 const adminAuthStatus = document.querySelector("#admin-auth-status");
@@ -14,6 +18,8 @@ let adminSession = null;
 
 reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", loadLeads);
+reloadDealersButton.addEventListener("click", loadDealers);
+dealerStaffForm.addEventListener("submit", addDealer);
 adminLoginButton.addEventListener("click", signInAdmin);
 adminLogoutButton.addEventListener("click", signOutAdmin);
 
@@ -68,8 +74,10 @@ async function setAdminSession(session) {
     adminAuthStatus.textContent = "Admin Google sign-in required.";
     statusEl.textContent = "";
     usersStatusEl.textContent = "";
+    dealersStatusEl.textContent = "";
     leadsEl.innerHTML = "";
     usersEl.innerHTML = "";
+    dealersEl.innerHTML = "";
     return;
   }
 
@@ -79,13 +87,15 @@ async function setAdminSession(session) {
     adminAuthStatus.textContent = admin.error || `This Google account is not an admin: ${session.user.email}`;
     statusEl.textContent = "Ask the site owner to add this email to ADMIN_EMAILS in Vercel.";
     usersStatusEl.textContent = "";
+    dealersStatusEl.textContent = "";
     leadsEl.innerHTML = "";
     usersEl.innerHTML = "";
+    dealersEl.innerHTML = "";
     return;
   }
 
   adminAuthStatus.textContent = `Signed in as ${session.user.email}`;
-  await Promise.all([loadLeads(), loadUsers()]);
+  await Promise.all([loadLeads(), loadUsers(), loadDealers()]);
 }
 
 async function checkAdminAccess() {
@@ -115,6 +125,66 @@ async function loadUsers() {
 
   usersStatusEl.textContent = `${data.users.length} user(s) with valuation activity in ${data.year}.`;
   usersEl.innerHTML = data.users.map(renderUser).join("") || "<p>No user activity yet.</p>";
+}
+
+async function loadDealers() {
+  if (!adminSession) return;
+  const response = await fetch("/api/dealer-staff", { headers: authHeaders() });
+  const data = await response.json();
+
+  if (!data.ok) {
+    dealersStatusEl.textContent = data.error || "Unable to load dealer staff.";
+    dealersEl.innerHTML = "";
+    return;
+  }
+
+  if (data.storage === "not_configured") {
+    dealersStatusEl.textContent = "Supabase is not configured, so dealer staff can only be managed through Vercel env vars.";
+  } else {
+    dealersStatusEl.textContent = `${data.staff.length} approved dealer email(s).`;
+  }
+
+  dealersEl.innerHTML = (data.staff || []).map(renderDealer).join("") || "<p>No dealer emails yet.</p>";
+}
+
+function renderDealer(staff) {
+  const removable = staff.source !== "vercel_env";
+  return `
+    <article class="user-limit-card dealer-staff-card" data-email="${escapeHtml(staff.email)}">
+      <div>
+        <strong>${escapeHtml(staff.email)}</strong>
+        <span>${staff.source === "vercel_env" ? "Vercel DEALER_EMAILS" : "Supabase dealer_staff"}</span>
+      </div>
+      <div>
+        <span>Status</span>
+        <b>${staff.active === false ? "Inactive" : "Active"}</b>
+      </div>
+      <div>
+        <span>Added by</span>
+        <b>${escapeHtml(staff.created_by || "-")}</b>
+      </div>
+      <button type="button" data-remove-dealer="${escapeHtml(staff.email)}" ${removable ? "" : "disabled"}>${removable ? "Remove" : "Env locked"}</button>
+    </article>
+  `;
+}
+
+async function addDealer(event) {
+  event.preventDefault();
+  if (!adminSession) return;
+
+  const email = String(new FormData(dealerStaffForm).get("email") || "").trim();
+  dealersStatusEl.textContent = "Adding dealer email...";
+  const response = await fetch("/api/dealer-staff", {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ email })
+  });
+  const data = await response.json();
+  dealersStatusEl.textContent = data.ok ? "Dealer email saved." : (data.error || "Unable to save dealer email.");
+  if (data.ok) {
+    dealerStaffForm.reset();
+    await loadDealers();
+  }
 }
 
 function renderUser(user) {
@@ -275,6 +345,25 @@ usersEl.addEventListener("submit", async (event) => {
   const data = await response.json();
   usersStatusEl.textContent = data.ok ? "User valuation limit saved." : (data.error || "Unable to save user limit.");
   if (data.ok) await loadUsers();
+});
+
+dealersEl.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-remove-dealer]");
+  if (!button || !adminSession) return;
+
+  const email = button.dataset.removeDealer;
+  const confirmed = window.confirm(`Remove ${email} from dealer portal access?`);
+  if (!confirmed) return;
+
+  button.disabled = true;
+  dealersStatusEl.textContent = "Removing dealer email...";
+  const response = await fetch(`/api/dealer-staff?email=${encodeURIComponent(email)}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  const data = await response.json();
+  dealersStatusEl.textContent = data.ok ? "Dealer email removed." : (data.error || "Unable to remove dealer email.");
+  await loadDealers();
 });
 
 function formatNumber(value) {

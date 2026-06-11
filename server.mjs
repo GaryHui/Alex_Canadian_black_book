@@ -97,6 +97,30 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true, user: admin.user });
     }
 
+    if (req.method === "GET" && url.pathname === "/api/dealer-check") {
+      const dealer = await requireDealer(req);
+      if (!dealer.ok) return sendJson(res, dealer.status, { ok: false, error: dealer.error });
+      return sendJson(res, 200, { ok: true, user: dealer.user, role: dealer.role });
+    }
+
+    if (url.pathname === "/api/dealer-staff") {
+      const admin = await requireAdmin(req);
+      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+
+      if (req.method === "GET") {
+        const result = await listDealerStaff();
+        return sendJson(res, result.ok ? 200 : 500, result);
+      }
+      if (req.method === "POST") {
+        const result = await addDealerStaff(await readJson(req), admin.user);
+        return sendJson(res, result.ok ? 200 : 400, result);
+      }
+      if (req.method === "DELETE") {
+        const result = await deleteDealerStaff(url.searchParams.get("email") || "");
+        return sendJson(res, result.ok ? 200 : 400, result);
+      }
+    }
+
     if (req.method === "POST" && url.pathname === "/api/valuation") {
       const body = await readJson(req);
       const result = await fetchValuation(body);
@@ -220,43 +244,54 @@ function readJson(req) {
 }
 
 async function requireAdmin(req) {
-  const adminEmails = String(process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
+  const adminEmails = configuredEmails(process.env.ADMIN_EMAILS);
 
   if (!adminEmails.length) {
     return { ok: false, status: 403, error: "Admin access is not configured. Set ADMIN_EMAILS on Vercel." };
   }
 
-  const token = bearerToken(req);
-  if (!token) return { ok: false, status: 401, error: "Admin sign-in required" };
+  const auth = await getSupabaseUserFromRequest(req, "Admin sign-in required");
+  if (!auth.ok) return auth;
 
-  const url = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return { ok: false, status: 500, error: "Supabase auth is not configured" };
-
-  const response = await fetch(`${url}/auth/v1/user`, {
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${token}`
-    }
-  });
-
-  const user = await response.json().catch(() => null);
-  if (!response.ok) return { ok: false, status: 401, error: "Invalid or expired admin session" };
-
-  const email = String(user?.email || "").toLowerCase();
+  const email = auth.user.email;
   if (!adminEmails.includes(email)) {
     return { ok: false, status: 403, error: `This Google account is not an admin: ${email || "unknown"}` };
   }
 
-  return { ok: true, user: { id: user.id, email } };
+  return { ok: true, user: auth.user };
+}
+
+async function requireDealer(req) {
+  const auth = await getSupabaseUserFromRequest(req, "Dealer sign-in required");
+  if (!auth.ok) return auth;
+
+  const email = auth.user.email;
+  if (configuredEmails(process.env.ADMIN_EMAILS).includes(email)) {
+    return { ok: true, user: auth.user, role: "admin" };
+  }
+
+  if (configuredEmails(process.env.DEALER_EMAILS).includes(email)) {
+    return { ok: true, user: auth.user, role: "dealer_env" };
+  }
+
+  const staff = await isDealerStaffEmail(email);
+  if (staff.ok && staff.allowed) {
+    return { ok: true, user: auth.user, role: "dealer_staff" };
+  }
+  if (!staff.ok && staff.error) {
+    return { ok: false, status: 500, error: staff.error };
+  }
+
+  return { ok: false, status: 403, error: `This Google account is not approved for dealer portal: ${email || "unknown"}` };
 }
 
 async function requireUser(req) {
+  return getSupabaseUserFromRequest(req, "Sign-in required");
+}
+
+async function getSupabaseUserFromRequest(req, missingMessage) {
   const token = bearerToken(req);
-  if (!token) return { ok: false, status: 401, error: "Sign-in required" };
+  if (!token) return { ok: false, status: 401, error: missingMessage };
 
   const url = process.env.SUPABASE_URL;
   const anonKey = process.env.SUPABASE_ANON_KEY;
@@ -279,6 +314,13 @@ async function requireUser(req) {
       email: String(user?.email || "").trim().toLowerCase()
     }
   };
+}
+
+function configuredEmails(value) {
+  return String(value || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 function bearerToken(req) {
@@ -990,6 +1032,119 @@ async function updateUserLimit(body) {
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
   return { ok: true, limit: data?.[0] || null };
+}
+
+async function listDealerStaff() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const envDealers = configuredEmails(process.env.DEALER_EMAILS).map((email) => ({
+    email,
+    source: "vercel_env",
+    active: true,
+    created_at: "",
+    created_by: ""
+  }));
+
+  if (!url || !key) {
+    return { ok: true, storage: "not_configured", staff: envDealers };
+  }
+
+  const response = await fetch(`${url}/rest/v1/dealer_staff?select=*&order=email.asc`, {
+    headers: supabaseServiceHeaders(key)
+  });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      error: "Unable to load dealer staff. Create the dealer_staff table in Supabase first.",
+      details: rows
+    };
+  }
+
+  const dbStaff = (Array.isArray(rows) ? rows : []).map((row) => ({
+    email: String(row.email || "").toLowerCase(),
+    source: "supabase",
+    active: row.active !== false,
+    created_at: row.created_at || "",
+    created_by: row.created_by || ""
+  }));
+
+  const byEmail = new Map([...envDealers, ...dbStaff].map((staff) => [staff.email, staff]));
+  return { ok: true, storage: "supabase", staff: [...byEmail.values()].sort((a, b) => a.email.localeCompare(b.email)) };
+}
+
+async function addDealerStaff(body, adminUser) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: false, error: "Supabase is not configured" };
+
+  const email = normalizeEmail(body.email);
+  if (!email) return { ok: false, error: "Dealer email is required" };
+
+  const response = await fetch(`${url}/rest/v1/dealer_staff?on_conflict=email`, {
+    method: "POST",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=representation"
+    },
+    body: JSON.stringify({
+      email,
+      active: true,
+      created_by: adminUser?.email || "",
+      updated_at: new Date().toISOString()
+    })
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+  return { ok: true, staff: data?.[0] || null };
+}
+
+async function deleteDealerStaff(emailValue) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: false, error: "Supabase is not configured" };
+
+  const email = normalizeEmail(emailValue);
+  if (!email) return { ok: false, error: "Dealer email is required" };
+
+  const response = await fetch(`${url}/rest/v1/dealer_staff?email=eq.${encodeURIComponent(email)}`, {
+    method: "DELETE",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      Prefer: "return=representation"
+    }
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+  return { ok: true, deleted: data || [] };
+}
+
+async function isDealerStaffEmail(emailValue) {
+  const email = normalizeEmail(emailValue);
+  if (!email) return { ok: true, allowed: false };
+
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: true, allowed: false };
+
+  const response = await fetch(`${url}/rest/v1/dealer_staff?select=email,active&email=eq.${encodeURIComponent(email)}&active=eq.true&limit=1`, {
+    headers: supabaseServiceHeaders(key)
+  });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) {
+    return { ok: false, error: "Unable to verify dealer staff. Create the dealer_staff table in Supabase first." };
+  }
+
+  return { ok: true, allowed: Array.isArray(rows) && rows.length > 0 };
+}
+
+function normalizeEmail(value) {
+  const email = String(value || "").trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
 }
 
 async function fetchSupabaseJson(url, key) {
