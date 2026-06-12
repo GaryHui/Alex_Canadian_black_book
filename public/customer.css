@@ -844,6 +844,7 @@ input::placeholder {
 }
 
 .photo-slot {
+  position: relative;
   display: grid;
   gap: 7px;
   padding: 12px;
@@ -862,8 +863,52 @@ input::placeholder {
   line-height: 1.4;
 }
 
-.photo-slot input {
-  width: 100%;
+.photo-slot input[type="file"] {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.photo-picker {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #bfd0e4;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.photo-picker-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  color: #0f4f9f;
+  font-weight: 850;
+  background: #eef6ff;
+  border: 1px solid #9fc8f4;
+  border-radius: 6px;
+}
+
+.photo-picker-name {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-slot:focus-within .photo-picker {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(32, 145, 236, 0.16);
 }
 
 .photo-slot figure {

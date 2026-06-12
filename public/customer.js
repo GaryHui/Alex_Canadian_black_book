@@ -251,6 +251,8 @@ const text = {
     photoOdometerHelp: "Show the mileage clearly on the cluster.",
     photoInterior: "Interior",
     photoInteriorHelp: "Show front seats, dashboard, and center console.",
+    choosePhoto: "Choose photo",
+    noPhotoSelected: "No photo selected",
     generateValuation: "Get Value Range",
     vehicleReady: "Vehicle found. Please review the details before generating a valuation.",
     odometerTooLow: "Please enter an odometer value greater than 500 km.",
@@ -412,6 +414,8 @@ const text = {
     photoOdometerHelp: "Montrez clairement le kilométrage au tableau de bord.",
     photoInterior: "Intérieur",
     photoInteriorHelp: "Montrez les sièges avant, le tableau de bord et la console.",
+    choosePhoto: "Choisir une photo",
+    noPhotoSelected: "Aucune photo choisie",
     generateValuation: "Obtenir la fourchette",
     vehicleReady: "Véhicule trouvé. Vérifiez les détails avant de générer une évaluation.",
     odometerTooLow: "Veuillez entrer un odomètre supérieur à 500 km.",
@@ -711,6 +715,7 @@ function setLanguage(nextLanguage) {
   });
   updateSelectPlaceholder(makeSelect, t("makePlaceholder"));
   updateSelectPlaceholder(modelSelect, t("modelPlaceholder"));
+  updatePhotoStatusText();
 
   setCustomerSession(authSession);
 }
@@ -1084,6 +1089,7 @@ async function renderPhotoPreview(event) {
 
   const photo = await compressPhoto(file, { role, label });
   selectedPhotos.set(role, photo);
+  updatePhotoStatusText(role, photo.name);
 
   if (preview) {
     const image = document.createElement("img");
@@ -1151,6 +1157,19 @@ function clearSelectedPhotos() {
     const role = input.dataset.photoRole || "";
     const preview = document.querySelector(`[data-photo-preview="${cssEscape(role)}"]`);
     if (preview) preview.replaceChildren();
+    updatePhotoStatusText(role);
+  });
+}
+
+function updatePhotoStatusText(role = "", fileName = "") {
+  const statuses = role
+    ? [document.querySelector(`[data-photo-status="${cssEscape(role)}"]`)].filter(Boolean)
+    : [...document.querySelectorAll("[data-photo-status]")];
+
+  statuses.forEach((status) => {
+    const statusRole = status.dataset.photoStatus || "";
+    const selected = fileName || selectedPhotos.get(statusRole)?.name || "";
+    status.textContent = selected || t("noPhotoSelected");
   });
 }
 
