@@ -32,12 +32,14 @@ async function getUsage({ userId, email, year }) {
     };
   }
 
-  const annualLimit = await getAnnualLimit({ url, key, userId, year });
+  const annualLimit = await getAnnualLimit({ url, key, userId, email, year });
   const used = await getUsedCount({ url, key, userId, email, year });
 
   if (annualLimit.error || used.error) {
     return { ok: false, error: annualLimit.error || used.error };
   }
+
+  const unlimited = annualLimit.limit < 0;
 
   return {
     ok: true,
@@ -45,34 +47,75 @@ async function getUsage({ userId, email, year }) {
     year,
     used: used.count,
     annualLimit: annualLimit.limit,
-    remaining: Math.max(0, annualLimit.limit - used.count),
+    unlimited,
+    remaining: unlimited ? null : Math.max(0, annualLimit.limit - used.count),
     contact: process.env.OWNER_CONTACT || "Please contact the website owner for more valuations."
   };
 }
 
-async function getAnnualLimit({ url, key, userId, year }) {
-  if (!userId) return { limit: DEFAULT_LIMIT };
+async function getAnnualLimit({ url, key, userId, email, year }) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!userId && !normalizedEmail) return { limit: DEFAULT_LIMIT };
 
-  const response = await fetch(`${url}/rest/v1/valuation_user_limits?select=annual_limit&user_id=eq.${encodeURIComponent(userId)}&valuation_year=eq.${year}&limit=1`, {
-    headers: authHeaders(key)
+  const queries = [];
+  if (userId) queries.push(`user_id=eq.${encodeURIComponent(userId)}`);
+  if (normalizedEmail) {
+    queries.push(`user_id=eq.${encodeURIComponent(normalizedEmail)}`);
+    queries.push(`email=eq.${encodeURIComponent(normalizedEmail)}`);
+  }
+
+  const responses = await Promise.all(queries.map(async (filter) => {
+    const response = await fetch(`${url}/rest/v1/valuation_user_limits?select=*&${filter}&valuation_year=eq.${year}&limit=10`, {
+      headers: authHeaders(key)
+    });
+    const rows = await response.json().catch(() => []);
+    if (!response.ok) return { error: `Unable to load valuation limit (${response.status})` };
+    return { rows: Array.isArray(rows) ? rows : [] };
+  }));
+
+  const failed = responses.find((result) => result.error);
+  if (failed) return failed;
+
+  const rows = responses.flatMap((result) => result.rows);
+  const exactUserLimit = rows.find((row) => row.user_id === userId);
+  const emailLimit = rows.find((row) => {
+    const rowUserId = normalizeEmail(row.user_id);
+    const rowEmail = normalizeEmail(row.email);
+    return rowUserId === normalizedEmail || rowEmail === normalizedEmail;
   });
-  const rows = await response.json().catch(() => []);
-  if (!response.ok) return { error: `Unable to load valuation limit (${response.status})` };
+  const limit = exactUserLimit || emailLimit;
 
-  return { limit: Number(rows?.[0]?.annual_limit || DEFAULT_LIMIT) };
+  return { limit: Number(limit?.annual_limit ?? DEFAULT_LIMIT) };
 }
 
 async function getUsedCount({ url, key, userId, email, year }) {
-  const filter = userId
-    ? `auth_user_id=eq.${encodeURIComponent(userId)}`
-    : `auth_email=eq.${encodeURIComponent(email)}`;
-  const response = await fetch(`${url}/rest/v1/valuation_leads?select=id&${filter}&valuation_year=eq.${year}`, {
-    headers: authHeaders(key)
-  });
-  const rows = await response.json().catch(() => []);
-  if (!response.ok) return { error: `Unable to load valuation usage (${response.status})` };
+  const normalizedEmail = normalizeEmail(email);
+  const queries = [];
+  if (userId) queries.push(`auth_user_id=eq.${encodeURIComponent(userId)}`);
+  if (normalizedEmail) queries.push(`auth_email=eq.${encodeURIComponent(normalizedEmail)}`);
 
-  return { count: Array.isArray(rows) ? rows.length : 0 };
+  const responses = await Promise.all(queries.map(async (filter) => {
+    const response = await fetch(`${url}/rest/v1/valuation_leads?select=id&${filter}&valuation_year=eq.${year}`, {
+      headers: authHeaders(key)
+    });
+    const rows = await response.json().catch(() => []);
+    if (!response.ok) return { error: `Unable to load valuation usage (${response.status})` };
+    return { rows: Array.isArray(rows) ? rows : [] };
+  }));
+
+  const failed = responses.find((result) => result.error);
+  if (failed) return failed;
+
+  const rowsById = new Map();
+  for (const row of responses.flatMap((result) => result.rows)) {
+    if (row?.id) rowsById.set(row.id, row);
+  }
+
+  return { count: rowsById.size };
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function authHeaders(key) {

@@ -237,8 +237,8 @@ const text = {
     colorPlaceholder: "White, black, silver...",
     conditionLabel: "Condition notes",
     conditionPlaceholder: "Any damage, warning lights, recent repairs, tire condition...",
-    photoLabel: "Vehicle photos",
-    photoNote: "Upload the requested angles. Each photo is automatically renamed by angle before it is saved to Google Drive.",
+    photoLabel: "Vehicle photos (optional)",
+    photoNote: "Optional: if you think your car is in above-average condition, please take some photos. A dealer can review them for a more accurate follow-up. Each photo is automatically renamed by angle before it is saved to Google Drive.",
     photoFront: "Front exterior",
     photoFrontHelp: "Stand in front and show the whole vehicle.",
     photoRear: "Rear exterior",
@@ -262,6 +262,7 @@ const text = {
     pleaseVerifyEmail: "Please verify your email first, then sign in again.",
     invalidVin: "Please enter a valid VIN.",
     required: "Please complete the required fields.",
+    ownershipRequired: "Please choose one ownership type.",
     selectText: "Select this vehicle",
     sourceText: "Source",
     valueUnavailable: "Not available"
@@ -397,8 +398,8 @@ const text = {
     colorPlaceholder: "Blanc, noir, argent...",
     conditionLabel: "Notes sur l'état",
     conditionPlaceholder: "Dommages, voyants, réparations récentes, pneus...",
-    photoLabel: "Photos du véhicule",
-    photoNote: "Téléversez les angles demandés. Chaque photo est renommée automatiquement selon l'angle avant l'enregistrement dans Google Drive.",
+    photoLabel: "Photos du véhicule (facultatif)",
+    photoNote: "Facultatif : si vous pensez que votre véhicule est dans un état supérieur à la moyenne, veuillez prendre quelques photos. Un concessionnaire pourra les examiner pour un suivi plus précis. Chaque photo est renommée automatiquement selon l'angle avant l'enregistrement dans Google Drive.",
     photoFront: "Avant extérieur",
     photoFrontHelp: "Placez-vous devant le véhicule et montrez-le au complet.",
     photoRear: "Arrière extérieur",
@@ -422,6 +423,7 @@ const text = {
     pleaseVerifyEmail: "Veuillez d'abord vérifier votre courriel, puis vous reconnecter.",
     invalidVin: "Veuillez entrer un NIV valide.",
     required: "Veuillez remplir les champs requis.",
+    ownershipRequired: "Veuillez choisir un type de propriété.",
     selectText: "Choisir ce véhicule",
     sourceText: "Source",
     valueUnavailable: "Non disponible"
@@ -807,6 +809,12 @@ function validateInput(input) {
     return false;
   }
 
+  if (!input.ownershipType) {
+    statusEl.textContent = t("ownershipRequired");
+    form.elements.ownershipType[0]?.focus();
+    return false;
+  }
+
   if (!hasBasics || !hasVehicle) {
     statusEl.textContent = t("required");
     return false;
@@ -882,17 +890,36 @@ function renderVehicleReview(vehicle, input) {
   setText("#review-year", vehicle.year || input.year || "-");
   setText("#review-make", vehicle.make || input.make || "-");
   setText("#review-model", vehicle.model || input.model || "-");
+  setText("#review-kilometers", input.kilometers ? `${formatNumber(input.kilometers)} km` : "-");
   setText("#review-region", regionName(input.region));
   setText("#review-postal", input.postalCode || "-");
-  populateReviewSelects(vehicle);
+  setText("#review-ownership", ownershipLabel(input.ownershipType));
+  const inferred = inferVehicleDetails(vehicle);
+  populateReviewSummary(inferred);
+  populateReviewSelects(vehicle, inferred);
   populateColorOptions(input.color || vehicle.color || "");
 
   statusEl.textContent = t("vehicleReady");
   vehicleReviewSection.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function populateReviewSelects(vehicle = {}) {
-  const inferred = inferVehicleDetails(vehicle);
+function populateReviewSummary(inferred = {}) {
+  setOptionalSummaryValue("series", uniqueReviewValues(inferred.series)[0]);
+  setOptionalSummaryValue("style", uniqueReviewValues(inferred.style)[0]);
+  setOptionalSummaryValue("engine", uniqueReviewValues(inferred.engine)[0]);
+  setOptionalSummaryValue("drivetrain", uniqueReviewValues(inferred.drivetrain)[0]);
+  setOptionalSummaryValue("transmission", uniqueReviewValues(inferred.transmission)[0]);
+}
+
+function setOptionalSummaryValue(name, value) {
+  const row = document.querySelector(`[data-review-summary-row="${cssEscape(name)}"]`);
+  const output = document.querySelector(`#review-summary-${cssEscape(name)}`);
+  const displayValue = String(value || "").trim();
+  if (row) row.hidden = !displayValue;
+  if (output) output.textContent = displayValue || "-";
+}
+
+function populateReviewSelects(vehicle = {}, inferred = inferVehicleDetails(vehicle)) {
   const visible = [
     setReviewFieldOptions("series", inferred.series),
     setReviewFieldOptions("engine", inferred.engine),
@@ -901,6 +928,15 @@ function populateReviewSelects(vehicle = {}) {
     setReviewFieldOptions("style", inferred.style)
   ].some(Boolean);
   if (blackbookOptions) blackbookOptions.hidden = !visible;
+}
+
+function ownershipLabel(value) {
+  const key = {
+    Owned: "ownershipOwned",
+    Financed: "ownershipFinanced",
+    Leased: "ownershipLeased"
+  }[value];
+  return key ? t(key) : "-";
 }
 
 function setReviewFieldOptions(name, values) {

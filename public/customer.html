@@ -134,7 +134,7 @@
             <div class="mode-panel" data-panel="drilldown" hidden>
               <label>
                 <span data-i18n="yearLabel">Year</span>
-                <select name="year" required></select>
+                <select name="year"></select>
               </label>
               <label>
                 <span data-i18n="makeLabel">Make</span>
@@ -159,11 +159,11 @@
             <div class="split-row">
               <label>
                 <span data-i18n="postalLabel">Postal code</span>
-                <input name="postalCode" autocomplete="postal-code" required data-i18n-placeholder="postalPlaceholder" placeholder="A1A 1A1" />
+                <input name="postalCode" autocomplete="postal-code" data-i18n-placeholder="postalPlaceholder" placeholder="A1A 1A1" />
               </label>
               <label>
                 <span data-i18n="odometerLabel">Odometer</span>
-                <input name="kilometers" type="number" inputmode="numeric" min="501" required data-i18n-placeholder="odometerPlaceholder" placeholder="Kilometers" />
+                <input name="kilometers" type="number" inputmode="numeric" min="501" data-i18n-placeholder="odometerPlaceholder" placeholder="Kilometers" />
               </label>
             </div>
 
@@ -177,7 +177,7 @@
             <fieldset class="ownership-group">
               <legend data-i18n="ownershipLabel">Type of Ownership</legend>
               <label>
-                <input name="ownershipType" type="radio" value="Owned" required />
+                <input name="ownershipType" type="radio" value="Owned" />
                 <span data-i18n="ownershipOwned">Owned</span>
               </label>
               <label>
@@ -322,6 +322,30 @@
                 <dt data-i18n="modelLabel">Model</dt>
                 <dd id="review-model">-</dd>
               </div>
+              <div data-review-summary-row="series">
+                <dt data-i18n="seriesLabel">Series / Trim</dt>
+                <dd id="review-summary-series">-</dd>
+              </div>
+              <div data-review-summary-row="style">
+                <dt data-i18n="styleLabel">Style</dt>
+                <dd id="review-summary-style">-</dd>
+              </div>
+              <div data-review-summary-row="engine">
+                <dt data-i18n="engineLabel">Engine</dt>
+                <dd id="review-summary-engine">-</dd>
+              </div>
+              <div data-review-summary-row="drivetrain">
+                <dt data-i18n="drivetrainLabel">Drivetrain</dt>
+                <dd id="review-summary-drivetrain">-</dd>
+              </div>
+              <div data-review-summary-row="transmission">
+                <dt data-i18n="transmissionLabel">Transmission</dt>
+                <dd id="review-summary-transmission">-</dd>
+              </div>
+              <div>
+                <dt data-i18n="odometerLabel">Odometer</dt>
+                <dd id="review-kilometers">-</dd>
+              </div>
               <div>
                 <dt data-i18n="regionLabel">Region</dt>
                 <dd id="review-region">-</dd>
@@ -329,6 +353,10 @@
               <div>
                 <dt data-i18n="postalLabel">Postal code</dt>
                 <dd id="review-postal">-</dd>
+              </div>
+              <div>
+                <dt data-i18n="ownershipLabel">Type of Ownership</dt>
+                <dd id="review-ownership">-</dd>
               </div>
             </dl>
           </section>
