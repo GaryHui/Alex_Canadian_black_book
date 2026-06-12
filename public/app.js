@@ -81,6 +81,7 @@ let historyLeads = [];
 let pendingDealerLeadCapture = null;
 let currentLookupMode = "free";
 let dealerRefreshTimer = null;
+let dealerDirectoryEmails = [];
 
 initializeDatalists();
 initializeAuth();
@@ -908,6 +909,7 @@ async function setSession(session) {
     dealerAdminAllowed = true;
     authSubtitle.textContent = "Dealer access confirmed. Dealer tools are available.";
     disableDealerTools(false);
+    await loadDealerDirectory();
     loadUsage();
     loadHistory();
     loadDealerLeads({ forceActivity: true });
@@ -953,6 +955,22 @@ async function checkDealerAccess() {
     return response.json();
   } catch (error) {
     return { ok: false, error: error.message || "Unable to verify dealer access." };
+  }
+}
+
+async function loadDealerDirectory() {
+  dealerDirectoryEmails = [];
+  if (!authSession?.access_token) return;
+  try {
+    const response = await fetch("/api/dealer-directory", {
+      headers: {
+        Authorization: `Bearer ${authSession.access_token}`
+      }
+    });
+    const data = await response.json();
+    if (data.ok) dealerDirectoryEmails = Array.isArray(data.emails) ? data.emails : [];
+  } catch {
+    dealerDirectoryEmails = [];
   }
 }
 
@@ -1067,6 +1085,8 @@ function renderDealerLeads(leads, role) {
     const retailAvg = historyMarketAverage(valuation, "retail");
     const dealerWholesale = ownerAdjustment.wholesale ?? "";
     const dealerRetail = ownerAdjustment.retail ?? "";
+    const dealerEmailOptionsId = `dealer-email-options-${cssToken(lead.id || String(Math.random()))}`;
+    const dealerEmailOptions = dealerDirectoryEmails.map((email) => `<option value="${escapeHtml(email)}"></option>`).join("");
     const vehicleDetails = [
       ["Year", input.year || valuation.year || ""],
       ["Make", input.make || valuation.make || ""],
@@ -1095,7 +1115,7 @@ function renderDealerLeads(leads, role) {
           </div>
           <b class="dealer-status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
         </div>
-        <p class="dealer-update-notice" hidden>Updated by another team member. Open this lead to review the latest activity.</p>
+        <p class="dealer-update-notice" hidden>Task or follow-up activity changed. Open this lead to review the latest update.</p>
         <dl class="history-meta">
           <div><dt>Customer</dt><dd>${escapeHtml(customerEmail)}</dd></div>
           <div><dt>Phone</dt><dd>${escapeHtml(input.phone || "-")}</dd></div>
@@ -1138,7 +1158,8 @@ function renderDealerLeads(leads, role) {
           </form>
           <form class="dealer-task-form">
             <input name="title" placeholder="Next task" />
-            <input name="assignedTo" type="email" placeholder="Assign to email" />
+            <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to dealer email" />
+            <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
             <input name="dueAt" type="datetime-local" />
             <button type="submit">Add task</button>
           </form>
@@ -1209,7 +1230,7 @@ async function checkDealerLeadUpdates() {
     if (hasNewLead) {
       dealerLeadsStatus.textContent = "New assigned leads are available. Click Reload to view them.";
     } else if (updatedCount) {
-      dealerLeadsStatus.textContent = `${updatedCount} lead${updatedCount === 1 ? "" : "s"} updated. Open highlighted leads to review.`;
+      dealerLeadsStatus.textContent = `${updatedCount} lead${updatedCount === 1 ? "" : "s"} updated. Open highlighted leads to review task or follow-up changes.`;
     }
   } catch {
     // Background checks should not interrupt active follow-up work.

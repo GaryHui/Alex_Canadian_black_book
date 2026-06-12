@@ -147,6 +147,13 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (req.method === "GET" && url.pathname === "/api/dealer-directory") {
+      const dealer = await requireDealer(req);
+      if (!dealer.ok) return sendJson(res, dealer.status, { ok: false, error: dealer.error });
+      const result = await listDealerDirectory();
+      return sendJson(res, result.ok ? 200 : result.status || 500, result);
+    }
+
     if (req.method === "POST" && url.pathname === "/api/valuation") {
       const body = await readJson(req);
       const result = await fetchValuation(body);
@@ -1623,6 +1630,17 @@ async function listDealerStaff() {
 
   const byEmail = new Map([...envDealers, ...dbStaff].map((staff) => [staff.email, staff]));
   return { ok: true, storage: "supabase", staff: [...byEmail.values()].sort((a, b) => a.email.localeCompare(b.email)) };
+}
+
+async function listDealerDirectory() {
+  const staffResult = await listDealerStaff();
+  if (!staffResult.ok) return staffResult;
+  const emails = [...new Set((staffResult.staff || [])
+    .filter((staff) => staff.active !== false)
+    .map((staff) => String(staff.email || "").trim().toLowerCase())
+    .filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+  return { ok: true, emails };
 }
 
 async function accessRolesForDisplay({ url, key }) {
