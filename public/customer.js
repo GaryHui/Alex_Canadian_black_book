@@ -28,6 +28,12 @@ const customerAuthSubtitle = document.querySelector("#customer-auth-subtitle");
 const customerLoginButton = document.querySelector("#customer-login");
 const customerLogoutButton = document.querySelector("#customer-logout");
 const customerAuthActions = document.querySelector("#customer-auth-actions");
+const openCreateAccountButton = document.querySelector("#open-create-account");
+const openLoginButton = document.querySelector("#open-login");
+const emailAuthModal = document.querySelector("#email-auth-modal");
+const emailAuthModalTitle = document.querySelector("#email-auth-modal-title");
+const emailAuthClose = document.querySelector("#email-auth-close");
+const emailAuthBackdrop = document.querySelector("#email-auth-backdrop");
 const emailAuthForm = document.querySelector("#email-auth-form");
 const emailAuthTabs = [...document.querySelectorAll("[data-auth-mode]")];
 const emailAuthEmailWrap = document.querySelector("#email-auth-email-wrap");
@@ -187,12 +193,18 @@ const text = {
     vinSpotFourText: "If you cannot access the car, check your registration, insurance card, or bill of sale.",
     vinGuideNote: "Tip: most modern VINs are 17 characters and do not use the letters I, O, or Q.",
     authChecking: "Checking sign-in...",
-    authRequired: "Google sign-in is required before valuation.",
+    authRequired: "Sign in with Google or email before valuation.",
     authReady: "Signed in as",
     authReadyHelp: "Your email will be saved with the valuation for follow-up.",
-    authMissing: "Google sign-in is not configured yet.",
+    authMissing: "Customer sign-in is not configured yet.",
     authUnverified: "Please verify your email before generating a valuation.",
     loginButton: "Continue with Google",
+    createFreeAccount: "Create Free Account",
+    loginShort: "Login",
+    continueWith: "or continue with",
+    emailAuthModalTitle: "Create Account",
+    emailCreateModalTitle: "Create Account",
+    emailLoginModalTitle: "Login",
     emailSignInTab: "Email sign in",
     emailSignUpTab: "Create account",
     emailResetTab: "Forgot password",
@@ -378,12 +390,18 @@ const text = {
     vinSpotFourText: "Si vous n'avez pas accès au véhicule, vérifiez l'immatriculation, l'assurance ou l'acte de vente.",
     vinGuideNote: "Conseil : la plupart des NIV modernes comptent 17 caractères et n'utilisent pas les lettres I, O ou Q.",
     authChecking: "Vérification de la connexion...",
-    authRequired: "Une connexion Google est requise avant l'évaluation.",
+    authRequired: "Connectez-vous avec Google ou par courriel avant l'evaluation.",
     authReady: "Connecté avec",
     authReadyHelp: "Votre courriel sera enregistré avec l'évaluation pour le suivi.",
-    authMissing: "La connexion Google n'est pas encore configurée.",
+    authMissing: "La connexion client n'est pas encore configuree.",
     authUnverified: "Veuillez vérifier votre courriel avant de générer une évaluation.",
     loginButton: "Continuer avec Google",
+    createFreeAccount: "Creer un compte gratuit",
+    loginShort: "Connexion",
+    continueWith: "ou continuer avec",
+    emailAuthModalTitle: "Creer un compte",
+    emailCreateModalTitle: "Creer un compte",
+    emailLoginModalTitle: "Connexion",
     emailSignInTab: "Connexion courriel",
     emailSignUpTab: "Créer un compte",
     emailResetTab: "Mot de passe oublié",
@@ -554,11 +572,16 @@ function initialize() {
     if (event.key === "Escape") {
       closeModal();
       closeVinGuide();
+      closeEmailAuthModal();
     }
   });
   startOver.addEventListener("click", resetCustomerFlow);
   customerLoginButton.addEventListener("click", signInCustomer);
   customerLogoutButton.addEventListener("click", signOutCustomer);
+  openCreateAccountButton?.addEventListener("click", () => openEmailAuthModal("signup"));
+  openLoginButton?.addEventListener("click", () => openEmailAuthModal("signin"));
+  emailAuthClose?.addEventListener("click", closeEmailAuthModal);
+  emailAuthBackdrop?.addEventListener("click", closeEmailAuthModal);
   emailAuthTabs.forEach((button) => button.addEventListener("click", () => setEmailAuthMode(button.dataset.authMode || "signin")));
   emailAuthForm.addEventListener("submit", handleEmailAuthSubmit);
   reloadHistoryButton.addEventListener("click", loadHistory);
@@ -867,6 +890,20 @@ async function signOutCustomer() {
   resetCustomerFlow();
 }
 
+function openEmailAuthModal(mode = "signin") {
+  setEmailAuthMode(mode);
+  if (!emailAuthModal) return;
+  emailAuthModal.hidden = false;
+  document.body.classList.add("modal-open");
+  window.setTimeout(() => emailAuthEmail?.focus(), 0);
+}
+
+function closeEmailAuthModal() {
+  if (!emailAuthModal || emailAuthModal.hidden) return;
+  emailAuthModal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
 function setEmailAuthMode(mode) {
   emailAuthMode = mode || "signin";
   const isReset = emailAuthMode === "reset";
@@ -897,8 +934,23 @@ function setEmailAuthMode(mode) {
         : "emailSignInAction";
   emailAuthSubmit.textContent = t(actionKey);
   emailAuthSubmit.dataset.i18n = actionKey;
+  if (emailAuthModalTitle) {
+    const titleKey = isUpdate
+      ? "emailUpdateTitle"
+      : isSignup
+        ? "emailCreateModalTitle"
+        : isReset
+          ? "emailResetTab"
+          : "emailLoginModalTitle";
+    emailAuthModalTitle.textContent = t(titleKey);
+    emailAuthModalTitle.dataset.i18n = titleKey;
+  }
 
   if (isUpdate) {
+    if (emailAuthModal?.hidden) {
+      emailAuthModal.hidden = false;
+      document.body.classList.add("modal-open");
+    }
     customerAuthTitle.textContent = t("emailUpdateTitle");
     customerAuthSubtitle.textContent = t("emailUpdateHelp");
   }
@@ -932,6 +984,7 @@ function setCustomerSession(session) {
   }
 
   if (session?.user) {
+    closeEmailAuthModal();
     customerAuthTitle.textContent = `${t("authReady")} ${email}`;
     form.elements.email.value = email;
     form.elements.email.readOnly = true;

@@ -94,7 +94,8 @@ button {
 }
 
 .ghost-button,
-.primary-button {
+.primary-button,
+.secondary-button {
   border: 1px solid var(--blue);
   border-radius: 8px;
   min-height: 44px;
@@ -102,7 +103,8 @@ button {
   font-weight: 800;
 }
 
-.ghost-button {
+.ghost-button,
+.secondary-button {
   color: var(--blue-dark);
   background: #fff;
 }
@@ -271,14 +273,88 @@ h1 {
 
 .customer-auth-actions {
   grid-column: 1 / -1;
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   width: 100%;
 }
 
 .google-auth-button {
-  justify-self: start;
   min-width: 210px;
+  min-height: 44px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-weight: 900;
+}
+
+.email-auth-modal[hidden] {
+  display: none;
+}
+
+.email-auth-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.email-auth-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 20, 32, 0.58);
+  border: 0;
+}
+
+.email-auth-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 28px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(12, 20, 32, 0.28);
+}
+
+.email-auth-dialog h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.email-auth-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.email-auth-divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.email-auth-divider::before,
+.email-auth-divider::after {
+  content: "";
+  height: 1px;
+  background: var(--line);
 }
 
 .email-auth-tabs {

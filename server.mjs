@@ -77,7 +77,7 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, {
         supabaseUrl: process.env.SUPABASE_URL || "",
         supabaseAnonKey: process.env.SUPABASE_ANON_KEY || "",
-        siteUrl: process.env.PUBLIC_SITE_URL || "http://localhost:3000",
+        siteUrl: process.env.PUBLIC_SITE_URL || requestOrigin(req),
         turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || ""
       });
     }
@@ -282,6 +282,12 @@ function sendFile(res, filePath, contentType) {
 function sendJson(res, status, payload) {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
+}
+
+function requestOrigin(req) {
+  const proto = String(req.headers["x-forwarded-proto"] || "http").split(",")[0].trim();
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || `localhost:${PORT}`).split(",")[0].trim();
+  return `${proto}://${host}`;
 }
 
 function readJson(req) {
