@@ -726,17 +726,8 @@ async function initializeCustomerAuth() {
   }
 
   siteUrl = config.siteUrl || window.location.origin;
-  customerTurnstileGate = window.createTurnstileGate?.({
-    siteKey: config.turnstileSiteKey,
-    wrap: customerTurnstileWrap,
-    container: customerTurnstile,
-    statusEl: customerTurnstileStatus,
-    waitingText: t("verifyHuman"),
-    readyText: t("verifyHumanReady"),
-    failedText: t("verifyHumanFailed"),
-    lazy: true,
-    onVerified: completePendingHumanAction
-  }) || null;
+  customerTurnstileGate = null;
+  if (customerTurnstileWrap) customerTurnstileWrap.hidden = true;
   supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: {
       flowType: "pkce",
@@ -836,11 +827,7 @@ async function handleEmailAuthSubmit(event) {
 }
 
 async function runWithHumanVerification(action) {
-  if (!customerTurnstileGate || customerTurnstileGate.canProceed()) {
-    await action();
-    return;
-  }
-  pendingHumanAction = action;
+  await action();
 }
 
 async function completePendingHumanAction() {
