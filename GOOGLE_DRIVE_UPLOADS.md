@@ -288,6 +288,12 @@ const LEADS_HEADERS = [
   "Condition Notes",
   "Region",
   "Country",
+  "Average Dealer Purchase Price",
+  "Dealer Purchase Low",
+  "Dealer Purchase High",
+  "If You Prefer To Sell Yourself",
+  "Private Sale Low",
+  "Private Sale High",
   "Wholesale AVG",
   "Retail AVG",
   "Trade-In AVG",
@@ -352,6 +358,12 @@ function doPost(e) {
     data.conditionNotes || "",
     data.region || "",
     data.country || "",
+    data.dealerPurchaseRange || "",
+    data.dealerPurchaseLow || "",
+    data.dealerPurchaseHigh || "",
+    data.privateSaleRange || "",
+    data.privateSaleLow || "",
+    data.privateSaleHigh || "",
     data.wholesaleAvg || "",
     data.retailAvg || "",
     data.tradeInAvg || "",
@@ -421,23 +433,38 @@ function createVehiclePdf_(data, receivedAt, leadFolder, savedFiles) {
   const doc = DocumentApp.create(summaryFileName_(data, "doc"));
   const body = doc.getBody();
 
-  body.appendParagraph("Vehicle Valuation Summary").setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  body.appendParagraph("Market View Summary").setHeading(DocumentApp.ParagraphHeading.HEADING1);
   body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING2);
-  body.appendParagraph("Received At: " + receivedAt);
-  body.appendParagraph("Customer Email: " + (data.email || data.authEmail || ""));
-  body.appendParagraph("Phone: " + (data.phone || ""));
-  body.appendParagraph("VIN: " + (data.vin || ""));
-  body.appendParagraph("UVC: " + (data.uvc || ""));
-  body.appendParagraph("Vehicle: " + title);
-  body.appendParagraph("Kilometers: " + (data.kilometers || ""));
-  body.appendParagraph("Ownership Type: " + (data.ownershipType || ""));
-  body.appendParagraph("Color: " + (data.color || ""));
-  body.appendParagraph("Region: " + (data.region || ""));
-  body.appendParagraph("Country: " + (data.country || ""));
-  body.appendParagraph("Wholesale AVG: " + (data.wholesaleAvg || ""));
-  body.appendParagraph("Retail AVG: " + (data.retailAvg || ""));
-  body.appendParagraph("Trade-In AVG: " + (data.tradeInAvg || ""));
-  body.appendParagraph("Condition Notes: " + (data.conditionNotes || ""));
+  body.appendParagraph([
+    data.kilometers ? data.kilometers + " km" : "",
+    data.region || "",
+    data.color ? "Color: " + data.color : ""
+  ].filter(Boolean).join(" | "));
+
+  body.appendParagraph("Estimated Value").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  addPdfRow_(body, "Average Dealer Purchase Price", data.dealerPurchaseRange || "");
+  addPdfRow_(body, "Dealer Purchase Average", data.wholesaleAvg || "");
+  addPdfRow_(body, "If You Prefer To Sell Yourself", data.privateSaleRange || "");
+  addPdfRow_(body, "Private Sale Average", data.retailAvg || "");
+
+  body.appendParagraph("Vehicle Details").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  addPdfRow_(body, "VIN", data.vin || "");
+  addPdfRow_(body, "UVC", data.uvc || "");
+  addPdfRow_(body, "Year", data.year || "");
+  addPdfRow_(body, "Make", data.make || "");
+  addPdfRow_(body, "Model", data.model || "");
+  addPdfRow_(body, "Series / Trim", data.series || "");
+  addPdfRow_(body, "Style", data.style || "");
+  addPdfRow_(body, "Kilometers", data.kilometers || "");
+  addPdfRow_(body, "Ownership Type", data.ownershipType || "");
+  addPdfRow_(body, "Region", data.region || "");
+  addPdfRow_(body, "Country", data.country || "");
+
+  body.appendParagraph("Customer And Follow-Up").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  addPdfRow_(body, "Received At", receivedAt);
+  addPdfRow_(body, "Customer Email", data.email || data.authEmail || "");
+  addPdfRow_(body, "Phone", data.phone || "");
+  addPdfRow_(body, "Condition Notes", data.conditionNotes || "");
 
   if (savedFiles.length) {
     body.appendParagraph("Uploaded Photos").setHeading(DocumentApp.ParagraphHeading.HEADING2);
@@ -483,6 +510,12 @@ function createVehicleSpreadsheet_(data, receivedAt, leadFolder, savedFiles, pdf
     ["Color", data.color || ""],
     ["Region", data.region || ""],
     ["Country", data.country || ""],
+    ["Average Dealer Purchase Price", data.dealerPurchaseRange || ""],
+    ["Dealer Purchase Low", data.dealerPurchaseLow || ""],
+    ["Dealer Purchase High", data.dealerPurchaseHigh || ""],
+    ["If You Prefer To Sell Yourself", data.privateSaleRange || ""],
+    ["Private Sale Low", data.privateSaleLow || ""],
+    ["Private Sale High", data.privateSaleHigh || ""],
     ["Wholesale AVG", data.wholesaleAvg || ""],
     ["Retail AVG", data.retailAvg || ""],
     ["Trade-In AVG", data.tradeInAvg || ""],
@@ -507,6 +540,10 @@ function createVehicleSpreadsheet_(data, receivedAt, leadFolder, savedFiles, pdf
     // If Drive root removal is unavailable, the file still exists in the lead folder.
   }
   return spreadsheetFile;
+}
+
+function addPdfRow_(body, label, value) {
+  body.appendParagraph(label + ": " + (value || ""));
 }
 
 function scaleImage_(image, maxWidth) {

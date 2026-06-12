@@ -803,6 +803,12 @@ function leadExportValues(lead) {
     photoNames: Array.isArray(input.photoNames) ? input.photoNames.join(", ") : "",
     region: valuation.region || input.region || "",
     country: valuation.country || input.country || "",
+    dealerPurchaseLow: marketRange(valuation, "wholesale").min,
+    dealerPurchaseHigh: marketRange(valuation, "wholesale").max,
+    dealerPurchaseRange: marketRange(valuation, "wholesale").label,
+    privateSaleLow: marketRange(valuation, "retail").min,
+    privateSaleHigh: marketRange(valuation, "retail").max,
+    privateSaleRange: marketRange(valuation, "retail").label,
     wholesaleAvg: marketAverage(valuation, "wholesale"),
     retailAvg: marketAverage(valuation, "retail"),
     tradeInAvg: marketAverage(valuation, "tradeIn"),
@@ -815,8 +821,29 @@ function leadExportValues(lead) {
 
 function marketAverage(valuation, market) {
   const marketData = valuation?.values?.[market] || {};
-  const value = marketData.adjusted?.avg ?? marketData.base?.avg ?? "";
-  return value === null || value === undefined ? "" : value;
+  return positiveNumber(marketData.adjusted?.avg) ?? positiveNumber(marketData.base?.avg) ?? "";
+}
+
+function marketRange(valuation, market) {
+  const marketData = valuation?.values?.[market] || {};
+  const row = marketData.adjusted || marketData.base || {};
+  const numbers = ["rough", "avg", "clean", "xclean"]
+    .map((key) => row[key])
+    .map(positiveNumber)
+    .filter((value) => value !== null);
+  if (!numbers.length) return { min: "", max: "", label: "" };
+  const min = Math.min(...numbers);
+  const max = Math.max(...numbers);
+  return {
+    min,
+    max,
+    label: min === max ? String(min) : `${min} - ${max}`
+  };
+}
+
+function positiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
 }
 
 async function listLeads() {
