@@ -29,6 +29,7 @@ const dealerLeadsStatus = document.querySelector("#dealer-leads-status");
 const dealerLeadsList = document.querySelector("#dealer-leads-list");
 const reloadDealerLeadsButton = document.querySelector("#reload-dealer-leads");
 const saveValuationLeadButton = document.querySelector("#save-valuation-lead");
+const DEALER_REFRESH_MS = 30000;
 const drilldownSuggestions = {
   Honda: {
     models: ["Accord", "Civic", "CR-V", "HR-V", "Odyssey", "Pilot", "Ridgeline"],
@@ -79,12 +80,16 @@ let drilldownRequestId = 0;
 let historyLeads = [];
 let pendingDealerLeadCapture = null;
 let currentLookupMode = "free";
+let dealerRefreshTimer = null;
 
 initializeDatalists();
 initializeAuth();
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && authSession && dealerAdminAllowed) refreshOpenDealerTasks();
+});
 
 reloadHistoryButton.addEventListener("click", loadHistory);
-reloadDealerLeadsButton?.addEventListener("click", loadDealerLeads);
+reloadDealerLeadsButton?.addEventListener("click", () => loadDealerLeads({ forceActivity: true }));
 saveValuationLeadButton?.addEventListener("click", savePendingDealerLead);
 setLookupMode("free", { openModal: false });
 
@@ -873,6 +878,7 @@ async function setSession(session) {
   authSession = session;
   const emailField = form.elements.email;
   dealerAdminAllowed = false;
+  stopDealerAutoRefresh();
 
   if (session?.user) {
     const email = session.user.email || "";
@@ -895,7 +901,8 @@ async function setSession(session) {
     disableDealerTools(false);
     loadUsage();
     loadHistory();
-    loadDealerLeads();
+    loadDealerLeads({ forceActivity: true });
+    startDealerAutoRefresh();
   } else {
     if (supabaseClient) {
       window.location.replace("/login.html?next=/dealer.html");
@@ -1004,7 +1011,7 @@ async function loadHistory() {
   }
 }
 
-async function loadDealerLeads() {
+async function loadDealerLeads(options = {}) {
   if (!authSession?.access_token || !dealerWorkbench) return;
 
   dealerWorkbench.hidden = false;
@@ -1020,7 +1027,7 @@ async function loadDealerLeads() {
     if (!data.ok) throw new Error(data.error || "Unable to load assigned leads");
 
     renderDealerLeads(data.leads || [], data.role || "dealer");
-    await loadVisibleDealerActivities();
+    await loadVisibleDealerActivities({ force: Boolean(options.forceActivity) });
   } catch (error) {
     dealerLeadsStatus.textContent = error.message || "Unable to load assigned leads";
     dealerLeadsList.innerHTML = "";
@@ -1130,9 +1137,29 @@ function renderDealerLeads(leads, role) {
   }).join("");
 }
 
-async function loadVisibleDealerActivities() {
+function startDealerAutoRefresh() {
+  stopDealerAutoRefresh();
+  dealerRefreshTimer = window.setInterval(refreshOpenDealerTasks, DEALER_REFRESH_MS);
+}
+
+function stopDealerAutoRefresh() {
+  if (dealerRefreshTimer) window.clearInterval(dealerRefreshTimer);
+  dealerRefreshTimer = null;
+}
+
+async function refreshOpenDealerTasks() {
+  if (!authSession?.access_token || !dealerAdminAllowed || document.hidden || isEditingDealerLeads()) return;
+  await loadDealerLeads({ forceActivity: true });
+}
+
+function isEditingDealerLeads() {
+  const active = document.activeElement;
+  return Boolean(active && dealerLeadsList?.contains(active) && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(active.tagName));
+}
+
+async function loadVisibleDealerActivities(options = {}) {
   const cards = [...dealerLeadsList.querySelectorAll(".dealer-lead-card")];
-  await Promise.all(cards.map((card) => loadDealerActivity(card)));
+  await Promise.all(cards.map((card) => loadDealerActivity(card, { force: Boolean(options.force) })));
 }
 
 async function loadDealerActivity(card, options = {}) {

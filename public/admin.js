@@ -16,14 +16,16 @@ const adminContent = document.querySelector("#admin-content");
 const adminTurnstileWrap = document.querySelector("#admin-turnstile-wrap");
 const adminTurnstile = document.querySelector("#admin-turnstile");
 const adminTurnstileStatus = document.querySelector("#admin-turnstile-status");
+const AUTO_REFRESH_MS = 30000;
 
 let supabaseClient = null;
 let adminSession = null;
 let adminTurnstileGate = null;
 let clearLeadsConfirmEl = null;
+let adminRefreshTimer = null;
 
 reloadUsersButton.addEventListener("click", loadUsers);
-reloadLeadsButton.addEventListener("click", loadLeads);
+reloadLeadsButton.addEventListener("click", () => loadLeads({ forceOpenActivity: true }));
 reloadDealersButton.addEventListener("click", loadDealers);
 clearLeadsButton?.addEventListener("click", clearAllLeads);
 dealerStaffForm.addEventListener("submit", addDealer);
@@ -31,6 +33,9 @@ adminLoginButton.addEventListener("click", signInAdmin);
 adminLogoutButton.addEventListener("click", signOutAdmin);
 
 initializeAdminAuth();
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && adminSession) refreshOpenAdminTasks();
+});
 
 async function initializeAdminAuth() {
   const config = await fetch("/api/config").then((res) => res.json()).catch(() => ({}));
@@ -95,6 +100,7 @@ async function setAdminSession(session) {
   }
 
   if (!session?.user) {
+    stopAdminAutoRefresh();
     adminAuthStatus.textContent = "Admin Google sign-in required.";
     statusEl.textContent = "";
     usersStatusEl.textContent = "";
@@ -107,6 +113,7 @@ async function setAdminSession(session) {
 
   const admin = await checkAdminAccess();
   if (!admin.ok) {
+    stopAdminAutoRefresh();
     adminContent.hidden = true;
     adminAuthStatus.textContent = admin.error || `This Google account is not an admin: ${session.user.email}`;
     statusEl.textContent = "Ask the site owner to add this email to ADMIN_EMAILS in Vercel.";
@@ -120,6 +127,7 @@ async function setAdminSession(session) {
 
   adminAuthStatus.textContent = `Signed in as ${session.user.email}`;
   await Promise.all([loadLeads(), loadUsers(), loadDealers()]);
+  startAdminAutoRefresh();
 }
 
 async function checkAdminAccess() {
@@ -242,8 +250,9 @@ function renderUser(user) {
   `;
 }
 
-async function loadLeads() {
+async function loadLeads(options = {}) {
   if (!adminSession) return;
+  const openIds = getOpenLeadIds();
   const response = await fetch("/api/leads", { headers: authHeaders() });
   const data = await response.json();
 
@@ -259,6 +268,45 @@ async function loadLeads() {
   }
 
   leadsEl.innerHTML = data.leads.map(renderLead).join("") || "<p>No leads yet.</p>";
+  await restoreOpenLeads(openIds, { forceActivity: Boolean(options.forceOpenActivity) });
+}
+
+function startAdminAutoRefresh() {
+  stopAdminAutoRefresh();
+  adminRefreshTimer = window.setInterval(refreshOpenAdminTasks, AUTO_REFRESH_MS);
+}
+
+function stopAdminAutoRefresh() {
+  if (adminRefreshTimer) window.clearInterval(adminRefreshTimer);
+  adminRefreshTimer = null;
+}
+
+async function refreshOpenAdminTasks() {
+  if (!adminSession || document.hidden || isEditingLeads()) return;
+  await loadLeads({ forceOpenActivity: true });
+}
+
+function isEditingLeads() {
+  const active = document.activeElement;
+  return Boolean(active && leadsEl.contains(active) && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(active.tagName));
+}
+
+function getOpenLeadIds() {
+  return [...leadsEl.querySelectorAll(".lead-card")]
+    .filter((card) => card.querySelector(".lead-manage")?.open)
+    .map((card) => card.dataset.id)
+    .filter(Boolean);
+}
+
+async function restoreOpenLeads(openIds, options = {}) {
+  if (!openIds.length) return;
+  const openSet = new Set(openIds);
+  const cards = [...leadsEl.querySelectorAll(".lead-card")].filter((card) => openSet.has(card.dataset.id));
+  for (const card of cards) {
+    const details = card.querySelector(".lead-manage");
+    if (details) details.open = true;
+  }
+  await Promise.all(cards.map((card) => loadLeadActivity(card, { force: Boolean(options.forceActivity) })));
 }
 
 function renderLead(lead) {
