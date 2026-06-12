@@ -1334,6 +1334,21 @@ select {
   gap: 12px;
 }
 
+.dealer-lead-updated {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.16);
+}
+
+.dealer-update-notice {
+  margin: 0;
+  padding: 10px 12px;
+  color: #854d0e;
+  background: #fef3c7;
+  border: 1px solid #facc15;
+  border-radius: 6px;
+  font-weight: 800;
+}
+
 .dealer-lead-top {
   align-items: flex-start;
   display: flex;
@@ -1404,6 +1419,23 @@ select {
   border-top: 1px solid #e8edf3;
   margin-top: 4px;
   padding-top: 12px;
+}
+
+.dealer-lead-details {
+  border-top: 1px solid #e8edf3;
+  margin-top: 4px;
+  padding-top: 10px;
+}
+
+.dealer-lead-details > summary {
+  color: var(--blue);
+  cursor: pointer;
+  font-weight: 900;
+  margin-bottom: 10px;
+}
+
+.dealer-lead-details[open] > summary {
+  margin-bottom: 14px;
 }
 
 .dealer-info-block summary {

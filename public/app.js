@@ -162,6 +162,15 @@ dealerLeadsList?.addEventListener("click", async (event) => {
   await loadDealerActivity(button.closest(".dealer-lead-card"), { force: true });
 });
 
+dealerLeadsList?.addEventListener("toggle", async (event) => {
+  const details = event.target.closest(".dealer-lead-details");
+  if (!details || !details.open) return;
+  const card = details.closest(".dealer-lead-card");
+  if (!card) return;
+  clearDealerLeadUpdateNotice(card);
+  await loadDealerActivity(card);
+}, true);
+
 logoutButton.addEventListener("click", async () => {
   if (supabaseClient) await supabaseClient.auth.signOut();
   setSession(null);
@@ -1027,7 +1036,6 @@ async function loadDealerLeads(options = {}) {
     if (!data.ok) throw new Error(data.error || "Unable to load assigned leads");
 
     renderDealerLeads(data.leads || [], data.role || "dealer");
-    await loadVisibleDealerActivities({ force: Boolean(options.forceActivity) });
   } catch (error) {
     dealerLeadsStatus.textContent = error.message || "Unable to load assigned leads";
     dealerLeadsList.innerHTML = "";
@@ -1076,8 +1084,10 @@ function renderDealerLeads(leads, role) {
       ["CBB retail AVG", retailAvg ? `$${formatNumber(retailAvg)}` : ""]
     ].filter(([, value]) => value !== "" && value !== null && value !== undefined);
 
+    const updateToken = dealerLeadUpdateToken(lead);
+
     return `
-      <article class="history-card dealer-lead-card ${overdue ? "lead-overdue" : ""}" data-lead-id="${escapeHtml(lead.id || "")}">
+      <article class="history-card dealer-lead-card ${overdue ? "lead-overdue" : ""}" data-lead-id="${escapeHtml(lead.id || "")}" data-update-token="${escapeHtml(updateToken)}">
         <div class="dealer-lead-top">
           <div>
             <strong>${escapeHtml(title)}</strong>
@@ -1085,6 +1095,7 @@ function renderDealerLeads(leads, role) {
           </div>
           <b class="dealer-status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
         </div>
+        <p class="dealer-update-notice" hidden>Updated by another team member. Open this lead to review the latest activity.</p>
         <dl class="history-meta">
           <div><dt>Customer</dt><dd>${escapeHtml(customerEmail)}</dd></div>
           <div><dt>Phone</dt><dd>${escapeHtml(input.phone || "-")}</dd></div>
@@ -1093,45 +1104,48 @@ function renderDealerLeads(leads, role) {
           <div><dt>Priority</dt><dd>${escapeHtml(lead.priority || "normal")}</dd></div>
           <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "-")}</dd></div>
         </dl>
-        <details class="dealer-info-block" open>
-          <summary>Vehicle details</summary>
-          <dl class="history-meta dealer-detail-grid">
-            ${vehicleDetails.map(([label, value]) => `
-              <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>
-            `).join("")}
-          </dl>
+        <details class="dealer-lead-details">
+          <summary>Open lead details, tasks, and activity</summary>
+          <section class="dealer-info-block">
+            <h3>Vehicle details</h3>
+            <dl class="history-meta dealer-detail-grid">
+              ${vehicleDetails.map(([label, value]) => `
+                <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>
+              `).join("")}
+            </dl>
+          </section>
+          <section class="dealer-review-summary">
+            <h3>Owner review from admin</h3>
+            <dl class="history-meta">
+              <div><dt>Owner wholesale</dt><dd>${dealerWholesale !== "" && dealerWholesale !== null ? `$${escapeHtml(formatNumber(dealerWholesale))}` : "-"}</dd></div>
+              <div><dt>Owner retail</dt><dd>${dealerRetail !== "" && dealerRetail !== null ? `$${escapeHtml(formatNumber(dealerRetail))}` : "-"}</dd></div>
+              <div><dt>Reason</dt><dd>${escapeHtml(ownerAdjustment.reason || "-")}</dd></div>
+            </dl>
+            ${lead.notes ? `<div class="dealer-admin-notes"><strong>Admin notes</strong><p>${escapeHtml(lead.notes)}</p></div>` : ""}
+          </section>
+          ${overdue ? `<p class="status overdue-text">Overdue follow-up</p>` : ""}
+          <form class="dealer-note-form">
+            <select name="noteType">
+              <option value="call">Call</option>
+              <option value="email">Email</option>
+              <option value="sms">SMS</option>
+              <option value="inspection">Inspection</option>
+              <option value="offer">Offer</option>
+              <option value="internal">Internal note</option>
+            </select>
+            <textarea name="note" placeholder="Record customer communication, inspection result, or quote detail..."></textarea>
+            <button type="submit">Add note</button>
+          </form>
+          <form class="dealer-task-form">
+            <input name="title" placeholder="Next task" />
+            <input name="assignedTo" type="email" placeholder="Assign to email" />
+            <input name="dueAt" type="datetime-local" />
+            <button type="submit">Add task</button>
+          </form>
+          <div class="dealer-activity-list">
+            <button type="button" data-load-dealer-activity>Refresh activity</button>
+          </div>
         </details>
-        <section class="dealer-review-summary">
-          <h3>Owner review from admin</h3>
-          <dl class="history-meta">
-            <div><dt>Owner wholesale</dt><dd>${dealerWholesale !== "" && dealerWholesale !== null ? `$${escapeHtml(formatNumber(dealerWholesale))}` : "-"}</dd></div>
-            <div><dt>Owner retail</dt><dd>${dealerRetail !== "" && dealerRetail !== null ? `$${escapeHtml(formatNumber(dealerRetail))}` : "-"}</dd></div>
-            <div><dt>Reason</dt><dd>${escapeHtml(ownerAdjustment.reason || "-")}</dd></div>
-          </dl>
-          ${lead.notes ? `<div class="dealer-admin-notes"><strong>Admin notes</strong><p>${escapeHtml(lead.notes)}</p></div>` : ""}
-        </section>
-        ${overdue ? `<p class="status overdue-text">Overdue follow-up</p>` : ""}
-        <form class="dealer-note-form">
-          <select name="noteType">
-            <option value="call">Call</option>
-            <option value="email">Email</option>
-            <option value="sms">SMS</option>
-            <option value="inspection">Inspection</option>
-            <option value="offer">Offer</option>
-            <option value="internal">Internal note</option>
-          </select>
-          <textarea name="note" placeholder="Record customer communication, inspection result, or quote detail..."></textarea>
-          <button type="submit">Add note</button>
-        </form>
-        <form class="dealer-task-form">
-          <input name="title" placeholder="Next task" />
-          <input name="assignedTo" type="email" placeholder="Assign to email" />
-          <input name="dueAt" type="datetime-local" />
-          <button type="submit">Add task</button>
-        </form>
-        <div class="dealer-activity-list">
-          <button type="button" data-load-dealer-activity>Refresh activity</button>
-        </div>
       </article>
     `;
   }).join("");
@@ -1149,7 +1163,7 @@ function stopDealerAutoRefresh() {
 
 async function refreshOpenDealerTasks() {
   if (!authSession?.access_token || !dealerAdminAllowed || document.hidden || isEditingDealerLeads()) return;
-  await loadDealerLeads({ forceActivity: true });
+  await checkDealerLeadUpdates();
 }
 
 function isEditingDealerLeads() {
@@ -1160,6 +1174,76 @@ function isEditingDealerLeads() {
 async function loadVisibleDealerActivities(options = {}) {
   const cards = [...dealerLeadsList.querySelectorAll(".dealer-lead-card")];
   await Promise.all(cards.map((card) => loadDealerActivity(card, { force: Boolean(options.force) })));
+}
+
+async function checkDealerLeadUpdates() {
+  const cardsById = new Map([...dealerLeadsList.querySelectorAll(".dealer-lead-card")]
+    .map((card) => [card.dataset.leadId, card])
+    .filter(([id]) => Boolean(id)));
+  if (!cardsById.size) return;
+
+  try {
+    const response = await fetch("/api/dealer-leads", {
+      headers: {
+        Authorization: `Bearer ${authSession.access_token}`
+      }
+    });
+    const data = await response.json();
+    if (!data.ok) return;
+    let updatedCount = 0;
+    let hasNewLead = false;
+    for (const lead of data.leads || []) {
+      const id = String(lead.id || "");
+      const card = cardsById.get(id);
+      if (!card) {
+        hasNewLead = true;
+        continue;
+      }
+      const nextToken = dealerLeadUpdateToken(lead);
+      if (nextToken && card.dataset.updateToken && nextToken !== card.dataset.updateToken) {
+        card.dataset.pendingUpdateToken = nextToken;
+        showDealerLeadUpdateNotice(card);
+        updatedCount += 1;
+      }
+    }
+    if (hasNewLead) {
+      dealerLeadsStatus.textContent = "New assigned leads are available. Click Reload to view them.";
+    } else if (updatedCount) {
+      dealerLeadsStatus.textContent = `${updatedCount} lead${updatedCount === 1 ? "" : "s"} updated. Open highlighted leads to review.`;
+    }
+  } catch {
+    // Background checks should not interrupt active follow-up work.
+  }
+}
+
+function dealerLeadUpdateToken(lead = {}) {
+  return [
+    lead.updated_at || "",
+    lead.last_activity_at || "",
+    lead.status || "",
+    lead.assigned_to || "",
+    lead.priority || "",
+    lead.next_follow_up_at || "",
+    JSON.stringify(lead.owner_adjustment || {}),
+    lead.notes || ""
+  ].join("|");
+}
+
+function showDealerLeadUpdateNotice(card) {
+  card.classList.add("dealer-lead-updated");
+  const notice = card.querySelector(".dealer-update-notice");
+  if (notice) notice.hidden = false;
+}
+
+function clearDealerLeadUpdateNotice(card) {
+  card.classList.remove("dealer-lead-updated");
+  card.dataset.activityLoaded = "false";
+  if (card.dataset.pendingUpdateToken) {
+    card.dataset.updateToken = card.dataset.pendingUpdateToken;
+    delete card.dataset.pendingUpdateToken;
+  }
+  const notice = card.querySelector(".dealer-update-notice");
+  if (notice) notice.hidden = true;
 }
 
 async function loadDealerActivity(card, options = {}) {
