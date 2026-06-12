@@ -21,8 +21,8 @@ const languageToggle = document.querySelector("#language-toggle");
 const postalHelp = document.querySelector("#postal-help");
 const modal = document.querySelector("#modal");
 const startOver = document.querySelector("#start-over");
-const makeList = document.querySelector("#make-list");
-const modelList = document.querySelector("#model-list");
+const makeSelect = form.elements.make;
+const modelSelect = form.elements.model;
 const vinHelpButton = document.querySelector("#vin-help");
 const vinGuide = document.querySelector("#vin-guide");
 const vinGuideClose = document.querySelector("#vin-guide-close");
@@ -432,7 +432,8 @@ let usageState = null;
 let historyLeads = [];
 let siteUrl = window.location.origin;
 let customerTurnstileGate = null;
-let drilldownRequestId = 0;
+let makeRequestId = 0;
+let modelRequestId = 0;
 
 const MAX_PHOTO_COUNT = 6;
 const MAX_PHOTO_EDGE = 1400;
@@ -442,8 +443,9 @@ initialize();
 
 function initialize() {
   populateYears();
-  populateDatalist(makeList, commonMakes);
-  syncModelList();
+  populateSelectOptions(makeSelect, commonMakes, t("makePlaceholder"));
+  loadMakesForYear({ preserveMake: true });
+  syncModelList({ preserveModel: true });
   setLanguage(language);
   updateMode();
 
@@ -459,21 +461,10 @@ function initialize() {
   });
   photoInputs.forEach((input) => input.addEventListener("change", renderPhotoPreview));
   form.elements.mode.forEach((item) => item.addEventListener("change", updateMode));
-  form.elements.make.addEventListener("input", syncModelList);
-  form.elements.year.addEventListener("change", syncModelList);
-  [form.elements.make, form.elements.model].forEach((field) => {
-    const openPicker = () => {
-      field.select();
-      if (typeof field.showPicker === "function") {
-        try {
-          field.showPicker();
-        } catch {
-          // Some browsers only allow showPicker during direct user gestures.
-        }
-      }
-    };
-    field.addEventListener("focus", openPicker);
-    field.addEventListener("click", openPicker);
+  form.elements.make.addEventListener("change", () => syncModelList({ preserveModel: false }));
+  form.elements.year.addEventListener("change", () => {
+    loadMakesForYear({ preserveMake: false });
+    syncModelList({ preserveModel: false });
   });
   languageToggle.addEventListener("click", () => setLanguage(language === "en" ? "fr" : "en"));
   vinHelpButton.addEventListener("click", () => {
@@ -515,24 +506,88 @@ function populateDatalist(list, values) {
   }));
 }
 
-async function syncModelList() {
+function populateSelectOptions(select, values, placeholder, selectedValue = "") {
+  if (!select) return;
+  const uniqueValues = [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))];
+  const placeholderOption = document.createElement("option");
+  placeholderOption.value = "";
+  placeholderOption.textContent = placeholder;
+  placeholderOption.disabled = true;
+  placeholderOption.selected = !selectedValue;
+  const options = uniqueValues.map((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    option.selected = sameText(value, selectedValue);
+    return option;
+  });
+  select.replaceChildren(placeholderOption, ...options);
+  select.disabled = uniqueValues.length === 0;
+}
+
+async function loadMakesForYear({ preserveMake = true } = {}) {
+  const year = form.elements.year.value.trim();
+  const currentMake = form.elements.make.value.trim();
+  populateSelectOptions(makeSelect, commonMakes, t("makePlaceholder"), preserveMake ? currentMake : "");
+  if (!preserveMake) {
+    form.elements.make.value = "";
+    form.elements.model.value = "";
+    populateSelectOptions(modelSelect, [], t("modelPlaceholder"));
+  }
+  if (!year) return;
+
+  const requestId = ++makeRequestId;
+  try {
+    const query = new URLSearchParams({ year, country: "C" });
+    const response = await fetch(`/api/drilldown?${query.toString()}`);
+    const data = await response.json();
+    if (requestId !== makeRequestId || !data.ok) return;
+    if (Array.isArray(data.makes) && data.makes.length) {
+      const liveMake = form.elements.make.value.trim();
+      const candidateMake = preserveMake ? currentMake : liveMake;
+      const selectedMake = hasDatalistValue(data.makes, candidateMake) ? candidateMake : "";
+      populateSelectOptions(makeSelect, data.makes, t("makePlaceholder"), selectedMake);
+      if (preserveMake && currentMake && !hasDatalistValue(data.makes, currentMake)) {
+        form.elements.make.value = "";
+        form.elements.model.value = "";
+        populateSelectOptions(modelSelect, [], t("modelPlaceholder"));
+      }
+    }
+  } catch (error) {
+    console.warn("Unable to load Black Book make list", error);
+  }
+}
+
+async function syncModelList({ preserveModel = false } = {}) {
   const make = form.elements.make.value.trim();
   const year = form.elements.year.value.trim();
-  populateDatalist(modelList, commonModels[make] || []);
+  const currentModel = form.elements.model.value.trim();
+  if (!preserveModel) form.elements.model.value = "";
+  populateSelectOptions(modelSelect, commonModels[make] || [], t("modelPlaceholder"), preserveModel ? currentModel : "");
   if (!year || !make) return;
 
-  const requestId = ++drilldownRequestId;
+  const requestId = ++modelRequestId;
   try {
     const query = new URLSearchParams({ year, make, country: "C" });
     const response = await fetch(`/api/drilldown?${query.toString()}`);
     const data = await response.json();
-    if (requestId !== drilldownRequestId || !data.ok) return;
+    if (requestId !== modelRequestId || !data.ok) return;
     if (Array.isArray(data.models) && data.models.length) {
-      populateDatalist(modelList, data.models);
+      const selectedModel = preserveModel && hasDatalistValue(data.models, currentModel) ? currentModel : "";
+      populateSelectOptions(modelSelect, data.models, t("modelPlaceholder"), selectedModel);
     }
   } catch (error) {
     console.warn("Unable to load Black Book model list", error);
   }
+}
+
+function hasDatalistValue(values = [], target = "") {
+  const normalizedTarget = target.trim().toLowerCase();
+  return values.some((value) => String(value || "").trim().toLowerCase() === normalizedTarget);
+}
+
+function sameText(a, b) {
+  return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 }
 
 async function initializeCustomerAuth() {
@@ -646,8 +701,15 @@ function setLanguage(nextLanguage) {
     const key = node.dataset.i18nPlaceholder;
     if (text[language][key]) node.placeholder = text[language][key];
   });
+  updateSelectPlaceholder(makeSelect, t("makePlaceholder"));
+  updateSelectPlaceholder(modelSelect, t("modelPlaceholder"));
 
   setCustomerSession(authSession);
+}
+
+function updateSelectPlaceholder(select, label) {
+  const option = select?.querySelector("option[value='']");
+  if (option) option.textContent = label;
 }
 
 function updateMode() {
