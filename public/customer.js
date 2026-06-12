@@ -7,10 +7,6 @@ const reviewForm = document.querySelector("#review-form");
 const changeVehicleButton = document.querySelector("#change-vehicle");
 const photoInputs = [...document.querySelectorAll("[data-photo-role]")];
 const blackbookOptions = document.querySelector("#blackbook-options");
-const basePreview = document.querySelector("#base-preview");
-const basePreviewStatus = document.querySelector("#base-preview-status");
-const baseWholesaleValue = document.querySelector("#base-wholesale-value");
-const baseRetailValue = document.querySelector("#base-retail-value");
 const resultSection = document.querySelector("#result-section");
 const resultTitle = document.querySelector("#result-title");
 const resultMeta = document.querySelector("#result-meta");
@@ -220,11 +216,6 @@ const text = {
     reviewSummary: "Vehicle data",
     blackbookOptionsTitle: "Black Book options",
     additionalDetailsTitle: "Additional details",
-    basePreviewEyebrow: "Base estimate",
-    basePreviewTitle: "Initial value using province and odometer",
-    basePreviewLoading: "Checking the first estimate...",
-    basePreviewReady: "This preview is not saved and does not use a free valuation.",
-    basePreviewUnavailable: "Initial estimate is not available yet. You can still continue.",
     editVehicle: "Edit",
     goBack: "Go Back",
     changeVehicle: "Change vehicle",
@@ -880,54 +871,9 @@ function renderVehicleReview(vehicle, input) {
   setText("#review-postal", input.postalCode || "-");
   populateReviewSelects(vehicle);
   populateColorOptions(input.color || vehicle.color || "");
-  resetBasePreview();
-  void loadBaseEstimatePreview(vehicle, input);
 
   statusEl.textContent = t("vehicleReady");
   vehicleReviewSection.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-function resetBasePreview() {
-  if (!basePreview) return;
-  basePreview.hidden = true;
-  basePreviewStatus.textContent = t("basePreviewLoading");
-  baseWholesaleValue.textContent = "-";
-  baseRetailValue.textContent = "-";
-}
-
-async function loadBaseEstimatePreview(vehicle, input) {
-  if (!basePreview) return;
-  basePreview.hidden = false;
-  basePreviewStatus.textContent = t("basePreviewLoading");
-  baseWholesaleValue.textContent = "-";
-  baseRetailValue.textContent = "-";
-
-  const payload = {
-    ...input,
-    vin: input.vin || vehicle.vin || "",
-    uvc: vehicle.uvc || "",
-    year: vehicle.year || input.year,
-    make: vehicle.make || input.make,
-    model: vehicle.model || input.model,
-    series: "",
-    style: ""
-  };
-
-  try {
-    const response = await fetch("/api/valuation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const valuation = await response.json();
-    if (!valuation.ok) throw new Error(valuation.error || t("basePreviewUnavailable"));
-
-    baseWholesaleValue.textContent = moneyRangeOrDash(marketRange(valuation, "wholesale"));
-    baseRetailValue.textContent = moneyRangeOrDash(marketRange(valuation, "retail"));
-    basePreviewStatus.textContent = t("basePreviewReady");
-  } catch (error) {
-    basePreviewStatus.textContent = error.message || t("basePreviewUnavailable");
-  }
 }
 
 function populateReviewSelects(vehicle = {}) {

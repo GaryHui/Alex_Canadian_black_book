@@ -782,51 +782,6 @@ input::placeholder {
   font-weight: 750;
 }
 
-.base-preview {
-  display: grid;
-  gap: 16px;
-  padding: 16px;
-  background: #f6fbff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-
-.base-preview h3 {
-  margin: 2px 0 4px;
-  font-size: 18px;
-}
-
-.base-preview p {
-  margin: 0;
-  color: var(--muted);
-}
-
-.base-preview-values {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.base-preview-values article {
-  padding: 14px;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-
-.base-preview-values span {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.base-preview-values strong {
-  font-size: clamp(20px, 2.2vw, 28px);
-}
-
 .review-extras {
   display: grid;
   gap: 14px;
