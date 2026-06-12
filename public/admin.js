@@ -269,8 +269,12 @@ function renderLead(lead) {
   const customerEmail = input.email || authUser.email || lead.auth_email || "-";
   const vin = input.vin || valuation.vin || "-";
   const status = lead.status || "new";
+  const assignedTo = lead.assigned_to || "";
+  const priority = lead.priority || "normal";
+  const followUp = lead.next_follow_up_at || "";
+  const overdue = isOverdue(followUp, status);
   return `
-    <article class="lead-card" data-id="${escapeHtml(lead.id || "")}">
+    <article class="lead-card ${overdue ? "lead-overdue" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <header class="lead-summary">
         <div>
           <strong>${escapeHtml(title)}</strong>
@@ -279,9 +283,12 @@ function renderLead(lead) {
         <div class="lead-summary-metrics">
           <span>${escapeHtml(customerEmail)}</span>
           <span>VIN ${escapeHtml(vin)}</span>
+          <span>Owner ${escapeHtml(assignedTo || "Unassigned")}</span>
           <span>Wholesale ${wholesale ? formatNumber(wholesale) : "-"}</span>
           <span>Retail ${retail ? formatNumber(retail) : "-"}</span>
+          <b class="priority-pill priority-${escapeHtml(priority)}">${escapeHtml(priority)}</b>
           <b class="status-pill">${escapeHtml(status)}</b>
+          ${overdue ? `<b class="status-pill overdue-pill">Overdue</b>` : ""}
         </div>
       </header>
       <details class="lead-manage">
@@ -304,10 +311,26 @@ function renderLead(lead) {
           <label>
             <span>Status</span>
             <select name="status">
-              ${["new", "reviewing", "manual_adjustment", "contacted", "sent_to_crm", "closed", "deleted"].map((item) =>
+              ${["new", "assigned", "contacted", "waiting_for_customer", "inspection_booked", "offer_sent", "won", "lost", "closed", "deleted"].map((item) =>
                 `<option value="${item}" ${status === item ? "selected" : ""}>${item}</option>`
               ).join("")}
             </select>
+          </label>
+          <label>
+            <span>Assigned to</span>
+            <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+          </label>
+          <label>
+            <span>Priority</span>
+            <select name="priority">
+              ${["low", "normal", "high", "urgent"].map((item) =>
+                `<option value="${item}" ${priority === item ? "selected" : ""}>${item}</option>`
+              ).join("")}
+            </select>
+          </label>
+          <label>
+            <span>Next follow-up</span>
+            <input name="nextFollowUpAt" type="datetime-local" value="${escapeHtml(datetimeLocalValue(followUp))}" />
           </label>
           <label>
             <span>Owner wholesale</span>
@@ -327,6 +350,31 @@ function renderLead(lead) {
           </label>
           <button type="submit">Save owner review</button>
         </form>
+        <section class="lead-activity-panel">
+          <div class="lead-activity-head">
+            <h3>Follow-up activity</h3>
+            <button type="button" data-load-activity>Load activity</button>
+          </div>
+          <form class="lead-note-form">
+            <select name="noteType">
+              <option value="internal">Internal note</option>
+              <option value="call">Call</option>
+              <option value="email">Email</option>
+              <option value="sms">SMS</option>
+              <option value="inspection">Inspection</option>
+              <option value="offer">Offer</option>
+            </select>
+            <textarea name="note" placeholder="Record a call, inspection result, quote discussion, or next-step detail..."></textarea>
+            <button type="submit">Add note</button>
+          </form>
+          <form class="lead-task-form">
+            <input name="title" placeholder="Next task, e.g. Call customer" />
+            <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+            <input name="dueAt" type="datetime-local" />
+            <button type="submit">Add task</button>
+          </form>
+          <div class="lead-activity-list">Activity not loaded yet.</div>
+        </section>
       </details>
       <details class="lead-raw">
         <summary>Raw valuation summary</summary>
@@ -353,7 +401,134 @@ leadsEl.addEventListener("submit", async (event) => {
   });
   const data = await response.json();
   statusEl.textContent = data.ok ? "Owner review saved." : (data.error || "Unable to save owner review.");
+  if (data.ok) await loadLeads();
 });
+
+leadsEl.addEventListener("submit", async (event) => {
+  const form = event.target.closest(".lead-note-form");
+  if (!form) return;
+  event.preventDefault();
+
+  const card = form.closest(".lead-card");
+  const payload = {
+    leadId: card.dataset.id,
+    type: "note",
+    ...Object.fromEntries(new FormData(form).entries())
+  };
+  const response = await fetch("/api/lead-activity", {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  statusEl.textContent = data.ok ? "Note saved." : (data.error || "Unable to save note.");
+  if (data.ok) {
+    form.reset();
+    await loadLeadActivity(card);
+  }
+});
+
+leadsEl.addEventListener("submit", async (event) => {
+  const form = event.target.closest(".lead-task-form");
+  if (!form) return;
+  event.preventDefault();
+
+  const card = form.closest(".lead-card");
+  const payload = {
+    leadId: card.dataset.id,
+    type: "task",
+    ...Object.fromEntries(new FormData(form).entries())
+  };
+  const response = await fetch("/api/lead-activity", {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  statusEl.textContent = data.ok ? "Task saved." : (data.error || "Unable to save task.");
+  if (data.ok) {
+    form.reset();
+    await loadLeadActivity(card);
+  }
+});
+
+leadsEl.addEventListener("click", async (event) => {
+  const loadButton = event.target.closest("[data-load-activity]");
+  if (loadButton) {
+    await loadLeadActivity(loadButton.closest(".lead-card"));
+    return;
+  }
+
+  const completeButton = event.target.closest("[data-complete-task]");
+  if (!completeButton) return;
+
+  const card = completeButton.closest(".lead-card");
+  const response = await fetch("/api/lead-activity", {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      leadId: card.dataset.id,
+      taskId: completeButton.dataset.completeTask,
+      completed: completeButton.dataset.completed !== "true"
+    })
+  });
+  const data = await response.json();
+  statusEl.textContent = data.ok ? "Task updated." : (data.error || "Unable to update task.");
+  if (data.ok) await loadLeadActivity(card);
+});
+
+async function loadLeadActivity(card) {
+  if (!card?.dataset?.id) return;
+  const list = card.querySelector(".lead-activity-list");
+  if (list) list.textContent = "Loading activity...";
+
+  const response = await fetch(`/api/lead-activity?leadId=${encodeURIComponent(card.dataset.id)}`, {
+    headers: authHeaders()
+  });
+  const data = await response.json();
+  if (!data.ok) {
+    if (list) list.textContent = data.error || "Unable to load activity.";
+    return;
+  }
+
+  if (list) list.innerHTML = renderActivity(data);
+}
+
+function renderActivity(data) {
+  const tasks = (data.tasks || []).map((task) => `
+    <article class="activity-item ${task.completed_at ? "activity-done" : ""}">
+      <div>
+        <strong>${escapeHtml(task.title || "Task")}</strong>
+        <span>Task for ${escapeHtml(task.assigned_to || "unassigned")} ${task.due_at ? `due ${escapeHtml(formatDateTime(task.due_at))}` : ""}</span>
+      </div>
+      <button type="button" data-complete-task="${escapeHtml(task.id)}" data-completed="${task.completed_at ? "true" : "false"}">
+        ${task.completed_at ? "Reopen" : "Complete"}
+      </button>
+    </article>
+  `);
+
+  const notes = (data.notes || []).map((note) => `
+    <article class="activity-item">
+      <div>
+        <strong>${escapeHtml(note.note_type || "note")} by ${escapeHtml(note.author_email || "-")}</strong>
+        <span>${escapeHtml(formatDateTime(note.created_at))}</span>
+        <p>${escapeHtml(note.note || "")}</p>
+      </div>
+    </article>
+  `);
+
+  const emails = (data.emails || []).map((email) => `
+    <article class="activity-item">
+      <div>
+        <strong>Email to ${escapeHtml(email.sent_to || "-")}</strong>
+        <span>${escapeHtml(email.subject || "")} - ${escapeHtml(formatDateTime(email.created_at))}</span>
+      </div>
+    </article>
+  `);
+
+  const content = [...tasks, ...notes, ...emails].join("");
+  return content || "<p>No activity yet.</p>";
+}
 
 usersEl.addEventListener("submit", async (event) => {
   const form = event.target.closest(".user-limit-card");
@@ -428,6 +603,22 @@ function formatDateTime(value) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
+}
+
+function datetimeLocalValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function isOverdue(value, status) {
+  if (!value) return false;
+  const closedStatuses = new Set(["won", "lost", "closed", "deleted"]);
+  if (closedStatuses.has(String(status || "").toLowerCase())) return false;
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
 }
 
 function authHeaders() {

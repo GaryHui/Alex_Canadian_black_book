@@ -966,6 +966,11 @@ select {
   padding: 16px;
 }
 
+.lead-overdue {
+  border-color: #d90429;
+  box-shadow: inset 4px 0 0 #d90429;
+}
+
 .lead-summary {
   align-items: flex-start;
   display: flex;
@@ -1009,6 +1014,34 @@ select {
 .status-pill {
   background: #f4f4f4;
   text-transform: capitalize;
+}
+
+.priority-pill {
+  border-radius: 4px;
+  font-size: 13px;
+  padding: 6px 8px;
+  text-transform: capitalize;
+}
+
+.priority-low {
+  background: #edf7ed;
+  color: #1f6f35;
+}
+
+.priority-normal {
+  background: #eef3fb;
+  color: #24476f;
+}
+
+.priority-high {
+  background: #fff4da;
+  color: #7b4c00;
+}
+
+.priority-urgent,
+.overdue-pill {
+  background: #ffe5e9;
+  color: #b00020;
 }
 
 .lead-grid {
@@ -1079,6 +1112,87 @@ select {
   padding: 0 14px;
 }
 
+.lead-activity-panel {
+  border-top: 1px solid #eee;
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.lead-activity-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.lead-activity-head h3 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.lead-note-form,
+.lead-task-form {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 180px 1fr auto;
+}
+
+.lead-note-form textarea,
+.lead-task-form input,
+.lead-note-form select {
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.lead-note-form textarea {
+  min-height: 64px;
+  resize: vertical;
+}
+
+.lead-activity-list {
+  display: grid;
+  gap: 8px;
+}
+
+.activity-item {
+  align-items: flex-start;
+  background: #fafafa;
+  border: 1px solid #e1e1e1;
+  border-radius: 4px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px;
+}
+
+.activity-item strong,
+.activity-item span,
+.activity-item p {
+  display: block;
+  margin: 0;
+}
+
+.activity-item span {
+  color: #777;
+  font-size: 12px;
+}
+
+.activity-item p {
+  margin-top: 6px;
+  white-space: pre-wrap;
+}
+
+.activity-done {
+  opacity: .7;
+}
+
+.activity-done strong {
+  text-decoration: line-through;
+}
+
 @media (max-width: 900px) {
   .form-grid,
   .info-row,
@@ -1129,5 +1243,20 @@ select {
   .admin-actions {
     justify-content: flex-start;
     width: 100%;
+  }
+
+  .lead-summary,
+  .owner-review,
+  .lead-note-form,
+  .lead-task-form {
+    grid-template-columns: 1fr;
+  }
+
+  .lead-summary {
+    display: grid;
+  }
+
+  .lead-summary-metrics {
+    justify-content: flex-start;
   }
 }

@@ -28,6 +28,10 @@ export default async function handler(req, res) {
       auth_email: String(req.body?.user?.email || rawInput.email || "").trim(),
       valuation_year: new Date().getFullYear(),
       status: "new",
+      assigned_to: "",
+      priority: "normal",
+      next_follow_up_at: null,
+      last_activity_at: null,
       notes: "",
       owner_adjustment: {}
     };
@@ -232,6 +236,10 @@ async function saveToSupabase(lead) {
   delete legacyLead.auth_user_id;
   delete legacyLead.auth_email;
   delete legacyLead.valuation_year;
+  delete legacyLead.assigned_to;
+  delete legacyLead.priority;
+  delete legacyLead.next_follow_up_at;
+  delete legacyLead.last_activity_at;
   const legacyResult = await insertLead({ url, key, lead: legacyLead });
   if (legacyResult.ok) return { ...legacyResult, legacyColumns: true };
 
@@ -281,6 +289,10 @@ async function updateLead(body) {
 
   const patch = {
     status: String(body.status || "reviewing").trim(),
+    assigned_to: String(body.assignedTo || body.assigned_to || "").trim().toLowerCase(),
+    priority: normalizePriority(body.priority),
+    next_follow_up_at: dateOrNull(body.nextFollowUpAt || body.next_follow_up_at),
+    last_activity_at: new Date().toISOString(),
     notes: String(body.notes || "").trim(),
     owner_adjustment: {
       wholesale: numberOrNull(body.ownerWholesale),
@@ -304,6 +316,17 @@ async function updateLead(body) {
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
   return { ok: true, lead: data?.[0] || null };
+}
+
+function normalizePriority(value) {
+  const priority = String(value || "normal").trim().toLowerCase();
+  return ["low", "normal", "high", "urgent"].includes(priority) ? priority : "normal";
+}
+
+function dateOrNull(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function sanitizeLeadInput(input) {

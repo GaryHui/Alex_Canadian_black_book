@@ -197,6 +197,23 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (url.pathname === "/api/lead-activity") {
+      const admin = await requireAdmin(req);
+      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+      if (req.method === "GET") {
+        const result = await listLeadActivity(url.searchParams.get("leadId") || "");
+        return sendJson(res, result.ok ? 200 : result.status || 400, result);
+      }
+      if (req.method === "POST") {
+        const result = await createLeadActivity(await readJson(req), admin.user);
+        return sendJson(res, result.ok ? 200 : result.status || 400, result);
+      }
+      if (req.method === "PATCH") {
+        const result = await updateLeadTask(await readJson(req));
+        return sendJson(res, result.ok ? 200 : result.status || 400, result);
+      }
+    }
+
     sendJson(res, 404, { error: "Not found" });
   } catch (error) {
     sendJson(res, 500, { error: error.message || "Server error" });
@@ -585,6 +602,10 @@ async function saveLead(body) {
     auth_email: String(body.user?.email || rawInput.email || "").trim(),
     valuation_year: new Date().getFullYear(),
     status: "new",
+    assigned_to: "",
+    priority: "normal",
+    next_follow_up_at: null,
+    last_activity_at: null,
     notes: "",
     owner_adjustment: {}
   };
@@ -951,6 +972,10 @@ async function updateLead(body) {
 
   const patch = {
     status: String(body.status || "reviewing").trim(),
+    assigned_to: String(body.assignedTo || body.assigned_to || "").trim().toLowerCase(),
+    priority: normalizePriority(body.priority),
+    next_follow_up_at: dateOrNull(body.nextFollowUpAt || body.next_follow_up_at),
+    last_activity_at: new Date().toISOString(),
     notes: String(body.notes || "").trim(),
     owner_adjustment: {
       wholesale: numberOrNull(body.ownerWholesale),
@@ -975,6 +1000,145 @@ async function updateLead(body) {
   return { ok: true, lead: data?.[0] || null };
 }
 
+async function listLeadActivity(leadId) {
+  const id = String(leadId || "").trim();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!id) return { ok: false, status: 400, error: "Lead id is required" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const [notes, tasks, emails] = await Promise.all([
+    fetchSupabaseJson(`${url}/rest/v1/lead_notes?select=*&lead_id=eq.${encodeURIComponent(id)}&order=created_at.desc&limit=100`, key),
+    fetchSupabaseJson(`${url}/rest/v1/lead_tasks?select=*&lead_id=eq.${encodeURIComponent(id)}&order=due_at.asc.nullslast,created_at.desc&limit=100`, key),
+    fetchSupabaseJson(`${url}/rest/v1/lead_emails?select=*&lead_id=eq.${encodeURIComponent(id)}&order=created_at.desc&limit=100`, key)
+  ]);
+  const failed = [notes, tasks, emails].find((result) => !result.ok);
+  if (failed) return failed;
+
+  return { ok: true, notes: notes.data || [], tasks: tasks.data || [], emails: emails.data || [] };
+}
+
+async function createLeadActivity(body, user) {
+  const leadId = String(body.leadId || "").trim();
+  const type = String(body.type || "note").trim().toLowerCase();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!leadId) return { ok: false, status: 400, error: "Lead id is required" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  if (type === "task") {
+    const title = String(body.title || "").trim();
+    if (!title) return { ok: false, status: 400, error: "Task title is required" };
+    const result = await insertSupabaseJson(`${url}/rest/v1/lead_tasks`, key, {
+      lead_id: leadId,
+      assigned_to: String(body.assignedTo || user?.email || "").trim().toLowerCase(),
+      title,
+      due_at: dateOrNull(body.dueAt)
+    });
+    if (result.ok) await touchLeadActivity({ url, key, leadId });
+    return result.ok ? { ok: true, task: result.data?.[0] || null } : result;
+  }
+
+  if (type === "email") {
+    const sentTo = String(body.sentTo || "").trim().toLowerCase();
+    const subject = String(body.subject || "").trim();
+    if (!sentTo || !subject) return { ok: false, status: 400, error: "Recipient and subject are required" };
+    const result = await insertSupabaseJson(`${url}/rest/v1/lead_emails`, key, {
+      lead_id: leadId,
+      sent_by: String(user?.email || "").trim().toLowerCase(),
+      sent_to: sentTo,
+      subject,
+      body: String(body.body || "").trim(),
+      provider_message_id: String(body.providerMessageId || "").trim(),
+      status: String(body.status || "sent").trim()
+    });
+    if (result.ok) await touchLeadActivity({ url, key, leadId });
+    return result.ok ? { ok: true, email: result.data?.[0] || null } : result;
+  }
+
+  const note = String(body.note || "").trim();
+  if (!note) return { ok: false, status: 400, error: "Note is required" };
+  const result = await insertSupabaseJson(`${url}/rest/v1/lead_notes`, key, {
+    lead_id: leadId,
+    author_email: String(user?.email || "").trim().toLowerCase(),
+    note_type: normalizeNoteType(body.noteType),
+    note
+  });
+  if (result.ok) await touchLeadActivity({ url, key, leadId });
+  return result.ok ? { ok: true, note: result.data?.[0] || null } : result;
+}
+
+async function updateLeadTask(body) {
+  const taskId = String(body.taskId || "").trim();
+  const leadId = String(body.leadId || "").trim();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!taskId) return { ok: false, status: 400, error: "Task id is required" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const patch = {};
+  if ("completed" in body) patch.completed_at = body.completed ? new Date().toISOString() : null;
+  if ("title" in body) patch.title = String(body.title || "").trim();
+  if ("assignedTo" in body) patch.assigned_to = String(body.assignedTo || "").trim().toLowerCase();
+  if ("dueAt" in body) patch.due_at = dateOrNull(body.dueAt);
+
+  const response = await fetch(`${url}/rest/v1/lead_tasks?id=eq.${encodeURIComponent(taskId)}`, {
+    method: "PATCH",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(patch)
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+  if (leadId) await touchLeadActivity({ url, key, leadId });
+  return { ok: true, task: data?.[0] || null };
+}
+
+async function insertSupabaseJson(url, key, payload) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+  return { ok: true, data };
+}
+
+async function touchLeadActivity({ url, key, leadId }) {
+  await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ last_activity_at: new Date().toISOString() })
+  }).catch(() => null);
+}
+
+function normalizePriority(value) {
+  const priority = String(value || "normal").trim().toLowerCase();
+  return ["low", "normal", "high", "urgent"].includes(priority) ? priority : "normal";
+}
+
+function normalizeNoteType(value) {
+  const type = String(value || "internal").trim().toLowerCase();
+  return ["call", "email", "sms", "inspection", "offer", "internal"].includes(type) ? type : "internal";
+}
+
+function dateOrNull(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 async function saveLeadToSupabase(lead) {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -987,6 +1151,10 @@ async function saveLeadToSupabase(lead) {
   delete legacyLead.auth_user_id;
   delete legacyLead.auth_email;
   delete legacyLead.valuation_year;
+  delete legacyLead.assigned_to;
+  delete legacyLead.priority;
+  delete legacyLead.next_follow_up_at;
+  delete legacyLead.last_activity_at;
   const legacyResult = await insertLead({ url, key, lead: legacyLead });
   if (legacyResult.ok) return { ...legacyResult, legacyColumns: true };
 
