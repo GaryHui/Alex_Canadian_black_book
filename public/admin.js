@@ -510,24 +510,34 @@ async function deleteSingleLead(button) {
 
 async function clearAllLeads() {
   if (!adminSession) return;
+  const confirmText = "DELETE ALL LEADS";
   const typed = window.prompt(
     "This permanently deletes ALL leads and their Supabase notes/tasks/email records.\n\nGoogle Sheet rows and Google Drive files will not be deleted.\n\nType DELETE ALL LEADS to continue."
   );
-  if (typed !== "DELETE ALL LEADS") {
+  if (normalizeDeleteConfirm(typed) !== confirmText) {
     statusEl.textContent = "Clear all leads cancelled.";
     return;
   }
 
   clearLeadsButton.disabled = true;
   statusEl.textContent = "Clearing all leads...";
-  const response = await fetch(`/api/leads?confirm=${encodeURIComponent("DELETE ALL LEADS")}`, {
-    method: "DELETE",
-    headers: authHeaders()
-  });
-  const data = await response.json();
-  statusEl.textContent = data.ok ? `Deleted ${data.deleted || 0} lead record(s).` : formatApiError(data, "Unable to clear leads.");
-  if (data.ok) await loadLeads();
-  clearLeadsButton.disabled = false;
+  try {
+    const response = await fetch(`/api/leads?confirm=${encodeURIComponent(confirmText)}`, {
+      method: "DELETE",
+      headers: authHeaders()
+    });
+    const data = await response.json();
+    statusEl.textContent = data.ok ? `Deleted ${data.deleted || 0} lead record(s).` : formatApiError(data, "Unable to clear leads.");
+    if (data.ok) await loadLeads();
+  } catch (error) {
+    statusEl.textContent = error.message || "Unable to clear leads.";
+  } finally {
+    clearLeadsButton.disabled = false;
+  }
+}
+
+function normalizeDeleteConfirm(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toUpperCase();
 }
 
 async function loadLeadActivity(card) {

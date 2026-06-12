@@ -293,7 +293,7 @@ async function deleteLeadRecords(query) {
   if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
 
   const id = String(query.id || "").trim();
-  const confirm = String(query.confirm || "").trim();
+  const confirm = normalizeDeleteConfirm(query.confirm);
 
   if (id) {
     const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(id)}`, {
@@ -312,16 +312,38 @@ async function deleteLeadRecords(query) {
     return { ok: false, status: 400, error: "Type DELETE ALL LEADS to confirm clearing all lead records." };
   }
 
-  const response = await fetch(`${url}/rest/v1/valuation_leads?id=not.is.null`, {
-    method: "DELETE",
-    headers: {
-      ...authHeaders(key),
-      Prefer: "return=representation"
-    }
+  return deleteAllLeads({ url, key });
+}
+
+async function deleteAllLeads({ url, key }) {
+  const listResponse = await fetch(`${url}/rest/v1/valuation_leads?select=id&limit=1000`, {
+    headers: authHeaders(key)
   });
-  const data = await response.json().catch(() => null);
-  if (!response.ok) return { ok: false, status: response.status, error: data };
-  return { ok: true, deleted: Array.isArray(data) ? data.length : 0 };
+  const rows = await listResponse.json().catch(() => []);
+  if (!listResponse.ok) return { ok: false, status: listResponse.status, error: rows };
+
+  const ids = (Array.isArray(rows) ? rows : []).map((row) => row.id).filter(Boolean);
+  if (!ids.length) return { ok: true, deleted: 0 };
+
+  let deleted = 0;
+  for (const id of ids) {
+    const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: {
+        ...authHeaders(key),
+        Prefer: "return=representation"
+      }
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) return { ok: false, status: response.status, error: data, deleted };
+    deleted += Array.isArray(data) ? data.length : 0;
+  }
+
+  return { ok: true, deleted };
+}
+
+function normalizeDeleteConfirm(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toUpperCase();
 }
 
 async function updateLead(body) {
