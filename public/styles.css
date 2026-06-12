@@ -30,13 +30,28 @@ select {
 }
 
 .shell {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
 }
 
 .search-panel {
   background: #fff;
   border-bottom: 1px solid #e4e4e4;
+  order: 1;
   padding: 24px;
+}
+
+#details {
+  order: 2;
+}
+
+#history-panel {
+  order: 3;
+}
+
+#dealer-workbench {
+  order: 4;
 }
 
 .dealer-valuation-panel {
@@ -1351,7 +1366,7 @@ select {
 }
 
 .dealer-task-form {
-  grid-template-columns: 1fr 220px auto;
+  grid-template-columns: 1fr 220px 220px auto;
 }
 
 .dealer-note-form select,

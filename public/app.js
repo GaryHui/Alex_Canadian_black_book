@@ -1066,6 +1066,7 @@ function renderDealerLeads(leads, role) {
         </form>
         <form class="dealer-task-form">
           <input name="title" placeholder="Next task" />
+          <input name="assignedTo" type="email" placeholder="Assign to email" />
           <input name="dueAt" type="datetime-local" />
           <button type="submit">Add task</button>
         </form>
@@ -1101,7 +1102,10 @@ function renderDealerActivity(data) {
     <article class="activity-item ${task.completed_at ? "activity-done" : ""}">
       <div>
         <strong>${escapeHtml(task.title || "Task")}</strong>
-        <span>${task.due_at ? `Due ${escapeHtml(formatDateTime(task.due_at))}` : "No due date"}</span>
+        <span>
+          Assigned to ${escapeHtml(task.assigned_to || "unassigned")}
+          ${task.due_at ? ` · Due ${escapeHtml(formatDateTime(task.due_at))}` : " · No due date"}
+        </span>
       </div>
     </article>
   `);
