@@ -39,6 +39,34 @@ select {
   padding: 24px;
 }
 
+.dealer-valuation-panel {
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  margin: 24px;
+}
+
+.section-subtitle {
+  color: #586a80;
+  margin: 0 0 18px;
+}
+
+.save-valuation-lead {
+  background: #0b4f9c;
+  border: 1px solid #0b4f9c;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+  margin: 8px 0 12px;
+  min-height: 40px;
+  padding: 0 16px;
+}
+
+.save-valuation-lead:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
 .eyebrow {
   color: var(--red);
   font-size: 12px;
@@ -680,6 +708,12 @@ select {
   padding: 24px;
 }
 
+.dealer-leads-panel {
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  margin: 24px;
+}
+
 .history-head {
   align-items: center;
   display: flex;
@@ -1267,6 +1301,46 @@ select {
 .dealer-lead-card {
   display: grid;
   gap: 12px;
+}
+
+.dealer-info-block {
+  border-top: 1px solid #e8edf3;
+  margin-top: 4px;
+  padding-top: 12px;
+}
+
+.dealer-info-block summary {
+  color: var(--blue);
+  cursor: pointer;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.dealer-detail-grid {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.dealer-review-summary {
+  background: #f6f9fd;
+  border: 1px solid #d5e2f0;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.dealer-review-summary h3 {
+  font-size: 15px;
+  margin: 0 0 10px;
+}
+
+.dealer-admin-notes {
+  border-top: 1px solid #d5e2f0;
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.dealer-admin-notes p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
 }
 
 .dealer-note-form,

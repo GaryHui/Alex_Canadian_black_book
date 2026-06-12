@@ -8,10 +8,11 @@
   </head>
   <body>
     <main class="shell">
-      <section class="search-panel">
+      <section class="search-panel dealer-valuation-panel">
         <div>
-          <p class="eyebrow">Search Canadian Used Cars</p>
-          <h1>Black Book vehicle lookup</h1>
+          <p class="eyebrow">Dealer valuation tool</p>
+          <h1>Create a vehicle estimate</h1>
+          <p class="section-subtitle">Use this area when a dealer staff member wants to search a vehicle and create a new valuation.</p>
         </div>
 
         <section class="auth-panel">
@@ -125,6 +126,7 @@
         </div>
 
         <p id="status" class="status">Ready.</p>
+        <button id="save-valuation-lead" class="save-valuation-lead" type="button" hidden>Save valuation to leads</button>
         <div id="inline-choice-list" class="choice-list inline-choice-list" hidden></div>
         <p class="admin-link"><a href="/admin.html" target="_blank" rel="noreferrer">View captured leads</a></p>
       </section>
@@ -141,12 +143,12 @@
         <div id="history-list" class="history-list"></div>
       </section>
 
-      <section id="dealer-workbench" class="history-panel" hidden>
+      <section id="dealer-workbench" class="history-panel dealer-leads-panel" hidden>
         <div class="history-head">
           <div>
-            <p class="eyebrow">Dealer follow-up</p>
+            <p class="eyebrow">Assigned leads</p>
             <h2>My assigned leads</h2>
-            <p>Your assigned customers, next steps, and overdue follow-ups.</p>
+            <p>Use this area to follow up on customers assigned by an admin, review admin notes, add activity, and set next tasks.</p>
           </div>
           <button id="reload-dealer-leads" type="button">Reload</button>
         </div>

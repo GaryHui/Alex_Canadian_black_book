@@ -27,6 +27,7 @@ const dealerWorkbench = document.querySelector("#dealer-workbench");
 const dealerLeadsStatus = document.querySelector("#dealer-leads-status");
 const dealerLeadsList = document.querySelector("#dealer-leads-list");
 const reloadDealerLeadsButton = document.querySelector("#reload-dealer-leads");
+const saveValuationLeadButton = document.querySelector("#save-valuation-lead");
 const drilldownSuggestions = {
   Honda: {
     models: ["Accord", "Civic", "CR-V", "HR-V", "Odyssey", "Pilot", "Ridgeline"],
@@ -75,12 +76,14 @@ let dealerAdminAllowed = false;
 let usageState = null;
 let drilldownRequestId = 0;
 let historyLeads = [];
+let pendingDealerLeadCapture = null;
 
 initializeDatalists();
 initializeAuth();
 
 reloadHistoryButton.addEventListener("click", loadHistory);
 reloadDealerLeadsButton?.addEventListener("click", loadDealerLeads);
+saveValuationLeadButton?.addEventListener("click", savePendingDealerLead);
 
 dealerLeadsList?.addEventListener("submit", async (event) => {
   const noteForm = event.target.closest(".dealer-note-form");
@@ -227,6 +230,7 @@ async function runValuation(extra = {}, options = {}) {
   if (!requireLogin()) return;
   if (!usageState) await loadUsage();
   if (!canUseValuation()) return;
+  hideDealerSaveOption();
   statusEl.textContent = "Calling valuation API...";
 
   const formData = new FormData(form);
@@ -275,6 +279,13 @@ async function runValuation(extra = {}, options = {}) {
     currentMarket = firstAvailableMarket(data) || "wholesale";
     renderResult(data);
     closeSearchModal();
+    if (dealerAdminAllowed) {
+      pendingDealerLeadCapture = { payload, valuation: data };
+      if (saveValuationLeadButton) saveValuationLeadButton.hidden = false;
+      statusEl.textContent = "Valuation rendered. Click Save valuation to leads if this should be kept for follow-up.";
+      return;
+    }
+
     const capture = await captureLead(payload, data);
     await loadUsage();
     if (capture?.captured) {
@@ -287,6 +298,41 @@ async function runValuation(extra = {}, options = {}) {
     }
   } catch (error) {
     statusEl.textContent = error.message || "Unexpected error.";
+  }
+}
+
+async function savePendingDealerLead() {
+  if (!pendingDealerLeadCapture) {
+    statusEl.textContent = "No valuation is ready to save yet.";
+    return;
+  }
+
+  saveValuationLeadButton.disabled = true;
+  statusEl.textContent = "Saving valuation to leads...";
+  try {
+    const capture = await captureLead(pendingDealerLeadCapture.payload, pendingDealerLeadCapture.valuation);
+    await loadUsage();
+    if (capture?.captured) {
+      statusEl.textContent = "Valuation saved to captured leads.";
+      pendingDealerLeadCapture = null;
+      if (saveValuationLeadButton) saveValuationLeadButton.hidden = true;
+      await loadHistory();
+      if (dealerAdminAllowed) await loadDealerLeads();
+    } else {
+      statusEl.textContent = capture?.message || "Valuation rendered, but lead storage is not configured yet.";
+    }
+  } catch (error) {
+    statusEl.textContent = error.message || "Unable to save valuation to leads.";
+  } finally {
+    saveValuationLeadButton.disabled = false;
+  }
+}
+
+function hideDealerSaveOption() {
+  pendingDealerLeadCapture = null;
+  if (saveValuationLeadButton) {
+    saveValuationLeadButton.hidden = true;
+    saveValuationLeadButton.disabled = false;
   }
 }
 
@@ -948,10 +994,31 @@ function renderDealerLeads(leads, role) {
   dealerLeadsList.innerHTML = leads.map((lead) => {
     const input = lead.input || {};
     const valuation = lead.valuation || {};
+    const ownerAdjustment = lead.owner_adjustment || {};
     const title = valuation.title || historyVehicleTitle(input) || "Vehicle lead";
     const customerEmail = input.email || lead.auth_email || lead.auth_user?.email || "-";
     const followUp = lead.next_follow_up_at || "";
     const overdue = isDealerLeadOverdue(followUp, lead.status);
+    const wholesaleAvg = historyMarketAverage(valuation, "wholesale");
+    const retailAvg = historyMarketAverage(valuation, "retail");
+    const dealerWholesale = ownerAdjustment.wholesale ?? "";
+    const dealerRetail = ownerAdjustment.retail ?? "";
+    const vehicleDetails = [
+      ["Year", input.year || valuation.year || ""],
+      ["Make", input.make || valuation.make || ""],
+      ["Model", input.model || valuation.model || ""],
+      ["Series / Trim", input.series || valuation.series || ""],
+      ["Style", input.style || valuation.style || ""],
+      ["UVC", input.uvc || valuation.uvc || ""],
+      ["Odometer", input.kilometers ? `${formatNumber(input.kilometers)} km` : ""],
+      ["Region", input.region || valuation.region || ""],
+      ["Postal code", input.postalCode || input.postal_code || ""],
+      ["Color", input.color || ""],
+      ["Ownership", input.ownershipType || input.ownership || ""],
+      ["Condition notes", input.conditionNotes || input.condition_notes || ""],
+      ["CBB wholesale AVG", wholesaleAvg ? `$${formatNumber(wholesaleAvg)}` : ""],
+      ["CBB retail AVG", retailAvg ? `$${formatNumber(retailAvg)}` : ""]
+    ].filter(([, value]) => value !== "" && value !== null && value !== undefined);
 
     return `
       <article class="history-card dealer-lead-card ${overdue ? "lead-overdue" : ""}" data-lead-id="${escapeHtml(lead.id || "")}">
@@ -967,6 +1034,23 @@ function renderDealerLeads(leads, role) {
           <div><dt>Priority</dt><dd>${escapeHtml(lead.priority || "normal")}</dd></div>
           <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "-")}</dd></div>
         </dl>
+        <details class="dealer-info-block" open>
+          <summary>Vehicle details</summary>
+          <dl class="history-meta dealer-detail-grid">
+            ${vehicleDetails.map(([label, value]) => `
+              <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>
+            `).join("")}
+          </dl>
+        </details>
+        <section class="dealer-review-summary">
+          <h3>Owner review from admin</h3>
+          <dl class="history-meta">
+            <div><dt>Owner wholesale</dt><dd>${dealerWholesale !== "" && dealerWholesale !== null ? `$${escapeHtml(formatNumber(dealerWholesale))}` : "-"}</dd></div>
+            <div><dt>Owner retail</dt><dd>${dealerRetail !== "" && dealerRetail !== null ? `$${escapeHtml(formatNumber(dealerRetail))}` : "-"}</dd></div>
+            <div><dt>Reason</dt><dd>${escapeHtml(ownerAdjustment.reason || "-")}</dd></div>
+          </dl>
+          ${lead.notes ? `<div class="dealer-admin-notes"><strong>Admin notes</strong><p>${escapeHtml(lead.notes)}</p></div>` : ""}
+        </section>
         ${overdue ? `<p class="status overdue-text">Overdue follow-up</p>` : ""}
         <form class="dealer-note-form">
           <select name="noteType">
