@@ -8,6 +8,7 @@ const dealerStaffForm = document.querySelector("#dealer-staff-form");
 const reloadDealersButton = document.querySelector("#reload-dealers");
 const reloadUsersButton = document.querySelector("#reload-users");
 const reloadLeadsButton = document.querySelector("#reload-leads");
+const clearLeadsButton = document.querySelector("#clear-leads");
 const adminAuthStatus = document.querySelector("#admin-auth-status");
 const adminLoginButton = document.querySelector("#admin-login");
 const adminLogoutButton = document.querySelector("#admin-logout");
@@ -23,6 +24,7 @@ let adminTurnstileGate = null;
 reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", loadLeads);
 reloadDealersButton.addEventListener("click", loadDealers);
+clearLeadsButton?.addEventListener("click", clearAllLeads);
 dealerStaffForm.addEventListener("submit", addDealer);
 adminLoginButton.addEventListener("click", signInAdmin);
 adminLogoutButton.addEventListener("click", signOutAdmin);
@@ -349,6 +351,7 @@ function renderLead(lead) {
             <textarea name="notes" placeholder="Follow-up notes, CRM notes, customer preference...">${escapeHtml(lead.notes || "")}</textarea>
           </label>
           <button type="submit">Save owner review</button>
+          <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(lead.id || "")}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
         </form>
         <section class="lead-activity-panel">
           <div class="lead-activity-head">
@@ -453,6 +456,12 @@ leadsEl.addEventListener("submit", async (event) => {
 });
 
 leadsEl.addEventListener("click", async (event) => {
+  const deleteButton = event.target.closest("[data-delete-lead]");
+  if (deleteButton) {
+    await deleteSingleLead(deleteButton);
+    return;
+  }
+
   const loadButton = event.target.closest("[data-load-activity]");
   if (loadButton) {
     await loadLeadActivity(loadButton.closest(".lead-card"));
@@ -476,6 +485,50 @@ leadsEl.addEventListener("click", async (event) => {
   statusEl.textContent = data.ok ? "Task updated." : (data.error || "Unable to update task.");
   if (data.ok) await loadLeadActivity(card);
 });
+
+async function deleteSingleLead(button) {
+  const id = button.dataset.deleteLead || "";
+  const title = button.dataset.deleteTitle || "this lead";
+  if (!id || !adminSession) return;
+
+  const confirmed = window.confirm(
+    `Delete "${title}" permanently?\n\nThis removes the lead and its notes/tasks/email records from Supabase. This does not delete Google Sheet rows or Google Drive files.`
+  );
+  if (!confirmed) return;
+
+  button.disabled = true;
+  statusEl.textContent = "Deleting lead...";
+  const response = await fetch(`/api/leads?id=${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  const data = await response.json();
+  statusEl.textContent = data.ok ? `Deleted ${data.deleted || 0} lead record.` : formatApiError(data, "Unable to delete lead.");
+  if (data.ok) await loadLeads();
+  button.disabled = false;
+}
+
+async function clearAllLeads() {
+  if (!adminSession) return;
+  const typed = window.prompt(
+    "This permanently deletes ALL leads and their Supabase notes/tasks/email records.\n\nGoogle Sheet rows and Google Drive files will not be deleted.\n\nType DELETE ALL LEADS to continue."
+  );
+  if (typed !== "DELETE ALL LEADS") {
+    statusEl.textContent = "Clear all leads cancelled.";
+    return;
+  }
+
+  clearLeadsButton.disabled = true;
+  statusEl.textContent = "Clearing all leads...";
+  const response = await fetch(`/api/leads?confirm=${encodeURIComponent("DELETE ALL LEADS")}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  const data = await response.json();
+  statusEl.textContent = data.ok ? `Deleted ${data.deleted || 0} lead record(s).` : formatApiError(data, "Unable to clear leads.");
+  if (data.ok) await loadLeads();
+  clearLeadsButton.disabled = false;
+}
 
 async function loadLeadActivity(card) {
   if (!card?.dataset?.id) return;

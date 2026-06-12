@@ -865,6 +865,19 @@ select {
   padding: 0 14px;
 }
 
+.admin-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.danger-outline {
+  background: #fff !important;
+  border: 1px solid #d90429 !important;
+  color: #d90429 !important;
+}
+
 .admin-users {
   display: grid;
   gap: 10px;
@@ -1110,6 +1123,10 @@ select {
   font-weight: 700;
   min-height: 38px;
   padding: 0 14px;
+}
+
+.owner-review .danger-outline {
+  justify-self: start;
 }
 
 .lead-activity-panel {

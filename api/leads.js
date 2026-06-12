@@ -63,13 +63,20 @@ export default async function handler(req, res) {
     });
   }
 
+  if (req.method === "DELETE") {
+    const admin = await requireAdmin(req);
+    if (!admin.ok) return res.status(admin.status).json({ ok: false, error: admin.error });
+    const result = await deleteLeadRecords(req.query || {});
+    return res.status(result.ok ? 200 : result.status || 400).json(result);
+  }
+
   if (req.method === "GET") {
     const admin = await requireAdmin(req);
     if (!admin.ok) return res.status(admin.status).json({ ok: false, error: admin.error });
     return res.status(200).json(await listFromSupabase());
   }
 
-  res.setHeader("Allow", "GET, POST, PATCH");
+  res.setHeader("Allow", "GET, POST, PATCH, DELETE");
   return res.status(405).json({ ok: false, error: "Method not allowed" });
 }
 
@@ -278,6 +285,43 @@ async function listFromSupabase() {
   const leads = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: leads, leads: [] };
   return { ok: true, storage: "supabase", leads };
+}
+
+async function deleteLeadRecords(query) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const id = String(query.id || "").trim();
+  const confirm = String(query.confirm || "").trim();
+
+  if (id) {
+    const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: {
+        ...authHeaders(key),
+        Prefer: "return=representation"
+      }
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) return { ok: false, status: response.status, error: data };
+    return { ok: true, deleted: Array.isArray(data) ? data.length : 0 };
+  }
+
+  if (confirm !== "DELETE ALL LEADS") {
+    return { ok: false, status: 400, error: "Type DELETE ALL LEADS to confirm clearing all lead records." };
+  }
+
+  const response = await fetch(`${url}/rest/v1/valuation_leads?id=not.is.null`, {
+    method: "DELETE",
+    headers: {
+      ...authHeaders(key),
+      Prefer: "return=representation"
+    }
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+  return { ok: true, deleted: Array.isArray(data) ? data.length : 0 };
 }
 
 async function updateLead(body) {
