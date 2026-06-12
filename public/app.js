@@ -124,6 +124,34 @@ dealerLeadsList?.addEventListener("submit", async (event) => {
 });
 
 dealerLeadsList?.addEventListener("click", async (event) => {
+  const completeButton = event.target.closest("[data-complete-dealer-task]");
+  if (completeButton) {
+    const card = completeButton.closest(".dealer-lead-card");
+    const leadId = card?.dataset?.leadId || "";
+    const taskId = completeButton.dataset.completeDealerTask || "";
+    if (!leadId || !taskId) return;
+    completeButton.disabled = true;
+    dealerLeadsStatus.textContent = "Marking task complete...";
+    try {
+      const response = await fetch("/api/lead-activity", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ leadId, taskId, completed: true })
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || "Unable to complete task");
+      dealerLeadsStatus.textContent = "Task completed. Admin can review it.";
+      await loadDealerActivity(card, { force: true });
+    } catch (error) {
+      completeButton.disabled = false;
+      dealerLeadsStatus.textContent = error.message || "Unable to complete task";
+    }
+    return;
+  }
+
   const button = event.target.closest("[data-load-dealer-activity]");
   if (!button) return;
   await loadDealerActivity(button.closest(".dealer-lead-card"), { force: true });
@@ -1129,17 +1157,21 @@ async function loadDealerActivity(card, options = {}) {
 }
 
 function renderDealerActivity(data) {
-  const tasks = (data.tasks || []).map((task) => `
-    <article class="activity-item ${task.completed_at ? "activity-done" : ""}">
-      <div>
-        <strong>${escapeHtml(task.title || "Task")}</strong>
-        <span>
-          Assigned to ${escapeHtml(task.assigned_to || "unassigned")}
-          ${task.due_at ? ` · Due ${escapeHtml(formatDateTime(task.due_at))}` : " · No due date"}
-        </span>
-      </div>
-    </article>
-  `);
+  const tasks = (data.tasks || []).map((task) => {
+    const dueText = task.due_at ? ` - Due ${escapeHtml(formatDateTime(task.due_at))}` : " - No due date";
+    const action = task.completed_at
+      ? `<span class="task-complete-note">Completed ${escapeHtml(formatDateTime(task.completed_at))}</span>`
+      : `<button type="button" data-complete-dealer-task="${escapeHtml(task.id || "")}">Mark complete</button>`;
+    return `
+      <article class="activity-item ${task.completed_at ? "activity-done" : ""}">
+        <div>
+          <strong>${escapeHtml(task.title || "Task")}</strong>
+          <span>Assigned to ${escapeHtml(task.assigned_to || "unassigned")}${dueText}</span>
+        </div>
+        ${action}
+      </article>
+    `;
+  });
 
   const notes = (data.notes || []).map((note) => `
     <article class="activity-item">

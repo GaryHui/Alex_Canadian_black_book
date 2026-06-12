@@ -73,6 +73,12 @@ async function canAccessLead(leadId, dealer) {
   const assignedTo = String(lead.assigned_to || "").trim().toLowerCase();
   const email = String(dealer.user?.email || "").trim().toLowerCase();
   if (assignedTo && assignedTo === email) return { ok: true, lead };
+  const taskAccess = await fetch(`${client.url}/rest/v1/lead_tasks?select=id&lead_id=eq.${encodeURIComponent(id)}&assigned_to=eq.${encodeURIComponent(email)}&limit=1`, {
+    headers: authHeaders(client.key)
+  });
+  const taskRows = await taskAccess.json().catch(() => []);
+  if (!taskAccess.ok) return { ok: false, status: taskAccess.status, error: taskRows };
+  if (Array.isArray(taskRows) && taskRows.length > 0) return { ok: true, lead };
   return { ok: false, status: 403, error: "This lead is not assigned to your dealer account." };
 }
 

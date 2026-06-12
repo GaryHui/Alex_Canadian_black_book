@@ -982,18 +982,53 @@ async function listDealerLeads(dealer) {
   const email = String(dealer.user?.email || "").trim().toLowerCase();
   const isAdmin = dealer.role === "admin";
   const filters = ["select=*", "order=next_follow_up_at.asc.nullslast,created_at.desc", "limit=100"];
-  if (!isAdmin) filters.push(`assigned_to=eq.${encodeURIComponent(email)}`);
 
-  const response = await fetch(`${url}/rest/v1/valuation_leads?${filters.join("&")}`, {
-    headers: supabaseServiceHeaders(key)
-  });
-  const rows = await response.json().catch(() => []);
-  if (!response.ok) return { ok: false, status: response.status, error: rows };
+  let rows = [];
+  if (isAdmin) {
+    const response = await fetch(`${url}/rest/v1/valuation_leads?${filters.join("&")}`, {
+      headers: supabaseServiceHeaders(key)
+    });
+    rows = await response.json().catch(() => []);
+    if (!response.ok) return { ok: false, status: response.status, error: rows };
+  } else {
+    const direct = await fetchSupabaseJson(
+      `${url}/rest/v1/valuation_leads?select=*&assigned_to=eq.${encodeURIComponent(email)}&order=next_follow_up_at.asc.nullslast,created_at.desc&limit=100`,
+      key
+    );
+    if (!direct.ok) return direct;
+
+    const taskRows = await fetchSupabaseJson(
+      `${url}/rest/v1/lead_tasks?select=lead_id&assigned_to=eq.${encodeURIComponent(email)}&limit=200`,
+      key
+    );
+    if (!taskRows.ok) return taskRows;
+
+    const taskLeadIds = [...new Set((taskRows.data || []).map((task) => String(task.lead_id || "").trim()).filter(Boolean))];
+    let taskLeads = [];
+    if (taskLeadIds.length) {
+      const taskLeadResult = await fetchSupabaseJson(
+        `${url}/rest/v1/valuation_leads?select=*&id=in.(${taskLeadIds.map(encodeURIComponent).join(",")})&order=next_follow_up_at.asc.nullslast,created_at.desc&limit=100`,
+        key
+      );
+      if (!taskLeadResult.ok) return taskLeadResult;
+      taskLeads = taskLeadResult.data || [];
+    }
+
+    rows = [...new Map([...(direct.data || []), ...taskLeads].map((lead) => [lead.id, lead])).values()]
+      .sort(compareDealerLeads);
+  }
 
   const leads = (Array.isArray(rows) ? rows : [])
     .filter((lead) => String(lead.status || "").toLowerCase() !== "deleted");
 
   return { ok: true, storage: "supabase", role: dealer.role, email, leads };
+}
+
+function compareDealerLeads(a, b) {
+  const followUpA = a.next_follow_up_at ? new Date(a.next_follow_up_at).getTime() : Number.MAX_SAFE_INTEGER;
+  const followUpB = b.next_follow_up_at ? new Date(b.next_follow_up_at).getTime() : Number.MAX_SAFE_INTEGER;
+  if (followUpA !== followUpB) return followUpA - followUpB;
+  return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
 }
 
 async function listMyLeads(user) {
@@ -1144,6 +1179,12 @@ async function canAccessLead(leadId, dealer) {
   const assignedTo = String(lead.assigned_to || "").trim().toLowerCase();
   const email = String(dealer.user?.email || "").trim().toLowerCase();
   if (assignedTo && assignedTo === email) return { ok: true, lead };
+  const taskAccess = await fetch(`${url}/rest/v1/lead_tasks?select=id&lead_id=eq.${encodeURIComponent(id)}&assigned_to=eq.${encodeURIComponent(email)}&limit=1`, {
+    headers: supabaseServiceHeaders(key)
+  });
+  const taskRows = await taskAccess.json().catch(() => []);
+  if (!taskAccess.ok) return { ok: false, status: taskAccess.status, error: taskRows };
+  if (Array.isArray(taskRows) && taskRows.length > 0) return { ok: true, lead };
   return { ok: false, status: 403, error: "This lead is not assigned to your dealer account." };
 }
 

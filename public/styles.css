@@ -1319,6 +1319,16 @@ select {
   text-decoration: line-through;
 }
 
+.task-complete-note {
+  align-self: center;
+  background: #edf7ed;
+  border-radius: 999px;
+  color: #1f6f35;
+  font-weight: 800;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
 .dealer-lead-card {
   display: grid;
   gap: 12px;

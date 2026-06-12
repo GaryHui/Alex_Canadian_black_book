@@ -276,6 +276,8 @@ function renderLead(lead) {
   const priority = lead.priority || "normal";
   const followUp = lead.next_follow_up_at || "";
   const overdue = isOverdue(followUp, status);
+  const statusClass = overdue ? "status-overdue" : `status-${cssToken(status)}`;
+  const statusLabel = overdue ? "Overdue" : status.replaceAll("_", " ");
   return `
     <article class="lead-card ${overdue ? "lead-overdue" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <header class="lead-summary">
@@ -290,8 +292,7 @@ function renderLead(lead) {
           <span>Wholesale ${wholesale ? formatNumber(wholesale) : "-"}</span>
           <span>Retail ${retail ? formatNumber(retail) : "-"}</span>
           <b class="priority-pill priority-${escapeHtml(priority)}">${escapeHtml(priority)}</b>
-          <b class="status-pill">${escapeHtml(status)}</b>
-          ${overdue ? `<b class="status-pill overdue-pill">Overdue</b>` : ""}
+          <b class="status-pill ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
         </div>
       </header>
       <details class="lead-manage">
@@ -747,4 +748,8 @@ function escapeHtml(value) {
     '"': "&quot;",
     "'": "&#39;"
   })[char]);
+}
+
+function cssToken(value) {
+  return String(value || "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
