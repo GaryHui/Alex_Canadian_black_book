@@ -86,6 +86,8 @@ then the Sheet ID is:
 
 `installHeaders` force-writes the header row to row 1. If A1 has a test value like `TEST HEADER WRITE`, it will be replaced by `Received At`.
 
+If a new field such as `Condition Notes` does not appear in the Google Sheet, save the script, run `installHeaders` again, and update the Web App deployment. The website already sends `conditionNotes`; the Sheet needs the current script below to write it into a visible column.
+
 ```javascript
 const SPREADSHEET_ID = "YOUR_GOOGLE_SHEET_ID";
 const LEADS_SHEET_NAME = "Leads";
@@ -105,6 +107,7 @@ const LEADS_HEADERS = [
   "Kilometers",
   "Ownership Type",
   "Color",
+  "Condition Notes",
   "Region",
   "Country",
   "Wholesale AVG",
@@ -147,6 +150,7 @@ function doPost(e) {
     data.kilometers || "",
     data.ownershipType || "",
     data.color || "",
+    data.conditionNotes || "",
     data.region || "",
     data.country || "",
     data.wholesaleAvg || "",

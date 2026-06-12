@@ -256,6 +256,8 @@ After those are provided, put the endpoint in `CRM_WEBHOOK_URL`, put the token i
 
 Replace `SPREADSHEET_ID` and `DRIVE_ROOT_FOLDER_ID` before deployment.
 
+If you add or move any column, run `installHeaders` again after saving the Apps Script. For example, `Condition Notes` is a normal lead column in the script below; if the Sheet does not show it, the owner is still running an older deployed Apps Script or has not rerun `installHeaders`.
+
 ```javascript
 const SPREADSHEET_ID = "YOUR_GOOGLE_SHEET_ID";
 const DRIVE_ROOT_FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID";
@@ -277,6 +279,7 @@ const LEADS_HEADERS = [
   "Kilometers",
   "Ownership Type",
   "Color",
+  "Condition Notes",
   "Region",
   "Country",
   "Wholesale AVG",
@@ -340,6 +343,7 @@ function doPost(e) {
     data.kilometers || "",
     data.ownershipType || "",
     data.color || "",
+    data.conditionNotes || "",
     data.region || "",
     data.country || "",
     data.wholesaleAvg || "",
