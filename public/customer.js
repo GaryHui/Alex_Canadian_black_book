@@ -35,13 +35,17 @@ const emailAuthModalTitle = document.querySelector("#email-auth-modal-title");
 const emailAuthClose = document.querySelector("#email-auth-close");
 const emailAuthBackdrop = document.querySelector("#email-auth-backdrop");
 const emailAuthForm = document.querySelector("#email-auth-form");
-const emailAuthTabs = [...document.querySelectorAll("[data-auth-mode]")];
+const emailAuthTabs = [...document.querySelectorAll(".email-auth-tab")];
 const emailAuthEmailWrap = document.querySelector("#email-auth-email-wrap");
 const emailAuthEmail = document.querySelector("#email-auth-email");
 const emailAuthPasswordWrap = document.querySelector("#email-auth-password-wrap");
 const emailAuthPassword = document.querySelector("#email-auth-password");
 const emailAuthConfirmWrap = document.querySelector("#email-auth-confirm-wrap");
 const emailAuthConfirm = document.querySelector("#email-auth-confirm");
+const emailAuthTermsWrap = document.querySelector("#email-auth-terms-wrap");
+const emailAuthTermsCheck = document.querySelector("#email-auth-terms-check");
+const emailAuthSwitchText = document.querySelector("#email-auth-switch-text");
+const emailAuthSwitchButton = document.querySelector("#email-auth-switch-button");
 const emailAuthSubmit = document.querySelector("#email-auth-submit");
 const emailAuthStatus = document.querySelector("#email-auth-status");
 const customerTurnstileWrap = document.querySelector("#customer-turnstile-wrap");
@@ -205,6 +209,14 @@ const text = {
     emailAuthModalTitle: "Create Account",
     emailCreateModalTitle: "Create Account",
     emailLoginModalTitle: "Login",
+    emailPasswordHint: "Minimum 6 characters",
+    emailTermsPrefix: "I agree to the",
+    emailTermsLink: "Terms of Service",
+    emailTermsRequired: "Please agree to the Terms of Service.",
+    emailSwitchToSignInText: "Already have an account?",
+    emailSwitchToSignInAction: "Sign in",
+    emailSwitchToSignUpText: "Need an account?",
+    emailSwitchToSignUpAction: "Create free account",
     emailSignInTab: "Email sign in",
     emailSignUpTab: "Create account",
     emailResetTab: "Forgot password",
@@ -216,7 +228,7 @@ const text = {
     emailResetAction: "Send reset link",
     emailUpdateAction: "Update password",
     emailPasswordMismatch: "Passwords do not match.",
-    emailPasswordShort: "Use at least 8 characters for your password.",
+    emailPasswordShort: "Use at least 6 characters for your password.",
     emailSignInReady: "Signed in successfully.",
     emailSignUpSent: "Check your email to confirm your account, then sign in.",
     emailResetSent: "Check your email for the password reset link.",
@@ -402,6 +414,14 @@ const text = {
     emailAuthModalTitle: "Creer un compte",
     emailCreateModalTitle: "Creer un compte",
     emailLoginModalTitle: "Connexion",
+    emailPasswordHint: "Minimum 6 caractères",
+    emailTermsPrefix: "J'accepte les",
+    emailTermsLink: "conditions d'utilisation",
+    emailTermsRequired: "Veuillez accepter les conditions d'utilisation.",
+    emailSwitchToSignInText: "Vous avez déjà un compte?",
+    emailSwitchToSignInAction: "Connexion",
+    emailSwitchToSignUpText: "Besoin d'un compte?",
+    emailSwitchToSignUpAction: "Créer un compte gratuit",
     emailSignInTab: "Connexion courriel",
     emailSignUpTab: "Créer un compte",
     emailResetTab: "Mot de passe oublié",
@@ -413,7 +433,7 @@ const text = {
     emailResetAction: "Envoyer le lien",
     emailUpdateAction: "Mettre à jour",
     emailPasswordMismatch: "Les mots de passe ne correspondent pas.",
-    emailPasswordShort: "Utilisez au moins 8 caractères.",
+    emailPasswordShort: "Utilisez au moins 6 caractères.",
     emailSignInReady: "Connexion réussie.",
     emailSignUpSent: "Vérifiez votre courriel pour confirmer le compte, puis connectez-vous.",
     emailResetSent: "Vérifiez votre courriel pour le lien de réinitialisation.",
@@ -582,6 +602,9 @@ function initialize() {
   openLoginButton?.addEventListener("click", () => openEmailAuthModal("signin"));
   emailAuthClose?.addEventListener("click", closeEmailAuthModal);
   emailAuthBackdrop?.addEventListener("click", closeEmailAuthModal);
+  emailAuthSwitchButton?.addEventListener("click", () => {
+    setEmailAuthMode(emailAuthSwitchButton.dataset.authMode || "signin");
+  });
   emailAuthTabs.forEach((button) => button.addEventListener("click", () => setEmailAuthMode(button.dataset.authMode || "signin")));
   emailAuthForm.addEventListener("submit", handleEmailAuthSubmit);
   reloadHistoryButton.addEventListener("click", loadHistory);
@@ -801,6 +824,10 @@ async function handleEmailAuthSubmit(event) {
       setEmailAuthStatus(t("emailPasswordMismatch"));
       return;
     }
+    if (emailAuthTermsCheck && !emailAuthTermsCheck.checked) {
+      setEmailAuthStatus(t("emailTermsRequired"));
+      return;
+    }
     await runWithHumanVerification(() => signUpWithEmail(email, password));
     return;
   }
@@ -895,6 +922,7 @@ function openEmailAuthModal(mode = "signin") {
   if (!emailAuthModal) return;
   emailAuthModal.hidden = false;
   document.body.classList.add("modal-open");
+  if (emailAuthTermsCheck) emailAuthTermsCheck.checked = false;
   window.setTimeout(() => emailAuthEmail?.focus(), 0);
 }
 
@@ -920,9 +948,11 @@ function setEmailAuthMode(mode) {
   emailAuthEmailWrap.hidden = isUpdate;
   emailAuthPasswordWrap.hidden = isReset;
   emailAuthConfirmWrap.hidden = !(isSignup || isUpdate);
+  if (emailAuthTermsWrap) emailAuthTermsWrap.hidden = !isSignup;
   emailAuthEmail.required = !isUpdate;
   emailAuthPassword.required = !isReset;
   emailAuthConfirm.required = isSignup || isUpdate;
+  if (emailAuthTermsCheck) emailAuthTermsCheck.required = isSignup;
   emailAuthPassword.autocomplete = isSignup || isUpdate ? "new-password" : "current-password";
 
   const actionKey = isReset
@@ -944,6 +974,16 @@ function setEmailAuthMode(mode) {
           : "emailLoginModalTitle";
     emailAuthModalTitle.textContent = t(titleKey);
     emailAuthModalTitle.dataset.i18n = titleKey;
+  }
+  if (emailAuthSwitchText && emailAuthSwitchButton) {
+    const switchTextKey = isSignup ? "emailSwitchToSignInText" : "emailSwitchToSignUpText";
+    const switchActionKey = isSignup ? "emailSwitchToSignInAction" : "emailSwitchToSignUpAction";
+    const switchMode = isSignup ? "signin" : "signup";
+    emailAuthSwitchText.textContent = t(switchTextKey);
+    emailAuthSwitchText.dataset.i18n = switchTextKey;
+    emailAuthSwitchButton.textContent = t(switchActionKey);
+    emailAuthSwitchButton.dataset.i18n = switchActionKey;
+    emailAuthSwitchButton.dataset.authMode = switchMode;
   }
 
   if (isUpdate) {
@@ -969,7 +1009,7 @@ function setEmailAuthBusy(isBusy) {
 }
 
 function isUsablePassword(password) {
-  return String(password || "").length >= 8;
+  return String(password || "").length >= 6;
 }
 
 function setCustomerSession(session) {
