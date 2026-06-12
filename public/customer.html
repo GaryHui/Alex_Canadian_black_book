@@ -301,33 +301,6 @@
             </div>
           </div>
 
-          <div class="review-select-stack">
-            <label>
-              <span data-i18n="seriesLabel">Series / Trim</span>
-              <input name="series" data-review-field="series" list="series-options" autocomplete="off" />
-              <datalist id="series-options"></datalist>
-            </label>
-            <label>
-              <span data-i18n="engineLabel">Engine</span>
-              <input name="engine" data-review-field="engine" list="engine-options" autocomplete="off" />
-              <datalist id="engine-options"></datalist>
-            </label>
-            <label>
-              <span data-i18n="drivetrainLabel">Drivetrain</span>
-              <input name="drivetrain" data-review-field="drivetrain" list="drivetrain-options" autocomplete="off" />
-              <datalist id="drivetrain-options"></datalist>
-            </label>
-            <label>
-              <span data-i18n="transmissionLabel">Transmission</span>
-              <select name="transmission" data-review-select="transmission"></select>
-            </label>
-            <label>
-              <span data-i18n="styleLabel">Style</span>
-              <input name="style" data-review-field="style" list="style-options" autocomplete="off" />
-              <datalist id="style-options"></datalist>
-            </label>
-          </div>
-
           <section class="review-summary" aria-labelledby="review-summary-title">
             <h3 id="review-summary-title" data-i18n="reviewSummary">Vehicle data</h3>
             <dl>
@@ -362,6 +335,34 @@
             </dl>
           </section>
 
+          <div class="review-select-stack" id="blackbook-options" hidden>
+            <h3 data-i18n="blackbookOptionsTitle">Black Book options</h3>
+            <label data-review-option="series">
+              <span data-i18n="seriesLabel">Series / Trim</span>
+              <input name="series" data-review-field="series" list="series-options" autocomplete="off" />
+              <datalist id="series-options"></datalist>
+            </label>
+            <label data-review-option="engine">
+              <span data-i18n="engineLabel">Engine</span>
+              <input name="engine" data-review-field="engine" list="engine-options" autocomplete="off" />
+              <datalist id="engine-options"></datalist>
+            </label>
+            <label data-review-option="drivetrain">
+              <span data-i18n="drivetrainLabel">Drivetrain</span>
+              <input name="drivetrain" data-review-field="drivetrain" list="drivetrain-options" autocomplete="off" />
+              <datalist id="drivetrain-options"></datalist>
+            </label>
+            <label data-review-option="transmission">
+              <span data-i18n="transmissionLabel">Transmission</span>
+              <select name="transmission" data-review-select="transmission"></select>
+            </label>
+            <label data-review-option="style">
+              <span data-i18n="styleLabel">Style</span>
+              <input name="style" data-review-field="style" list="style-options" autocomplete="off" />
+              <datalist id="style-options"></datalist>
+            </label>
+          </div>
+
           <section id="base-preview" class="base-preview" hidden>
             <div>
               <p class="eyebrow" data-i18n="basePreviewEyebrow">Base estimate</p>
@@ -381,6 +382,7 @@
           </section>
 
           <div class="review-extras">
+            <h3 data-i18n="additionalDetailsTitle">Additional details</h3>
             <label>
               <span data-i18n="colorLabel">Color</span>
               <input name="color" data-review-color list="color-options" autocomplete="off" data-i18n-placeholder="colorPlaceholder" placeholder="White, black, silver..." />

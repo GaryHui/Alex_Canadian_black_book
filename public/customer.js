@@ -6,6 +6,7 @@ const vehicleReviewSection = document.querySelector("#vehicle-review");
 const reviewForm = document.querySelector("#review-form");
 const changeVehicleButton = document.querySelector("#change-vehicle");
 const photoInputs = [...document.querySelectorAll("[data-photo-role]")];
+const blackbookOptions = document.querySelector("#blackbook-options");
 const basePreview = document.querySelector("#base-preview");
 const basePreviewStatus = document.querySelector("#base-preview-status");
 const baseWholesaleValue = document.querySelector("#base-wholesale-value");
@@ -217,6 +218,8 @@ const text = {
     reviewTitle: "Confirm a few more details about the car",
     reviewIntro: "This will help us provide a more accurate value.",
     reviewSummary: "Vehicle data",
+    blackbookOptionsTitle: "Black Book options",
+    additionalDetailsTitle: "Additional details",
     basePreviewEyebrow: "Base estimate",
     basePreviewTitle: "Initial value using province and odometer",
     basePreviewLoading: "Checking the first estimate...",
@@ -458,6 +461,20 @@ function initialize() {
   form.elements.mode.forEach((item) => item.addEventListener("change", updateMode));
   form.elements.make.addEventListener("input", syncModelList);
   form.elements.year.addEventListener("change", syncModelList);
+  [form.elements.make, form.elements.model].forEach((field) => {
+    const openPicker = () => {
+      field.select();
+      if (typeof field.showPicker === "function") {
+        try {
+          field.showPicker();
+        } catch {
+          // Some browsers only allow showPicker during direct user gestures.
+        }
+      }
+    };
+    field.addEventListener("focus", openPicker);
+    field.addEventListener("click", openPicker);
+  });
   languageToggle.addEventListener("click", () => setLanguage(language === "en" ? "fr" : "en"));
   vinHelpButton.addEventListener("click", () => {
     openVinGuide();
@@ -853,41 +870,56 @@ async function loadBaseEstimatePreview(vehicle, input) {
 
 function populateReviewSelects(vehicle = {}) {
   const inferred = inferVehicleDetails(vehicle);
-  setReviewFieldOptions("series", inferred.series);
-  setReviewFieldOptions("engine", inferred.engine);
-  setReviewFieldOptions("drivetrain", inferred.drivetrain, ["Not sure", "AWD", "FWD", "RWD", "4WD", "4X4"]);
-  setTransmissionOptions(inferred.transmission);
-  setReviewFieldOptions("style", inferred.style);
+  const visible = [
+    setReviewFieldOptions("series", inferred.series),
+    setReviewFieldOptions("engine", inferred.engine),
+    setReviewFieldOptions("drivetrain", inferred.drivetrain),
+    setTransmissionOptions(inferred.transmission),
+    setReviewFieldOptions("style", inferred.style)
+  ].some(Boolean);
+  if (blackbookOptions) blackbookOptions.hidden = !visible;
 }
 
-function setReviewFieldOptions(name, values, fallbackValues = ["Not sure"]) {
+function setReviewFieldOptions(name, values) {
   const field = reviewForm.elements[name];
   const datalist = document.querySelector(`#${name}-options`);
+  const wrapper = document.querySelector(`[data-review-option="${cssEscape(name)}"]`);
   if (!field) return;
 
-  const uniqueValues = uniqueReviewValues([...values, ...fallbackValues]);
-  field.value = uniqueReviewValues(values)[0] || "Not sure";
+  const uniqueValues = uniqueReviewValues(values);
+  const shouldShow = uniqueValues.length > 0;
+  if (wrapper) wrapper.hidden = !shouldShow;
+  field.value = shouldShow ? uniqueValues[0] : "";
 
   if (datalist) {
     datalist.innerHTML = uniqueValues
       .map((value) => `<option value="${escapeHtml(value)}"></option>`)
       .join("");
   }
+  return shouldShow;
 }
 
 function setTransmissionOptions(values = []) {
   const select = reviewForm.elements.transmission;
+  const wrapper = document.querySelector('[data-review-option="transmission"]');
   if (!select) return;
   const inferred = uniqueReviewValues(values);
+  const shouldShow = inferred.length > 0;
+  if (wrapper) wrapper.hidden = !shouldShow;
+  if (!shouldShow) {
+    select.innerHTML = "";
+    return false;
+  }
   const matched = inferred.find((value) => /manual/i.test(value))
     ? "Manual"
     : inferred.find((value) => /auto|automatic|cvt/i.test(value))
       ? "Automatic"
-      : "Not sure";
+      : inferred[0];
 
-  select.innerHTML = ["Not sure", "Automatic", "Manual"]
+  select.innerHTML = uniqueReviewValues([matched, ...inferred])
     .map((value) => `<option value="${escapeHtml(value)}"${value === matched ? " selected" : ""}>${escapeHtml(value)}</option>`)
     .join("");
+  return true;
 }
 
 function uniqueReviewValues(values = []) {

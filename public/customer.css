@@ -686,18 +686,34 @@ input::placeholder {
 
 .review-select-stack {
   display: grid;
-  gap: 8px;
+  gap: 12px;
+  padding: 16px;
+  background: #fbfdff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.review-select-stack h3,
+.review-extras h3 {
+  margin: 0 0 2px;
+  color: var(--blue-dark);
+  font-size: 18px;
+  font-weight: 850;
 }
 
 .review-select-stack label span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
+  position: static;
+  width: auto;
+  height: auto;
   padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
+  margin: 0 0 6px;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
   border: 0;
 }
 
@@ -814,6 +830,10 @@ input::placeholder {
 .review-extras {
   display: grid;
   gap: 14px;
+  padding: 16px;
+  background: #fbfdff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 
 .review-extras label span {
