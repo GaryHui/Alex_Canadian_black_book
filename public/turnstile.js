@@ -26,6 +26,7 @@
     const readyText = options?.readyText || "Human verification passed.";
     const failedText = options?.failedText || "Human verification failed. Please try again.";
     const action = String(options?.action || "login").trim();
+    const language = String(options?.language || "en").trim();
     const lazy = Boolean(options?.lazy);
     const onVerified = typeof options?.onVerified === "function" ? options.onVerified : null;
     let verified = false;
@@ -58,6 +59,9 @@
         const data = await response.json().catch(() => ({}));
         verified = Boolean(response.ok && data.ok);
         setStatus(verified ? readyText : data.error || failedText);
+        if (!verified && window.turnstile && widgetId !== null) {
+          window.setTimeout(() => window.turnstile.reset(widgetId), 400);
+        }
         if (verified && onVerified) window.setTimeout(onVerified, 0);
       } catch (error) {
         verified = false;
@@ -79,6 +83,7 @@
         widgetId = turnstile.render(container, {
           sitekey: siteKey,
           action,
+          language,
           callback: verifyToken,
           "expired-callback": () => {
             verified = false;
