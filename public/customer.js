@@ -731,6 +731,21 @@ function validateInput(input) {
 }
 
 async function searchVehicles(input) {
+  if (input.mode === "drilldown") {
+    const query = new URLSearchParams({
+      year: input.year,
+      make: input.make,
+      model: input.model,
+      country: input.country || "C"
+    });
+    const response = await fetch(`/api/drilldown?${query.toString()}`);
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || t("noMatches"));
+    return (data.vehicles || [])
+      .filter((item) => item.title || item.uvc)
+      .slice(0, 20);
+  }
+
   const searchText = input.mode === "vin"
     ? input.vin
     : [input.year, input.make, input.model].filter(Boolean).join(" ");

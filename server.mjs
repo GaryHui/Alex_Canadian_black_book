@@ -1600,7 +1600,9 @@ function normalizeDrilldown(raw, input = {}) {
   const activeSeriesNodes = selectedSeries
     ? seriesNodes.filter((node) => sameName(node?.name, selectedSeries))
     : seriesNodes;
-  const styleNodes = activeSeriesNodes.flatMap((seriesItem) => arrayOf(seriesItem?.style_list));
+  const styleNodes = activeSeriesNodes.flatMap((seriesItem) =>
+    arrayOf(seriesItem?.style_list).map((style) => ({ seriesItem, style }))
+  );
 
   const makes = selectedMake
     ? uniqueSorted(activeMakeNodes.map((item) => item?.name))
@@ -1609,14 +1611,14 @@ function normalizeDrilldown(raw, input = {}) {
   const series = selectedModel ? uniqueSorted(seriesNodes.map((item) => item?.name)) : [];
   const styles = selectedModel ? uniqueSorted(styleNodes.map((item) => item?.name)) : [];
   const vehicles = selectedModel
-    ? styleNodes.map((style) => ({
-      uvc: style.uvc || "",
-      title: [input.year, selectedMake, selectedModel, selectedSeries || "", style.name || ""].filter(Boolean).join(" "),
+    ? styleNodes.map(({ seriesItem, style }) => ({
+      uvc: style?.uvc || "",
+      title: [input.year, selectedMake, selectedModel, seriesItem?.name || selectedSeries || "", style?.name || ""].filter(Boolean).join(" "),
       year: String(input.year || ""),
       make: selectedMake,
       model: selectedModel,
-      series: selectedSeries || "",
-      style: style.name || ""
+      series: seriesItem?.name || selectedSeries || "",
+      style: style?.name || ""
     }))
     : allVehicles(raw).map(vehicleChoice).filter((item) => item.title && item.title !== "Vehicle ");
 
