@@ -55,12 +55,12 @@ Important:
 The customer page compresses photos before sending them:
 
 ```text
-Max photos: 6
+Max photos: 9
 Max long edge: 1400 px
 Format sent to Apps Script: JPEG
 ```
 
-The customer page asks for these six photo angles:
+The customer page asks for these optional photo angles:
 
 ```text
 Front exterior
@@ -69,6 +69,9 @@ Driver side
 Passenger side
 Odometer
 Interior
+Engine bay
+Wheels and tires
+Damage or wear
 ```
 
 Each uploaded photo is automatically renamed before it is sent to Google Drive. Examples:
@@ -80,6 +83,9 @@ driver-side-original-name.jpg
 passenger-side-original-name.jpg
 odometer-original-name.jpg
 interior-original-name.jpg
+engine-bay-original-name.jpg
+wheels-tires-original-name.jpg
+damage-wear-original-name.jpg
 ```
 
 This makes the Drive folder easier for the dealer to review without opening every image.

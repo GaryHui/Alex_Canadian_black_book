@@ -251,6 +251,12 @@ const text = {
     photoOdometerHelp: "Show the mileage clearly on the cluster.",
     photoInterior: "Interior",
     photoInteriorHelp: "Show front seats, dashboard, and center console.",
+    photoEngineBay: "Engine bay",
+    photoEngineBayHelp: "Open the hood and show the engine bay clearly.",
+    photoWheels: "Wheels and tires",
+    photoWheelsHelp: "Show tire tread, rims, and any curb rash.",
+    photoDamage: "Damage or wear",
+    photoDamageHelp: "Show scratches, dents, warning lights, or other concerns.",
     choosePhoto: "Choose photo",
     noPhotoSelected: "No photo selected",
     generateValuation: "Get Value Range",
@@ -414,6 +420,12 @@ const text = {
     photoOdometerHelp: "Montrez clairement le kilométrage au tableau de bord.",
     photoInterior: "Intérieur",
     photoInteriorHelp: "Montrez les sièges avant, le tableau de bord et la console.",
+    photoEngineBay: "Compartiment moteur",
+    photoEngineBayHelp: "Ouvrez le capot et montrez clairement le compartiment moteur.",
+    photoWheels: "Roues et pneus",
+    photoWheelsHelp: "Montrez la bande de roulement, les jantes et les marques de trottoir.",
+    photoDamage: "Dommages ou usure",
+    photoDamageHelp: "Montrez les rayures, bosses, voyants ou autres points à signaler.",
     choosePhoto: "Choisir une photo",
     noPhotoSelected: "Aucune photo choisie",
     generateValuation: "Obtenir la fourchette",
@@ -447,7 +459,7 @@ let customerTurnstileGate = null;
 let makeRequestId = 0;
 let modelRequestId = 0;
 
-const MAX_PHOTO_COUNT = 6;
+const MAX_PHOTO_COUNT = 9;
 const MAX_PHOTO_EDGE = 1400;
 const PHOTO_JPEG_QUALITY = 0.78;
 
@@ -951,9 +963,9 @@ function setReviewFieldOptions(name, values) {
   if (!field) return;
 
   const uniqueValues = uniqueReviewValues(values);
-  const shouldShow = uniqueValues.length > 0;
+  const shouldShow = uniqueValues.length > 1;
   if (wrapper) wrapper.hidden = !shouldShow;
-  field.value = shouldShow ? uniqueValues[0] : "";
+  field.value = uniqueValues[0] || "";
 
   if (datalist) {
     datalist.innerHTML = uniqueValues
@@ -968,17 +980,18 @@ function setTransmissionOptions(values = []) {
   const wrapper = document.querySelector('[data-review-option="transmission"]');
   if (!select) return;
   const inferred = uniqueReviewValues(values);
-  const shouldShow = inferred.length > 0;
+  const shouldShow = inferred.length > 1;
   if (wrapper) wrapper.hidden = !shouldShow;
-  if (!shouldShow) {
-    select.innerHTML = "";
-    return false;
-  }
   const matched = inferred.find((value) => /manual/i.test(value))
     ? "Manual"
     : inferred.find((value) => /auto|automatic|cvt/i.test(value))
       ? "Automatic"
-      : inferred[0];
+      : inferred[0] || "";
+
+  if (!inferred.length) {
+    select.innerHTML = "";
+    return false;
+  }
 
   select.innerHTML = uniqueReviewValues([matched, ...inferred])
     .map((value) => `<option value="${escapeHtml(value)}"${value === matched ? " selected" : ""}>${escapeHtml(value)}</option>`)

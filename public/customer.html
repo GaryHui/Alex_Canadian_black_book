@@ -306,7 +306,7 @@
                 <dt>VIN</dt>
                 <dd id="review-vin">-</dd>
               </div>
-              <div>
+              <div data-internal-vehicle-field hidden>
                 <dt>UVC</dt>
                 <dd id="review-uvc">-</dd>
               </div>
@@ -463,6 +463,36 @@
                     <span class="photo-picker-name" data-photo-status="interior" data-i18n="noPhotoSelected">No photo selected</span>
                   </span>
                   <figure data-photo-preview="interior"></figure>
+                </label>
+                <label class="photo-slot">
+                  <span data-i18n="photoEngineBay">Engine bay</span>
+                  <small data-i18n="photoEngineBayHelp">Open the hood and show the engine bay clearly.</small>
+                  <input name="photo-engine-bay" type="file" accept="image/*" data-photo-role="engine-bay" data-photo-label="Engine bay" />
+                  <span class="photo-picker">
+                    <span class="photo-picker-button" data-i18n="choosePhoto">Choose photo</span>
+                    <span class="photo-picker-name" data-photo-status="engine-bay" data-i18n="noPhotoSelected">No photo selected</span>
+                  </span>
+                  <figure data-photo-preview="engine-bay"></figure>
+                </label>
+                <label class="photo-slot">
+                  <span data-i18n="photoWheels">Wheels and tires</span>
+                  <small data-i18n="photoWheelsHelp">Show tire tread, rims, and any curb rash.</small>
+                  <input name="photo-wheels" type="file" accept="image/*" data-photo-role="wheels-tires" data-photo-label="Wheels and tires" />
+                  <span class="photo-picker">
+                    <span class="photo-picker-button" data-i18n="choosePhoto">Choose photo</span>
+                    <span class="photo-picker-name" data-photo-status="wheels-tires" data-i18n="noPhotoSelected">No photo selected</span>
+                  </span>
+                  <figure data-photo-preview="wheels-tires"></figure>
+                </label>
+                <label class="photo-slot">
+                  <span data-i18n="photoDamage">Damage or wear</span>
+                  <small data-i18n="photoDamageHelp">Show scratches, dents, warning lights, or other concerns.</small>
+                  <input name="photo-damage" type="file" accept="image/*" data-photo-role="damage-wear" data-photo-label="Damage or wear" />
+                  <span class="photo-picker">
+                    <span class="photo-picker-button" data-i18n="choosePhoto">Choose photo</span>
+                    <span class="photo-picker-name" data-photo-status="damage-wear" data-i18n="noPhotoSelected">No photo selected</span>
+                  </span>
+                  <figure data-photo-preview="damage-wear"></figure>
                 </label>
               </div>
             </section>

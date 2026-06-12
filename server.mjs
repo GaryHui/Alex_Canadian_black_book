@@ -1414,7 +1414,7 @@ function sanitizePhotoFiles(files) {
   if (!Array.isArray(files)) return [];
 
   return files
-    .slice(0, 6)
+    .slice(0, 9)
     .map((file, index) => {
       const mimeType = String(file?.mimeType || file?.type || "image/jpeg").trim();
       const base64 = String(file?.base64 || "")
