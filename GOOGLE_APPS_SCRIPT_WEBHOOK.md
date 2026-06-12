@@ -103,6 +103,7 @@ const LEADS_HEADERS = [
   "Series / Trim",
   "Style",
   "Kilometers",
+  "Ownership Type",
   "Color",
   "Region",
   "Country",
@@ -144,6 +145,7 @@ function doPost(e) {
     data.series || "",
     data.style || "",
     data.kilometers || "",
+    data.ownershipType || "",
     data.color || "",
     data.region || "",
     data.country || "",
@@ -287,7 +289,7 @@ Advanced > Go to ... unsafe > Allow
 Row 1 should now show:
 
 ```text
-Received At | Customer Email | Phone | VIN | UVC | Year | Make | Model | Series / Trim | Style | Kilometers | Color | Region | Country | Wholesale AVG | Retail AVG | Trade-In AVG | Lead ID | Auth Email | Status
+Received At | Customer Email | Phone | VIN | UVC | Year | Make | Model | Series / Trim | Style | Kilometers | Ownership Type | Color | Region | Country | Wholesale AVG | Retail AVG | Trade-In AVG | Lead ID | Auth Email | Status
 ```
 
 The file should also have a second tab named:

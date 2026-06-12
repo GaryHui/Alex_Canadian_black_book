@@ -275,6 +275,7 @@ const LEADS_HEADERS = [
   "Series / Trim",
   "Style",
   "Kilometers",
+  "Ownership Type",
   "Color",
   "Region",
   "Country",
@@ -337,6 +338,7 @@ function doPost(e) {
     data.series || "",
     data.style || "",
     data.kilometers || "",
+    data.ownershipType || "",
     data.color || "",
     data.region || "",
     data.country || "",
@@ -418,6 +420,7 @@ function createVehiclePdf_(data, receivedAt, leadFolder, savedFiles) {
   body.appendParagraph("UVC: " + (data.uvc || ""));
   body.appendParagraph("Vehicle: " + title);
   body.appendParagraph("Kilometers: " + (data.kilometers || ""));
+  body.appendParagraph("Ownership Type: " + (data.ownershipType || ""));
   body.appendParagraph("Color: " + (data.color || ""));
   body.appendParagraph("Region: " + (data.region || ""));
   body.appendParagraph("Country: " + (data.country || ""));
@@ -466,6 +469,7 @@ function createVehicleSpreadsheet_(data, receivedAt, leadFolder, savedFiles, pdf
     ["Series / Trim", data.series || ""],
     ["Style", data.style || ""],
     ["Kilometers", data.kilometers || ""],
+    ["Ownership Type", data.ownershipType || ""],
     ["Color", data.color || ""],
     ["Region", data.region || ""],
     ["Country", data.country || ""],

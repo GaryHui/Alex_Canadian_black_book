@@ -332,15 +332,35 @@ h1 {
   border: 0;
 }
 
+.ownership-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  padding: 0;
+  margin: 6px 0 8px;
+  border: 0;
+}
+
+.ownership-group legend {
+  width: 100%;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .mode-toggle label,
-.check-row {
+.check-row,
+.ownership-group label {
   display: inline-flex;
   align-items: center;
   gap: 10px;
 }
 
 .mode-toggle input,
-.check-row input {
+.check-row input,
+.ownership-group input {
   width: 20px;
   height: 20px;
   accent-color: var(--blue);

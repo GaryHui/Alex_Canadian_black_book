@@ -133,7 +133,10 @@ const text = {
     emailLabel: "Email",
     phoneLabel: "Phone (optional)",
     postalHelp: "Why do you need my postal code?",
-    ownVehicle: "I own this vehicle",
+    ownershipLabel: "Type of Ownership",
+    ownershipOwned: "Owned",
+    ownershipFinanced: "Financed",
+    ownershipLeased: "Leased",
     continueButton: "Continue",
     chooseEyebrow: "Confirm vehicle",
     chooseTitle: "Choose the closest match",
@@ -288,7 +291,10 @@ const text = {
     emailLabel: "Courriel",
     phoneLabel: "Téléphone (optionnel)",
     postalHelp: "Pourquoi demander mon code postal?",
-    ownVehicle: "Je suis propriétaire de ce véhicule",
+    ownershipLabel: "Type de propriete",
+    ownershipOwned: "Proprietaire",
+    ownershipFinanced: "Finance",
+    ownershipLeased: "Location",
     continueButton: "Continuer",
     chooseEyebrow: "Confirmer le véhicule",
     chooseTitle: "Choisissez la meilleure correspondance",
@@ -423,6 +429,7 @@ let usageState = null;
 let historyLeads = [];
 let siteUrl = window.location.origin;
 let customerTurnstileGate = null;
+let drilldownRequestId = 0;
 
 const MAX_PHOTO_COUNT = 6;
 const MAX_PHOTO_EDGE = 1400;
@@ -450,6 +457,7 @@ function initialize() {
   photoInputs.forEach((input) => input.addEventListener("change", renderPhotoPreview));
   form.elements.mode.forEach((item) => item.addEventListener("change", updateMode));
   form.elements.make.addEventListener("input", syncModelList);
+  form.elements.year.addEventListener("change", syncModelList);
   languageToggle.addEventListener("click", () => setLanguage(language === "en" ? "fr" : "en"));
   vinHelpButton.addEventListener("click", () => {
     openVinGuide();
@@ -490,9 +498,24 @@ function populateDatalist(list, values) {
   }));
 }
 
-function syncModelList() {
+async function syncModelList() {
   const make = form.elements.make.value.trim();
+  const year = form.elements.year.value.trim();
   populateDatalist(modelList, commonModels[make] || []);
+  if (!year || !make) return;
+
+  const requestId = ++drilldownRequestId;
+  try {
+    const query = new URLSearchParams({ year, make, country: "C" });
+    const response = await fetch(`/api/drilldown?${query.toString()}`);
+    const data = await response.json();
+    if (requestId !== drilldownRequestId || !data.ok) return;
+    if (Array.isArray(data.models) && data.models.length) {
+      populateDatalist(modelList, data.models);
+    }
+  } catch (error) {
+    console.warn("Unable to load Black Book model list", error);
+  }
 }
 
 async function initializeCustomerAuth() {
@@ -677,7 +700,8 @@ function collectInput() {
     region: provinceFromPostal(postalCode),
     country: "C",
     language: language === "fr" ? "fr" : "en",
-    ownsVehicle: Boolean(input.ownsVehicle)
+    ownershipType: String(input.ownershipType || "").trim(),
+    ownsVehicle: input.ownershipType === "Owned"
   };
 }
 

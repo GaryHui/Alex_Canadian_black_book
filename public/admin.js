@@ -290,6 +290,7 @@ function renderLead(lead) {
           <span>UVC</span><b>${escapeHtml(input.uvc || "-")}</b>
           <span>Vehicle</span><b>${escapeHtml([input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" ") || "-")}</b>
           <span>Kilometers</span><b>${formatNumber(input.kilometers || 0)}</b>
+          <span>Ownership</span><b>${escapeHtml(input.ownershipType || (input.ownsVehicle ? "Owned" : "-"))}</b>
           <span>Color</span><b>${escapeHtml(input.color || "-")}</b>
           <span>Region</span><b>${escapeHtml(input.region || valuation.region || "-")}</b>
           <span>AVG Wholesale</span><b>${wholesale ? formatNumber(wholesale) : "-"}</b>

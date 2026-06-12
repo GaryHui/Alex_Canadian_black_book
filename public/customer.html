@@ -176,10 +176,21 @@
             <input name="email" type="hidden" />
             <input name="phone" type="hidden" />
 
-            <label class="check-row">
-              <input name="ownsVehicle" type="checkbox" />
-              <span data-i18n="ownVehicle">I own this vehicle</span>
-            </label>
+            <fieldset class="ownership-group">
+              <legend data-i18n="ownershipLabel">Type of Ownership</legend>
+              <label>
+                <input name="ownershipType" type="radio" value="Owned" required />
+                <span data-i18n="ownershipOwned">Owned</span>
+              </label>
+              <label>
+                <input name="ownershipType" type="radio" value="Financed" />
+                <span data-i18n="ownershipFinanced">Financed</span>
+              </label>
+              <label>
+                <input name="ownershipType" type="radio" value="Leased" />
+                <span data-i18n="ownershipLeased">Leased</span>
+              </label>
+            </fieldset>
 
             <button id="continue-button" class="primary-button" type="submit" data-i18n="continueButton">Continue</button>
           </form>
