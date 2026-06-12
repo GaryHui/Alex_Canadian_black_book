@@ -357,7 +357,7 @@ function renderLead(lead) {
         <section class="lead-activity-panel">
           <div class="lead-activity-head">
             <h3>Follow-up activity</h3>
-            <button type="button" data-load-activity>Load activity</button>
+            <button type="button" data-load-activity>Refresh activity</button>
           </div>
           <form class="lead-note-form">
             <select name="noteType">
@@ -428,7 +428,7 @@ leadsEl.addEventListener("submit", async (event) => {
   statusEl.textContent = data.ok ? "Note saved." : (data.error || "Unable to save note.");
   if (data.ok) {
     form.reset();
-    await loadLeadActivity(card);
+    await loadLeadActivity(card, { force: true });
   }
 });
 
@@ -452,7 +452,7 @@ leadsEl.addEventListener("submit", async (event) => {
   statusEl.textContent = data.ok ? "Task saved." : (data.error || "Unable to save task.");
   if (data.ok) {
     form.reset();
-    await loadLeadActivity(card);
+    await loadLeadActivity(card, { force: true });
   }
 });
 
@@ -465,7 +465,7 @@ leadsEl.addEventListener("click", async (event) => {
 
   const loadButton = event.target.closest("[data-load-activity]");
   if (loadButton) {
-    await loadLeadActivity(loadButton.closest(".lead-card"));
+    await loadLeadActivity(loadButton.closest(".lead-card"), { force: true });
     return;
   }
 
@@ -484,8 +484,17 @@ leadsEl.addEventListener("click", async (event) => {
   });
   const data = await response.json();
   statusEl.textContent = data.ok ? "Task updated." : (data.error || "Unable to update task.");
-  if (data.ok) await loadLeadActivity(card);
+  if (data.ok) await loadLeadActivity(card, { force: true });
 });
+
+leadsEl.addEventListener("toggle", async (event) => {
+  const details = event.target.closest(".lead-manage");
+  if (!details || !details.open) return;
+
+  const card = details.closest(".lead-card");
+  if (!card || card.dataset.activityLoaded === "true") return;
+  await loadLeadActivity(card, { force: true });
+}, true);
 
 async function deleteSingleLead(button) {
   const id = button.dataset.deleteLead || "";
@@ -578,8 +587,9 @@ function cancelClearAllLeads() {
   clearLeadsConfirmEl = null;
 }
 
-async function loadLeadActivity(card) {
+async function loadLeadActivity(card, options = {}) {
   if (!card?.dataset?.id) return;
+  if (card.dataset.activityLoaded === "true" && !options.force) return;
   const list = card.querySelector(".lead-activity-list");
   if (list) list.textContent = "Loading activity...";
 
@@ -592,6 +602,7 @@ async function loadLeadActivity(card) {
     return;
   }
 
+  card.dataset.activityLoaded = "true";
   if (list) list.innerHTML = renderActivity(data);
 }
 

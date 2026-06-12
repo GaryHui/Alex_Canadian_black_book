@@ -6,6 +6,7 @@ const detailsEl = document.querySelector("#details");
 const valueBody = document.querySelector("#value-body");
 const tabs = document.querySelectorAll(".market-tabs button");
 const modeButtons = document.querySelectorAll(".lookup-mode");
+const lookupPanel = document.querySelector(".lookup-panel");
 const choiceList = document.querySelector("#choice-list");
 const inlineChoiceList = document.querySelector("#inline-choice-list");
 const authTitle = document.querySelector("#auth-title");
@@ -77,6 +78,7 @@ let usageState = null;
 let drilldownRequestId = 0;
 let historyLeads = [];
 let pendingDealerLeadCapture = null;
+let currentLookupMode = "free";
 
 initializeDatalists();
 initializeAuth();
@@ -84,6 +86,7 @@ initializeAuth();
 reloadHistoryButton.addEventListener("click", loadHistory);
 reloadDealerLeadsButton?.addEventListener("click", loadDealerLeads);
 saveValuationLeadButton?.addEventListener("click", savePendingDealerLead);
+setLookupMode("free", { openModal: false });
 
 dealerLeadsList?.addEventListener("submit", async (event) => {
   const noteForm = event.target.closest(".dealer-note-form");
@@ -114,7 +117,7 @@ dealerLeadsList?.addEventListener("submit", async (event) => {
     if (!data.ok) throw new Error(data.error || "Unable to save follow-up");
     dealerLeadsStatus.textContent = isTask ? "Task saved." : "Note saved.";
     (isTask ? taskForm : noteForm).reset();
-    await loadDealerActivity(card);
+    await loadDealerActivity(card, { force: true });
   } catch (error) {
     dealerLeadsStatus.textContent = error.message || "Unable to save follow-up";
   }
@@ -123,7 +126,7 @@ dealerLeadsList?.addEventListener("submit", async (event) => {
 dealerLeadsList?.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-load-dealer-activity]");
   if (!button) return;
-  await loadDealerActivity(button.closest(".dealer-lead-card"));
+  await loadDealerActivity(button.closest(".dealer-lead-card"), { force: true });
 });
 
 logoutButton.addEventListener("click", async () => {
@@ -134,10 +137,7 @@ logoutButton.addEventListener("click", async () => {
 
 modeButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    modeButtons.forEach((item) => item.classList.toggle("active", item === button));
-    const mode = button.dataset.mode;
-    if (mode === "free") openSearchModal();
-    drilldownForm.hidden = mode !== "drilldown";
+    setLookupMode(button.dataset.mode, { openModal: true });
   });
 });
 
@@ -469,6 +469,7 @@ function renderChoices(items, options = {}) {
         series: item.series || "",
         style: item.style || ""
       });
+      showValuationFormForCurrentSelection();
       target.hidden = true;
       if (selectOnly) {
         closeSearchModal();
@@ -498,6 +499,22 @@ function setValuationFields(values) {
     if (field) field.value = value === unknownOption ? "" : value ?? "";
   }
   setDrilldownFields(values);
+}
+
+function setLookupMode(mode, options = {}) {
+  currentLookupMode = mode === "drilldown" ? "drilldown" : "free";
+  modeButtons.forEach((item) => item.classList.toggle("active", item.dataset.mode === currentLookupMode));
+  if (currentLookupMode === "free" && options.openModal) openSearchModal();
+  drilldownForm.hidden = currentLookupMode !== "drilldown";
+  form.hidden = currentLookupMode === "free" && !options.showValuation;
+  if (lookupPanel) lookupPanel.hidden = currentLookupMode === "free" && !options.showValuation;
+}
+
+function showValuationFormForCurrentSelection() {
+  if (currentLookupMode === "free") {
+    form.hidden = false;
+    if (lookupPanel) lookupPanel.hidden = false;
+  }
 }
 
 function setDrilldownFields(values) {
@@ -975,6 +992,7 @@ async function loadDealerLeads() {
     if (!data.ok) throw new Error(data.error || "Unable to load assigned leads");
 
     renderDealerLeads(data.leads || [], data.role || "dealer");
+    await loadVisibleDealerActivities();
   } catch (error) {
     dealerLeadsStatus.textContent = error.message || "Unable to load assigned leads";
     dealerLeadsList.innerHTML = "";
@@ -998,7 +1016,10 @@ function renderDealerLeads(leads, role) {
     const title = valuation.title || historyVehicleTitle(input) || "Vehicle lead";
     const customerEmail = input.email || lead.auth_email || lead.auth_user?.email || "-";
     const followUp = lead.next_follow_up_at || "";
-    const overdue = isDealerLeadOverdue(followUp, lead.status);
+    const status = lead.status || "new";
+    const overdue = isDealerLeadOverdue(followUp, status);
+    const statusLabel = overdue ? "Overdue" : status.replaceAll("_", " ");
+    const statusClass = overdue ? "status-overdue" : `status-${cssToken(status)}`;
     const wholesaleAvg = historyMarketAverage(valuation, "wholesale");
     const retailAvg = historyMarketAverage(valuation, "retail");
     const dealerWholesale = ownerAdjustment.wholesale ?? "";
@@ -1022,15 +1043,18 @@ function renderDealerLeads(leads, role) {
 
     return `
       <article class="history-card dealer-lead-card ${overdue ? "lead-overdue" : ""}" data-lead-id="${escapeHtml(lead.id || "")}">
-        <div>
-          <strong>${escapeHtml(title)}</strong>
-          <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
+        <div class="dealer-lead-top">
+          <div>
+            <strong>${escapeHtml(title)}</strong>
+            <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
+          </div>
+          <b class="dealer-status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
         </div>
         <dl class="history-meta">
           <div><dt>Customer</dt><dd>${escapeHtml(customerEmail)}</dd></div>
           <div><dt>Phone</dt><dd>${escapeHtml(input.phone || "-")}</dd></div>
           <div><dt>VIN</dt><dd>${escapeHtml(valuation.vin || input.vin || "-")}</dd></div>
-          <div><dt>Status</dt><dd>${escapeHtml(lead.status || "new")}</dd></div>
+          <div><dt>Status</dt><dd>${escapeHtml(status)}</dd></div>
           <div><dt>Priority</dt><dd>${escapeHtml(lead.priority || "normal")}</dd></div>
           <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "-")}</dd></div>
         </dl>
@@ -1071,15 +1095,21 @@ function renderDealerLeads(leads, role) {
           <button type="submit">Add task</button>
         </form>
         <div class="dealer-activity-list">
-          <button type="button" data-load-dealer-activity>Load activity</button>
+          <button type="button" data-load-dealer-activity>Refresh activity</button>
         </div>
       </article>
     `;
   }).join("");
 }
 
-async function loadDealerActivity(card) {
+async function loadVisibleDealerActivities() {
+  const cards = [...dealerLeadsList.querySelectorAll(".dealer-lead-card")];
+  await Promise.all(cards.map((card) => loadDealerActivity(card)));
+}
+
+async function loadDealerActivity(card, options = {}) {
   if (!card?.dataset?.leadId) return;
+  if (card.dataset.activityLoaded === "true" && !options.force) return;
   const list = card.querySelector(".dealer-activity-list");
   if (list) list.textContent = "Loading activity...";
 
@@ -1091,6 +1121,7 @@ async function loadDealerActivity(card) {
     });
     const data = await response.json();
     if (!data.ok) throw new Error(data.error || "Unable to load activity");
+    card.dataset.activityLoaded = "true";
     if (list) list.innerHTML = renderDealerActivity(data);
   } catch (error) {
     if (list) list.textContent = error.message || "Unable to load activity";
@@ -1284,4 +1315,8 @@ function escapeHtml(value) {
     '"': "&quot;",
     "'": "&#39;"
   })[char]);
+}
+
+function cssToken(value) {
+  return String(value || "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
