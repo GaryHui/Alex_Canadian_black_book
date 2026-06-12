@@ -627,12 +627,15 @@ async function initializeCustomerAuth() {
   siteUrl = config.siteUrl || window.location.origin;
   customerTurnstileGate = window.createTurnstileGate?.({
     siteKey: config.turnstileSiteKey,
+    wrap: customerTurnstileWrap,
     container: customerTurnstile,
     button: customerLoginButton,
     statusEl: customerTurnstileStatus,
     waitingText: t("verifyHuman"),
     readyText: t("verifyHumanReady"),
-    failedText: t("verifyHumanFailed")
+    failedText: t("verifyHumanFailed"),
+    lazy: true,
+    onVerified: signInCustomer
   }) || null;
   supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: {
@@ -676,7 +679,8 @@ function setCustomerSession(session) {
   customerLoginButton.hidden = Boolean(session?.user);
   customerLogoutButton.hidden = !session?.user;
   if (customerTurnstileWrap && customerTurnstileGate?.enabled) {
-    customerTurnstileWrap.hidden = Boolean(session?.user);
+    if (session?.user) customerTurnstileGate.hide();
+    customerTurnstileWrap.hidden = true;
   }
 
   if (session?.user) {

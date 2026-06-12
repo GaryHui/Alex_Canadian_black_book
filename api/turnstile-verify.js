@@ -4,12 +4,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
+  const siteKey = process.env.TURNSTILE_SITE_KEY || "";
   const secret = process.env.TURNSTILE_SECRET_KEY || "";
   if (!secret) {
-    return res.status(200).json({ ok: true, skipped: true });
+    if (!siteKey) return res.status(200).json({ ok: true, skipped: true });
+    return res.status(500).json({ ok: false, error: "Human verification is not configured correctly." });
   }
 
   const token = String(req.body?.token || "").trim();
+  const expectedAction = String(req.body?.action || "login").trim();
   if (!token) {
     return res.status(400).json({ ok: false, error: "Human verification token is missing." });
   }
@@ -32,6 +35,9 @@ export default async function handler(req, res) {
         error: "Human verification failed.",
         codes: data["error-codes"] || []
       });
+    }
+    if (expectedAction && data.action && data.action !== expectedAction) {
+      return res.status(403).json({ ok: false, error: "Human verification action did not match." });
     }
     return res.status(200).json({ ok: true });
   } catch (error) {

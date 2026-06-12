@@ -84,7 +84,8 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/turnstile-verify") {
       const body = await readJson(req);
-      return sendJson(res, 200, await verifyTurnstile(body, req));
+      const result = await verifyTurnstile(body, req);
+      return sendJson(res, result.status || (result.ok ? 200 : 403), result);
     }
 
     if (req.method === "GET" && url.pathname === "/api/usage") {
@@ -262,11 +263,16 @@ function readJson(req) {
 }
 
 async function verifyTurnstile(body, req) {
+  const siteKey = process.env.TURNSTILE_SITE_KEY || "";
   const secret = process.env.TURNSTILE_SECRET_KEY || "";
-  if (!secret) return { ok: true, skipped: true };
+  if (!secret) {
+    if (!siteKey) return { ok: true, skipped: true };
+    return { ok: false, status: 500, error: "Human verification is not configured correctly." };
+  }
 
   const token = String(body?.token || "").trim();
-  if (!token) return { ok: false, error: "Human verification token is missing." };
+  const expectedAction = String(body?.action || "login").trim();
+  if (!token) return { ok: false, status: 400, error: "Human verification token is missing." };
 
   const form = new URLSearchParams();
   form.set("secret", secret);
@@ -282,6 +288,9 @@ async function verifyTurnstile(body, req) {
     const data = await response.json().catch(() => ({}));
     if (!data.success) {
       return { ok: false, error: "Human verification failed.", codes: data["error-codes"] || [] };
+    }
+    if (expectedAction && data.action && data.action !== expectedAction) {
+      return { ok: false, error: "Human verification action did not match." };
     }
     return { ok: true };
   } catch (error) {

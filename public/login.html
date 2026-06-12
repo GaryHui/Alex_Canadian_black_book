@@ -15,9 +15,9 @@
         <button id="google-login" type="button">Continue with Google</button>
         <div class="turnstile-wrap" id="login-turnstile-wrap" hidden>
           <div id="login-turnstile"></div>
-          <small id="login-turnstile-status"></small>
+          <small id="login-turnstile-status" aria-live="polite"></small>
         </div>
-        <p id="login-status" class="status">Checking login...</p>
+        <p id="login-status" class="status" aria-live="polite">Checking login...</p>
       </section>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

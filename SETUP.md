@@ -230,6 +230,7 @@ TURNSTILE_SECRET_KEY=your_cloudflare_turnstile_secret_key
 ```
 
 If these two Turnstile variables are empty, Google login works exactly as before and no verification box is shown.
+Configure both variables together. If only `TURNSTILE_SITE_KEY` is set, the widget may appear but server verification will fail.
 
 Add Black Book credentials:
 
@@ -305,10 +306,12 @@ How it works:
 ```text
 1. User opens the customer login, dealer login, admin login, or /login.html.
 2. If TURNSTILE_SITE_KEY is configured, the page shows a human verification widget.
-3. The Google login button stays disabled until Turnstile is completed.
-4. The browser sends the Turnstile token to /api/turnstile-verify.
-5. The server verifies the token using TURNSTILE_SECRET_KEY.
-6. Only after verification passes does the page allow the Google OAuth redirect.
+3. The user clicks a Google login button.
+4. The page shows the human verification widget.
+5. The browser sends the Turnstile token to /api/turnstile-verify.
+6. The server verifies the token using TURNSTILE_SECRET_KEY.
+7. The server confirms the token was issued for the `login` action.
+8. Only after verification passes does the page start the Google OAuth redirect.
 ```
 
 If the widget does not appear:

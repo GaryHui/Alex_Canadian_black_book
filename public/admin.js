@@ -40,12 +40,15 @@ async function initializeAdminAuth() {
 
   adminTurnstileGate = window.createTurnstileGate?.({
     siteKey: config.turnstileSiteKey,
+    wrap: adminTurnstileWrap,
     container: adminTurnstile,
     button: adminLoginButton,
     statusEl: adminTurnstileStatus,
     waitingText: "Complete the human verification first.",
     readyText: "Human verification passed.",
-    failedText: "Human verification failed. Please try again."
+    failedText: "Human verification failed. Please try again.",
+    lazy: true,
+    onVerified: signInAdmin
   }) || null;
   supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: {
@@ -84,7 +87,8 @@ async function setAdminSession(session) {
   adminLogoutButton.hidden = !session?.user;
   adminContent.hidden = !session?.user;
   if (adminTurnstileWrap && adminTurnstileGate?.enabled) {
-    adminTurnstileWrap.hidden = Boolean(session?.user);
+    if (session?.user) adminTurnstileGate.hide();
+    adminTurnstileWrap.hidden = true;
   }
 
   if (!session?.user) {
