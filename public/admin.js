@@ -20,6 +20,7 @@ const adminTurnstileStatus = document.querySelector("#admin-turnstile-status");
 let supabaseClient = null;
 let adminSession = null;
 let adminTurnstileGate = null;
+let clearLeadsConfirmEl = null;
 
 reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", loadLeads);
@@ -510,16 +511,44 @@ async function deleteSingleLead(button) {
 
 async function clearAllLeads() {
   if (!adminSession) return;
+  if (clearLeadsConfirmEl) {
+    clearLeadsConfirmEl.querySelector("input")?.focus();
+    statusEl.textContent = "Type DELETE ALL LEADS in the confirmation box below.";
+    return;
+  }
+
+  clearLeadsConfirmEl = document.createElement("div");
+  clearLeadsConfirmEl.className = "clear-leads-confirm";
+  clearLeadsConfirmEl.innerHTML = `
+    <p><strong>Confirm permanent deletion</strong></p>
+    <p>This deletes all Supabase lead records, notes, tasks, and email activity. Google Sheet rows and Google Drive files are not deleted.</p>
+    <label>
+      <span>Type DELETE ALL LEADS</span>
+      <input type="text" autocomplete="off" placeholder="DELETE ALL LEADS" />
+    </label>
+    <div>
+      <button type="button" class="danger-confirm">Confirm clear all</button>
+      <button type="button" class="secondary-cancel">Cancel</button>
+    </div>
+  `;
+  clearLeadsButton.parentElement?.insertAdjacentElement("afterend", clearLeadsConfirmEl);
+  clearLeadsConfirmEl.querySelector("input")?.focus();
+  clearLeadsConfirmEl.querySelector(".danger-confirm")?.addEventListener("click", confirmClearAllLeads);
+  clearLeadsConfirmEl.querySelector(".secondary-cancel")?.addEventListener("click", cancelClearAllLeads);
+  statusEl.textContent = "Type DELETE ALL LEADS in the confirmation box below.";
+}
+
+async function confirmClearAllLeads() {
   const confirmText = "DELETE ALL LEADS";
-  const typed = window.prompt(
-    "This permanently deletes ALL leads and their Supabase notes/tasks/email records.\n\nGoogle Sheet rows and Google Drive files will not be deleted.\n\nType DELETE ALL LEADS to continue."
-  );
+  const typed = clearLeadsConfirmEl?.querySelector("input")?.value || "";
   if (normalizeDeleteConfirm(typed) !== confirmText) {
-    statusEl.textContent = "Clear all leads cancelled.";
+    statusEl.textContent = "Confirmation text does not match. Type DELETE ALL LEADS exactly.";
+    clearLeadsConfirmEl?.querySelector("input")?.focus();
     return;
   }
 
   clearLeadsButton.disabled = true;
+  clearLeadsConfirmEl.querySelector(".danger-confirm").disabled = true;
   statusEl.textContent = "Clearing all leads...";
   try {
     const response = await fetch(`/api/leads?confirm=${encodeURIComponent(confirmText)}`, {
@@ -528,16 +557,25 @@ async function clearAllLeads() {
     });
     const data = await response.json();
     statusEl.textContent = data.ok ? `Deleted ${data.deleted || 0} lead record(s).` : formatApiError(data, "Unable to clear leads.");
-    if (data.ok) await loadLeads();
+    if (data.ok) {
+      cancelClearAllLeads();
+      await loadLeads();
+    }
   } catch (error) {
     statusEl.textContent = error.message || "Unable to clear leads.";
   } finally {
     clearLeadsButton.disabled = false;
+    clearLeadsConfirmEl?.querySelector(".danger-confirm")?.removeAttribute("disabled");
   }
 }
 
 function normalizeDeleteConfirm(value) {
   return String(value || "").trim().replace(/\s+/g, " ").toUpperCase();
+}
+
+function cancelClearAllLeads() {
+  clearLeadsConfirmEl?.remove();
+  clearLeadsConfirmEl = null;
 }
 
 async function loadLeadActivity(card) {

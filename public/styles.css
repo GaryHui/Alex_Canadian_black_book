@@ -878,6 +878,60 @@ select {
   color: #d90429 !important;
 }
 
+.clear-leads-confirm {
+  background: #fff5f6;
+  border: 1px solid #f2a0aa;
+  border-radius: 6px;
+  color: #2b2f33;
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  max-width: 560px;
+  padding: 14px;
+}
+
+.clear-leads-confirm p {
+  margin: 0;
+}
+
+.clear-leads-confirm label {
+  display: grid;
+  gap: 6px;
+}
+
+.clear-leads-confirm input {
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.clear-leads-confirm div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.clear-leads-confirm button {
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.danger-confirm {
+  background: var(--red);
+  border: 1px solid var(--red);
+  color: #fff;
+}
+
+.secondary-cancel {
+  background: #fff;
+  border: 1px solid #bbb;
+  color: #2b2f33;
+}
+
 .admin-users {
   display: grid;
   gap: 10px;
