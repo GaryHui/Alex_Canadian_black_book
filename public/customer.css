@@ -984,10 +984,23 @@ input::placeholder {
 }
 
 .history-values span {
+  display: grid;
+  gap: 4px;
   padding: 8px 10px;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.history-values b {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.history-values small {
+  color: var(--blue-dark);
+  font-weight: 800;
 }
 
 .history-actions button {

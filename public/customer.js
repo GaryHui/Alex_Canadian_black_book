@@ -1270,6 +1270,8 @@ function renderHistory(leads) {
     const input = lead.input || {};
     const valuation = lead.valuation || {};
     const title = valuation.title || vehicleTitle(input) || "Vehicle valuation";
+    const wholesaleRange = marketRange(valuation, "wholesale");
+    const retailRange = marketRange(valuation, "retail");
     const wholesaleAvg = marketAverage(valuation, "wholesale");
     const retailAvg = marketAverage(valuation, "retail");
 
@@ -1288,8 +1290,8 @@ function renderHistory(leads) {
           <div><dt>Status</dt><dd>${escapeHtml(lead.status || "new")}</dd></div>
         </dl>
         <div class="history-values">
-          <span>${escapeHtml(t("wholesaleAvgLabel"))} ${formatHistoryValue(wholesaleAvg)}</span>
-          <span>${escapeHtml(t("retailAvgLabel"))} ${formatHistoryValue(retailAvg)}</span>
+          <span><b>${escapeHtml(t("dealerPurchaseRange"))}</b>${escapeHtml(moneyRangeOrDash(wholesaleRange))}<small>${escapeHtml(t("averageLabel"))}: ${escapeHtml(moneyOrDash(wholesaleAvg))}</small></span>
+          <span><b>${escapeHtml(t("privateSaleRange"))}</b>${escapeHtml(moneyRangeOrDash(retailRange))}<small>${escapeHtml(t("averageLabel"))}: ${escapeHtml(moneyOrDash(retailAvg))}</small></span>
         </div>
         <div class="history-actions">
           <button type="button" data-history-index="${index}">${escapeHtml(t("historyView"))}</button>
@@ -1388,7 +1390,7 @@ function renderResult(valuation, input) {
 
 function marketAverage(valuation, market) {
   const values = valuation?.values?.[market] || {};
-  return values.adjusted?.avg ?? values.base?.avg ?? null;
+  return positiveNumber(values.adjusted?.avg) ?? positiveNumber(values.base?.avg) ?? null;
 }
 
 function marketRange(valuation, market) {
@@ -1396,13 +1398,18 @@ function marketRange(valuation, market) {
   const row = values.adjusted || values.base || {};
   const numbers = ["rough", "avg", "clean", "xclean"]
     .map((key) => row[key])
-    .filter((value) => Number.isFinite(Number(value)))
+    .filter((value) => positiveNumber(value) !== null)
     .map(Number);
   if (!numbers.length) return null;
   return {
     min: Math.min(...numbers),
     max: Math.max(...numbers)
   };
+}
+
+function positiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
 }
 
 function moneyRangeOrDash(range) {
