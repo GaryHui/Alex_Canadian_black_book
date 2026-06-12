@@ -1193,6 +1193,46 @@ select {
   text-decoration: line-through;
 }
 
+.dealer-lead-card {
+  display: grid;
+  gap: 12px;
+}
+
+.dealer-note-form,
+.dealer-task-form {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 160px 1fr auto;
+}
+
+.dealer-task-form {
+  grid-template-columns: 1fr 220px auto;
+}
+
+.dealer-note-form select,
+.dealer-note-form textarea,
+.dealer-task-form input {
+  border: 1px solid #b9c7d8;
+  border-radius: 6px;
+  min-height: 40px;
+  padding: 8px 10px;
+}
+
+.dealer-note-form textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.dealer-activity-list {
+  display: grid;
+  gap: 8px;
+}
+
+.overdue-text {
+  color: #b00020;
+  font-weight: 700;
+}
+
 @media (max-width: 900px) {
   .form-grid,
   .info-row,
@@ -1248,7 +1288,9 @@ select {
   .lead-summary,
   .owner-review,
   .lead-note-form,
-  .lead-task-form {
+  .lead-task-form,
+  .dealer-note-form,
+  .dealer-task-form {
     grid-template-columns: 1fr;
   }
 

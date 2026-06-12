@@ -66,11 +66,18 @@ Admin:
 
 ## Phase 2: Staff Workflow
 
-Planned.
+Status: started.
 
-- Dealer staff sees only assigned leads.
-- Dealer staff can add notes and tasks.
-- Dealer staff can update lead status.
+- Dealer staff sees only assigned leads in the dealer portal.
+- Dealer staff can add follow-up notes and tasks.
+- Admin can still see all leads and reassign them from the admin portal.
+- Activity updates are permission checked: non-admin dealer staff can only access leads assigned to their email.
+
+Next:
+
+- Allow dealer staff to update status from the dealer portal.
+- Add dealer-side follow-up date editing.
+- Add a management dashboard for overdue and unassigned leads.
 - Admin can reassign leads.
 
 ## Phase 3: Email Workflow

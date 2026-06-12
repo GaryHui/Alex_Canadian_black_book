@@ -23,6 +23,10 @@ const historyPanel = document.querySelector("#history-panel");
 const historyStatus = document.querySelector("#history-status");
 const historyList = document.querySelector("#history-list");
 const reloadHistoryButton = document.querySelector("#reload-history");
+const dealerWorkbench = document.querySelector("#dealer-workbench");
+const dealerLeadsStatus = document.querySelector("#dealer-leads-status");
+const dealerLeadsList = document.querySelector("#dealer-leads-list");
+const reloadDealerLeadsButton = document.querySelector("#reload-dealer-leads");
 const drilldownSuggestions = {
   Honda: {
     models: ["Accord", "Civic", "CR-V", "HR-V", "Odyssey", "Pilot", "Ridgeline"],
@@ -76,6 +80,48 @@ initializeDatalists();
 initializeAuth();
 
 reloadHistoryButton.addEventListener("click", loadHistory);
+reloadDealerLeadsButton?.addEventListener("click", loadDealerLeads);
+
+dealerLeadsList?.addEventListener("submit", async (event) => {
+  const noteForm = event.target.closest(".dealer-note-form");
+  const taskForm = event.target.closest(".dealer-task-form");
+  if (!noteForm && !taskForm) return;
+  event.preventDefault();
+
+  const card = event.target.closest(".dealer-lead-card");
+  const leadId = card?.dataset?.leadId || "";
+  const isTask = Boolean(taskForm);
+  const payload = {
+    leadId,
+    type: isTask ? "task" : "note",
+    ...Object.fromEntries(new FormData(isTask ? taskForm : noteForm).entries())
+  };
+
+  dealerLeadsStatus.textContent = isTask ? "Saving task..." : "Saving note...";
+  try {
+    const response = await fetch("/api/lead-activity", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${authSession?.access_token || ""}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to save follow-up");
+    dealerLeadsStatus.textContent = isTask ? "Task saved." : "Note saved.";
+    (isTask ? taskForm : noteForm).reset();
+    await loadDealerActivity(card);
+  } catch (error) {
+    dealerLeadsStatus.textContent = error.message || "Unable to save follow-up";
+  }
+});
+
+dealerLeadsList?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-load-dealer-activity]");
+  if (!button) return;
+  await loadDealerActivity(button.closest(".dealer-lead-card"));
+});
 
 logoutButton.addEventListener("click", async () => {
   if (supabaseClient) await supabaseClient.auth.signOut();
@@ -749,6 +795,7 @@ async function setSession(session) {
       disableDealerTools(true);
       quotaPanel.hidden = true;
       historyPanel.hidden = true;
+      if (dealerWorkbench) dealerWorkbench.hidden = true;
       statusEl.textContent = "Ask the site owner to add this email in Admin > Dealer portal access.";
       return;
     }
@@ -757,6 +804,7 @@ async function setSession(session) {
     disableDealerTools(false);
     loadUsage();
     loadHistory();
+    loadDealerLeads();
   } else {
     if (supabaseClient) {
       window.location.replace("/login.html?next=/dealer.html");
@@ -767,7 +815,9 @@ async function setSession(session) {
     logoutButton.hidden = true;
     quotaPanel.hidden = true;
     historyPanel.hidden = true;
+    if (dealerWorkbench) dealerWorkbench.hidden = true;
     historyList.innerHTML = "";
+    if (dealerLeadsList) dealerLeadsList.innerHTML = "";
     historyLeads = [];
     emailField.value = "";
     disableDealerTools(true);
@@ -861,6 +911,128 @@ async function loadHistory() {
     historyStatus.textContent = error.message || "Unable to load quote history";
     historyList.innerHTML = "";
   }
+}
+
+async function loadDealerLeads() {
+  if (!authSession?.access_token || !dealerWorkbench) return;
+
+  dealerWorkbench.hidden = false;
+  dealerLeadsStatus.textContent = "Loading assigned leads...";
+
+  try {
+    const response = await fetch("/api/dealer-leads", {
+      headers: {
+        Authorization: `Bearer ${authSession.access_token}`
+      }
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to load assigned leads");
+
+    renderDealerLeads(data.leads || [], data.role || "dealer");
+  } catch (error) {
+    dealerLeadsStatus.textContent = error.message || "Unable to load assigned leads";
+    dealerLeadsList.innerHTML = "";
+  }
+}
+
+function renderDealerLeads(leads, role) {
+  if (!leads.length) {
+    dealerLeadsStatus.textContent = role === "admin"
+      ? "No active leads yet."
+      : "No leads assigned to you yet.";
+    dealerLeadsList.innerHTML = "";
+    return;
+  }
+
+  dealerLeadsStatus.textContent = `${leads.length} assigned lead${leads.length === 1 ? "" : "s"}.`;
+  dealerLeadsList.innerHTML = leads.map((lead) => {
+    const input = lead.input || {};
+    const valuation = lead.valuation || {};
+    const title = valuation.title || historyVehicleTitle(input) || "Vehicle lead";
+    const customerEmail = input.email || lead.auth_email || lead.auth_user?.email || "-";
+    const followUp = lead.next_follow_up_at || "";
+    const overdue = isDealerLeadOverdue(followUp, lead.status);
+
+    return `
+      <article class="history-card dealer-lead-card ${overdue ? "lead-overdue" : ""}" data-lead-id="${escapeHtml(lead.id || "")}">
+        <div>
+          <strong>${escapeHtml(title)}</strong>
+          <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
+        </div>
+        <dl class="history-meta">
+          <div><dt>Customer</dt><dd>${escapeHtml(customerEmail)}</dd></div>
+          <div><dt>Phone</dt><dd>${escapeHtml(input.phone || "-")}</dd></div>
+          <div><dt>VIN</dt><dd>${escapeHtml(valuation.vin || input.vin || "-")}</dd></div>
+          <div><dt>Status</dt><dd>${escapeHtml(lead.status || "new")}</dd></div>
+          <div><dt>Priority</dt><dd>${escapeHtml(lead.priority || "normal")}</dd></div>
+          <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "-")}</dd></div>
+        </dl>
+        ${overdue ? `<p class="status overdue-text">Overdue follow-up</p>` : ""}
+        <form class="dealer-note-form">
+          <select name="noteType">
+            <option value="call">Call</option>
+            <option value="email">Email</option>
+            <option value="sms">SMS</option>
+            <option value="inspection">Inspection</option>
+            <option value="offer">Offer</option>
+            <option value="internal">Internal note</option>
+          </select>
+          <textarea name="note" placeholder="Record customer communication, inspection result, or quote detail..."></textarea>
+          <button type="submit">Add note</button>
+        </form>
+        <form class="dealer-task-form">
+          <input name="title" placeholder="Next task" />
+          <input name="dueAt" type="datetime-local" />
+          <button type="submit">Add task</button>
+        </form>
+        <div class="dealer-activity-list">
+          <button type="button" data-load-dealer-activity>Load activity</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+async function loadDealerActivity(card) {
+  if (!card?.dataset?.leadId) return;
+  const list = card.querySelector(".dealer-activity-list");
+  if (list) list.textContent = "Loading activity...";
+
+  try {
+    const response = await fetch(`/api/lead-activity?leadId=${encodeURIComponent(card.dataset.leadId)}`, {
+      headers: {
+        Authorization: `Bearer ${authSession?.access_token || ""}`
+      }
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to load activity");
+    if (list) list.innerHTML = renderDealerActivity(data);
+  } catch (error) {
+    if (list) list.textContent = error.message || "Unable to load activity";
+  }
+}
+
+function renderDealerActivity(data) {
+  const tasks = (data.tasks || []).map((task) => `
+    <article class="activity-item ${task.completed_at ? "activity-done" : ""}">
+      <div>
+        <strong>${escapeHtml(task.title || "Task")}</strong>
+        <span>${task.due_at ? `Due ${escapeHtml(formatDateTime(task.due_at))}` : "No due date"}</span>
+      </div>
+    </article>
+  `);
+
+  const notes = (data.notes || []).map((note) => `
+    <article class="activity-item">
+      <div>
+        <strong>${escapeHtml(note.note_type || "note")} by ${escapeHtml(note.author_email || "-")}</strong>
+        <span>${escapeHtml(formatDateTime(note.created_at))}</span>
+        <p>${escapeHtml(note.note || "")}</p>
+      </div>
+    </article>
+  `);
+
+  return [...tasks, ...notes].join("") || "<p>No activity yet.</p>";
 }
 
 function renderHistory(leads) {
@@ -997,6 +1169,14 @@ function formatDateTime(value) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
+}
+
+function isDealerLeadOverdue(value, status) {
+  if (!value) return false;
+  const closedStatuses = new Set(["won", "lost", "closed", "deleted"]);
+  if (closedStatuses.has(String(status || "").toLowerCase())) return false;
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
 }
 
 function canUseValuation() {

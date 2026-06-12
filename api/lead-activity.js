@@ -1,22 +1,30 @@
-import { requireAdmin } from "./_admin.js";
+import { requireDealer } from "./_auth.js";
 
 export default async function handler(req, res) {
-  const admin = await requireAdmin(req);
-  if (!admin.ok) return res.status(admin.status).json({ ok: false, error: admin.error });
+  const dealer = await requireDealer(req);
+  if (!dealer.ok) return res.status(dealer.status).json({ ok: false, error: dealer.error });
 
   if (req.method === "GET") {
     const leadId = String(req.query?.leadId || "").trim();
+    const access = await canAccessLead(leadId, dealer);
+    if (!access.ok) return res.status(access.status || 403).json(access);
     const result = await listActivity(leadId);
     return res.status(result.ok ? 200 : result.status || 400).json(result);
   }
 
   if (req.method === "POST") {
-    const result = await createActivity(req.body || {}, admin.user);
+    const body = req.body || {};
+    const access = await canAccessLead(body.leadId, dealer);
+    if (!access.ok) return res.status(access.status || 403).json(access);
+    const result = await createActivity(body, dealer.user);
     return res.status(result.ok ? 200 : result.status || 400).json(result);
   }
 
   if (req.method === "PATCH") {
-    const result = await updateTask(req.body || {}, admin.user);
+    const body = req.body || {};
+    const access = await canAccessLead(body.leadId, dealer);
+    if (!access.ok) return res.status(access.status || 403).json(access);
+    const result = await updateTask(body, dealer.user);
     return res.status(result.ok ? 200 : result.status || 400).json(result);
   }
 
@@ -44,6 +52,28 @@ async function listActivity(leadId) {
     tasks: tasks.data || [],
     emails: emails.data || []
   };
+}
+
+async function canAccessLead(leadId, dealer) {
+  const id = String(leadId || "").trim();
+  if (!id) return { ok: false, status: 400, error: "Lead id is required" };
+  const client = supabaseClient();
+  if (!client.ok) return client;
+
+  const response = await fetch(`${client.url}/rest/v1/valuation_leads?select=id,assigned_to&id=eq.${encodeURIComponent(id)}&limit=1`, {
+    headers: authHeaders(client.key)
+  });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) return { ok: false, status: response.status, error: rows };
+
+  const lead = rows?.[0];
+  if (!lead) return { ok: false, status: 404, error: "Lead not found" };
+  if (dealer.role === "admin") return { ok: true, lead };
+
+  const assignedTo = String(lead.assigned_to || "").trim().toLowerCase();
+  const email = String(dealer.user?.email || "").trim().toLowerCase();
+  if (assignedTo && assignedTo === email) return { ok: true, lead };
+  return { ok: false, status: 403, error: "This lead is not assigned to your dealer account." };
 }
 
 async function createActivity(body, user) {

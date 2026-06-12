@@ -122,6 +122,13 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true, user: dealer.user, role: dealer.role });
     }
 
+    if (req.method === "GET" && url.pathname === "/api/dealer-leads") {
+      const dealer = await requireDealer(req);
+      if (!dealer.ok) return sendJson(res, dealer.status, { ok: false, error: dealer.error });
+      const result = await listDealerLeads(dealer);
+      return sendJson(res, result.ok ? 200 : result.status || 500, result);
+    }
+
     if (url.pathname === "/api/dealer-staff") {
       const admin = await requireAdmin(req);
       if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
@@ -198,18 +205,27 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/api/lead-activity") {
-      const admin = await requireAdmin(req);
-      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+      const dealer = await requireDealer(req);
+      if (!dealer.ok) return sendJson(res, dealer.status, { ok: false, error: dealer.error });
       if (req.method === "GET") {
-        const result = await listLeadActivity(url.searchParams.get("leadId") || "");
+        const leadId = url.searchParams.get("leadId") || "";
+        const access = await canAccessLead(leadId, dealer);
+        if (!access.ok) return sendJson(res, access.status || 403, access);
+        const result = await listLeadActivity(leadId);
         return sendJson(res, result.ok ? 200 : result.status || 400, result);
       }
       if (req.method === "POST") {
-        const result = await createLeadActivity(await readJson(req), admin.user);
+        const body = await readJson(req);
+        const access = await canAccessLead(body.leadId, dealer);
+        if (!access.ok) return sendJson(res, access.status || 403, access);
+        const result = await createLeadActivity(body, dealer.user);
         return sendJson(res, result.ok ? 200 : result.status || 400, result);
       }
       if (req.method === "PATCH") {
-        const result = await updateLeadTask(await readJson(req));
+        const body = await readJson(req);
+        const access = await canAccessLead(body.leadId, dealer);
+        if (!access.ok) return sendJson(res, access.status || 403, access);
+        const result = await updateLeadTask(body);
         return sendJson(res, result.ok ? 200 : result.status || 400, result);
       }
     }
@@ -890,6 +906,28 @@ async function listLeads() {
   return { ok: true, storage: "supabase", leads };
 }
 
+async function listDealerLeads(dealer) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const email = String(dealer.user?.email || "").trim().toLowerCase();
+  const isAdmin = dealer.role === "admin";
+  const filters = ["select=*", "order=next_follow_up_at.asc.nullslast,created_at.desc", "limit=100"];
+  if (!isAdmin) filters.push(`assigned_to=eq.${encodeURIComponent(email)}`);
+
+  const response = await fetch(`${url}/rest/v1/valuation_leads?${filters.join("&")}`, {
+    headers: supabaseServiceHeaders(key)
+  });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) return { ok: false, status: response.status, error: rows };
+
+  const leads = (Array.isArray(rows) ? rows : [])
+    .filter((lead) => String(lead.status || "").toLowerCase() !== "deleted");
+
+  return { ok: true, storage: "supabase", role: dealer.role, email, leads };
+}
+
 async function listMyLeads(user) {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1016,6 +1054,29 @@ async function listLeadActivity(leadId) {
   if (failed) return failed;
 
   return { ok: true, notes: notes.data || [], tasks: tasks.data || [], emails: emails.data || [] };
+}
+
+async function canAccessLead(leadId, dealer) {
+  const id = String(leadId || "").trim();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!id) return { ok: false, status: 400, error: "Lead id is required" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const response = await fetch(`${url}/rest/v1/valuation_leads?select=id,assigned_to&id=eq.${encodeURIComponent(id)}&limit=1`, {
+    headers: supabaseServiceHeaders(key)
+  });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) return { ok: false, status: response.status, error: rows };
+
+  const lead = rows?.[0];
+  if (!lead) return { ok: false, status: 404, error: "Lead not found" };
+  if (dealer.role === "admin") return { ok: true, lead };
+
+  const assignedTo = String(lead.assigned_to || "").trim().toLowerCase();
+  const email = String(dealer.user?.email || "").trim().toLowerCase();
+  if (assignedTo && assignedTo === email) return { ok: true, lead };
+  return { ok: false, status: 403, error: "This lead is not assigned to your dealer account." };
 }
 
 async function createLeadActivity(body, user) {
