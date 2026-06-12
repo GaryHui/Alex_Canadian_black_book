@@ -16,6 +16,7 @@
         <a href="#tools" data-i18n="toolsLink">Tools</a>
         <a href="/dealer.html" data-i18n="dealerLink">Dealer portal</a>
         <button id="language-toggle" class="ghost-button" type="button">FR</button>
+        <button id="customer-logout" class="ghost-button nav-auth-button" type="button" hidden data-i18n="logoutButton">Sign out</button>
       </nav>
     </header>
 
@@ -93,7 +94,7 @@
 
         <section class="valuation-card" aria-labelledby="card-title">
           <div class="customer-auth">
-            <div>
+            <div class="customer-auth-copy">
               <strong id="customer-auth-title" data-i18n="authChecking">Checking sign-in...</strong>
               <span id="customer-auth-subtitle" data-i18n="authRequired">Google sign-in is required before valuation.</span>
             </div>
@@ -102,12 +103,41 @@
               <strong id="quota-title">-</strong>
               <small id="quota-subtitle"></small>
             </div>
-            <button id="customer-login" class="ghost-button" type="button" hidden data-i18n="loginButton">Continue with Google</button>
-            <div class="turnstile-wrap" id="customer-turnstile-wrap" hidden>
-              <div id="customer-turnstile"></div>
-              <small id="customer-turnstile-status"></small>
+            <div class="customer-auth-actions" id="customer-auth-actions">
+              <button id="customer-login" class="primary-button google-auth-button" type="button" hidden data-i18n="loginButton">Continue with Google</button>
+
+              <div class="email-auth-tabs" role="tablist" aria-label="Email account options">
+                <button class="email-auth-tab active" type="button" data-auth-mode="signin" data-i18n="emailSignInTab">Email sign in</button>
+                <button class="email-auth-tab" type="button" data-auth-mode="signup" data-i18n="emailSignUpTab">Create account</button>
+                <button class="email-auth-tab" type="button" data-auth-mode="reset" data-i18n="emailResetTab">Forgot password</button>
+              </div>
+
+              <form id="email-auth-form" class="email-auth-form" hidden>
+                <div class="email-auth-grid">
+                  <label id="email-auth-email-wrap">
+                    <span data-i18n="emailAuthEmail">Email</span>
+                    <input id="email-auth-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" />
+                  </label>
+                  <label id="email-auth-password-wrap">
+                    <span data-i18n="emailAuthPassword">Password</span>
+                    <input id="email-auth-password" name="password" type="password" autocomplete="current-password" />
+                  </label>
+                  <label id="email-auth-confirm-wrap" hidden>
+                    <span data-i18n="emailAuthConfirm">Confirm password</span>
+                    <input id="email-auth-confirm" name="confirmPassword" type="password" autocomplete="new-password" />
+                  </label>
+                </div>
+                <div class="email-auth-footer">
+                  <button id="email-auth-submit" class="primary-button" type="submit" data-i18n="emailSignInAction">Sign in</button>
+                  <small id="email-auth-status" aria-live="polite"></small>
+                </div>
+              </form>
+
+              <div class="turnstile-wrap" id="customer-turnstile-wrap" hidden>
+                <div id="customer-turnstile"></div>
+                <small id="customer-turnstile-status" aria-live="polite"></small>
+              </div>
             </div>
-            <button id="customer-logout" class="ghost-button" type="button" hidden data-i18n="logoutButton">Sign out</button>
           </div>
 
           <div class="card-heading">

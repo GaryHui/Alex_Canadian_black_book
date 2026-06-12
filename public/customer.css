@@ -107,6 +107,11 @@ button {
   background: #fff;
 }
 
+.nav-auth-button {
+  min-height: 38px;
+  padding: 0 14px;
+}
+
 .primary-button {
   color: #fff;
   background: linear-gradient(135deg, var(--blue), var(--blue-dark));
@@ -238,15 +243,18 @@ h1 {
 }
 
 .customer-auth {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
   padding: 14px;
   margin-bottom: 22px;
   background: #f7fbff;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.customer-auth-copy {
+  min-width: 0;
 }
 
 .customer-auth strong,
@@ -261,10 +269,106 @@ h1 {
   line-height: 1.35;
 }
 
-.turnstile-wrap {
+.customer-auth-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+
+.google-auth-button {
+  justify-self: start;
+  min-width: 210px;
+}
+
+.email-auth-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  background: #eaf2fb;
+  border: 1px solid rgba(185, 200, 219, 0.88);
+  border-radius: 8px;
+}
+
+.email-auth-tab {
+  min-height: 38px;
+  padding: 0 10px;
+  color: var(--blue-dark);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.email-auth-tab.active {
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(20, 32, 51, 0.08);
+}
+
+.email-auth-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.email-auth-form {
+  display: grid;
+  gap: 12px;
+}
+
+.email-auth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.email-auth-grid label {
   display: grid;
   gap: 6px;
-  max-width: 320px;
+}
+
+.email-auth-grid label:first-child {
+  grid-column: 1 / -1;
+}
+
+.email-auth-grid input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.email-auth-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.email-auth-footer .primary-button {
+  min-width: 150px;
+}
+
+.email-auth-footer small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.turnstile-wrap {
+  display: inline-grid;
+  gap: 6px;
+  justify-self: start;
+  max-width: 100%;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 
 .turnstile-wrap small {
@@ -1268,6 +1372,14 @@ input::placeholder {
     display: none;
   }
 
+  .top-nav {
+    gap: 8px;
+  }
+
+  .top-nav a {
+    display: none;
+  }
+
   main {
     width: min(100% - 24px, 1180px);
   }
@@ -1305,6 +1417,28 @@ input::placeholder {
   .customer-auth button {
     width: 100%;
     margin-top: 12px;
+  }
+
+  .email-auth-tabs,
+  .email-auth-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .email-auth-tab {
+    margin-top: 0;
+  }
+
+  .email-auth-footer {
+    display: grid;
+  }
+
+  .email-auth-footer small {
+    text-align: left;
+  }
+
+  .turnstile-wrap {
+    width: 100%;
+    overflow-x: auto;
   }
 
   .history-meta {

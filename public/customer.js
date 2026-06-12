@@ -27,6 +27,17 @@ const customerAuthTitle = document.querySelector("#customer-auth-title");
 const customerAuthSubtitle = document.querySelector("#customer-auth-subtitle");
 const customerLoginButton = document.querySelector("#customer-login");
 const customerLogoutButton = document.querySelector("#customer-logout");
+const customerAuthActions = document.querySelector("#customer-auth-actions");
+const emailAuthForm = document.querySelector("#email-auth-form");
+const emailAuthTabs = [...document.querySelectorAll("[data-auth-mode]")];
+const emailAuthEmailWrap = document.querySelector("#email-auth-email-wrap");
+const emailAuthEmail = document.querySelector("#email-auth-email");
+const emailAuthPasswordWrap = document.querySelector("#email-auth-password-wrap");
+const emailAuthPassword = document.querySelector("#email-auth-password");
+const emailAuthConfirmWrap = document.querySelector("#email-auth-confirm-wrap");
+const emailAuthConfirm = document.querySelector("#email-auth-confirm");
+const emailAuthSubmit = document.querySelector("#email-auth-submit");
+const emailAuthStatus = document.querySelector("#email-auth-status");
 const customerTurnstileWrap = document.querySelector("#customer-turnstile-wrap");
 const customerTurnstile = document.querySelector("#customer-turnstile");
 const customerTurnstileStatus = document.querySelector("#customer-turnstile-status");
@@ -182,6 +193,26 @@ const text = {
     authMissing: "Google sign-in is not configured yet.",
     authUnverified: "Please verify your email before generating a valuation.",
     loginButton: "Continue with Google",
+    emailSignInTab: "Email sign in",
+    emailSignUpTab: "Create account",
+    emailResetTab: "Forgot password",
+    emailAuthEmail: "Email",
+    emailAuthPassword: "Password",
+    emailAuthConfirm: "Confirm password",
+    emailSignInAction: "Sign in",
+    emailSignUpAction: "Create account",
+    emailResetAction: "Send reset link",
+    emailUpdateAction: "Update password",
+    emailPasswordMismatch: "Passwords do not match.",
+    emailPasswordShort: "Use at least 8 characters for your password.",
+    emailSignInReady: "Signed in successfully.",
+    emailSignUpSent: "Check your email to confirm your account, then sign in.",
+    emailResetSent: "Check your email for the password reset link.",
+    emailUpdateReady: "Password updated.",
+    emailAuthRequired: "Enter your email and password.",
+    emailResetRequired: "Enter your email to receive a reset link.",
+    emailUpdateTitle: "Set a new password",
+    emailUpdateHelp: "Enter a new password for your account.",
     verifyHuman: "Please complete the human verification first.",
     verifyHumanReady: "Human verification passed.",
     verifyHumanFailed: "Human verification failed. Please try again.",
@@ -353,6 +384,26 @@ const text = {
     authMissing: "La connexion Google n'est pas encore configurée.",
     authUnverified: "Veuillez vérifier votre courriel avant de générer une évaluation.",
     loginButton: "Continuer avec Google",
+    emailSignInTab: "Connexion courriel",
+    emailSignUpTab: "Créer un compte",
+    emailResetTab: "Mot de passe oublié",
+    emailAuthEmail: "Courriel",
+    emailAuthPassword: "Mot de passe",
+    emailAuthConfirm: "Confirmer le mot de passe",
+    emailSignInAction: "Se connecter",
+    emailSignUpAction: "Créer le compte",
+    emailResetAction: "Envoyer le lien",
+    emailUpdateAction: "Mettre à jour",
+    emailPasswordMismatch: "Les mots de passe ne correspondent pas.",
+    emailPasswordShort: "Utilisez au moins 8 caractères.",
+    emailSignInReady: "Connexion réussie.",
+    emailSignUpSent: "Vérifiez votre courriel pour confirmer le compte, puis connectez-vous.",
+    emailResetSent: "Vérifiez votre courriel pour le lien de réinitialisation.",
+    emailUpdateReady: "Mot de passe mis à jour.",
+    emailAuthRequired: "Entrez votre courriel et votre mot de passe.",
+    emailResetRequired: "Entrez votre courriel pour recevoir un lien.",
+    emailUpdateTitle: "Définir un nouveau mot de passe",
+    emailUpdateHelp: "Entrez un nouveau mot de passe pour votre compte.",
     verifyHuman: "Veuillez completer la verification humaine.",
     verifyHumanReady: "Verification humaine reussie.",
     verifyHumanFailed: "La verification humaine a echoue. Veuillez reessayer.",
@@ -456,6 +507,8 @@ let usageState = null;
 let historyLeads = [];
 let siteUrl = window.location.origin;
 let customerTurnstileGate = null;
+let pendingHumanAction = null;
+let emailAuthMode = "signin";
 let makeRequestId = 0;
 let modelRequestId = 0;
 
@@ -506,6 +559,8 @@ function initialize() {
   startOver.addEventListener("click", resetCustomerFlow);
   customerLoginButton.addEventListener("click", signInCustomer);
   customerLogoutButton.addEventListener("click", signOutCustomer);
+  emailAuthTabs.forEach((button) => button.addEventListener("click", () => setEmailAuthMode(button.dataset.authMode || "signin")));
+  emailAuthForm.addEventListener("submit", handleEmailAuthSubmit);
   reloadHistoryButton.addEventListener("click", loadHistory);
   initializeCustomerAuth();
 }
@@ -629,13 +684,12 @@ async function initializeCustomerAuth() {
     siteKey: config.turnstileSiteKey,
     wrap: customerTurnstileWrap,
     container: customerTurnstile,
-    button: customerLoginButton,
     statusEl: customerTurnstileStatus,
     waitingText: t("verifyHuman"),
     readyText: t("verifyHumanReady"),
     failedText: t("verifyHumanFailed"),
     lazy: true,
-    onVerified: signInCustomer
+    onVerified: completePendingHumanAction
   }) || null;
   supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: {
@@ -649,8 +703,16 @@ async function initializeCustomerAuth() {
   if (window.location.hash.includes("access_token") || window.location.search.includes("code=")) {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
+  if (window.location.search.includes("reset_password=1")) {
+    setEmailAuthMode("update");
+  } else {
+    setEmailAuthMode(emailAuthMode);
+  }
   setCustomerSession(data.session);
-  supabaseClient.auth.onAuthStateChange((_event, session) => setCustomerSession(session));
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === "PASSWORD_RECOVERY") setEmailAuthMode("update");
+    setCustomerSession(session);
+  });
 }
 
 async function signInCustomer() {
@@ -658,7 +720,10 @@ async function signInCustomer() {
     statusEl.textContent = t("authMissing");
     return;
   }
-  if (customerTurnstileGate && !customerTurnstileGate.canProceed()) return;
+  await runWithHumanVerification(startGoogleSignIn);
+}
+
+async function startGoogleSignIn() {
   await supabaseClient.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -667,10 +732,192 @@ async function signInCustomer() {
   });
 }
 
+async function handleEmailAuthSubmit(event) {
+  event.preventDefault();
+  if (!supabaseClient) {
+    setEmailAuthStatus(t("authMissing"));
+    return;
+  }
+
+  const email = emailAuthEmail.value.trim();
+  const password = emailAuthPassword.value;
+  const confirmPassword = emailAuthConfirm.value;
+
+  if (emailAuthMode === "reset") {
+    if (!email) {
+      setEmailAuthStatus(t("emailResetRequired"));
+      return;
+    }
+    await runWithHumanVerification(() => sendPasswordReset(email));
+    return;
+  }
+
+  if (emailAuthMode === "update") {
+    if (!isUsablePassword(password)) {
+      setEmailAuthStatus(t("emailPasswordShort"));
+      return;
+    }
+    if (password !== confirmPassword) {
+      setEmailAuthStatus(t("emailPasswordMismatch"));
+      return;
+    }
+    await updateEmailPassword(password);
+    return;
+  }
+
+  if (!email || !password) {
+    setEmailAuthStatus(t("emailAuthRequired"));
+    return;
+  }
+  if (emailAuthMode === "signup") {
+    if (!isUsablePassword(password)) {
+      setEmailAuthStatus(t("emailPasswordShort"));
+      return;
+    }
+    if (password !== confirmPassword) {
+      setEmailAuthStatus(t("emailPasswordMismatch"));
+      return;
+    }
+    await runWithHumanVerification(() => signUpWithEmail(email, password));
+    return;
+  }
+
+  await runWithHumanVerification(() => signInWithEmail(email, password));
+}
+
+async function runWithHumanVerification(action) {
+  if (!customerTurnstileGate || customerTurnstileGate.canProceed()) {
+    await action();
+    return;
+  }
+  pendingHumanAction = action;
+}
+
+async function completePendingHumanAction() {
+  const action = pendingHumanAction;
+  pendingHumanAction = null;
+  if (action) await action();
+}
+
+async function signInWithEmail(email, password) {
+  setEmailAuthBusy(true);
+  setEmailAuthStatus("");
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  setEmailAuthBusy(false);
+  if (error) {
+    setEmailAuthStatus(error.message || t("emailAuthRequired"));
+    return;
+  }
+  setEmailAuthStatus(t("emailSignInReady"));
+  customerTurnstileGate?.hide?.();
+}
+
+async function signUpWithEmail(email, password) {
+  setEmailAuthBusy(true);
+  setEmailAuthStatus("");
+  const { error } = await supabaseClient.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${siteUrl}/`
+    }
+  });
+  setEmailAuthBusy(false);
+  if (error) {
+    setEmailAuthStatus(error.message || t("emailAuthRequired"));
+    return;
+  }
+  emailAuthForm.reset();
+  customerTurnstileGate?.hide?.();
+  setEmailAuthStatus(t("emailSignUpSent"));
+}
+
+async function sendPasswordReset(email) {
+  setEmailAuthBusy(true);
+  setEmailAuthStatus("");
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl}/?reset_password=1`
+  });
+  setEmailAuthBusy(false);
+  if (error) {
+    setEmailAuthStatus(error.message || t("emailResetRequired"));
+    return;
+  }
+  customerTurnstileGate?.hide?.();
+  setEmailAuthStatus(t("emailResetSent"));
+}
+
+async function updateEmailPassword(password) {
+  setEmailAuthBusy(true);
+  setEmailAuthStatus("");
+  const { error } = await supabaseClient.auth.updateUser({ password });
+  setEmailAuthBusy(false);
+  if (error) {
+    setEmailAuthStatus(error.message || t("emailPasswordShort"));
+    return;
+  }
+  emailAuthForm.reset();
+  setEmailAuthMode("signin");
+  setEmailAuthStatus(t("emailUpdateReady"));
+}
+
 async function signOutCustomer() {
   if (supabaseClient) await supabaseClient.auth.signOut();
   setCustomerSession(null);
   resetCustomerFlow();
+}
+
+function setEmailAuthMode(mode) {
+  emailAuthMode = mode || "signin";
+  const isReset = emailAuthMode === "reset";
+  const isSignup = emailAuthMode === "signup";
+  const isUpdate = emailAuthMode === "update";
+
+  emailAuthTabs.forEach((button) => {
+    const active = button.dataset.authMode === emailAuthMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  });
+
+  emailAuthForm.hidden = Boolean(authSession?.user && !isUpdate);
+  emailAuthEmailWrap.hidden = isUpdate;
+  emailAuthPasswordWrap.hidden = isReset;
+  emailAuthConfirmWrap.hidden = !(isSignup || isUpdate);
+  emailAuthEmail.required = !isUpdate;
+  emailAuthPassword.required = !isReset;
+  emailAuthConfirm.required = isSignup || isUpdate;
+  emailAuthPassword.autocomplete = isSignup || isUpdate ? "new-password" : "current-password";
+
+  const actionKey = isReset
+    ? "emailResetAction"
+    : isSignup
+      ? "emailSignUpAction"
+      : isUpdate
+        ? "emailUpdateAction"
+        : "emailSignInAction";
+  emailAuthSubmit.textContent = t(actionKey);
+  emailAuthSubmit.dataset.i18n = actionKey;
+
+  if (isUpdate) {
+    customerAuthTitle.textContent = t("emailUpdateTitle");
+    customerAuthSubtitle.textContent = t("emailUpdateHelp");
+  }
+  setEmailAuthStatus("");
+}
+
+function setEmailAuthStatus(message) {
+  if (emailAuthStatus) emailAuthStatus.textContent = message || "";
+}
+
+function setEmailAuthBusy(isBusy) {
+  emailAuthSubmit.disabled = isBusy;
+  emailAuthTabs.forEach((button) => {
+    button.disabled = isBusy;
+  });
+}
+
+function isUsablePassword(password) {
+  return String(password || "").length >= 8;
 }
 
 function setCustomerSession(session) {
@@ -678,6 +925,7 @@ function setCustomerSession(session) {
   const email = session?.user?.email || "";
   customerLoginButton.hidden = Boolean(session?.user);
   customerLogoutButton.hidden = !session?.user;
+  if (customerAuthActions) customerAuthActions.hidden = Boolean(session?.user && emailAuthMode !== "update");
   if (customerTurnstileWrap && customerTurnstileGate?.enabled) {
     if (session?.user) customerTurnstileGate.hide();
     customerTurnstileWrap.hidden = true;
@@ -703,6 +951,7 @@ function setCustomerSession(session) {
   } else {
     customerAuthTitle.textContent = t("authRequired");
     customerAuthSubtitle.textContent = t("authRequired");
+    emailAuthForm.hidden = false;
     form.elements.email.value = "";
     form.elements.email.readOnly = false;
     usageState = null;
@@ -734,6 +983,7 @@ function setLanguage(nextLanguage) {
   updatePhotoStatusText();
 
   setCustomerSession(authSession);
+  setEmailAuthMode(emailAuthMode);
 }
 
 function updateSelectPlaceholder(select, label) {
