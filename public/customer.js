@@ -12,7 +12,8 @@ const resultTitle = document.querySelector("#result-title");
 const resultMeta = document.querySelector("#result-meta");
 const wholesaleValue = document.querySelector("#wholesale-value");
 const retailValue = document.querySelector("#retail-value");
-const tradeInValue = document.querySelector("#tradein-value");
+const wholesaleAverage = document.querySelector("#wholesale-average");
+const retailAverage = document.querySelector("#retail-average");
 const languageToggle = document.querySelector("#language-toggle");
 const postalHelp = document.querySelector("#postal-help");
 const modal = document.querySelector("#modal");
@@ -143,6 +144,13 @@ const text = {
     wholesaleAvg: "Estimated Wholesale Range",
     retailAvg: "Estimated Private Range",
     tradeInAvg: "Estimated Trade-In Range",
+    dealerPurchaseRange: "Average Dealer Purchase Price",
+    privateSaleRange: "If you prefer to sell yourself",
+    wholesaleAvgLabel: "Wholesale AVG",
+    retailAvgLabel: "Private AVG",
+    tradeInAvgLabel: "Trade-In AVG",
+    averageLabel: "Average",
+    avgFormula: "Average uses CBB adjusted.avg; if unavailable, base.avg.",
     resultNote: "This is an estimate. A dealer may adjust it after reviewing condition, options, and photos.",
     toolsEyebrow: "Useful tools",
     toolsTitle: "Plan the next step with confidence",
@@ -298,6 +306,13 @@ const text = {
     wholesaleAvg: "Fourchette gros estimée",
     retailAvg: "Fourchette privée estimée",
     tradeInAvg: "Fourchette échange estimée",
+    dealerPurchaseRange: "Prix moyen d'achat par un concessionnaire",
+    privateSaleRange: "Si vous préférez vendre vous-même",
+    wholesaleAvgLabel: "Moyenne gros",
+    retailAvgLabel: "Moyenne vente privée",
+    tradeInAvgLabel: "Moyenne échange",
+    averageLabel: "Moyenne",
+    avgFormula: "La moyenne utilise adjusted.avg de CBB; sinon base.avg.",
     resultNote: "Il s'agit d'une estimation. Un concessionnaire peut l'ajuster après examen de l'état, des options et des photos.",
     toolsEyebrow: "Outils utiles",
     toolsTitle: "Planifiez la prochaine étape avec confiance",
@@ -1257,7 +1272,6 @@ function renderHistory(leads) {
     const title = valuation.title || vehicleTitle(input) || "Vehicle valuation";
     const wholesaleAvg = marketAverage(valuation, "wholesale");
     const retailAvg = marketAverage(valuation, "retail");
-    const tradeInAvg = marketAverage(valuation, "tradeIn");
 
     return `
       <article class="history-card">
@@ -1274,9 +1288,8 @@ function renderHistory(leads) {
           <div><dt>Status</dt><dd>${escapeHtml(lead.status || "new")}</dd></div>
         </dl>
         <div class="history-values">
-          <span>${escapeHtml(t("wholesaleAvg"))} ${formatHistoryValue(wholesaleAvg)}</span>
-          <span>${escapeHtml(t("retailAvg"))} ${formatHistoryValue(retailAvg)}</span>
-          <span>${escapeHtml(t("tradeInAvg"))} ${formatHistoryValue(tradeInAvg)}</span>
+          <span>${escapeHtml(t("wholesaleAvgLabel"))} ${formatHistoryValue(wholesaleAvg)}</span>
+          <span>${escapeHtml(t("retailAvgLabel"))} ${formatHistoryValue(retailAvg)}</span>
         </div>
         <div class="history-actions">
           <button type="button" data-history-index="${index}">${escapeHtml(t("historyView"))}</button>
@@ -1356,7 +1369,8 @@ function showHistoryResult(lead) {
 function renderResult(valuation, input) {
   const wholesale = marketRange(valuation, "wholesale");
   const retail = marketRange(valuation, "retail");
-  const tradeIn = marketRange(valuation, "tradeIn");
+  const wholesaleAvg = marketAverage(valuation, "wholesale");
+  const retailAvg = marketAverage(valuation, "retail");
   resultTitle.textContent = valuation.title || selectedVehicle?.title || vehicleTitle(input);
   resultMeta.textContent = [
     [input.style, input.engine, input.transmission, input.drivetrain].filter(Boolean).join(", "),
@@ -1366,7 +1380,8 @@ function renderResult(valuation, input) {
   resultMeta.textContent = resultMeta.textContent.replace(/\s+[^\w\s.,-]+\s+/g, " | ");
   wholesaleValue.textContent = moneyRangeOrDash(wholesale);
   retailValue.textContent = moneyRangeOrDash(retail);
-  tradeInValue.textContent = moneyRangeOrDash(tradeIn);
+  if (wholesaleAverage) wholesaleAverage.textContent = `${t("averageLabel")}: ${moneyOrDash(wholesaleAvg)}`;
+  if (retailAverage) retailAverage.textContent = `${t("averageLabel")}: ${moneyOrDash(retailAvg)}`;
   resultSection.hidden = false;
   resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
 }

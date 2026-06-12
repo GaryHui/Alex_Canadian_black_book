@@ -1012,7 +1012,7 @@ input::placeholder {
 
 .value-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 14px;
   margin: 26px 0 18px;
 }
@@ -1042,6 +1042,23 @@ input::placeholder {
   font-size: clamp(24px, 3vw, 32px);
   line-height: 1.18;
   overflow-wrap: anywhere;
+}
+
+.value-cards small {
+  display: block;
+  margin-top: 10px;
+  color: var(--blue-dark);
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.value-cards em {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.4;
 }
 
 .fine-print {
