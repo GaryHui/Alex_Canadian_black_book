@@ -28,7 +28,8 @@ export async function listAdminInventory() {
   );
   if (!result.ok) return { ...result, inventory: [] };
   const inventory = Array.isArray(result.data) ? result.data.map(publicInventoryRow) : [];
-  return { ok: true, storage: "supabase", inventory: await attachListingPhotos(inventory, false, client) };
+  const withListingPhotos = await attachListingPhotos(inventory, false, client);
+  return { ok: true, storage: "supabase", inventory: await attachAvailableLeadPhotos(withListingPhotos, client) };
 }
 
 export async function updateInventoryListing(body, user) {
@@ -44,6 +45,7 @@ export async function updateInventoryListing(body, user) {
     asking_price: numberOrNull(body.askingPrice),
     monthly_payment_estimate: numberOrNull(body.monthlyPaymentEstimate),
     description: String(body.description || "").trim(),
+    public_options: buildListingPublicOptions(body),
     updated_at: new Date().toISOString()
   };
   patch.published_at = status === "published" ? new Date().toISOString() : null;
@@ -60,6 +62,9 @@ export async function updateInventoryListing(body, user) {
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
+  if (Array.isArray(body.selectedPhotoUrls)) {
+    await syncSelectedListingPhotos(client, id, String(body.sourceLeadId || "").trim(), body.selectedPhotoUrls);
+  }
   return { ok: true, listing: publicInventoryRow(data?.[0] || {}) };
 }
 
@@ -264,6 +269,19 @@ async function attachListingPhotos(inventory, publicOnly, client) {
   }));
 }
 
+async function attachAvailableLeadPhotos(inventory, client) {
+  const leadIds = [...new Set(inventory.map((item) => item.sourceLeadId).filter(Boolean))];
+  if (!leadIds.length) return inventory;
+  const photosByLead = new Map();
+  await Promise.all(leadIds.map(async (leadId) => {
+    photosByLead.set(leadId, await findLeadPhotoLinks(leadId, client));
+  }));
+  return inventory.map((item) => ({
+    ...item,
+    availableLeadPhotos: photosByLead.get(item.sourceLeadId) || []
+  }));
+}
+
 async function attachLeadPhotosToListing(leadId, listingId, client) {
   if (!leadId || !listingId) return;
   const links = await findLeadPhotoLinks(leadId, client);
@@ -284,6 +302,33 @@ async function attachLeadPhotosToListing(leadId, listingId, client) {
     }));
   if (!rows.length) return;
 
+  await fetch(`${client.url}/rest/v1/listing_photos`, {
+    method: "POST",
+    headers: {
+      ...serviceHeaders(client.key),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(rows)
+  }).catch(() => null);
+}
+
+async function syncSelectedListingPhotos(client, listingId, leadId, selectedUrls = []) {
+  if (!listingId) return;
+  const urls = [...new Set((selectedUrls || []).map((url) => String(url || "").trim()).filter(Boolean))];
+  await fetch(`${client.url}/rest/v1/listing_photos?listing_id=eq.${encodeURIComponent(listingId)}`, {
+    method: "DELETE",
+    headers: serviceHeaders(client.key)
+  }).catch(() => null);
+  if (!urls.length || !leadId) return;
+
+  const available = await findLeadPhotoLinks(leadId, client);
+  const byUrl = new Map(available.map((photo) => [photo.url, photo]));
+  const rows = urls.map((url, index) => ({
+    listing_id: listingId,
+    url,
+    label: byUrl.get(url)?.label || `Vehicle photo ${index + 1}`,
+    sort_order: index
+  }));
   await fetch(`${client.url}/rest/v1/listing_photos`, {
     method: "POST",
     headers: {

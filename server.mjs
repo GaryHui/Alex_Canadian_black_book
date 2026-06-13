@@ -741,6 +741,15 @@ async function saveLead(body) {
     });
   }
   const webhook = await submitLeadToWebhook(savedLead, uploadFiles);
+  if (saved.ok && savedLead.id) {
+    await recordWebhookPhotosAsLeadNote({
+      url: process.env.SUPABASE_URL,
+      key: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      leadId: savedLead.id,
+      uploadFiles,
+      webhook
+    });
+  }
   const googleForm = await submitLeadToGoogleForm(savedLead);
   const crm = await submitLeadToCrm(savedLead, webhook);
 
@@ -1329,7 +1338,8 @@ async function listAdminInventory() {
   const rows = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: rows, inventory: [] };
   const inventory = Array.isArray(rows) ? rows.map(publicInventoryRow) : [];
-  return { ok: true, storage: "supabase", inventory: await attachListingPhotos(inventory, false) };
+  const withListingPhotos = await attachListingPhotos(inventory, false);
+  return { ok: true, storage: "supabase", inventory: await attachAvailableLeadPhotos(withListingPhotos) };
 }
 
 async function updateInventoryListing(body, user) {
@@ -1346,6 +1356,7 @@ async function updateInventoryListing(body, user) {
     asking_price: numberOrNull(body.askingPrice),
     monthly_payment_estimate: numberOrNull(body.monthlyPaymentEstimate),
     description: String(body.description || "").trim(),
+    public_options: mergeListingPublicOptions(body),
     updated_at: new Date().toISOString()
   };
   if (status === "published" && !body.publishedAt) {
@@ -1367,6 +1378,9 @@ async function updateInventoryListing(body, user) {
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
+  if (Array.isArray(body.selectedPhotoUrls)) {
+    await syncSelectedListingPhotos({ url, key }, id, String(body.sourceLeadId || "").trim(), body.selectedPhotoUrls);
+  }
   return { ok: true, listing: publicInventoryRow(data?.[0] || {}) };
 }
 
@@ -1877,6 +1891,49 @@ async function attachLeadPhotosToListing(leadId, listingId, supabase) {
   }).catch(() => null);
 }
 
+async function attachAvailableLeadPhotos(inventory) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return inventory;
+  const supabase = { url, key };
+  const leadIds = [...new Set(inventory.map((item) => item.sourceLeadId).filter(Boolean))];
+  if (!leadIds.length) return inventory;
+  const photosByLead = new Map();
+  await Promise.all(leadIds.map(async (leadId) => {
+    photosByLead.set(leadId, await findLeadPhotoLinks(leadId, supabase));
+  }));
+  return inventory.map((item) => ({
+    ...item,
+    availableLeadPhotos: photosByLead.get(item.sourceLeadId) || []
+  }));
+}
+
+async function syncSelectedListingPhotos(supabase, listingId, leadId, selectedUrls = []) {
+  if (!listingId) return;
+  const urls = [...new Set((selectedUrls || []).map((photoUrl) => String(photoUrl || "").trim()).filter(Boolean))];
+  await fetch(`${supabase.url}/rest/v1/listing_photos?listing_id=eq.${encodeURIComponent(listingId)}`, {
+    method: "DELETE",
+    headers: supabaseServiceHeaders(supabase.key)
+  }).catch(() => null);
+  if (!urls.length || !leadId) return;
+  const available = await findLeadPhotoLinks(leadId, supabase);
+  const byUrl = new Map(available.map((photo) => [photo.url, photo]));
+  const rows = urls.map((photoUrl, index) => ({
+    listing_id: listingId,
+    url: photoUrl,
+    label: byUrl.get(photoUrl)?.label || `Vehicle photo ${index + 1}`,
+    sort_order: index
+  }));
+  await fetch(`${supabase.url}/rest/v1/listing_photos`, {
+    method: "POST",
+    headers: {
+      ...supabaseServiceHeaders(supabase.key),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(rows)
+  }).catch(() => null);
+}
+
 async function findLeadPhotoLinks(leadId, supabase) {
   const result = await fetchSupabaseJson(
     `${supabase.url}/rest/v1/lead_notes?select=note&lead_id=eq.${encodeURIComponent(leadId)}&note_type=eq.inspection&order=created_at.desc&limit=50`,
@@ -2352,6 +2409,25 @@ async function createOwnerReviewNote({ url, key, leadId, authorEmail, reason }) 
     author_email: String(authorEmail || "").trim().toLowerCase(),
     note_type: "owner_review",
     note: reason
+  }).catch(() => null);
+}
+
+async function recordWebhookPhotosAsLeadNote({ url, key, leadId, uploadFiles = [], webhook = {} }) {
+  if (!url || !key || !leadId || !webhook?.submitted) return;
+  const parsed = webhook.data || parseJson(webhook.response) || {};
+  const savedFiles = Array.isArray(parsed.savedFiles) ? parsed.savedFiles : [];
+  if (!savedFiles.length) return;
+  const lines = savedFiles.map((file, index) => {
+    const label = uploadFiles[index]?.role || uploadFiles[index]?.angle || uploadFiles[index]?.name || file.name || `Photo ${index + 1}`;
+    const photoUrl = file.url || file.webViewLink || "";
+    return photoUrl ? `${label}: ${photoUrl}` : "";
+  }).filter(Boolean);
+  if (!lines.length) return;
+  await insertSupabaseJson(`${url}/rest/v1/lead_notes`, key, {
+    lead_id: leadId,
+    author_email: "system",
+    note_type: "inspection",
+    note: `Vehicle photo upload:\n${lines.join("\n")}`
   }).catch(() => null);
 }
 

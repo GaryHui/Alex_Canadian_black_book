@@ -56,10 +56,13 @@
           </div>
         </div>
         <div class="dealer-lead-filters" role="tablist" aria-label="Lead filters">
-          <button class="active" type="button" data-dealer-filter="all">All</button>
+          <button class="active" type="button" data-dealer-filter="active">Active</button>
+          <button type="button" data-dealer-filter="priority">High priority</button>
           <button type="button" data-dealer-filter="due">Needs follow-up</button>
           <button type="button" data-dealer-filter="buyer">BUY leads</button>
           <button type="button" data-dealer-filter="seller">SELL leads</button>
+          <button type="button" data-dealer-filter="closed">Closed</button>
+          <button type="button" data-dealer-filter="all">All</button>
         </div>
         <p id="dealer-leads-status" class="status">Loading assigned leads...</p>
         <div id="dealer-leads-list" class="history-list dealer-leads-list"></div>

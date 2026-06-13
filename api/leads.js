@@ -50,6 +50,15 @@ export default async function handler(req, res) {
       });
     }
     const webhook = await submitLeadToWebhook(savedLead, uploadFiles);
+    if (saved.ok && savedLead.id) {
+      await recordWebhookPhotosAsLeadNote({
+        url: process.env.SUPABASE_URL,
+        key: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        leadId: savedLead.id,
+        uploadFiles,
+        webhook
+      });
+    }
     const crm = await submitLeadToCrm(savedLead, webhook);
     if (saved.ok) return res.status(200).json({ ...saved, webhook, crm });
 
@@ -374,6 +383,25 @@ async function createOwnerReviewNote({ url, key, leadId, authorEmail, reason }) 
     author_email: String(authorEmail || "").trim().toLowerCase(),
     note_type: "owner_review",
     note: reason
+  }).catch(() => null);
+}
+
+async function recordWebhookPhotosAsLeadNote({ url, key, leadId, uploadFiles = [], webhook = {} }) {
+  if (!url || !key || !leadId || !webhook?.submitted) return;
+  const parsed = webhook.data || parseJson(webhook.response) || {};
+  const savedFiles = Array.isArray(parsed.savedFiles) ? parsed.savedFiles : [];
+  if (!savedFiles.length) return;
+  const lines = savedFiles.map((file, index) => {
+    const label = uploadFiles[index]?.role || uploadFiles[index]?.angle || uploadFiles[index]?.name || file.name || `Photo ${index + 1}`;
+    const photoUrl = file.url || file.webViewLink || "";
+    return photoUrl ? `${label}: ${photoUrl}` : "";
+  }).filter(Boolean);
+  if (!lines.length) return;
+  await insertJson(`${url}/rest/v1/lead_notes`, key, {
+    lead_id: leadId,
+    author_email: "system",
+    note_type: "inspection",
+    note: `Vehicle photo upload:\n${lines.join("\n")}`
   }).catch(() => null);
 }
 

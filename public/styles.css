@@ -2219,6 +2219,27 @@ select {
   border-left: 5px solid #0f766e;
 }
 
+.lead-workspace-grid {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(320px, .9fr) minmax(360px, 1.1fr);
+}
+
+.lead-owner-action-panel {
+  border-left: 5px solid #7c3aed;
+}
+
+.lead-owner-action-panel .owner-review {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.lead-activity-panel {
+  border-left: 5px solid #0b4f9c;
+}
+
 .lead-card pre {
   background: #f6f6f6;
   overflow: auto;
@@ -2229,7 +2250,7 @@ select {
   border-top: 1px solid #eee;
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 14px;
   padding-top: 14px;
 }
@@ -2714,6 +2735,49 @@ select {
   font-weight: 900;
   min-height: 38px;
   padding: 0 14px;
+}
+
+.inventory-photo-picker {
+  border: 1px solid #d9e1ec;
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+}
+
+.inventory-photo-picker legend {
+  color: #516174;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0 6px;
+  text-transform: uppercase;
+}
+
+.inventory-photo-picker label {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #d9e1ec;
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 8px 10px;
+}
+
+.inventory-photo-picker input {
+  height: 18px;
+  width: 18px;
+}
+
+.inventory-photo-picker span {
+  color: #1f3652;
+  font-weight: 800;
+}
+
+.inventory-photo-picker a {
+  color: #0b4f9c;
+  font-weight: 800;
 }
 
 .inventory-photo-list {
@@ -3250,6 +3314,7 @@ select {
 
   .lead-summary,
   .owner-review,
+  .lead-workspace-grid,
   .lead-photo-manager,
   .inventory-publish-form,
   .inventory-photo-upload,

@@ -88,7 +88,7 @@ let dealerRefreshTimer = null;
 let dealerDirectoryEmails = [];
 let dealerLeadsCache = [];
 let dealerLeadRole = "dealer";
-let dealerLeadFilter = "all";
+let dealerLeadFilter = "active";
 let dealerLeadAlertMap = new Map();
 
 initializeDatalists();
@@ -1129,14 +1129,16 @@ function renderDealerLeads(leads, role) {
     return;
   }
 
-  const visibleLeads = filterDealerLeads(leads);
+  const visibleLeads = sortDealerLeads(filterDealerLeads(leads));
   if (!visibleLeads.length) {
     dealerLeadsStatus.textContent = `No ${dealerLeadFilter.replace("-", " ")} leads in this view.`;
     dealerLeadsList.innerHTML = "";
     return;
   }
 
-  dealerLeadsStatus.textContent = `${visibleLeads.length} shown of ${leads.length} assigned lead${leads.length === 1 ? "" : "s"}.`;
+  const activeCount = leads.filter((lead) => !isDealerClosedLead(lead)).length;
+  const closedCount = leads.length - activeCount;
+  dealerLeadsStatus.textContent = `${visibleLeads.length} shown. ${activeCount} active / ${closedCount} closed assigned lead${leads.length === 1 ? "" : "s"}.`;
   dealerLeadsList.innerHTML = renderDealerLeadGroups(visibleLeads, (lead) => {
     const input = lead.input || {};
     const valuation = lead.valuation || {};
@@ -1150,7 +1152,8 @@ function renderDealerLeads(leads, role) {
     const customerEmail = input.email || lead.auth_email || lead.auth_user?.email || "-";
     const followUp = lead.next_follow_up_at || "";
     const status = lead.status || "new";
-    const dueNow = isDealerLeadDueNow(followUp, status);
+    const closedLead = isDealerClosedLead(lead);
+    const dueNow = !closedLead && isDealerLeadDueNow(followUp, status);
     const overdue = isDealerLeadOverdue(followUp, status);
     const statusLabel = overdue ? "Overdue" : dueNow ? "Due today" : status.replaceAll("_", " ");
     const statusClass = overdue ? "status-overdue" : dueNow ? "status-due" : `status-${cssToken(status)}`;
@@ -1261,7 +1264,7 @@ function renderDealerLeads(leads, role) {
               <option value="offer">Offer</option>
               <option value="internal">Internal note</option>
             </select>
-            <textarea name="note" placeholder="Record customer communication, inspection result, or quote detail..."></textarea>
+            <textarea name="note" placeholder="Record calls, inspection result, or corrections for admin approval. Price and inventory fields are owner-only."></textarea>
             <button type="submit">Add note</button>
           </form>
           <form class="dealer-task-form">
@@ -1289,15 +1292,20 @@ function setDealerLeadFilter(filter) {
 
 function renderDealerLeadSummary(leads) {
   if (!dealerLeadSummary) return;
-  const buyer = leads.filter(isBuyerLead).length;
-  const seller = leads.length - buyer;
-  const due = leads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new")).length;
+  const activeLeads = leads.filter((lead) => !isDealerClosedLead(lead));
+  const buyer = activeLeads.filter(isBuyerLead).length;
+  const seller = activeLeads.length - buyer;
+  const due = activeLeads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new")).length;
+  const priority = activeLeads.filter((lead) => ["high", "urgent"].includes(String(lead.priority || "").toLowerCase())).length;
+  const closed = leads.length - activeLeads.length;
   const updated = dealerLeadAlertMap.size;
   dealerLeadSummary.innerHTML = [
-    ["Total", leads.length, "All assigned active leads", "all"],
+    ["Active", activeLeads.length, "Current assigned work", "active"],
+    ["High priority", priority, "High or urgent leads", "priority"],
     ["BUY", buyer, "Buyer inquiries from inventory", "buyer"],
     ["SELL", seller, "Seller valuation leads", "seller"],
     ["Needs follow-up", due, "Overdue or due today", "due"],
+    ["Closed", closed, "Done or moved to inventory", "closed"],
     ["Updated", updated, "Changed since last refresh", "all"]
   ].map(([label, value, hint, filter]) => `
     <button type="button" data-dealer-summary-filter="${escapeHtml(filter || "all")}">
@@ -1310,7 +1318,11 @@ function renderDealerLeadSummary(leads) {
 
 function renderDealerTodayWork(leads) {
   if (!dealerTodayWorkEl) return;
-  const dueLeads = leads
+  const activeLeads = leads.filter((lead) => !isDealerClosedLead(lead));
+  const priorityLeads = activeLeads
+    .filter((lead) => ["high", "urgent"].includes(String(lead.priority || "").toLowerCase()))
+    .slice(0, 5);
+  const dueLeads = activeLeads
     .filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"))
     .slice(0, 5);
   const updatedLeads = [...dealerLeadAlertMap.values()]
@@ -1319,14 +1331,19 @@ function renderDealerTodayWork(leads) {
     .filter((lead, index, list) => list.findIndex((item) => item.id === lead.id) === index)
     .slice(0, 5);
   dealerTodayWorkEl.hidden = false;
-  const quickList = dueLeads.length ? dueLeads : updatedLeads;
+  const quickList = priorityLeads.length ? priorityLeads : dueLeads.length ? dueLeads : updatedLeads;
+  const todayTitle = priorityLeads.length
+    ? `${priorityLeads.length} high priority lead${priorityLeads.length === 1 ? "" : "s"}`
+    : dueLeads.length
+      ? `${dueLeads.length} follow-up${dueLeads.length === 1 ? "" : "s"} due`
+      : `${updatedLeads.length} updated lead${updatedLeads.length === 1 ? "" : "s"}`;
   dealerTodayWorkEl.innerHTML = quickList.length ? `
     <header>
       <div>
         <span>Today</span>
-        <strong>${dueLeads.length ? `${dueLeads.length} follow-up${dueLeads.length === 1 ? "" : "s"} due` : `${updatedLeads.length} updated lead${updatedLeads.length === 1 ? "" : "s"}`}</strong>
+        <strong>${todayTitle}</strong>
       </div>
-      <button type="button" data-dealer-filter-shortcut="${dueLeads.length ? "due" : "all"}">${dueLeads.length ? "View all due" : "View all leads"}</button>
+      <button type="button" data-dealer-filter-shortcut="${priorityLeads.length ? "priority" : dueLeads.length ? "due" : "active"}">${priorityLeads.length ? "View priority" : dueLeads.length ? "View all due" : "View active"}</button>
     </header>
     <div class="dealer-today-list">
       ${quickList.map((lead) => {
@@ -1347,7 +1364,7 @@ function renderDealerTodayWork(leads) {
         <span>Today</span>
         <strong>No due follow-ups right now</strong>
       </div>
-      <button type="button" data-dealer-filter-shortcut="all">View all leads</button>
+      <button type="button" data-dealer-filter-shortcut="active">View active leads</button>
     </header>
     <div class="dealer-today-empty">
       <b>Your current queue is clear.</b>
@@ -1357,12 +1374,26 @@ function renderDealerTodayWork(leads) {
 }
 
 function filterDealerLeads(leads) {
-  if (dealerLeadFilter === "buyer") return leads.filter(isBuyerLead);
-  if (dealerLeadFilter === "seller") return leads.filter((lead) => !isBuyerLead(lead));
+  if (dealerLeadFilter === "active") return leads.filter((lead) => !isDealerClosedLead(lead));
+  if (dealerLeadFilter === "closed") return leads.filter(isDealerClosedLead);
+  if (dealerLeadFilter === "priority") return leads.filter((lead) => !isDealerClosedLead(lead) && ["high", "urgent"].includes(String(lead.priority || "").toLowerCase()));
+  if (dealerLeadFilter === "buyer") return leads.filter((lead) => !isDealerClosedLead(lead) && isBuyerLead(lead));
+  if (dealerLeadFilter === "seller") return leads.filter((lead) => !isDealerClosedLead(lead) && !isBuyerLead(lead));
   if (dealerLeadFilter === "due") {
-    return leads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"));
+    return leads.filter((lead) => !isDealerClosedLead(lead) && isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"));
   }
   return leads;
+}
+
+function sortDealerLeads(leads) {
+  const priorityRank = { urgent: 0, high: 1, normal: 2, low: 3 };
+  return [...leads].sort((a, b) => {
+    const priorityDiff = (priorityRank[String(a.priority || "normal").toLowerCase()] ?? 2) - (priorityRank[String(b.priority || "normal").toLowerCase()] ?? 2);
+    if (priorityDiff) return priorityDiff;
+    const aDue = new Date(a.next_follow_up_at || a.created_at || 0).getTime();
+    const bDue = new Date(b.next_follow_up_at || b.created_at || 0).getTime();
+    return (Number.isNaN(aDue) ? Infinity : aDue) - (Number.isNaN(bDue) ? Infinity : bDue);
+  });
 }
 
 function renderDealerLeadGroups(leads, cardRenderer) {
@@ -1395,6 +1426,10 @@ function isBuyerLead(lead) {
   return input.leadType === "buyer_inquiry" || valuation.source === "buyer_inquiry";
 }
 
+function isDealerClosedLead(lead) {
+  return ["won", "lost", "closed", "deleted", "in_inventory"].includes(String(lead?.status || "").toLowerCase());
+}
+
 function cleanDealerLeadTitle(title, buyerLead) {
   const value = String(title || "").trim();
   return buyerLead ? value.replace(/^Buyer inquiry\s*-\s*/i, "") : value;
@@ -1419,6 +1454,7 @@ function dealerStatusActions(buyerLead, status) {
         ["contacted", "Mark contacted"],
         ["inspection_booked", "Inspection booked"],
         ["offer_sent", "Offer sent"],
+        ["in_inventory", "Moved to inventory"],
         ["won", "Purchased"],
         ["lost", "Lost"]
       ];
@@ -1443,6 +1479,7 @@ function dealerLeadProgressSteps(buyerLead) {
         ["contacted", "Contacted"],
         ["inspection_booked", "Inspection"],
         ["offer_sent", "Offer"],
+        ["in_inventory", "Inventory"],
         ["won", "Purchased"]
       ];
 }
@@ -1451,7 +1488,7 @@ function renderDealerLeadProgress(buyerLead, status) {
   const current = String(status || "new").toLowerCase();
   const steps = dealerLeadProgressSteps(buyerLead);
   const currentIndex = steps.findIndex(([value]) => value === current);
-  const closedLost = ["lost", "closed", "deleted"].includes(current);
+  const closedLost = ["lost", "closed", "deleted", "in_inventory"].includes(current);
   return `
     <ol class="lead-progress ${closedLost ? "lead-progress-closed" : ""}" aria-label="Lead progress">
       ${steps.map(([value, label], index) => {
@@ -1937,7 +1974,7 @@ function formatDateTime(value) {
 
 function isDealerLeadOverdue(value, status) {
   if (!value) return false;
-  const closedStatuses = new Set(["won", "lost", "closed", "deleted"]);
+  const closedStatuses = new Set(["won", "lost", "closed", "deleted", "in_inventory"]);
   if (closedStatuses.has(String(status || "").toLowerCase())) return false;
   const date = new Date(value);
   return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
@@ -1945,7 +1982,7 @@ function isDealerLeadOverdue(value, status) {
 
 function isDealerLeadDueNow(value, status) {
   if (!value) return false;
-  const closedStatuses = new Set(["won", "lost", "closed", "deleted"]);
+  const closedStatuses = new Set(["won", "lost", "closed", "deleted", "in_inventory"]);
   if (closedStatuses.has(String(status || "").toLowerCase())) return false;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return false;

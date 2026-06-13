@@ -30,6 +30,7 @@ const adminTurnstileWrap = document.querySelector("#admin-turnstile-wrap");
 const adminTurnstile = document.querySelector("#admin-turnstile");
 const adminTurnstileStatus = document.querySelector("#admin-turnstile-status");
 const AUTO_REFRESH_MS = 30000;
+const ADMIN_LEAD_READ_TOKENS_KEY = "autoswitch-admin-lead-read-tokens";
 
 let supabaseClient = null;
 let adminSession = null;
@@ -401,14 +402,31 @@ function renderInquiry(inquiry) {
 
 function renderInventoryListing(listing) {
   const photos = Array.isArray(listing.photos) ? listing.photos : [];
+  const availablePhotos = Array.isArray(listing.availableLeadPhotos) ? listing.availableLeadPhotos : [];
+  const selectedPhotoUrls = new Set(photos.map((photo) => String(photo.url || "").trim()).filter(Boolean));
   const canUnpublish = listing.status === "published";
   const canPublish = listing.status !== "published" && listing.status !== "sold";
   const canArchive = listing.status !== "archived";
   const publicOptionInputs = renderInventoryPublicOptionInputs(listing.publicOptions || {});
+  const selectablePhotos = availablePhotos.length ? `
+            <fieldset class="inventory-photo-picker">
+              <legend>Show on Buy page</legend>
+              <input type="hidden" name="photoSelectionPresent" value="1" />
+              ${availablePhotos.map((photo, index) => {
+                const url = String(photo.url || "").trim();
+                return `
+                  <label>
+                    <input type="checkbox" name="selectedPhotoUrls" value="${escapeHtml(url)}" ${selectedPhotoUrls.has(url) ? "checked" : ""} />
+                    <span>${escapeHtml(photo.label || `Vehicle photo ${index + 1}`)}</span>
+                    <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Open</a>
+                  </label>
+                `;
+              }).join("")}
+            </fieldset>` : "";
   const photoManager = listing.sourceLeadId ? `
           <section class="inventory-photo-summary inventory-photo-manager">
             <h4>Vehicle photos</h4>
-            <p>Upload and attach vehicle photos here. Photos stay with the warehouse listing, not the SELL lead card.</p>
+            <p>Choose which Drive photos appear on the Buy page. New uploads go to the same vehicle lead folder and become selectable here.</p>
             <div class="inventory-photo-upload">
               <label>
                 <span>Photo type</span>
@@ -432,6 +450,7 @@ function renderInventoryListing(listing) {
               <button type="button" data-upload-inventory-photos="${escapeHtml(listing.id || "")}">Upload photos</button>
             </div>
             <p class="inventory-photo-status" aria-live="polite"></p>
+            ${selectablePhotos}
             <div class="inventory-photo-list">
               ${photos.map((photo) => `<a href="${escapeHtml(photo.url)}" target="_blank" rel="noreferrer">${escapeHtml(photo.label || "Vehicle photo")}</a>`).join("") || "<span>No photos attached yet.</span>"}
             </div>
@@ -445,6 +464,7 @@ function renderInventoryListing(listing) {
           </section>`;
   return `
     <form class="inventory-card-admin" data-id="${escapeHtml(listing.id || "")}" data-source-lead-id="${escapeHtml(listing.sourceLeadId || "")}">
+      <input type="hidden" name="sourceLeadId" value="${escapeHtml(listing.sourceLeadId || "")}" />
       ${publicOptionInputs}
       <div class="inventory-card-head">
         <div>
@@ -508,8 +528,7 @@ function renderInventoryPublicOptionInputs(options) {
     showKilometers: true,
     showRegion: true,
     showColor: true,
-    showMaintenance: false,
-    showPhotos: false
+    showMaintenance: false
   };
   return Object.entries(defaults).map(([key, defaultValue]) => {
     const enabled = Object.prototype.hasOwnProperty.call(options || {}, key) ? options[key] === true : defaultValue;
@@ -612,18 +631,36 @@ async function loadLeads(options = {}) {
 }
 
 function collectAdminLeadAlerts(leads) {
+  const readTokens = loadAdminLeadReadTokens();
+  let readTokensChanged = false;
   if (!adminLeadSnapshotReady) {
-    rememberAdminLeadTokens(leads);
     for (const lead of leads) {
       const id = String(lead.id || "");
-      if (!id || !lead.owner_review?.unread) continue;
-      adminLeadAlertMap.set(id, {
-        id,
-        type: "owner",
-        title: leadAlertTitle(lead),
-        message: lead.owner_review.reason || "Owner review required"
-      });
+      if (!id) continue;
+      const token = leadUpdateToken(lead);
+      if (lead.owner_review?.unread) {
+        adminLeadAlertMap.set(id, {
+          id,
+          type: "owner",
+          title: leadAlertTitle(lead),
+          message: lead.owner_review.reason || "Owner review required"
+        });
+      } else if (readTokens[id] && readTokens[id] !== token) {
+        adminLeadAlertMap.set(id, {
+          id,
+          type: "updated",
+          title: leadAlertTitle(lead),
+          message: "Lead changed since you last opened it"
+        });
+      } else if (!readTokens[id]) {
+        readTokens[id] = token;
+        readTokensChanged = true;
+      }
     }
+    if (readTokensChanged) saveAdminLeadReadTokens(readTokens);
+    adminLeadTokenMap = new Map(leads
+      .map((lead) => [String(lead.id || ""), leadUpdateToken(lead)])
+      .filter(([id]) => Boolean(id)));
     adminLeadSnapshotReady = true;
     return;
   }
@@ -640,10 +677,22 @@ function collectAdminLeadAlerts(leads) {
         title: leadAlertTitle(lead),
         message: lead.owner_review.reason || "Owner review required"
       });
+    } else if (readTokens[id] && readTokens[id] !== token) {
+      adminLeadAlertMap.set(id, {
+        id,
+        type: "updated",
+        title: leadAlertTitle(lead),
+        message: "Lead changed since you last opened it"
+      });
     } else {
       adminLeadAlertMap.delete(id);
+      if (!readTokens[id]) {
+        readTokens[id] = token;
+        readTokensChanged = true;
+      }
     }
   }
+  if (readTokensChanged) saveAdminLeadReadTokens(readTokens);
   adminLeadTokenMap = nextMap;
 }
 
@@ -651,7 +700,40 @@ function rememberAdminLeadTokens(leads) {
   adminLeadTokenMap = new Map(leads
     .map((lead) => [String(lead.id || ""), leadUpdateToken(lead)])
     .filter(([id]) => Boolean(id)));
+  const readTokens = loadAdminLeadReadTokens();
+  let changed = false;
+  for (const lead of leads) {
+    const id = String(lead.id || "");
+    if (!id || lead.owner_review?.unread) continue;
+    readTokens[id] = leadUpdateToken(lead);
+    changed = true;
+  }
+  if (changed) saveAdminLeadReadTokens(readTokens);
   adminLeadSnapshotReady = true;
+}
+
+function loadAdminLeadReadTokens() {
+  try {
+    return JSON.parse(window.localStorage.getItem(ADMIN_LEAD_READ_TOKENS_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveAdminLeadReadTokens(tokens) {
+  try {
+    window.localStorage.setItem(ADMIN_LEAD_READ_TOKENS_KEY, JSON.stringify(tokens || {}));
+  } catch {
+    // localStorage is best-effort; owner_review remains persisted in Supabase.
+  }
+}
+
+function markAdminLeadTokenRead(id) {
+  const lead = adminLeadsCache.find((item) => String(item.id || "") === String(id || ""));
+  if (!lead) return;
+  const readTokens = loadAdminLeadReadTokens();
+  readTokens[String(id)] = leadUpdateToken(lead);
+  saveAdminLeadReadTokens(readTokens);
 }
 
 function leadUpdateToken(lead = {}) {
@@ -708,7 +790,10 @@ async function openAdminLeadFromAlert(id) {
   const card = leadsEl.querySelector(`.lead-card[data-id="${cssEscape(id)}"]`);
   if (!card) return;
   const lead = adminLeadsCache.find((item) => String(item.id || "") === id);
-  if (!lead?.owner_review?.unread) adminLeadAlertMap.delete(id);
+  if (!lead?.owner_review?.unread) {
+    markAdminLeadTokenRead(id);
+    adminLeadAlertMap.delete(id);
+  }
   renderAdminLeadAlerts();
   if (!lead?.owner_review?.unread) card.classList.remove("lead-card-updated");
   card.classList.add("lead-card-flash");
@@ -1131,10 +1216,11 @@ function renderLead(lead) {
           ${valueRows}
           </div>
         </section>
-        <section class="lead-detail-section">
+        <div class="lead-workspace-grid">
+        <section class="lead-detail-section lead-owner-action-panel">
           <header>
-            <h3>Owner controls</h3>
-            <span>Status, assignment, priority, and next follow-up</span>
+            <h3>Next action</h3>
+            <span>Owner decision, assignment, priority, and follow-up</span>
           </header>
         <form class="owner-review">
           <label>
@@ -1170,7 +1256,7 @@ function renderLead(lead) {
         </section>
         <section class="lead-detail-section lead-activity-panel">
           <div class="lead-activity-head">
-            <h3>Follow-up activity</h3>
+            <h3>Activity timeline</h3>
             <button type="button" data-load-activity>Refresh activity</button>
           </div>
           <form class="lead-note-form">
@@ -1193,6 +1279,7 @@ function renderLead(lead) {
           </form>
           <div class="lead-activity-list">Activity not loaded yet.</div>
         </section>
+        </div>
       </details>
       <details class="lead-raw">
         <summary>Raw valuation summary</summary>
@@ -1355,7 +1442,7 @@ inventoryEl?.addEventListener("click", async (event) => {
 async function saveInventoryListing(form, overrides = {}) {
   const payload = {
     id: form.dataset.id,
-    ...Object.fromEntries(new FormData(form).entries()),
+    ...inventoryListingPayloadFromForm(form),
     ...overrides
   };
   inventoryStatusEl.textContent = "Saving inventory listing...";
@@ -1451,6 +1538,7 @@ async function uploadInventoryPhotos(button) {
 function inventoryListingPayloadFromForm(form) {
   const data = new FormData(form);
   const payload = {
+    sourceLeadId: String(data.get("sourceLeadId") || form.dataset.sourceLeadId || "").trim(),
     title: String(data.get("title") || "").trim(),
     askingPrice: String(data.get("askingPrice") || "").trim(),
     monthlyPaymentEstimate: String(data.get("monthlyPaymentEstimate") || "").trim(),
@@ -1460,6 +1548,10 @@ function inventoryListingPayloadFromForm(form) {
   ["showVin", "showUvc", "showKilometers", "showRegion", "showColor", "showMaintenance", "showPhotos"].forEach((key) => {
     if (data.has(key)) payload[key] = true;
   });
+  if (data.has("photoSelectionPresent")) {
+    payload.selectedPhotoUrls = data.getAll("selectedPhotoUrls").map((url) => String(url || "").trim()).filter(Boolean);
+    payload.showPhotos = payload.selectedPhotoUrls.length > 0;
+  }
   return payload;
 }
 
@@ -1764,6 +1856,8 @@ leadsEl.addEventListener("toggle", async (event) => {
   const card = details.closest(".lead-card");
   if (!card) return;
   if (card.dataset.id && adminLeadAlertMap.has(card.dataset.id)) {
+    const lead = adminLeadsCache.find((item) => String(item.id || "") === String(card.dataset.id));
+    if (!lead?.owner_review?.unread) markAdminLeadTokenRead(card.dataset.id);
     adminLeadAlertMap.delete(card.dataset.id);
     renderAdminLeadAlerts();
     card.classList.remove("lead-card-updated");
