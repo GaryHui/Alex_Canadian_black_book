@@ -374,6 +374,8 @@ Main fields:
 - Admin can one-click assign a lead to active dealer staff.
 - Dealer workbench shows a today/due follow-up list.
 - Admin CRM defaults to active leads, supports closed lead storage, owner-unread review, and fuzzy search across vehicle, VIN, contact, staff, status, and notes.
+- Seller leads stay focused on customer follow-up. Vehicle photos, listing fields, pricing, visibility, sold/archive actions, and public inventory management live in the Warehouse.
+- Moving a seller lead to Warehouse creates a draft inventory listing and changes the original lead to `in_inventory`, so it leaves the daily Active queue but remains searchable in Closed/All and traceable from inventory.
 - Admin can publish a valuation lead into `vehicle_listings`.
 - Admin can list, edit, publish, mark sold, or archive inventory listings.
 - Buy page reads published listings from `/api/inventory`.
@@ -619,6 +621,7 @@ Tasks:
 - show seller leads and buyer inquiries in separated BUY/SELL groups and filters: done
 - add overdue / due today filters: done
 - add fuzzy search and active/closed lead views so old completed deals do not crowd the daily queue: done
+- move vehicle photo/listing editing out of SELL lead details and into Warehouse inventory cards: done
 - add "complete follow-up" workflow: partial; staff can set next follow-up, see due list, and complete tasks, but there is no single "complete current follow-up" button yet
 - add owner/staff update reminders: done
 - add owner one-click assignment: done

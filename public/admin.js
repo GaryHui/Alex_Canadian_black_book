@@ -404,8 +404,48 @@ function renderInventoryListing(listing) {
   const canUnpublish = listing.status === "published";
   const canPublish = listing.status !== "published" && listing.status !== "sold";
   const canArchive = listing.status !== "archived";
+  const publicOptionInputs = renderInventoryPublicOptionInputs(listing.publicOptions || {});
+  const photoManager = listing.sourceLeadId ? `
+          <section class="inventory-photo-summary inventory-photo-manager">
+            <h4>Vehicle photos</h4>
+            <p>Upload and attach vehicle photos here. Photos stay with the warehouse listing, not the SELL lead card.</p>
+            <div class="inventory-photo-upload">
+              <label>
+                <span>Photo type</span>
+                <select name="inventoryPhotoLabel">
+                  <option value="Front exterior">Front exterior</option>
+                  <option value="Rear exterior">Rear exterior</option>
+                  <option value="Driver side">Driver side</option>
+                  <option value="Passenger side">Passenger side</option>
+                  <option value="Interior">Interior</option>
+                  <option value="Odometer">Odometer</option>
+                  <option value="Engine bay">Engine bay</option>
+                  <option value="Damage or wear">Damage or wear</option>
+                  <option value="Service record">Service record</option>
+                  <option value="Other vehicle photo">Other vehicle photo</option>
+                </select>
+              </label>
+              <label>
+                <span>Choose photos</span>
+                <input name="inventoryPhotos" type="file" accept="image/*" multiple />
+              </label>
+              <button type="button" data-upload-inventory-photos="${escapeHtml(listing.id || "")}">Upload photos</button>
+            </div>
+            <p class="inventory-photo-status" aria-live="polite"></p>
+            <div class="inventory-photo-list">
+              ${photos.map((photo) => `<a href="${escapeHtml(photo.url)}" target="_blank" rel="noreferrer">${escapeHtml(photo.label || "Vehicle photo")}</a>`).join("") || "<span>No photos attached yet.</span>"}
+            </div>
+          </section>` : `
+          <section class="inventory-photo-summary">
+            <h4>Vehicle photos</h4>
+            <p>This listing was not created from a SELL lead, so direct photo upload is not connected yet.</p>
+            <div class="inventory-photo-list">
+              ${photos.map((photo) => `<a href="${escapeHtml(photo.url)}" target="_blank" rel="noreferrer">${escapeHtml(photo.label || "Vehicle photo")}</a>`).join("") || "<span>No photos attached yet.</span>"}
+            </div>
+          </section>`;
   return `
-    <form class="inventory-card-admin" data-id="${escapeHtml(listing.id || "")}">
+    <form class="inventory-card-admin" data-id="${escapeHtml(listing.id || "")}" data-source-lead-id="${escapeHtml(listing.sourceLeadId || "")}">
+      ${publicOptionInputs}
       <div class="inventory-card-head">
         <div>
           <strong>${escapeHtml(listing.title || "Untitled vehicle")}</strong>
@@ -453,18 +493,28 @@ function renderInventoryListing(listing) {
             <span>Description</span>
             <textarea name="description">${escapeHtml(listing.description || "")}</textarea>
           </label>
-          <section class="inventory-photo-summary">
-            <h4>Published photos</h4>
-            <p>Photos are managed from the source lead or future inventory photo tools.</p>
-            <div class="inventory-photo-list">
-              ${photos.map((photo) => `<a href="${escapeHtml(photo.url)}" target="_blank" rel="noreferrer">${escapeHtml(photo.label || "Vehicle photo")}</a>`).join("") || "<span>No photos attached yet.</span>"}
-            </div>
-          </section>
+          ${photoManager}
         </div>
         <button type="submit">Save listing details</button>
       </details>
     </form>
   `;
+}
+
+function renderInventoryPublicOptionInputs(options) {
+  const defaults = {
+    showVin: true,
+    showUvc: false,
+    showKilometers: true,
+    showRegion: true,
+    showColor: true,
+    showMaintenance: false,
+    showPhotos: false
+  };
+  return Object.entries(defaults).map(([key, defaultValue]) => {
+    const enabled = Object.prototype.hasOwnProperty.call(options || {}, key) ? options[key] === true : defaultValue;
+    return enabled ? `<input type="hidden" name="${escapeHtml(key)}" value="on" />` : "";
+  }).join("");
 }
 
 function renderDealer(staff) {
@@ -834,9 +884,9 @@ function buildAdminAttentionItems(leads) {
     const lead = leads.find((item) => String(item.id || "") === String(alert.id || ""));
     if (lead) add(lead, alert.type === "new" ? "New lead" : "Updated lead", "update");
   }
-  leads.filter((lead) => isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).forEach((lead) => add(lead, "Follow-up due", "due"));
-  leads.filter((lead) => !String(lead.assigned_to || "").trim()).forEach((lead) => add(lead, "Needs assignment", "assign"));
-  leads.filter((lead) => String(lead.priority || "").toLowerCase() === "urgent").forEach((lead) => add(lead, "Urgent", "urgent"));
+  leads.filter((lead) => !isClosedLead(lead) && isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).forEach((lead) => add(lead, "Follow-up due", "due"));
+  leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim()).forEach((lead) => add(lead, "Needs assignment", "assign"));
+  leads.filter((lead) => !isClosedLead(lead) && String(lead.priority || "").toLowerCase() === "urgent").forEach((lead) => add(lead, "Urgent", "urgent"));
   return items.slice(0, 8);
 }
 
@@ -915,7 +965,8 @@ function isBuyerLead(lead) {
 }
 
 function isClosedLead(lead) {
-  return ["won", "lost", "closed", "deleted"].includes(String(lead?.status || "").toLowerCase());
+  if (!isBuyerLead(lead) && inventoryCache.some((item) => item.sourceLeadId && item.sourceLeadId === lead?.id)) return true;
+  return ["won", "lost", "closed", "deleted", "in_inventory"].includes(String(lead?.status || "").toLowerCase());
 }
 
 function searchableLeadText(lead) {
@@ -986,7 +1037,7 @@ function renderLead(lead) {
     .join("");
   const warehouseAction = buyer ? "" : inventoryListing
     ? `<button type="button" data-view-inventory="${escapeHtml(inventoryListing.id || "")}">View inventory</button>`
-    : `<button type="button" data-quick-inventory="${escapeHtml(lead.id || "")}">Create inventory draft</button>`;
+    : `<button type="button" data-quick-inventory="${escapeHtml(lead.id || "")}">Move to warehouse</button>`;
   const quickAssign = dealerStaffEmails.length ? `
       <div class="quick-assign-row" aria-label="Quick assign lead">
         <span>Assign</span>
@@ -1012,74 +1063,6 @@ function renderLead(lead) {
             <span>Reason</span>
             <input name="reason" value="${escapeHtml(adjustment.reason || "")}" placeholder="Why adjust this value?" />
           </label>`;
-  const sellerPhotoManager = buyer ? "" : `
-        <section class="lead-photo-manager inventory-step-card">
-          <div class="inventory-step-number">1</div>
-          <div class="inventory-step-body">
-            <h3>Upload intake photos</h3>
-            <p>Add inspection or customer photos first. Keep private by default; choose public later only if the listing is ready.</p>
-          </div>
-          <label>
-            <span>Photo type</span>
-            <select name="photoLabel">
-              <option value="Front exterior">Front exterior</option>
-              <option value="Rear exterior">Rear exterior</option>
-              <option value="Driver side">Driver side</option>
-              <option value="Passenger side">Passenger side</option>
-              <option value="Interior">Interior</option>
-              <option value="Odometer">Odometer</option>
-              <option value="Engine bay">Engine bay</option>
-              <option value="Damage or wear">Damage or wear</option>
-              <option value="Service record">Service record</option>
-              <option value="Other vehicle photo">Other vehicle photo</option>
-            </select>
-          </label>
-          <label>
-            <span>Choose photos</span>
-            <input name="leadPhotos" type="file" accept="image/*" multiple />
-          </label>
-          <button type="button" data-upload-lead-photos="${escapeHtml(lead.id || "")}">Upload photos</button>
-          <p class="lead-photo-status" aria-live="polite"></p>
-        </section>`;
-  const sellerPublishForm = buyer ? "" : `
-        <form class="inventory-publish-form inventory-step-card">
-          <div class="inventory-step-number">2</div>
-          <div class="inventory-step-body inventory-step-heading">
-            <h3>Create inventory listing</h3>
-            <p class="inventory-helper">Save as Draft while pricing/photos are not ready. Publish only when buyers should see it on the Buy page.</p>
-          </div>
-          <label>
-            <span>Listing title</span>
-            <input name="title" value="${escapeHtml(title)}" />
-          </label>
-          <label>
-            <span>Asking price</span>
-            <input name="askingPrice" type="number" min="0" step="1" value="${escapeHtml(retail || wholesale || "")}" placeholder="Listing price" />
-          </label>
-          <label>
-            <span>Visibility</span>
-            <select name="status">
-              <option value="draft">Draft - internal only</option>
-              <option value="published">Published - visible to buyers</option>
-            </select>
-          </label>
-          <label class="review-notes">
-            <span>Listing description</span>
-            <textarea name="description" placeholder="Short public description for buyers...">${escapeHtml(lead.notes || "")}</textarea>
-          </label>
-          <fieldset class="inventory-public-options">
-            <legend>Public information</legend>
-            <label><input type="checkbox" name="showVin" checked /> VIN</label>
-            <label><input type="checkbox" name="showUvc" /> UVC</label>
-            <label><input type="checkbox" name="showKilometers" checked /> Kilometers</label>
-            <label><input type="checkbox" name="showRegion" checked /> Region</label>
-            <label><input type="checkbox" name="showColor" checked /> Color</label>
-            <label><input type="checkbox" name="showMaintenance" /> Publish selected maintenance / repair activity</label>
-            <label><input type="checkbox" name="showPhotos" /> Publish photos uploaded in this lead</label>
-          </fieldset>
-          <button type="submit">Save inventory listing</button>
-          <p class="inventory-publish-status" aria-live="polite"></p>
-        </form>`;
   const valueRows = buyer ? `
           <span>Asking price</span><b>${retail ? formatNumber(retail) : input.askingPrice ? formatNumber(input.askingPrice) : "-"}</b>
           <span>Payment target</span><b>${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)} / mo` : "-"}</b>` : `
@@ -1148,7 +1131,6 @@ function renderLead(lead) {
           ${valueRows}
           </div>
         </section>
-        ${sellerPhotoManager}
         <section class="lead-detail-section">
           <header>
             <h3>Owner controls</h3>
@@ -1186,7 +1168,6 @@ function renderLead(lead) {
           <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(lead.id || "")}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
         </form>
         </section>
-        ${sellerPublishForm ? `<section class="lead-detail-section lead-detail-inventory">${sellerPublishForm}</section>` : ""}
         <section class="lead-detail-section lead-activity-panel">
           <div class="lead-activity-head">
             <h3>Follow-up activity</h3>
@@ -1242,6 +1223,7 @@ function leadStatusOptions(buyer) {
         { value: "waiting_for_customer", label: "Waiting for seller" },
         { value: "inspection_booked", label: "Inspection booked" },
         { value: "offer_sent", label: "Offer sent" },
+        { value: "in_inventory", label: "In inventory" },
         { value: "won", label: "Purchased" },
         { value: "lost", label: "Lost" },
         { value: "closed", label: "Closed" },
@@ -1270,6 +1252,7 @@ function leadStatusActions(buyer, status) {
         ["contacted", "Contacted"],
         ["inspection_booked", "Inspection"],
         ["offer_sent", "Offer sent"],
+        ["in_inventory", "In inventory"],
         ["won", "Purchased"],
         ["lost", "Lost"]
       ];
@@ -1294,6 +1277,7 @@ function leadProgressSteps(buyer) {
         ["contacted", "Contacted"],
         ["inspection_booked", "Inspection"],
         ["offer_sent", "Offer"],
+        ["in_inventory", "Inventory"],
         ["won", "Purchased"]
       ];
 }
@@ -1302,7 +1286,7 @@ function renderLeadProgress(buyer, status) {
   const current = String(status || "new").toLowerCase();
   const steps = leadProgressSteps(buyer);
   const currentIndex = steps.findIndex(([value]) => value === current);
-  const closedLost = ["lost", "closed", "deleted"].includes(current);
+  const closedLost = ["lost", "closed", "deleted", "in_inventory"].includes(current);
   return `
     <ol class="lead-progress ${closedLost ? "lead-progress-closed" : ""}" aria-label="Lead progress">
       ${steps.map(([value, label], index) => {
@@ -1345,6 +1329,12 @@ inventoryEl?.addEventListener("submit", async (event) => {
 });
 
 inventoryEl?.addEventListener("click", async (event) => {
+  const uploadPhotosButton = event.target.closest("[data-upload-inventory-photos]");
+  if (uploadPhotosButton) {
+    await uploadInventoryPhotos(uploadPhotosButton);
+    return;
+  }
+
   const statusButton = event.target.closest("[data-inventory-status]");
   if (statusButton) {
     const form = statusButton.closest(".inventory-card-admin");
@@ -1400,6 +1390,77 @@ async function removeInventoryListing(button) {
     await Promise.all([loadInventory(), loadLeads({ suppressAlerts: true, forceOpenActivity: true })]);
   }
   button.disabled = false;
+}
+
+async function uploadInventoryPhotos(button) {
+  const form = button.closest(".inventory-card-admin");
+  const leadId = form?.dataset?.sourceLeadId || "";
+  const fileInput = form?.querySelector("input[name='inventoryPhotos']");
+  const labelInput = form?.querySelector("select[name='inventoryPhotoLabel']");
+  const status = form?.querySelector(".inventory-photo-status");
+  const files = [...(fileInput?.files || [])];
+  if (!leadId || !files.length) {
+    if (status) status.textContent = "Choose at least one photo first.";
+    return;
+  }
+
+  button.disabled = true;
+  inventoryStatusEl.textContent = "Uploading vehicle photos...";
+  if (status) status.textContent = "Preparing photos...";
+  try {
+    const photoFiles = [];
+    for (const file of files) {
+      photoFiles.push(await fileToBase64Payload(file, labelInput?.value || "Vehicle photo"));
+    }
+    const uploadResponse = await fetch("/api/lead-photos", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId,
+        files: photoFiles
+      })
+    });
+    const uploadData = await uploadResponse.json();
+    if (!uploadData.ok) throw new Error(formatApiError(uploadData, "Unable to upload photos."));
+
+    const listingPayload = inventoryListingPayloadFromForm(form);
+    listingPayload.leadId = leadId;
+    listingPayload.showPhotos = true;
+    const syncResponse = await fetch("/api/inventory/from-lead", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(listingPayload)
+    });
+    const syncData = await syncResponse.json();
+    if (!syncData.ok) throw new Error(formatApiError(syncData, "Photos uploaded, but could not attach them to the listing."));
+
+    const message = `${uploadData.photos.length} photo(s) uploaded and attached to this warehouse listing.`;
+    if (status) status.textContent = message;
+    inventoryStatusEl.textContent = message;
+    if (fileInput) fileInput.value = "";
+    await loadInventory();
+  } catch (error) {
+    const message = error.message || "Unable to upload inventory photos.";
+    if (status) status.textContent = message;
+    inventoryStatusEl.textContent = message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function inventoryListingPayloadFromForm(form) {
+  const data = new FormData(form);
+  const payload = {
+    title: String(data.get("title") || "").trim(),
+    askingPrice: String(data.get("askingPrice") || "").trim(),
+    monthlyPaymentEstimate: String(data.get("monthlyPaymentEstimate") || "").trim(),
+    status: String(data.get("status") || "draft").trim(),
+    description: String(data.get("description") || "").trim()
+  };
+  ["showVin", "showUvc", "showKilometers", "showRegion", "showColor", "showMaintenance", "showPhotos"].forEach((key) => {
+    if (data.has(key)) payload[key] = true;
+  });
+  return payload;
 }
 
 function fileToBase64Payload(file, label) {
@@ -1652,7 +1713,7 @@ async function quickAddDraftInventory(button) {
   if (!leadId) return;
 
   button.disabled = true;
-  statusEl.textContent = "Adding vehicle to inventory drafts...";
+  statusEl.textContent = "Moving vehicle to warehouse draft...";
   try {
     const response = await fetch("/api/inventory/from-lead", {
       method: "POST",
@@ -1664,7 +1725,17 @@ async function quickAddDraftInventory(button) {
     });
     const data = await response.json();
     if (!data.ok) throw new Error(formatApiError(data, "Unable to add inventory draft."));
-    statusEl.textContent = "Inventory draft created. Review it in the warehouse before publishing.";
+    await fetch("/api/lead-activity", {
+      method: "PATCH",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId,
+        action: "status",
+        status: "in_inventory",
+        note: "Admin moved this seller lead into the warehouse. Vehicle details, photos, price, and publishing are now managed from Inventory."
+      })
+    }).catch(() => null);
+    statusEl.textContent = "Warehouse draft created. The SELL lead was moved out of Active leads.";
     await Promise.all([loadInventory(), loadLeads({ suppressAlerts: true, forceOpenActivity: true })]);
     document.querySelector("#inventory-warehouse")?.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
@@ -2022,7 +2093,7 @@ function datetimeLocalValue(value) {
 
 function isOverdue(value, status) {
   if (!value) return false;
-  const closedStatuses = new Set(["won", "lost", "closed", "deleted"]);
+  const closedStatuses = new Set(["won", "lost", "closed", "deleted", "in_inventory"]);
   if (closedStatuses.has(String(status || "").toLowerCase())) return false;
   const date = new Date(value);
   return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
@@ -2030,7 +2101,7 @@ function isOverdue(value, status) {
 
 function isFollowUpDue(value, status) {
   if (!value) return false;
-  const closedStatuses = new Set(["won", "lost", "closed", "deleted"]);
+  const closedStatuses = new Set(["won", "lost", "closed", "deleted", "in_inventory"]);
   if (closedStatuses.has(String(status || "").toLowerCase())) return false;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return false;

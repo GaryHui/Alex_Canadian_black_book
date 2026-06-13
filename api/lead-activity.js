@@ -297,6 +297,7 @@ function ownerReviewReason(status) {
     appointment_booked: "Buyer appointment booked by staff.",
     finance_sent: "Finance quote sent by staff.",
     offer_sent: "Purchase offer sent by staff.",
+    in_inventory: "Seller lead moved into inventory by staff.",
     won: "Lead marked won by staff.",
     lost: "Lead marked lost by staff."
   };
@@ -348,6 +349,7 @@ function normalizeLeadStatus(value) {
     "appointment_booked",
     "finance_sent",
     "offer_sent",
+    "in_inventory",
     "won",
     "lost",
     "closed"

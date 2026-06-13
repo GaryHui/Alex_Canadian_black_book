@@ -2676,6 +2676,46 @@ select {
   color: #555;
 }
 
+.inventory-photo-upload {
+  display: grid;
+  grid-template-columns: minmax(150px, .8fr) minmax(200px, 1fr) auto;
+  gap: 10px;
+}
+
+.inventory-photo-upload label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.inventory-photo-upload span {
+  color: #516174;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.inventory-photo-upload select,
+.inventory-photo-upload input {
+  border: 1px solid #b9c7d8;
+  border-radius: 6px;
+  min-height: 38px;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.inventory-photo-upload button {
+  align-self: end;
+  background: #0b4f9c;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 900;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
 .inventory-photo-list {
   display: flex;
   flex-wrap: wrap;
@@ -3007,6 +3047,11 @@ select {
   color: #854d0e;
 }
 
+.status-in-inventory {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .status-due {
   background: #fff7ed;
   color: #9a3412;
@@ -3207,6 +3252,7 @@ select {
   .owner-review,
   .lead-photo-manager,
   .inventory-publish-form,
+  .inventory-photo-upload,
   .inventory-edit-grid,
   .lead-note-form,
   .lead-task-form,
