@@ -313,7 +313,9 @@ const server = http.createServer(async (req, res) => {
         const body = await readJson(req);
         const access = await canAccessLead(body.leadId, dealer);
         if (!access.ok) return sendJson(res, access.status || 403, access);
-        const result = await updateLeadTask(body);
+        const result = body.action === "status"
+          ? await updateLeadStatusFromActivity(body, dealer.user)
+          : await updateLeadTask(body);
         return sendJson(res, result.ok ? 200 : result.status || 400, result);
       }
     }
@@ -2144,6 +2146,42 @@ async function updateLeadTask(body) {
   return { ok: true, task: data?.[0] || null };
 }
 
+async function updateLeadStatusFromActivity(body, user) {
+  const leadId = String(body.leadId || "").trim();
+  const status = normalizeLeadStatus(body.status);
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!leadId) return { ok: false, status: 400, error: "Lead id is required" };
+  if (!status) return { ok: false, status: 400, error: "Unsupported lead status" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const now = new Date().toISOString();
+  const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify({
+      status,
+      last_activity_at: now
+    })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+
+  const note = String(body.note || `Status changed to ${status.replaceAll("_", " ")}.`).trim();
+  await insertSupabaseJson(`${url}/rest/v1/lead_notes`, key, {
+    lead_id: leadId,
+    author_email: String(user?.email || "").trim().toLowerCase(),
+    note_type: "internal",
+    note
+  }).catch(() => null);
+
+  return { ok: true, lead: data?.[0] || null };
+}
+
 async function insertSupabaseJson(url, key, payload) {
   const response = await fetch(url, {
     method: "POST",
@@ -2178,6 +2216,23 @@ function normalizePriority(value) {
 function normalizeNoteType(value) {
   const type = String(value || "internal").trim().toLowerCase();
   return ["call", "email", "sms", "inspection", "offer", "internal"].includes(type) ? type : "internal";
+}
+
+function normalizeLeadStatus(value) {
+  const status = String(value || "").trim().toLowerCase();
+  return [
+    "new",
+    "assigned",
+    "contacted",
+    "waiting_for_customer",
+    "inspection_booked",
+    "appointment_booked",
+    "finance_sent",
+    "offer_sent",
+    "won",
+    "lost",
+    "closed"
+  ].includes(status) ? status : "";
 }
 
 function dateOrNull(value) {

@@ -517,7 +517,7 @@ function openContactDealer(vehicle) {
   if (contactVehicleTitle) contactVehicleTitle.textContent = vehicle.title;
   if (contactVehicleContext) contactVehicleContext.innerHTML = contactVehicleContextMarkup(vehicle);
   if (contactDealerForm.elements.message) {
-    contactDealerForm.elements.message.value = `${text[language].contactDefaultMessage}\n\n${vehicle.title} - ${money(vehicle.price)}${vehicle.vin ? `\nVIN: ${vehicle.vin}` : ""}`;
+    contactDealerForm.elements.message.value = text[language].contactDefaultMessage;
   }
   updateContactBuyingSummary();
   if (contactDealerStatus) contactDealerStatus.textContent = "";

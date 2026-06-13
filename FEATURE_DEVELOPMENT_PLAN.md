@@ -17,6 +17,100 @@ Customer wants to sell car
 > Buyer contacts dealer
 ```
 
+## Current Product North Star
+
+The product must stay simple. Every screen should answer one question for the person using it:
+
+- buyer: "Can I find a car and tell the dealer how I want to buy it?"
+- seller: "Can I get a value and ask the dealer to follow up?"
+- admin / owner: "Which BUY and SELL leads came in, who owns them, and what is happening?"
+- dealer staff: "Which assigned customer should I follow up with next, and what action do I need to record?"
+
+The system should avoid adding extra inboxes or side pages unless they clearly reduce work. BUY inquiries and SELL valuations both become CRM leads. The lead type, status, next follow-up, staff owner, and activity history should be visible without making staff hunt through raw data.
+
+## Role-Based UX Contract
+
+### Buyer
+
+The Buy page should feel like a simple vehicle marketplace:
+
+- inventory and finance calculator should support the same shopping decision
+- Contact dealer must package the selected vehicle, payment intent, calculator estimate, timeline, and preferred contact method
+- the form should ask only for information that changes dealer follow-up quality
+- cash, finance, lease, and not-sure intents must all be supported
+
+### Seller
+
+The Sell flow should remain focused on valuation:
+
+- ask for VIN or year/make/model, kilometers, region, ownership, color, condition, and optional photos
+- save the valuation as a SELL lead
+- do not make the seller understand dealer CRM details
+
+### Admin / Owner
+
+The Admin page is the owner cockpit:
+
+- BUY and SELL leads must be visually separated
+- owner can assign staff, set priority, set next follow-up, review activity, and adjust values
+- inventory management stays with admin because publishing vehicles affects the public Buy page
+- Buyer inquiries should not appear as a separate inbox; they belong in Leads
+- User valuation limits must count only seller/customer valuation usage, not unregistered buyer inquiries
+
+### Dealer Staff
+
+The Dealer page is the staff workbench:
+
+- assigned leads are the first screen
+- valuation is a secondary sub-tool, not the page's main purpose
+- staff can see BUY/SELL type, status color, due/overdue follow-up, owner notes, and activity
+- staff can quickly mark contacted, appointment/inspection booked, finance/offer sent, won/purchased, or lost
+- every status action should create an activity note so the owner can review progress
+
+## Lead Status Model
+
+The database stores one `status` field, but the UI labels it by lead type.
+
+BUY lead statuses:
+
+- `new` = New buyer inquiry
+- `assigned` = Assigned
+- `contacted` = Contacted
+- `waiting_for_customer` = Waiting for buyer
+- `appointment_booked` = Appointment booked
+- `finance_sent` = Finance sent
+- `won` = Won
+- `lost` = Lost
+- `closed` = Closed
+
+SELL lead statuses:
+
+- `new` = New seller lead
+- `assigned` = Assigned
+- `contacted` = Contacted
+- `waiting_for_customer` = Waiting for seller
+- `inspection_booked` = Inspection booked
+- `offer_sent` = Offer sent
+- `won` = Purchased
+- `lost` = Lost
+- `closed` = Closed
+
+Important implementation rule:
+
+```text
+Do not add a second lead inbox. Improve the Leads workflow.
+```
+
+## Remaining Quality Gaps
+
+These are the next areas to keep tightening without making the product heavier:
+
+- make every lead card more action-first and less raw-data-first
+- keep seller-only controls, such as publishing inventory, away from buyer-only leads where possible
+- make the Buy page inventory browse feel more like ecommerce: filters/calculator beside listings, easy contact, no bloated form
+- add careful cleanup for old automatically generated duplicate buyer inquiry notes if needed
+- continue testing real admin/dealer role flows after each deploy
+
 ## Product Structure
 
 ## Modular Architecture Principle

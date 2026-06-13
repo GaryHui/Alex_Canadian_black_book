@@ -171,8 +171,15 @@ dealerLeadsList?.addEventListener("click", async (event) => {
   }
 
   const button = event.target.closest("[data-load-dealer-activity]");
-  if (!button) return;
-  await loadDealerActivity(button.closest(".dealer-lead-card"), { force: true });
+  if (button) {
+    await loadDealerActivity(button.closest(".dealer-lead-card"), { force: true });
+    return;
+  }
+
+  const statusButton = event.target.closest("[data-dealer-status]");
+  if (statusButton) {
+    await updateDealerLeadStatus(statusButton);
+  }
 });
 
 dealerLeadsList?.addEventListener("toggle", async (event) => {
@@ -1140,6 +1147,9 @@ function renderDealerLeads(leads, role) {
     ].filter(Boolean).filter(([, value]) => value !== "" && value !== null && value !== undefined);
 
     const updateToken = dealerLeadUpdateToken(lead);
+    const actionButtons = dealerStatusActions(buyerLead, status)
+      .map((action) => `<button type="button" data-dealer-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
+      .join("");
 
     return `
       <article class="history-card dealer-lead-card dealer-lead-${leadKind} ${overdue ? "lead-overdue" : ""}" data-lead-id="${escapeHtml(lead.id || "")}" data-update-token="${escapeHtml(updateToken)}">
@@ -1164,6 +1174,7 @@ function renderDealerLeads(leads, role) {
           <div><dt>Priority</dt><dd>${escapeHtml(lead.priority || "normal")}</dd></div>
           <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "-")}</dd></div>
         </dl>
+        ${actionButtons ? `<div class="dealer-lead-actions">${actionButtons}</div>` : ""}
         <details class="dealer-lead-details">
           <summary>Open lead details, tasks, and activity</summary>
           <section class="dealer-info-block">
@@ -1280,6 +1291,60 @@ function cleanDealerLeadTitle(title, buyerLead) {
 function isAutoBuyerInquiryNote(note) {
   const value = String(note || "").trim();
   return /^Buyer inquiry from public Buy page/i.test(value) || /^Buyer inquiry for /i.test(value);
+}
+
+function dealerStatusActions(buyerLead, status) {
+  const current = String(status || "new").toLowerCase();
+  const actions = buyerLead
+    ? [
+        ["contacted", "Mark contacted"],
+        ["appointment_booked", "Book appointment"],
+        ["finance_sent", "Finance sent"],
+        ["won", "Won"],
+        ["lost", "Lost"]
+      ]
+    : [
+        ["contacted", "Mark contacted"],
+        ["inspection_booked", "Inspection booked"],
+        ["offer_sent", "Offer sent"],
+        ["won", "Purchased"],
+        ["lost", "Lost"]
+      ];
+  return actions
+    .filter(([next]) => next !== current)
+    .map(([next, label]) => ({ status: next, label }));
+}
+
+async function updateDealerLeadStatus(button) {
+  const card = button.closest(".dealer-lead-card");
+  const leadId = card?.dataset?.leadId || "";
+  const status = button.dataset.dealerStatus || "";
+  if (!leadId || !status) return;
+
+  button.disabled = true;
+  dealerLeadsStatus.textContent = "Updating lead status...";
+  try {
+    const response = await fetch("/api/lead-activity", {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${authSession?.access_token || ""}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        leadId,
+        action: "status",
+        status,
+        note: `Dealer updated status to ${status.replaceAll("_", " ")}.`
+      })
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to update lead status");
+    dealerLeadsStatus.textContent = "Lead status updated.";
+    await loadDealerLeads({ forceActivity: true });
+  } catch (error) {
+    dealerLeadsStatus.textContent = error.message || "Unable to update lead status";
+    button.disabled = false;
+  }
 }
 
 function startDealerAutoRefresh() {

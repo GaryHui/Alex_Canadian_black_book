@@ -507,7 +507,13 @@ function renderLead(lead) {
   const followUp = lead.next_follow_up_at || "";
   const overdue = isOverdue(followUp, status);
   const statusClass = overdue ? "status-overdue" : `status-${cssToken(status)}`;
-  const statusLabel = overdue ? "Overdue" : status.replaceAll("_", " ");
+  const statusLabel = overdue ? "Overdue" : leadStatusLabel(status, buyer);
+  const actionButtons = leadStatusActions(buyer, status)
+    .map((action) => `<button type="button" data-lead-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
+    .join("");
+  const statusOptions = leadStatusOptions(buyer)
+    .map((item) => `<option value="${item.value}" ${status === item.value ? "selected" : ""}>${escapeHtml(item.label)}</option>`)
+    .join("");
   return `
     <article class="lead-card lead-card-${leadType} ${overdue ? "lead-overdue" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <header class="lead-summary">
@@ -528,6 +534,7 @@ function renderLead(lead) {
           <b class="status-pill ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
         </div>
       </header>
+      ${actionButtons ? `<div class="lead-action-row">${actionButtons}</div>` : ""}
       <details class="lead-manage">
         <summary>Manage lead</summary>
         <div class="lead-grid">
@@ -580,9 +587,7 @@ function renderLead(lead) {
           <label>
             <span>Status</span>
             <select name="status">
-              ${["new", "assigned", "contacted", "waiting_for_customer", "inspection_booked", "offer_sent", "won", "lost", "closed", "deleted"].map((item) =>
-                `<option value="${item}" ${status === item ? "selected" : ""}>${item}</option>`
-              ).join("")}
+              ${statusOptions}
             </select>
           </label>
           <label>
@@ -687,6 +692,63 @@ function renderLead(lead) {
       </details>
     </article>
   `;
+}
+
+function leadStatusOptions(buyer) {
+  return buyer
+    ? [
+        { value: "new", label: "New buyer inquiry" },
+        { value: "assigned", label: "Assigned" },
+        { value: "contacted", label: "Contacted" },
+        { value: "waiting_for_customer", label: "Waiting for buyer" },
+        { value: "appointment_booked", label: "Appointment booked" },
+        { value: "finance_sent", label: "Finance sent" },
+        { value: "won", label: "Won" },
+        { value: "lost", label: "Lost" },
+        { value: "closed", label: "Closed" },
+        { value: "deleted", label: "Deleted" }
+      ]
+    : [
+        { value: "new", label: "New seller lead" },
+        { value: "assigned", label: "Assigned" },
+        { value: "contacted", label: "Contacted" },
+        { value: "waiting_for_customer", label: "Waiting for seller" },
+        { value: "inspection_booked", label: "Inspection booked" },
+        { value: "offer_sent", label: "Offer sent" },
+        { value: "won", label: "Purchased" },
+        { value: "lost", label: "Lost" },
+        { value: "closed", label: "Closed" },
+        { value: "deleted", label: "Deleted" }
+      ];
+}
+
+function leadStatusLabel(status, buyer) {
+  const option = leadStatusOptions(buyer).find((item) => item.value === status);
+  return option?.label || String(status || "new").replaceAll("_", " ");
+}
+
+function leadStatusActions(buyer, status) {
+  const current = String(status || "new").toLowerCase();
+  const actions = buyer
+    ? [
+        ["assigned", "Assign"],
+        ["contacted", "Contacted"],
+        ["appointment_booked", "Appointment"],
+        ["finance_sent", "Finance sent"],
+        ["won", "Won"],
+        ["lost", "Lost"]
+      ]
+    : [
+        ["assigned", "Assign"],
+        ["contacted", "Contacted"],
+        ["inspection_booked", "Inspection"],
+        ["offer_sent", "Offer sent"],
+        ["won", "Purchased"],
+        ["lost", "Lost"]
+      ];
+  return actions
+    .filter(([next]) => next !== current)
+    .map(([next, label]) => ({ status: next, label }));
 }
 
 leadsEl.addEventListener("submit", async (event) => {
@@ -890,21 +952,39 @@ leadsEl.addEventListener("click", async (event) => {
   }
 
   const completeButton = event.target.closest("[data-complete-task]");
-  if (!completeButton) return;
+  if (completeButton) {
+    const card = completeButton.closest(".lead-card");
+    const response = await fetch("/api/lead-activity", {
+      method: "PATCH",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId: card.dataset.id,
+        taskId: completeButton.dataset.completeTask,
+        completed: completeButton.dataset.completed !== "true"
+      })
+    });
+    const data = await response.json();
+    statusEl.textContent = data.ok ? "Task updated." : (data.error || "Unable to update task.");
+    if (data.ok) await loadLeadActivity(card, { force: true });
+    return;
+  }
 
-  const card = completeButton.closest(".lead-card");
+  const statusButton = event.target.closest("[data-lead-status]");
+  if (!statusButton) return;
+  const card = statusButton.closest(".lead-card");
   const response = await fetch("/api/lead-activity", {
     method: "PATCH",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({
       leadId: card.dataset.id,
-      taskId: completeButton.dataset.completeTask,
-      completed: completeButton.dataset.completed !== "true"
+      action: "status",
+      status: statusButton.dataset.leadStatus,
+      note: `Admin updated status to ${String(statusButton.dataset.leadStatus || "").replaceAll("_", " ")}.`
     })
   });
   const data = await response.json();
-  statusEl.textContent = data.ok ? "Task updated." : (data.error || "Unable to update task.");
-  if (data.ok) await loadLeadActivity(card, { force: true });
+  statusEl.textContent = data.ok ? "Lead status updated." : (data.error || "Unable to update lead status.");
+  if (data.ok) await loadLeads({ forceOpenActivity: true });
 });
 
 leadsEl.addEventListener("toggle", async (event) => {
