@@ -50,7 +50,16 @@
               <span data-i18n="budgetLabel">Max price</span>
               <input name="maxPrice" type="number" inputmode="numeric" placeholder="50000" />
             </label>
+            <div class="inventory-filter-chips" aria-label="Quick filters">
+              <button type="button" data-filter-chip="SUV">SUV</button>
+              <button type="button" data-filter-chip="AWD">AWD</button>
+              <button type="button" data-filter-chip="Luxury">Luxury</button>
+              <button type="button" data-filter-chip="Hybrid">Hybrid</button>
+              <button type="button" data-filter-chip="British Columbia">BC</button>
+              <button type="button" data-filter-chip="Ontario">ON</button>
+            </div>
             <button class="primary-button" type="submit" data-i18n="filterButton">Search inventory</button>
+            <button class="secondary-button compact-filter-clear" type="button" data-clear-filters>Clear filters</button>
           </form>
 
           <section class="finance-panel">

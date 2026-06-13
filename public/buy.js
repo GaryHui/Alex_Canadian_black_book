@@ -220,6 +220,8 @@ const contactDealerStatus = document.querySelector("#contact-dealer-status");
 const contactVehicleTitle = document.querySelector("#contact-vehicle-title");
 const contactVehicleContext = document.querySelector("#contact-vehicle-context");
 const contactFinanceSummary = document.querySelector("#contact-finance-summary");
+const filterChipButtons = document.querySelectorAll("[data-filter-chip]");
+const clearFilterButton = document.querySelector("[data-clear-filters]");
 let currentContactVehicle = null;
 let selectedFinanceVehicle = null;
 
@@ -413,6 +415,30 @@ function applyFilters(event) {
     return matchesQuery && matchesPrice;
   });
   renderInventory();
+  syncFilterChipState();
+}
+
+function applyFilterChip(button) {
+  if (!inventoryFilter) return;
+  const value = button.dataset.filterChip || "";
+  const input = inventoryFilter.elements.query;
+  input.value = input.value === value ? "" : value;
+  applyFilters();
+}
+
+function clearInventoryFilters() {
+  if (!inventoryFilter) return;
+  inventoryFilter.reset();
+  applyFilters();
+}
+
+function syncFilterChipState() {
+  if (!inventoryFilter) return;
+  const query = String(inventoryFilter.elements.query?.value || "").trim().toLowerCase();
+  filterChipButtons.forEach((button) => {
+    const active = String(button.dataset.filterChip || "").trim().toLowerCase() === query;
+    button.classList.toggle("active", active);
+  });
 }
 
 function setLanguage(nextLanguage) {
@@ -659,6 +685,8 @@ function escapeHtml(value) {
 
 languageToggle?.addEventListener("click", () => setLanguage(language === "en" ? "fr" : "en"));
 inventoryFilter?.addEventListener("submit", applyFilters);
+filterChipButtons.forEach((button) => button.addEventListener("click", () => applyFilterChip(button)));
+clearFilterButton?.addEventListener("click", clearInventoryFilters);
 financeForm?.addEventListener("input", calculatePayment);
 financeForm?.addEventListener("input", () => {
   if (contactDealerModal && !contactDealerModal.hidden) updateContactBuyingSummary();

@@ -514,6 +514,83 @@ function renderLead(lead) {
   const statusOptions = leadStatusOptions(buyer)
     .map((item) => `<option value="${item.value}" ${status === item.value ? "selected" : ""}>${escapeHtml(item.label)}</option>`)
     .join("");
+  const sellerAdjustmentFields = buyer ? "" : `
+          <label>
+            <span>Owner wholesale</span>
+            <input name="ownerWholesale" type="number" value="${adjustment.wholesale ?? ""}" placeholder="Manual wholesale" />
+          </label>
+          <label>
+            <span>Owner retail</span>
+            <input name="ownerRetail" type="number" value="${adjustment.retail ?? ""}" placeholder="Manual retail" />
+          </label>
+          <label>
+            <span>Reason</span>
+            <input name="reason" value="${escapeHtml(adjustment.reason || "")}" placeholder="Why adjust this value?" />
+          </label>`;
+  const sellerPhotoManager = buyer ? "" : `
+        <section class="lead-photo-manager">
+          <div>
+            <h3>Vehicle photos for intake</h3>
+            <p>Upload customer or inspection photos here while the vehicle is still a lead. If photos are selected as public when publishing, they can be shown on the Buy page.</p>
+          </div>
+          <label>
+            <span>Photo type</span>
+            <select name="photoLabel">
+              <option value="Front exterior">Front exterior</option>
+              <option value="Rear exterior">Rear exterior</option>
+              <option value="Driver side">Driver side</option>
+              <option value="Passenger side">Passenger side</option>
+              <option value="Interior">Interior</option>
+              <option value="Odometer">Odometer</option>
+              <option value="Engine bay">Engine bay</option>
+              <option value="Damage or wear">Damage or wear</option>
+              <option value="Service record">Service record</option>
+              <option value="Other vehicle photo">Other vehicle photo</option>
+            </select>
+          </label>
+          <label>
+            <span>Choose photos</span>
+            <input name="leadPhotos" type="file" accept="image/*" multiple />
+          </label>
+          <button type="button" data-upload-lead-photos="${escapeHtml(lead.id || "")}">Upload photos to Drive</button>
+          <p class="lead-photo-status" aria-live="polite"></p>
+        </section>`;
+  const sellerPublishForm = buyer ? "" : `
+        <form class="inventory-publish-form">
+          <h3>Publish to buy page</h3>
+          <p class="inventory-helper">Choose what buyers can see before sending this lead into inventory. Once it is in inventory, use Inventory management to edit price, upload photos, unpublish, mark sold, or remove it from inventory.</p>
+          <label>
+            <span>Listing title</span>
+            <input name="title" value="${escapeHtml(title)}" />
+          </label>
+          <label>
+            <span>Asking price</span>
+            <input name="askingPrice" type="number" min="0" step="1" value="${escapeHtml(retail || wholesale || "")}" placeholder="Listing price" />
+          </label>
+          <label>
+            <span>Status</span>
+            <select name="status">
+              <option value="published">Published</option>
+              <option value="draft">Draft</option>
+            </select>
+          </label>
+          <label class="review-notes">
+            <span>Listing description</span>
+            <textarea name="description" placeholder="Short public description for buyers...">${escapeHtml(lead.notes || "")}</textarea>
+          </label>
+          <fieldset class="inventory-public-options">
+            <legend>Public information</legend>
+            <label><input type="checkbox" name="showVin" checked /> VIN</label>
+            <label><input type="checkbox" name="showUvc" /> UVC</label>
+            <label><input type="checkbox" name="showKilometers" checked /> Kilometers</label>
+            <label><input type="checkbox" name="showRegion" checked /> Region</label>
+            <label><input type="checkbox" name="showColor" checked /> Color</label>
+            <label><input type="checkbox" name="showMaintenance" /> Publish selected maintenance / repair activity</label>
+            <label><input type="checkbox" name="showPhotos" /> Publish photos uploaded in this lead</label>
+          </fieldset>
+          <button type="submit">Publish inventory listing</button>
+          <p class="inventory-publish-status" aria-live="polite"></p>
+        </form>`;
   return `
     <article class="lead-card lead-card-${leadType} ${overdue ? "lead-overdue" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <header class="lead-summary">
@@ -556,33 +633,7 @@ function renderLead(lead) {
           <span>AVG Wholesale</span><b>${wholesale ? formatNumber(wholesale) : "-"}</b>
           <span>AVG Retail</span><b>${retail ? formatNumber(retail) : "-"}</b>
         </div>
-        <section class="lead-photo-manager">
-          <div>
-            <h3>Vehicle photos for intake</h3>
-            <p>Upload customer or inspection photos here while the vehicle is still a lead. If photos are selected as public when publishing, they can be shown on the Buy page.</p>
-          </div>
-          <label>
-            <span>Photo type</span>
-            <select name="photoLabel">
-              <option value="Front exterior">Front exterior</option>
-              <option value="Rear exterior">Rear exterior</option>
-              <option value="Driver side">Driver side</option>
-              <option value="Passenger side">Passenger side</option>
-              <option value="Interior">Interior</option>
-              <option value="Odometer">Odometer</option>
-              <option value="Engine bay">Engine bay</option>
-              <option value="Damage or wear">Damage or wear</option>
-              <option value="Service record">Service record</option>
-              <option value="Other vehicle photo">Other vehicle photo</option>
-            </select>
-          </label>
-          <label>
-            <span>Choose photos</span>
-            <input name="leadPhotos" type="file" accept="image/*" multiple />
-          </label>
-          <button type="button" data-upload-lead-photos="${escapeHtml(lead.id || "")}">Upload photos to Drive</button>
-          <p class="lead-photo-status" aria-live="polite"></p>
-        </section>
+        ${sellerPhotoManager}
         <form class="owner-review">
           <label>
             <span>Status</span>
@@ -606,18 +657,7 @@ function renderLead(lead) {
             <span>Next follow-up</span>
             <input name="nextFollowUpAt" type="datetime-local" value="${escapeHtml(datetimeLocalValue(followUp))}" />
           </label>
-          <label>
-            <span>Owner wholesale</span>
-            <input name="ownerWholesale" type="number" value="${adjustment.wholesale ?? ""}" placeholder="Manual wholesale" />
-          </label>
-          <label>
-            <span>Owner retail</span>
-            <input name="ownerRetail" type="number" value="${adjustment.retail ?? ""}" placeholder="Manual retail" />
-          </label>
-          <label>
-            <span>Reason</span>
-            <input name="reason" value="${escapeHtml(adjustment.reason || "")}" placeholder="Why adjust this value?" />
-          </label>
+          ${sellerAdjustmentFields}
           <label class="review-notes">
             <span>Admin notes</span>
             <textarea name="notes" placeholder="Follow-up notes, CRM notes, customer preference...">${escapeHtml(lead.notes || "")}</textarea>
@@ -625,41 +665,7 @@ function renderLead(lead) {
           <button type="submit">Save owner review</button>
           <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(lead.id || "")}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
         </form>
-        <form class="inventory-publish-form">
-          <h3>Publish to buy page</h3>
-          <p class="inventory-helper">Choose what buyers can see before sending this lead into inventory. Once it is in inventory, use Inventory management to edit price, upload photos, unpublish, mark sold, or remove it from inventory.</p>
-          <label>
-            <span>Listing title</span>
-            <input name="title" value="${escapeHtml(title)}" />
-          </label>
-          <label>
-            <span>Asking price</span>
-            <input name="askingPrice" type="number" min="0" step="1" value="${escapeHtml(retail || wholesale || "")}" placeholder="Listing price" />
-          </label>
-          <label>
-            <span>Status</span>
-            <select name="status">
-              <option value="published">Published</option>
-              <option value="draft">Draft</option>
-            </select>
-          </label>
-          <label class="review-notes">
-            <span>Listing description</span>
-            <textarea name="description" placeholder="Short public description for buyers...">${escapeHtml(lead.notes || "")}</textarea>
-          </label>
-          <fieldset class="inventory-public-options">
-            <legend>Public information</legend>
-            <label><input type="checkbox" name="showVin" checked /> VIN</label>
-            <label><input type="checkbox" name="showUvc" /> UVC</label>
-            <label><input type="checkbox" name="showKilometers" checked /> Kilometers</label>
-            <label><input type="checkbox" name="showRegion" checked /> Region</label>
-            <label><input type="checkbox" name="showColor" checked /> Color</label>
-            <label><input type="checkbox" name="showMaintenance" /> Publish selected maintenance / repair activity</label>
-            <label><input type="checkbox" name="showPhotos" /> Publish photos uploaded in this lead</label>
-          </fieldset>
-          <button type="submit">Publish inventory listing</button>
-          <p class="inventory-publish-status" aria-live="polite"></p>
-        </form>
+        ${sellerPublishForm}
         <section class="lead-activity-panel">
           <div class="lead-activity-head">
             <h3>Follow-up activity</h3>
