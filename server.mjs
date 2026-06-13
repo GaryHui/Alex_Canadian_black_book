@@ -170,6 +170,18 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, result.ok ? 200 : result.status || 500, result);
     }
 
+    if (req.method === "GET" && url.pathname === "/api/inventory") {
+      const result = await listPublishedInventory();
+      return sendJson(res, result.ok ? 200 : result.status || 500, result);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/inventory/from-lead") {
+      const admin = await requireAdmin(req);
+      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+      const result = await publishLeadToInventory(await readJson(req), admin.user);
+      return sendJson(res, result.ok ? 200 : result.status || 400, result);
+    }
+
     if (req.method === "POST" && url.pathname === "/api/valuation") {
       const body = await readJson(req);
       const result = await fetchValuation(body);
@@ -1168,6 +1180,127 @@ async function updateLead(body) {
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
   return { ok: true, lead: data?.[0] || null };
+}
+
+async function listPublishedInventory() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: true, storage: "not_configured", inventory: [] };
+
+  const response = await fetch(
+    `${url}/rest/v1/vehicle_listings?select=*&status=eq.published&order=published_at.desc.nullslast,created_at.desc&limit=100`,
+    { headers: supabaseServiceHeaders(key) }
+  );
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) return { ok: false, status: response.status, error: rows, inventory: [] };
+  return { ok: true, storage: "supabase", inventory: Array.isArray(rows) ? rows.map(publicInventoryRow) : [] };
+}
+
+async function publishLeadToInventory(body, user) {
+  const leadId = String(body.leadId || "").trim();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!leadId) return { ok: false, status: 400, error: "Lead id is required" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const leadResult = await fetchSupabaseJson(
+    `${url}/rest/v1/valuation_leads?select=*&id=eq.${encodeURIComponent(leadId)}&limit=1`,
+    key
+  );
+  if (!leadResult.ok) return leadResult;
+  const lead = leadResult.data?.[0];
+  if (!lead) return { ok: false, status: 404, error: "Lead not found" };
+
+  const listing = buildListingFromLead(lead, body, user);
+  const existing = await fetchSupabaseJson(
+    `${url}/rest/v1/vehicle_listings?select=id&source_lead_id=eq.${encodeURIComponent(leadId)}&limit=1`,
+    key
+  );
+  if (!existing.ok) return existing;
+
+  const existingId = existing.data?.[0]?.id;
+  const endpoint = existingId
+    ? `${url}/rest/v1/vehicle_listings?id=eq.${encodeURIComponent(existingId)}`
+    : `${url}/rest/v1/vehicle_listings`;
+  const response = await fetch(endpoint, {
+    method: existingId ? "PATCH" : "POST",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(listing)
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+  return { ok: true, listing: publicInventoryRow(data?.[0] || listing), updated: Boolean(existingId) };
+}
+
+function buildListingFromLead(lead, body, user) {
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+  const adjustment = lead.owner_adjustment || {};
+  const askingPrice = firstNumber(
+    body.askingPrice,
+    adjustment.retail,
+    marketAverage(valuation, "retail"),
+    marketAverage(valuation, "wholesale")
+  ) || 0;
+  const title = String(body.title || valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" ")).trim();
+
+  return {
+    source_lead_id: lead.id,
+    status: String(body.status || "published").trim() || "published",
+    title,
+    vin: String(input.vin || valuation.vin || "").trim(),
+    uvc: String(input.uvc || "").trim(),
+    vehicle_year: numberOrNull(input.year),
+    make: String(input.make || "").trim(),
+    model: String(input.model || "").trim(),
+    series: String(input.series || "").trim(),
+    style: String(input.style || "").trim(),
+    kilometers: numberOrNull(input.kilometers),
+    color: String(input.color || "").trim(),
+    region: String(input.region || valuation.region || "").trim(),
+    asking_price: askingPrice,
+    monthly_payment_estimate: numberOrNull(body.monthlyPaymentEstimate),
+    description: String(body.description || lead.notes || "").trim(),
+    published_at: new Date().toISOString(),
+    created_by: String(user?.email || "").trim(),
+    updated_at: new Date().toISOString()
+  };
+}
+
+function firstNumber(...values) {
+  for (const value of values) {
+    const number = numberOrNull(value);
+    if (number !== null) return number;
+  }
+  return null;
+}
+
+function publicInventoryRow(row) {
+  return {
+    id: row.id || "",
+    sourceLeadId: row.source_lead_id || "",
+    status: row.status || "",
+    title: row.title || "",
+    vin: row.vin || "",
+    uvc: row.uvc || "",
+    year: row.vehicle_year || "",
+    make: row.make || "",
+    model: row.model || "",
+    series: row.series || "",
+    style: row.style || "",
+    kilometers: row.kilometers || 0,
+    color: row.color || "",
+    region: row.region || "",
+    price: Number(row.asking_price || 0),
+    monthlyPaymentEstimate: Number(row.monthly_payment_estimate || 0),
+    description: row.description || "",
+    publishedAt: row.published_at || row.created_at || ""
+  };
 }
 
 async function listLeadActivity(leadId) {

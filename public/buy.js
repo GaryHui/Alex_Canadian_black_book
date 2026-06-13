@@ -1,4 +1,4 @@
-const inventory = [
+const sampleInventory = [
   {
     id: "sample-lexus-nx",
     title: "2024 Lexus NX 350 Premium AWD",
@@ -85,7 +85,9 @@ const text = {
 };
 
 let language = localStorage.getItem("customer-language") || "en";
+let inventory = [...sampleInventory];
 let filteredInventory = [...inventory];
+let inventorySource = "sample";
 
 const languageToggle = document.querySelector("#language-toggle");
 const inventoryList = document.querySelector("#inventory-list");
@@ -121,6 +123,55 @@ function renderInventory() {
       </div>
     </article>
   `).join("");
+}
+
+async function loadInventory() {
+  try {
+    const response = await fetch("/api/inventory");
+    const data = await response.json();
+    if (data.ok && Array.isArray(data.inventory) && data.inventory.length) {
+      inventorySource = "supabase";
+      inventory = data.inventory.map(normalizeInventoryVehicle);
+      filteredInventory = [...inventory];
+      updateInventoryIntro();
+    }
+  } catch (error) {
+    console.warn("Unable to load inventory", error);
+  }
+}
+
+function updateInventoryIntro() {
+  const intro = document.querySelector("[data-i18n='inventoryIntro']");
+  if (!intro || inventorySource !== "supabase") return;
+  intro.textContent = language === "fr"
+    ? "Inventaire publie par l'equipe du concessionnaire."
+    : "Published inventory from the dealer team.";
+}
+
+function normalizeInventoryVehicle(vehicle) {
+  const title = vehicle.title || [vehicle.year, vehicle.make, vehicle.model, vehicle.series, vehicle.style].filter(Boolean).join(" ");
+  const tags = [
+    vehicle.series,
+    vehicle.style,
+    vehicle.region
+  ].filter(Boolean).slice(0, 3);
+  return {
+    id: vehicle.id || vehicle.sourceLeadId || title,
+    title,
+    price: Number(vehicle.price || 0),
+    kilometers: Number(vehicle.kilometers || 0),
+    region: vehicle.region || "",
+    color: vehicle.color || "",
+    tags: tags.length ? tags : ["Dealer reviewed"],
+    photoTone: photoToneFor(vehicle.color || vehicle.make || title)
+  };
+}
+
+function photoToneFor(value) {
+  const textValue = String(value || "").toLowerCase();
+  if (textValue.includes("gray") || textValue.includes("grey") || textValue.includes("silver") || textValue.includes("audi")) return "silver";
+  if (textValue.includes("green") || textValue.includes("toyota")) return "green";
+  return "blue";
 }
 
 function calculatePayment() {
@@ -165,6 +216,7 @@ function setLanguage(nextLanguage) {
     const key = node.dataset.i18nPlaceholder;
     if (text[language][key]) node.placeholder = text[language][key];
   });
+  updateInventoryIntro();
   renderInventory();
 }
 
@@ -190,6 +242,11 @@ inventoryList?.addEventListener("click", (event) => {
   document.querySelector(".finance-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
 });
 
-setLanguage(language);
-applyFilters();
-calculatePayment();
+async function init() {
+  setLanguage(language);
+  await loadInventory();
+  applyFilters();
+  calculatePayment();
+}
+
+init();

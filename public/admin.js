@@ -403,6 +403,29 @@ function renderLead(lead) {
           <button type="submit">Save owner review</button>
           <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(lead.id || "")}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
         </form>
+        <form class="inventory-publish-form">
+          <h3>Publish to buy page</h3>
+          <label>
+            <span>Listing title</span>
+            <input name="title" value="${escapeHtml(title)}" />
+          </label>
+          <label>
+            <span>Asking price</span>
+            <input name="askingPrice" type="number" min="0" step="1" value="${escapeHtml(retail || wholesale || "")}" placeholder="Listing price" />
+          </label>
+          <label>
+            <span>Status</span>
+            <select name="status">
+              <option value="published">Published</option>
+              <option value="draft">Draft</option>
+            </select>
+          </label>
+          <label class="review-notes">
+            <span>Listing description</span>
+            <textarea name="description" placeholder="Short public description for buyers...">${escapeHtml(lead.notes || "")}</textarea>
+          </label>
+          <button type="submit">Publish inventory listing</button>
+        </form>
         <section class="lead-activity-panel">
           <div class="lead-activity-head">
             <h3>Follow-up activity</h3>
@@ -479,6 +502,27 @@ leadsEl.addEventListener("submit", async (event) => {
     form.reset();
     await loadLeadActivity(card, { force: true });
   }
+});
+
+leadsEl.addEventListener("submit", async (event) => {
+  const form = event.target.closest(".inventory-publish-form");
+  if (!form) return;
+  event.preventDefault();
+
+  const card = form.closest(".lead-card");
+  const payload = {
+    leadId: card.dataset.id,
+    ...Object.fromEntries(new FormData(form).entries())
+  };
+  const response = await fetch("/api/inventory/from-lead", {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  statusEl.textContent = data.ok
+    ? `Inventory listing ${data.updated ? "updated" : "published"}.`
+    : formatApiError(data, "Unable to publish inventory listing.");
 });
 
 leadsEl.addEventListener("submit", async (event) => {

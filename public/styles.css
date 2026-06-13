@@ -1258,6 +1258,49 @@ select {
   justify-self: start;
 }
 
+.inventory-publish-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px;
+  background: #f8fbff;
+  border: 1px solid #d9e1ec;
+  border-radius: 8px;
+}
+
+.inventory-publish-form h3 {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.inventory-publish-form label {
+  min-width: 0;
+}
+
+.inventory-publish-form .review-notes {
+  grid-column: 1 / -1;
+}
+
+.inventory-publish-form textarea {
+  width: 100%;
+  min-height: 84px;
+  padding: 10px 12px;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.inventory-publish-form button {
+  grid-column: 1 / -1;
+  min-height: 40px;
+  color: #fff;
+  background: #0f4f9a;
+  border: 0;
+  border-radius: 4px;
+  font-weight: 800;
+}
+
 .lead-activity-panel {
   border-top: 1px solid #eee;
   display: grid;
@@ -1581,6 +1624,7 @@ select {
 
   .lead-summary,
   .owner-review,
+  .inventory-publish-form,
   .lead-note-form,
   .lead-task-form,
   .dealer-note-form,
