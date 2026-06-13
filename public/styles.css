@@ -2227,6 +2227,9 @@ select {
 .lead-activity-list {
   display: grid;
   gap: 8px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .activity-item {
@@ -2569,6 +2572,9 @@ select {
 .dealer-activity-list {
   display: grid;
   gap: 8px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .overdue-text {

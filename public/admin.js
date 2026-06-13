@@ -1566,7 +1566,11 @@ function formatApiError(data, fallback) {
   if (isMissingInventoryTable(value)) {
     return "Supabase is missing public.vehicle_listings. Open Supabase SQL Editor, run the latest supabase.sql, then reload this page.";
   }
-  if (value.message) return value.message;
+  if (isMissingInventoryColumn(value)) {
+    const message = value.message || value.details || "Supabase inventory schema is missing a column.";
+    return `${message} Run the latest supabase.sql in Supabase SQL Editor, then reload this page.`;
+  }
+  if (value.message) return [value.message, value.hint].filter(Boolean).join(" ");
   if (value.error_description) return value.error_description;
   if (value.details && typeof value.details === "string") return value.details;
   try {
@@ -1578,7 +1582,12 @@ function formatApiError(data, fallback) {
 
 function isMissingInventoryTable(value) {
   const text = JSON.stringify(value || {}).toLowerCase();
-  return text.includes("vehicle_listings") && (text.includes("schema cache") || text.includes("could not find"));
+  return text.includes("vehicle_listings") && text.includes("schema cache") && text.includes("table");
+}
+
+function isMissingInventoryColumn(value) {
+  const text = JSON.stringify(value || {}).toLowerCase();
+  return text.includes("vehicle_listings") && text.includes("schema cache") && text.includes("column");
 }
 
 function formatNumber(value) {

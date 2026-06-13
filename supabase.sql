@@ -158,7 +158,67 @@ create table if not exists vehicle_listings (
 );
 
 alter table vehicle_listings
+add column if not exists source_lead_id uuid references valuation_leads(id) on delete set null;
+
+alter table vehicle_listings
+add column if not exists status text not null default 'draft';
+
+alter table vehicle_listings
+add column if not exists title text not null default '';
+
+alter table vehicle_listings
+add column if not exists vin text not null default '';
+
+alter table vehicle_listings
+add column if not exists uvc text not null default '';
+
+alter table vehicle_listings
+add column if not exists vehicle_year integer;
+
+alter table vehicle_listings
+add column if not exists make text not null default '';
+
+alter table vehicle_listings
+add column if not exists model text not null default '';
+
+alter table vehicle_listings
+add column if not exists series text not null default '';
+
+alter table vehicle_listings
+add column if not exists style text not null default '';
+
+alter table vehicle_listings
+add column if not exists kilometers integer;
+
+alter table vehicle_listings
+add column if not exists color text not null default '';
+
+alter table vehicle_listings
+add column if not exists region text not null default '';
+
+alter table vehicle_listings
+add column if not exists asking_price numeric;
+
+alter table vehicle_listings
+add column if not exists monthly_payment_estimate numeric;
+
+alter table vehicle_listings
+add column if not exists description text not null default '';
+
+alter table vehicle_listings
 add column if not exists public_options jsonb not null default '{}'::jsonb;
+
+alter table vehicle_listings
+add column if not exists published_at timestamptz;
+
+alter table vehicle_listings
+add column if not exists created_by text not null default '';
+
+alter table vehicle_listings
+add column if not exists created_at timestamptz not null default now();
+
+alter table vehicle_listings
+add column if not exists updated_at timestamptz not null default now();
 
 create index if not exists vehicle_listings_status_idx
 on vehicle_listings (status);
