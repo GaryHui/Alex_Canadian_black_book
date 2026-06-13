@@ -25,7 +25,7 @@
         </div>
       </header>
       <section id="admin-content" hidden>
-      <section class="admin-section">
+      <section class="admin-section admin-section-access">
         <div class="admin-section-head">
           <div>
             <h2>Dealer portal access</h2>
@@ -43,7 +43,7 @@
         <p id="dealers-status" class="status">Loading dealer access...</p>
         <div id="admin-dealers" class="admin-users"></div>
       </section>
-      <section class="admin-section">
+      <section class="admin-section admin-section-limits">
         <div class="admin-section-head">
           <div>
             <h2>User valuation limits</h2>
@@ -54,18 +54,29 @@
         <p id="users-status" class="status">Loading users...</p>
         <div id="admin-users" class="admin-users"></div>
       </section>
-      <section class="admin-section">
+      <section class="admin-section admin-section-inventory">
         <div class="admin-section-head">
           <div>
             <h2>Inventory management</h2>
-            <p>Manage vehicles published to the public buy page.</p>
+            <p>Manage vehicles that are already in inventory. Public fields are selected when a lead is published into inventory.</p>
           </div>
           <button id="reload-inventory" type="button">Reload inventory</button>
         </div>
         <p id="inventory-status" class="status">Loading inventory...</p>
         <div id="admin-inventory" class="admin-inventory"></div>
       </section>
-      <section class="admin-section">
+      <section class="admin-section admin-section-inquiries">
+        <div class="admin-section-head">
+          <div>
+            <h2>Buyer inquiries</h2>
+            <p>Messages submitted from the public Buy page.</p>
+          </div>
+          <button id="reload-inquiries" type="button">Reload inquiries</button>
+        </div>
+        <p id="inquiries-status" class="status">Loading inquiries...</p>
+        <div id="admin-inquiries" class="admin-inquiries"></div>
+      </section>
+      <section class="admin-section admin-section-leads">
         <div class="admin-section-head">
           <div>
             <h2>Captured leads</h2>

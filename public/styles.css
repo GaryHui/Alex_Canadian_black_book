@@ -755,6 +755,36 @@ select {
   border-left-color: #64748b;
 }
 
+.admin-section {
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-left: 6px solid #64748b;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .04);
+  margin: 20px 0;
+  padding: 20px;
+}
+
+.admin-section-access {
+  border-left-color: #7c3aed;
+}
+
+.admin-section-limits {
+  border-left-color: #2563eb;
+}
+
+.admin-section-inventory {
+  border-left-color: #0f766e;
+}
+
+.admin-section-inquiries {
+  border-left-color: #f59e0b;
+}
+
+.admin-section-leads {
+  border-left-color: var(--red);
+}
+
 .history-head {
   align-items: center;
   display: flex;
@@ -1349,6 +1379,49 @@ select {
   gap: 12px;
 }
 
+.admin-inquiries {
+  display: grid;
+  gap: 10px;
+}
+
+.inquiry-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.inquiry-card > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inquiry-card > div:first-child span,
+.inquiry-meta span {
+  color: #666;
+}
+
+.inquiry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inquiry-meta span,
+.inquiry-meta b {
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.inquiry-card p {
+  margin: 0;
+  color: #333;
+}
+
 .inventory-card-admin {
   display: grid;
   gap: 12px;
@@ -1464,6 +1537,17 @@ select {
 .inventory-actions button {
   min-height: 38px;
   padding: 0 14px;
+}
+
+.inventory-actions .secondary-action {
+  background: #fff;
+  border-color: #2563eb;
+  color: #174ea6;
+}
+
+.inventory-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .lead-activity-panel {

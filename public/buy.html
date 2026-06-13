@@ -97,6 +97,37 @@
       </section>
     </div>
 
+    <div id="contact-dealer-modal" class="modal-shell" hidden>
+      <button class="modal-backdrop" type="button" data-close-contact aria-label="Close"></button>
+      <section class="modal-card vehicle-detail-card" role="dialog" aria-modal="true" aria-labelledby="contact-dealer-title">
+        <button class="close-button" type="button" data-close-contact aria-label="Close">x</button>
+        <p class="eyebrow" data-i18n="contactEyebrow">Dealer message</p>
+        <h2 id="contact-dealer-title" data-i18n="contactTitle">Contact the dealer</h2>
+        <form id="contact-dealer-form" class="contact-dealer-form">
+          <input name="listingId" type="hidden" />
+          <p id="contact-vehicle-title" class="contact-vehicle-title"></p>
+          <label>
+            <span data-i18n="contactName">Name</span>
+            <input name="name" autocomplete="name" />
+          </label>
+          <label>
+            <span data-i18n="contactEmail">Email</span>
+            <input name="email" type="email" autocomplete="email" />
+          </label>
+          <label>
+            <span data-i18n="contactPhone">Phone</span>
+            <input name="phone" autocomplete="tel" />
+          </label>
+          <label>
+            <span data-i18n="contactMessage">Message</span>
+            <textarea name="message" rows="4"></textarea>
+          </label>
+          <p id="contact-dealer-status" class="status"></p>
+          <button class="primary-button" type="submit" data-i18n="contactSubmit">Send message</button>
+        </form>
+      </section>
+    </div>
+
     <script src="/buy.js"></script>
   </body>
 </html>

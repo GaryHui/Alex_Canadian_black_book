@@ -175,6 +175,19 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, result.ok ? 200 : result.status || 500, result);
     }
 
+    if (url.pathname === "/api/buyer-inquiries") {
+      if (req.method === "POST") {
+        const result = await createBuyerInquiry(await readJson(req));
+        return sendJson(res, result.ok ? 200 : result.status || 400, result);
+      }
+      if (req.method === "GET") {
+        const admin = await requireAdmin(req);
+        if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+        const result = await listBuyerInquiries();
+        return sendJson(res, result.ok ? 200 : result.status || 500, result);
+      }
+    }
+
     if (req.method === "POST" && url.pathname === "/api/inventory/from-lead") {
       const admin = await requireAdmin(req);
       if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
@@ -191,6 +204,10 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === "PATCH") {
         const result = await updateInventoryListing(await readJson(req), admin.user);
+        return sendJson(res, result.ok ? 200 : result.status || 400, result);
+      }
+      if (req.method === "DELETE") {
+        const result = await deleteInventoryListing(url.searchParams.get("id") || "", admin.user);
         return sendJson(res, result.ok ? 200 : result.status || 400, result);
       }
     }
@@ -1245,7 +1262,6 @@ async function updateInventoryListing(body, user) {
     title: String(body.title || "").trim(),
     asking_price: numberOrNull(body.askingPrice),
     monthly_payment_estimate: numberOrNull(body.monthlyPaymentEstimate),
-    public_options: mergeListingPublicOptions(body),
     description: String(body.description || "").trim(),
     updated_at: new Date().toISOString()
   };
@@ -1269,6 +1285,43 @@ async function updateInventoryListing(body, user) {
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
   return { ok: true, listing: publicInventoryRow(data?.[0] || {}) };
+}
+
+async function deleteInventoryListing(id, user) {
+  const listingId = String(id || "").trim();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!listingId) return { ok: false, status: 400, error: "Listing id is required" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const listingResult = await fetchSupabaseJson(
+    `${url}/rest/v1/vehicle_listings?select=*&id=eq.${encodeURIComponent(listingId)}&limit=1`,
+    key
+  );
+  if (!listingResult.ok) return listingResult;
+  const listing = listingResult.data?.[0];
+  if (!listing) return { ok: false, status: 404, error: "Inventory listing not found" };
+
+  const response = await fetch(`${url}/rest/v1/vehicle_listings?id=eq.${encodeURIComponent(listingId)}`, {
+    method: "DELETE",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      Prefer: "return=representation"
+    }
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+
+  if (listing.source_lead_id) {
+    await createLeadActivity({
+      leadId: listing.source_lead_id,
+      type: "note",
+      noteType: "internal",
+      note: `Inventory listing removed by ${user?.email || "admin"}. Staff can update the lead details, then an admin can publish it again.`
+    }, user);
+  }
+
+  return { ok: true, deleted: Array.isArray(data) ? data.length : 1, listing: publicInventoryRow(listing) };
 }
 
 function normalizeListingStatus(value) {
@@ -1315,6 +1368,59 @@ async function publishLeadToInventory(body, user) {
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
   return { ok: true, listing: publicInventoryRow(data?.[0] || listing), updated: Boolean(existingId) };
+}
+
+async function createBuyerInquiry(body) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const listingId = String(body.listingId || "").trim();
+  const email = String(body.email || "").trim().toLowerCase();
+  const phone = String(body.phone || "").trim();
+  const name = String(body.name || "").trim();
+  const message = String(body.message || "").trim();
+  if (!listingId) return { ok: false, status: 400, error: "Vehicle listing is required" };
+  if (!email && !phone) return { ok: false, status: 400, error: "Please provide an email or phone number" };
+
+  const result = await insertSupabaseJson(`${url}/rest/v1/buyer_inquiries`, key, {
+    listing_id: listingId,
+    customer_email: email,
+    customer_phone: phone,
+    customer_name: name,
+    message,
+    source: "buy_page",
+    status: "new"
+  });
+  return result.ok ? { ok: true, inquiry: result.data?.[0] || null } : result;
+}
+
+async function listBuyerInquiries() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: true, storage: "not_configured", inquiries: [] };
+  const result = await fetchSupabaseJson(
+    `${url}/rest/v1/buyer_inquiries?select=*&order=created_at.desc&limit=100`,
+    key
+  );
+  if (!result.ok) return { ...result, inquiries: [] };
+  const inquiries = Array.isArray(result.data) ? result.data.map(publicBuyerInquiryRow) : [];
+  return { ok: true, storage: "supabase", inquiries };
+}
+
+function publicBuyerInquiryRow(row) {
+  return {
+    id: row.id || "",
+    listingId: row.listing_id || "",
+    name: row.customer_name || "",
+    email: row.customer_email || "",
+    phone: row.customer_phone || "",
+    message: row.message || "",
+    status: row.status || "new",
+    assignedTo: row.assigned_to || "",
+    source: row.source || "",
+    createdAt: row.created_at || ""
+  };
 }
 
 async function uploadInventoryPhotos(body, user) {

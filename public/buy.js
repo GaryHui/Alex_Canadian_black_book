@@ -70,6 +70,17 @@ const text = {
     detailSource: "Source lead",
     detailDescription: "Description",
     detailUseCalculator: "Use this price in calculator",
+    contactEyebrow: "Dealer message",
+    contactTitle: "Contact the dealer",
+    contactName: "Name",
+    contactEmail: "Email",
+    contactPhone: "Phone",
+    contactMessage: "Message",
+    contactSubmit: "Send message",
+    contactNeedInfo: "Please provide an email or phone number.",
+    contactSending: "Sending message...",
+    contactSent: "Message sent. The dealer team can review it in the admin inbox.",
+    contactFailed: "Unable to send message. Please try again.",
     notAvailable: "Not available",
     noResults: "No vehicles match the current filters."
   },
@@ -111,6 +122,17 @@ const text = {
     detailSource: "Lead source",
     detailDescription: "Description",
     detailUseCalculator: "Utiliser ce prix dans le calculateur",
+    contactEyebrow: "Message au concessionnaire",
+    contactTitle: "Contacter le concessionnaire",
+    contactName: "Nom",
+    contactEmail: "Courriel",
+    contactPhone: "Telephone",
+    contactMessage: "Message",
+    contactSubmit: "Envoyer le message",
+    contactNeedInfo: "Veuillez fournir un courriel ou un numero de telephone.",
+    contactSending: "Envoi du message...",
+    contactSent: "Message envoye. L'equipe du concessionnaire peut le voir dans l'administration.",
+    contactFailed: "Impossible d'envoyer le message. Veuillez reessayer.",
     notAvailable: "Non disponible",
     noResults: "Aucun vehicule ne correspond aux filtres."
   }
@@ -130,6 +152,10 @@ const inventorySourceStatus = document.querySelector("#inventory-source-status")
 const vehicleDetailModal = document.querySelector("#vehicle-detail-modal");
 const vehicleDetailTitle = document.querySelector("#vehicle-detail-title");
 const vehicleDetailBody = document.querySelector("#vehicle-detail-body");
+const contactDealerModal = document.querySelector("#contact-dealer-modal");
+const contactDealerForm = document.querySelector("#contact-dealer-form");
+const contactDealerStatus = document.querySelector("#contact-dealer-status");
+const contactVehicleTitle = document.querySelector("#contact-vehicle-title");
 
 function money(value) {
   return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -378,6 +404,39 @@ function closeVehicleDetails() {
   if (vehicleDetailModal) vehicleDetailModal.hidden = true;
 }
 
+function openContactDealer(vehicle) {
+  if (!contactDealerModal || !contactDealerForm) return;
+  contactDealerForm.reset();
+  contactDealerForm.elements.listingId.value = vehicle.id;
+  if (contactVehicleTitle) contactVehicleTitle.textContent = vehicle.title;
+  if (contactDealerStatus) contactDealerStatus.textContent = "";
+  contactDealerModal.hidden = false;
+}
+
+function closeContactDealer() {
+  if (contactDealerModal) contactDealerModal.hidden = true;
+}
+
+async function submitDealerContact(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(contactDealerForm).entries());
+  if (!String(data.email || "").trim() && !String(data.phone || "").trim()) {
+    contactDealerStatus.textContent = text[language].contactNeedInfo;
+    return;
+  }
+  contactDealerStatus.textContent = text[language].contactSending;
+  const response = await fetch("/api/buyer-inquiries", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+  const result = await response.json().catch(() => ({}));
+  contactDealerStatus.textContent = result.ok ? text[language].contactSent : (result.error || text[language].contactFailed);
+  if (result.ok) {
+    window.setTimeout(closeContactDealer, 1200);
+  }
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -402,9 +461,7 @@ inventoryList?.addEventListener("click", (event) => {
   if (!button) return;
   const vehicle = inventory.find((item) => item.id === button.dataset.fillFinance);
   if (!vehicle) return;
-  financeForm.elements.price.value = vehicle.price;
-  calculatePayment();
-  document.querySelector(".finance-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  openContactDealer(vehicle);
 });
 
 vehicleDetailModal?.addEventListener("click", (event) => {
@@ -422,8 +479,15 @@ vehicleDetailModal?.addEventListener("click", (event) => {
   document.querySelector(".finance-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
 });
 
+contactDealerModal?.addEventListener("click", (event) => {
+  if (event.target.closest("[data-close-contact]")) closeContactDealer();
+});
+
+contactDealerForm?.addEventListener("submit", submitDealerContact);
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeVehicleDetails();
+  if (event.key === "Escape") closeContactDealer();
 });
 
 async function init() {

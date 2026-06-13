@@ -6,11 +6,14 @@ const dealersStatusEl = document.querySelector("#dealers-status");
 const dealersEl = document.querySelector("#admin-dealers");
 const inventoryStatusEl = document.querySelector("#inventory-status");
 const inventoryEl = document.querySelector("#admin-inventory");
+const inquiriesStatusEl = document.querySelector("#inquiries-status");
+const inquiriesEl = document.querySelector("#admin-inquiries");
 const dealerStaffForm = document.querySelector("#dealer-staff-form");
 const reloadDealersButton = document.querySelector("#reload-dealers");
 const reloadUsersButton = document.querySelector("#reload-users");
 const reloadLeadsButton = document.querySelector("#reload-leads");
 const reloadInventoryButton = document.querySelector("#reload-inventory");
+const reloadInquiriesButton = document.querySelector("#reload-inquiries");
 const clearLeadsButton = document.querySelector("#clear-leads");
 const adminAuthStatus = document.querySelector("#admin-auth-status");
 const adminLoginButton = document.querySelector("#admin-login");
@@ -31,6 +34,7 @@ reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", () => loadLeads({ forceOpenActivity: true }));
 reloadDealersButton.addEventListener("click", loadDealers);
 reloadInventoryButton?.addEventListener("click", loadInventory);
+reloadInquiriesButton?.addEventListener("click", loadInquiries);
 clearLeadsButton?.addEventListener("click", clearAllLeads);
 dealerStaffForm.addEventListener("submit", addDealer);
 adminLoginButton.addEventListener("click", signInAdmin);
@@ -110,10 +114,12 @@ async function setAdminSession(session) {
     usersStatusEl.textContent = "";
     dealersStatusEl.textContent = "";
     inventoryStatusEl.textContent = "";
+    inquiriesStatusEl.textContent = "";
     leadsEl.innerHTML = "";
     usersEl.innerHTML = "";
     dealersEl.innerHTML = "";
     inventoryEl.innerHTML = "";
+    inquiriesEl.innerHTML = "";
     return;
   }
 
@@ -126,15 +132,17 @@ async function setAdminSession(session) {
     usersStatusEl.textContent = "";
     dealersStatusEl.textContent = "";
     inventoryStatusEl.textContent = "";
+    inquiriesStatusEl.textContent = "";
     leadsEl.innerHTML = "";
     usersEl.innerHTML = "";
     dealersEl.innerHTML = "";
     inventoryEl.innerHTML = "";
+    inquiriesEl.innerHTML = "";
     return;
   }
 
   adminAuthStatus.textContent = `Signed in as ${session.user.email}`;
-  await Promise.all([loadLeads(), loadUsers(), loadDealers(), loadInventory()]);
+  await Promise.all([loadLeads(), loadUsers(), loadDealers(), loadInventory(), loadInquiries()]);
   startAdminAutoRefresh();
 }
 
@@ -210,9 +218,49 @@ async function loadInventory() {
   inventoryEl.innerHTML = (data.inventory || []).map(renderInventoryListing).join("") || "<p>No inventory listings yet. Publish a lead from Captured leads first.</p>";
 }
 
+async function loadInquiries() {
+  if (!adminSession) return;
+  inquiriesStatusEl.textContent = "Loading buyer inquiries...";
+  const response = await fetch("/api/buyer-inquiries", { headers: authHeaders() });
+  const data = await response.json();
+
+  if (!data.ok) {
+    inquiriesStatusEl.textContent = formatApiError(data, "Unable to load buyer inquiries.");
+    inquiriesEl.innerHTML = "";
+    return;
+  }
+
+  if (data.storage === "not_configured") {
+    inquiriesStatusEl.textContent = "Supabase is not configured, so buyer inquiries cannot be stored yet.";
+    inquiriesEl.innerHTML = "";
+    return;
+  }
+
+  inquiriesStatusEl.textContent = `${data.inquiries.length} buyer inquiry message(s).`;
+  inquiriesEl.innerHTML = (data.inquiries || []).map(renderInquiry).join("") || "<p>No buyer inquiries yet.</p>";
+}
+
+function renderInquiry(inquiry) {
+  return `
+    <article class="inquiry-card">
+      <div>
+        <strong>${escapeHtml(inquiry.name || inquiry.email || inquiry.phone || "Buyer inquiry")}</strong>
+        <span>${escapeHtml(formatDateTime(inquiry.createdAt))}</span>
+      </div>
+      <div class="inquiry-meta">
+        <span>Email ${escapeHtml(inquiry.email || "-")}</span>
+        <span>Phone ${escapeHtml(inquiry.phone || "-")}</span>
+        <span>Listing ${escapeHtml(inquiry.listingId || "-")}</span>
+        <b class="status-pill status-${escapeHtml(cssToken(inquiry.status || "new"))}">${escapeHtml(inquiry.status || "new")}</b>
+      </div>
+      <p>${escapeHtml(inquiry.message || "No message.")}</p>
+    </article>
+  `;
+}
+
 function renderInventoryListing(listing) {
-  const options = listing.publicOptions || {};
   const photos = Array.isArray(listing.photos) ? listing.photos : [];
+  const canUnpublish = listing.status === "published";
   return `
     <form class="inventory-card-admin" data-id="${escapeHtml(listing.id || "")}">
       <div class="inventory-card-head">
@@ -255,19 +303,9 @@ function renderInventoryListing(listing) {
           <span>Description</span>
           <textarea name="description">${escapeHtml(listing.description || "")}</textarea>
         </label>
-        <fieldset class="inventory-public-options">
-          <legend>Public information</legend>
-          <label><input type="checkbox" name="showVin" ${checkedOption(options, "showVin")} /> VIN</label>
-          <label><input type="checkbox" name="showUvc" ${checkedOption(options, "showUvc")} /> UVC</label>
-          <label><input type="checkbox" name="showKilometers" ${checkedOption(options, "showKilometers")} /> Kilometers</label>
-          <label><input type="checkbox" name="showRegion" ${checkedOption(options, "showRegion")} /> Region</label>
-          <label><input type="checkbox" name="showColor" ${checkedOption(options, "showColor")} /> Color</label>
-          <label><input type="checkbox" name="showMaintenance" ${checkedOption(options, "showMaintenance", false)} /> Maintenance / repair notes</label>
-          <label><input type="checkbox" name="showPhotos" ${checkedOption(options, "showPhotos", false)} /> Publish photos</label>
-        </fieldset>
         <section class="inventory-photo-manager">
           <h4>Vehicle photos</h4>
-          <p>Upload photos to Google Drive, then save this listing with Publish photos checked to show them on the Buy page.</p>
+          <p>Upload photos to Google Drive. Photos are shown on the Buy page only if photos were selected as public when this lead was published into inventory.</p>
           <div class="inventory-photo-list">
             ${photos.map((photo) => `<a href="${escapeHtml(photo.url)}" target="_blank" rel="noreferrer">${escapeHtml(photo.label || "Vehicle photo")}</a>`).join("") || "<span>No photos attached yet.</span>"}
           </div>
@@ -285,16 +323,12 @@ function renderInventoryListing(listing) {
       </div>
       <div class="inventory-actions">
         <button type="submit">Save listing</button>
-        <button class="danger-outline" type="button" data-archive-listing="${escapeHtml(listing.id || "")}">Archive</button>
+        <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="draft" ${canUnpublish ? "" : "disabled"}>Unpublish</button>
+        <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="sold">Mark sold</button>
+        <button class="danger-outline" type="button" data-remove-inventory="${escapeHtml(listing.id || "")}">Remove from inventory</button>
       </div>
     </form>
   `;
-}
-
-function checkedOption(options, key, defaultValue = true) {
-  const hasOptions = options && Object.keys(options).length > 0;
-  const enabled = hasOptions ? options[key] === true : defaultValue;
-  return enabled ? "checked" : "";
 }
 
 function renderDealer(staff) {
@@ -522,7 +556,7 @@ function renderLead(lead) {
         </form>
         <form class="inventory-publish-form">
           <h3>Publish to buy page</h3>
-          <p class="inventory-helper">Published listings appear on the public Buy page. Use Inventory management to unpublish by changing status to draft, sold, or archived.</p>
+          <p class="inventory-helper">Choose what buyers can see before sending this lead into inventory. Once it is in inventory, use Inventory management to edit price, upload photos, unpublish, mark sold, or remove it from inventory.</p>
           <label>
             <span>Listing title</span>
             <input name="title" value="${escapeHtml(title)}" />
@@ -625,14 +659,22 @@ inventoryEl?.addEventListener("click", async (event) => {
     return;
   }
 
-  const button = event.target.closest("[data-archive-listing]");
-  if (!button) return;
-  const form = button.closest(".inventory-card-admin");
-  if (!form) return;
-  const confirmed = window.confirm("Archive this listing? It will be removed from the public buy page.");
-  if (!confirmed) return;
-  form.elements.status.value = "archived";
-  await saveInventoryListing(form);
+  const statusButton = event.target.closest("[data-inventory-status]");
+  if (statusButton) {
+    const form = statusButton.closest(".inventory-card-admin");
+    if (!form) return;
+    const nextStatus = statusButton.dataset.status || "draft";
+    const label = nextStatus === "draft" ? "unpublish this listing" : `mark this listing as ${nextStatus}`;
+    if (!window.confirm(`Confirm ${label}?`)) return;
+    form.elements.status.value = nextStatus;
+    await saveInventoryListing(form);
+    return;
+  }
+
+  const removeButton = event.target.closest("[data-remove-inventory]");
+  if (removeButton) {
+    await removeInventoryListing(removeButton);
+  }
 });
 
 async function saveInventoryListing(form) {
@@ -649,6 +691,29 @@ async function saveInventoryListing(form) {
   const data = await response.json();
   inventoryStatusEl.textContent = data.ok ? "Inventory listing saved." : formatApiError(data, "Unable to save inventory listing.");
   if (data.ok) await loadInventory();
+}
+
+async function removeInventoryListing(button) {
+  const form = button.closest(".inventory-card-admin");
+  const title = form?.querySelector(".inventory-card-head strong")?.textContent || "this vehicle";
+  const id = button.dataset.removeInventory || form?.dataset.id || "";
+  if (!id) return;
+  const confirmed = window.confirm(
+    `Remove "${title}" from inventory?\n\nIt will disappear from Inventory management and the public Buy page. The original lead and activity remain, so staff can keep working on it and an admin can publish it again later.`
+  );
+  if (!confirmed) return;
+  button.disabled = true;
+  inventoryStatusEl.textContent = "Removing inventory listing...";
+  const response = await fetch(`/api/admin-inventory?id=${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  const data = await response.json();
+  inventoryStatusEl.textContent = data.ok ? "Inventory listing removed. The original lead remains available for follow-up." : formatApiError(data, "Unable to remove inventory listing.");
+  if (data.ok) {
+    await Promise.all([loadInventory(), loadLeads({ forceOpenActivity: true })]);
+  }
+  button.disabled = false;
 }
 
 async function uploadInventoryPhotos(form, button) {
