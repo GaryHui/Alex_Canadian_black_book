@@ -12,12 +12,22 @@
         <a href="/">Customer home</a>
         <a href="/admin.html">Admin backend</a>
       </nav>
-      <section id="dealer-workbench" class="history-panel dealer-leads-panel" hidden>
+      <section id="dealer-workbench" class="dealer-app-shell" hidden>
+        <aside class="dealer-sidebar" aria-label="Dealer workspace">
+          <nav class="dealer-module-nav" aria-label="Dealer modules">
+            <a href="#dealer-today-section">Today</a>
+            <a href="#dealer-assigned-leads">Assigned leads</a>
+            <a href="#dealer-valuation-tool">Valuation</a>
+            <a href="#history-panel">My quotes</a>
+          </nav>
+        </aside>
+        <div class="dealer-workspace-main">
+        <section id="dealer-today-section" class="history-panel dealer-leads-panel dealer-today-panel">
         <div class="history-head dealer-workbench-head">
           <div>
             <p class="eyebrow">Dealer workbench</p>
-            <h1>Assigned BUY / SELL leads</h1>
-            <p>Track customers assigned by the owner, record follow-up, complete tasks, and keep the owner updated.</p>
+            <h1>Today work queue</h1>
+            <p>Start with assigned updates and due follow-ups, then open the full lead only when details are needed.</p>
           </div>
           <button id="reload-dealer-leads" type="button">Reload leads</button>
         </div>
@@ -35,7 +45,16 @@
         </section>
         <div id="dealer-lead-summary" class="dealer-lead-summary"></div>
         <section id="dealer-lead-alerts" class="lead-alerts" aria-live="polite" hidden></section>
-        <section id="dealer-today-work" class="dealer-today-work" hidden></section>
+        <section id="dealer-today-work" class="dealer-today-work"></section>
+        </section>
+        <section id="dealer-assigned-leads" class="history-panel dealer-leads-panel dealer-assigned-panel">
+        <div class="history-head dealer-workbench-head">
+          <div>
+            <p class="eyebrow">Assigned leads</p>
+            <h2>Lead pipeline</h2>
+            <p>Use filters for your current work. Open a lead for vehicle details, notes, tasks, and activity.</p>
+          </div>
+        </div>
         <div class="dealer-lead-filters" role="tablist" aria-label="Lead filters">
           <button class="active" type="button" data-dealer-filter="all">All</button>
           <button type="button" data-dealer-filter="due">Needs follow-up</button>
@@ -44,9 +63,11 @@
         </div>
         <p id="dealer-leads-status" class="status">Loading assigned leads...</p>
         <div id="dealer-leads-list" class="history-list dealer-leads-list"></div>
+        </section>
+        </div>
       </section>
 
-      <section class="search-panel dealer-valuation-panel">
+      <section id="dealer-valuation-tool" class="search-panel dealer-valuation-panel">
         <details class="dealer-valuation-details">
           <summary>
             <span>

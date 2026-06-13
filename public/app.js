@@ -102,10 +102,16 @@ reloadDealerLeadsButton?.addEventListener("click", () => loadDealerLeads({ force
 saveValuationLeadButton?.addEventListener("click", savePendingDealerLead);
 dealerLeadFilterButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    dealerLeadFilter = button.dataset.dealerFilter || "all";
-    dealerLeadFilterButtons.forEach((item) => item.classList.toggle("active", item === button));
+    setDealerLeadFilter(button.dataset.dealerFilter || "all");
     renderDealerLeads(dealerLeadsCache, dealerLeadRole);
   });
+});
+dealerLeadSummary?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-dealer-summary-filter]");
+  if (!button) return;
+  setDealerLeadFilter(button.dataset.dealerSummaryFilter || "all");
+  renderDealerLeads(dealerLeadsCache, dealerLeadRole);
+  document.querySelector("#dealer-assigned-leads")?.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 dealerLeadAlertsEl?.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-dealer-open-alert]");
@@ -115,9 +121,9 @@ dealerLeadAlertsEl?.addEventListener("click", async (event) => {
 dealerTodayWorkEl?.addEventListener("click", async (event) => {
   const filterButton = event.target.closest("[data-dealer-filter-shortcut]");
   if (filterButton) {
-    dealerLeadFilter = filterButton.dataset.dealerFilterShortcut || "due";
-    dealerLeadFilterButtons.forEach((button) => button.classList.toggle("active", button.dataset.dealerFilter === dealerLeadFilter));
+    setDealerLeadFilter(filterButton.dataset.dealerFilterShortcut || "due");
     renderDealerLeads(dealerLeadsCache, dealerLeadRole);
+    document.querySelector("#dealer-assigned-leads")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
 
@@ -1274,6 +1280,13 @@ function renderDealerLeads(leads, role) {
   });
 }
 
+function setDealerLeadFilter(filter) {
+  dealerLeadFilter = filter || "all";
+  dealerLeadFilterButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.dealerFilter === dealerLeadFilter);
+  });
+}
+
 function renderDealerLeadSummary(leads) {
   if (!dealerLeadSummary) return;
   const buyer = leads.filter(isBuyerLead).length;
@@ -1281,17 +1294,17 @@ function renderDealerLeadSummary(leads) {
   const due = leads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new")).length;
   const updated = dealerLeadAlertMap.size;
   dealerLeadSummary.innerHTML = [
-    ["Total", leads.length, "All assigned active leads"],
-    ["BUY", buyer, "Buyer inquiries from inventory"],
-    ["SELL", seller, "Seller valuation leads"],
-    ["Needs follow-up", due, "Overdue or due today"],
-    ["Updated", updated, "Changed since last refresh"]
-  ].map(([label, value, hint]) => `
-    <article>
+    ["Total", leads.length, "All assigned active leads", "all"],
+    ["BUY", buyer, "Buyer inquiries from inventory", "buyer"],
+    ["SELL", seller, "Seller valuation leads", "seller"],
+    ["Needs follow-up", due, "Overdue or due today", "due"],
+    ["Updated", updated, "Changed since last refresh", "all"]
+  ].map(([label, value, hint, filter]) => `
+    <button type="button" data-dealer-summary-filter="${escapeHtml(filter || "all")}">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(String(value))}</strong>
       <small>${escapeHtml(hint)}</small>
-    </article>
+    </button>
   `).join("");
 }
 
@@ -1300,17 +1313,23 @@ function renderDealerTodayWork(leads) {
   const dueLeads = leads
     .filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"))
     .slice(0, 5);
-  dealerTodayWorkEl.hidden = dueLeads.length === 0;
-  dealerTodayWorkEl.innerHTML = dueLeads.length ? `
+  const updatedLeads = [...dealerLeadAlertMap.values()]
+    .map((alert) => leads.find((lead) => String(lead.id || "") === String(alert.id || "")))
+    .filter(Boolean)
+    .filter((lead, index, list) => list.findIndex((item) => item.id === lead.id) === index)
+    .slice(0, 5);
+  dealerTodayWorkEl.hidden = false;
+  const quickList = dueLeads.length ? dueLeads : updatedLeads;
+  dealerTodayWorkEl.innerHTML = quickList.length ? `
     <header>
       <div>
         <span>Today</span>
-        <strong>${dueLeads.length} follow-up${dueLeads.length === 1 ? "" : "s"} due</strong>
+        <strong>${dueLeads.length ? `${dueLeads.length} follow-up${dueLeads.length === 1 ? "" : "s"} due` : `${updatedLeads.length} updated lead${updatedLeads.length === 1 ? "" : "s"}`}</strong>
       </div>
-      <button type="button" data-dealer-filter-shortcut="due">View all due</button>
+      <button type="button" data-dealer-filter-shortcut="${dueLeads.length ? "due" : "all"}">${dueLeads.length ? "View all due" : "View all leads"}</button>
     </header>
     <div class="dealer-today-list">
-      ${dueLeads.map((lead) => {
+      ${quickList.map((lead) => {
         const input = lead.input || {};
         const valuation = lead.valuation || {};
         const title = cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || "Vehicle lead", isBuyerLead(lead));
@@ -1322,7 +1341,19 @@ function renderDealerTodayWork(leads) {
         `;
       }).join("")}
     </div>
-  ` : "";
+  ` : `
+    <header>
+      <div>
+        <span>Today</span>
+        <strong>No due follow-ups right now</strong>
+      </div>
+      <button type="button" data-dealer-filter-shortcut="all">View all leads</button>
+    </header>
+    <div class="dealer-today-empty">
+      <b>Your current queue is clear.</b>
+      <span>Use Assigned leads for the full pipeline or Valuation when you need to price a vehicle manually.</span>
+    </div>
+  `;
 }
 
 function filterDealerLeads(leads) {
@@ -1638,8 +1669,7 @@ async function openDealerLead(id, options = {}) {
     await loadDealerLeads({ forceActivity: true, suppressAlerts: true });
   }
   if (dealerLeadFilter !== "all") {
-    dealerLeadFilter = "all";
-    dealerLeadFilterButtons.forEach((button) => button.classList.toggle("active", button.dataset.dealerFilter === "all"));
+    setDealerLeadFilter("all");
     renderDealerLeads(dealerLeadsCache, dealerLeadRole);
   }
   let card = dealerLeadsList.querySelector(`.dealer-lead-card[data-lead-id="${cssEscape(id)}"]`);
