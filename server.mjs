@@ -182,6 +182,19 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, result.ok ? 200 : result.status || 400, result);
     }
 
+    if (url.pathname === "/api/admin-inventory") {
+      const admin = await requireAdmin(req);
+      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+      if (req.method === "GET") {
+        const result = await listAdminInventory();
+        return sendJson(res, result.ok ? 200 : result.status || 500, result);
+      }
+      if (req.method === "PATCH") {
+        const result = await updateInventoryListing(await readJson(req), admin.user);
+        return sendJson(res, result.ok ? 200 : result.status || 400, result);
+      }
+    }
+
     if (req.method === "POST" && url.pathname === "/api/valuation") {
       const body = await readJson(req);
       const result = await fetchValuation(body);
@@ -1194,6 +1207,63 @@ async function listPublishedInventory() {
   const rows = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: rows, inventory: [] };
   return { ok: true, storage: "supabase", inventory: Array.isArray(rows) ? rows.map(publicInventoryRow) : [] };
+}
+
+async function listAdminInventory() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: true, storage: "not_configured", inventory: [] };
+
+  const response = await fetch(
+    `${url}/rest/v1/vehicle_listings?select=*&order=created_at.desc&limit=200`,
+    { headers: supabaseServiceHeaders(key) }
+  );
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) return { ok: false, status: response.status, error: rows, inventory: [] };
+  return { ok: true, storage: "supabase", inventory: Array.isArray(rows) ? rows.map(publicInventoryRow) : [] };
+}
+
+async function updateInventoryListing(body, user) {
+  const id = String(body.id || "").trim();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!id) return { ok: false, status: 400, error: "Listing id is required" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const status = normalizeListingStatus(body.status);
+  const patch = {
+    status,
+    title: String(body.title || "").trim(),
+    asking_price: numberOrNull(body.askingPrice),
+    monthly_payment_estimate: numberOrNull(body.monthlyPaymentEstimate),
+    description: String(body.description || "").trim(),
+    updated_at: new Date().toISOString()
+  };
+  if (status === "published" && !body.publishedAt) {
+    patch.published_at = new Date().toISOString();
+  }
+  if (status !== "published") {
+    patch.published_at = null;
+  }
+  if (user?.email) patch.created_by = String(user.email || "").trim();
+
+  const response = await fetch(`${url}/rest/v1/vehicle_listings?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(patch)
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+  return { ok: true, listing: publicInventoryRow(data?.[0] || {}) };
+}
+
+function normalizeListingStatus(value) {
+  const status = String(value || "draft").trim().toLowerCase();
+  return ["draft", "review", "published", "sold", "archived"].includes(status) ? status : "draft";
 }
 
 async function publishLeadToInventory(body, user) {

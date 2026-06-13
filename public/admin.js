@@ -4,10 +4,13 @@ const usersStatusEl = document.querySelector("#users-status");
 const usersEl = document.querySelector("#admin-users");
 const dealersStatusEl = document.querySelector("#dealers-status");
 const dealersEl = document.querySelector("#admin-dealers");
+const inventoryStatusEl = document.querySelector("#inventory-status");
+const inventoryEl = document.querySelector("#admin-inventory");
 const dealerStaffForm = document.querySelector("#dealer-staff-form");
 const reloadDealersButton = document.querySelector("#reload-dealers");
 const reloadUsersButton = document.querySelector("#reload-users");
 const reloadLeadsButton = document.querySelector("#reload-leads");
+const reloadInventoryButton = document.querySelector("#reload-inventory");
 const clearLeadsButton = document.querySelector("#clear-leads");
 const adminAuthStatus = document.querySelector("#admin-auth-status");
 const adminLoginButton = document.querySelector("#admin-login");
@@ -27,6 +30,7 @@ let adminRefreshTimer = null;
 reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", () => loadLeads({ forceOpenActivity: true }));
 reloadDealersButton.addEventListener("click", loadDealers);
+reloadInventoryButton?.addEventListener("click", loadInventory);
 clearLeadsButton?.addEventListener("click", clearAllLeads);
 dealerStaffForm.addEventListener("submit", addDealer);
 adminLoginButton.addEventListener("click", signInAdmin);
@@ -105,9 +109,11 @@ async function setAdminSession(session) {
     statusEl.textContent = "";
     usersStatusEl.textContent = "";
     dealersStatusEl.textContent = "";
+    inventoryStatusEl.textContent = "";
     leadsEl.innerHTML = "";
     usersEl.innerHTML = "";
     dealersEl.innerHTML = "";
+    inventoryEl.innerHTML = "";
     return;
   }
 
@@ -119,14 +125,16 @@ async function setAdminSession(session) {
     statusEl.textContent = "Ask the site owner to add this email to ADMIN_EMAILS in Vercel.";
     usersStatusEl.textContent = "";
     dealersStatusEl.textContent = "";
+    inventoryStatusEl.textContent = "";
     leadsEl.innerHTML = "";
     usersEl.innerHTML = "";
     dealersEl.innerHTML = "";
+    inventoryEl.innerHTML = "";
     return;
   }
 
   adminAuthStatus.textContent = `Signed in as ${session.user.email}`;
-  await Promise.all([loadLeads(), loadUsers(), loadDealers()]);
+  await Promise.all([loadLeads(), loadUsers(), loadDealers(), loadInventory()]);
   startAdminAutoRefresh();
 }
 
@@ -178,6 +186,80 @@ async function loadDealers() {
   }
 
   dealersEl.innerHTML = (data.staff || []).map(renderDealer).join("") || "<p>No dealer emails yet.</p>";
+}
+
+async function loadInventory() {
+  if (!adminSession) return;
+  inventoryStatusEl.textContent = "Loading inventory...";
+  const response = await fetch("/api/admin-inventory", { headers: authHeaders() });
+  const data = await response.json();
+
+  if (!data.ok) {
+    inventoryStatusEl.textContent = formatApiError(data, "Unable to load inventory.");
+    inventoryEl.innerHTML = "";
+    return;
+  }
+
+  if (data.storage === "not_configured") {
+    inventoryStatusEl.textContent = "Supabase is not configured, so inventory cannot be managed yet.";
+    inventoryEl.innerHTML = "";
+    return;
+  }
+
+  inventoryStatusEl.textContent = `${data.inventory.length} inventory listing(s).`;
+  inventoryEl.innerHTML = (data.inventory || []).map(renderInventoryListing).join("") || "<p>No inventory listings yet. Publish a lead from Captured leads first.</p>";
+}
+
+function renderInventoryListing(listing) {
+  return `
+    <form class="inventory-card-admin" data-id="${escapeHtml(listing.id || "")}">
+      <div class="inventory-card-head">
+        <div>
+          <strong>${escapeHtml(listing.title || "Untitled vehicle")}</strong>
+          <span>${escapeHtml([listing.year, listing.make, listing.model, listing.series, listing.style].filter(Boolean).join(" ") || "-")}</span>
+        </div>
+        <b class="status-pill status-${escapeHtml(cssToken(listing.status || "draft"))}">${escapeHtml(listing.status || "draft")}</b>
+      </div>
+      <div class="inventory-edit-grid">
+        <label>
+          <span>Title</span>
+          <input name="title" value="${escapeHtml(listing.title || "")}" />
+        </label>
+        <label>
+          <span>Asking price</span>
+          <input name="askingPrice" type="number" min="0" step="1" value="${escapeHtml(listing.price || "")}" />
+        </label>
+        <label>
+          <span>Monthly estimate</span>
+          <input name="monthlyPaymentEstimate" type="number" min="0" step="1" value="${escapeHtml(listing.monthlyPaymentEstimate || "")}" />
+        </label>
+        <label>
+          <span>Status</span>
+          <select name="status">
+            ${["draft", "review", "published", "sold", "archived"].map((status) =>
+              `<option value="${status}" ${listing.status === status ? "selected" : ""}>${status}</option>`
+            ).join("")}
+          </select>
+        </label>
+        <label>
+          <span>Kilometers</span>
+          <input value="${escapeHtml(formatNumber(listing.kilometers || 0))}" disabled />
+        </label>
+        <label>
+          <span>Region</span>
+          <input value="${escapeHtml(listing.region || "-")}" disabled />
+        </label>
+        <label class="inventory-description">
+          <span>Description</span>
+          <textarea name="description">${escapeHtml(listing.description || "")}</textarea>
+        </label>
+      </div>
+      <div class="inventory-actions">
+        <button type="submit">Save listing</button>
+        <button class="danger-outline" type="button" data-archive-listing="${escapeHtml(listing.id || "")}">Archive</button>
+      </div>
+    </form>
+  `;
 }
 
 function renderDealer(staff) {
@@ -480,6 +562,40 @@ leadsEl.addEventListener("submit", async (event) => {
   if (data.ok) await loadLeads();
 });
 
+inventoryEl?.addEventListener("submit", async (event) => {
+  const form = event.target.closest(".inventory-card-admin");
+  if (!form) return;
+  event.preventDefault();
+  await saveInventoryListing(form);
+});
+
+inventoryEl?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-archive-listing]");
+  if (!button) return;
+  const form = button.closest(".inventory-card-admin");
+  if (!form) return;
+  const confirmed = window.confirm("Archive this listing? It will be removed from the public buy page.");
+  if (!confirmed) return;
+  form.elements.status.value = "archived";
+  await saveInventoryListing(form);
+});
+
+async function saveInventoryListing(form) {
+  const payload = {
+    id: form.dataset.id,
+    ...Object.fromEntries(new FormData(form).entries())
+  };
+  inventoryStatusEl.textContent = "Saving inventory listing...";
+  const response = await fetch("/api/admin-inventory", {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  inventoryStatusEl.textContent = data.ok ? "Inventory listing saved." : formatApiError(data, "Unable to save inventory listing.");
+  if (data.ok) await loadInventory();
+}
+
 leadsEl.addEventListener("submit", async (event) => {
   const form = event.target.closest(".lead-note-form");
   if (!form) return;
@@ -523,6 +639,7 @@ leadsEl.addEventListener("submit", async (event) => {
   statusEl.textContent = data.ok
     ? `Inventory listing ${data.updated ? "updated" : "published"}.`
     : formatApiError(data, "Unable to publish inventory listing.");
+  if (data.ok) await loadInventory();
 });
 
 leadsEl.addEventListener("submit", async (event) => {

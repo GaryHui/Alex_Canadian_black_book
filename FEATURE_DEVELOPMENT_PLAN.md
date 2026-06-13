@@ -275,6 +275,7 @@ Main fields:
 - Buy inventory page exists at `/buy.html`.
 - Dealer/admin CRM lead follow-up exists.
 - Admin can publish a valuation lead into `vehicle_listings`.
+- Admin can list, edit, publish, mark sold, or archive inventory listings.
 - Buy page reads published listings from `/api/inventory`.
 - Buy page falls back to sample inventory only when no published listings are available.
 - Database schema is prepared for inventory, listing photos, buyer inquiries, and finance estimates.
@@ -320,6 +321,8 @@ Important separation:
 | `DELETE /api/dealer-staff?email=...` | Admin removes dealer staff email. |
 | `GET /api/inventory` | Public buy page reads published inventory. |
 | `POST /api/inventory/from-lead` | Admin publishes a valuation lead into inventory. |
+| `GET /api/admin-inventory` | Admin lists all inventory statuses. |
+| `PATCH /api/admin-inventory` | Admin updates listing title, price, monthly estimate, status, and description. |
 
 ## Admin Workflow: Publish A Lead To Inventory
 
@@ -480,9 +483,9 @@ Goal: let admin manage published vehicles without touching raw leads.
 
 Tasks:
 
-- add admin inventory list
-- edit listing price/status/description
-- archive listing
+- add admin inventory list: done
+- edit listing price/status/description: done
+- archive listing: done
 - add listing photo support
 - connect listing photos from Google Drive or future storage
 

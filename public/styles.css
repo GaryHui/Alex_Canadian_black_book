@@ -1301,6 +1301,89 @@ select {
   font-weight: 800;
 }
 
+.admin-inventory {
+  display: grid;
+  gap: 12px;
+}
+
+.inventory-card-admin {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.inventory-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.inventory-card-head > div {
+  display: grid;
+  gap: 4px;
+}
+
+.inventory-card-head strong {
+  font-size: 17px;
+}
+
+.inventory-card-head span {
+  color: #666;
+  font-size: 13px;
+}
+
+.inventory-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.inventory-edit-grid label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.inventory-edit-grid span {
+  color: #666;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.inventory-edit-grid input,
+.inventory-edit-grid select,
+.inventory-edit-grid textarea {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+}
+
+.inventory-description {
+  grid-column: 1 / -1;
+}
+
+.inventory-description textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.inventory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.inventory-actions button {
+  min-height: 38px;
+  padding: 0 14px;
+}
+
 .lead-activity-panel {
   border-top: 1px solid #eee;
   display: grid;
@@ -1625,6 +1708,7 @@ select {
   .lead-summary,
   .owner-review,
   .inventory-publish-form,
+  .inventory-edit-grid,
   .lead-note-form,
   .lead-task-form,
   .dealer-note-form,
