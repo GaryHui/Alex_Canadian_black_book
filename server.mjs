@@ -1366,23 +1366,48 @@ async function publishLeadToInventory(body, user) {
   const endpoint = existingId
     ? `${url}/rest/v1/vehicle_listings?id=eq.${encodeURIComponent(existingId)}`
     : `${url}/rest/v1/vehicle_listings`;
-  const response = await fetch(endpoint, {
+  const saveResult = await saveVehicleListingWithRetry({
+    url: endpoint,
+    key,
     method: existingId ? "PATCH" : "POST",
-    headers: {
-      ...supabaseServiceHeaders(key),
-      "Content-Type": "application/json",
-      Prefer: "return=representation"
-    },
-    body: JSON.stringify(listing)
+    payload: listing
   });
-
-  const data = await response.json().catch(() => null);
-  if (!response.ok) return { ok: false, status: response.status, error: data };
-  const savedListing = data?.[0] || { ...listing, id: existingId };
+  if (!saveResult.ok) return saveResult;
+  const savedListing = saveResult.data?.[0] || { ...saveResult.payload, id: existingId };
   if (isPublicOptionEnabled(savedListing.public_options || listing.public_options, "showPhotos")) {
     await attachLeadPhotosToListing(leadId, savedListing.id || existingId, { url, key });
   }
   return { ok: true, listing: publicInventoryRow(savedListing), updated: Boolean(existingId) };
+}
+
+async function saveVehicleListingWithRetry({ url, key, method, payload }) {
+  let currentPayload = { ...payload };
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const response = await fetch(url, {
+      method,
+      headers: {
+        ...supabaseServiceHeaders(key),
+        "Content-Type": "application/json",
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify(currentPayload)
+    });
+    const data = await response.json().catch(() => null);
+    if (response.ok) return { ok: true, data, payload: currentPayload };
+
+    const missingColumn = missingSchemaColumn(data);
+    if (!missingColumn || !(missingColumn in currentPayload)) {
+      return { ok: false, status: response.status, error: data };
+    }
+    delete currentPayload[missingColumn];
+  }
+  return { ok: false, status: 400, error: "Unable to save inventory listing after removing unsupported legacy columns." };
+}
+
+function missingSchemaColumn(error) {
+  const text = [error?.message, error?.details, error?.hint, JSON.stringify(error || {})].filter(Boolean).join(" ");
+  const match = text.match(/'([^']+)'\s+column/i);
+  return match?.[1] || "";
 }
 
 async function createBuyerInquiry(body) {
