@@ -30,6 +30,7 @@ const dealerLeadsList = document.querySelector("#dealer-leads-list");
 const reloadDealerLeadsButton = document.querySelector("#reload-dealer-leads");
 const dealerLeadSummary = document.querySelector("#dealer-lead-summary");
 const dealerLeadAlertsEl = document.querySelector("#dealer-lead-alerts");
+const dealerTodayWorkEl = document.querySelector("#dealer-today-work");
 const dealerLeadFilterButtons = document.querySelectorAll("[data-dealer-filter]");
 const saveValuationLeadButton = document.querySelector("#save-valuation-lead");
 const DEALER_REFRESH_MS = 30000;
@@ -110,6 +111,19 @@ dealerLeadAlertsEl?.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-dealer-open-alert]");
   if (!button) return;
   await openDealerLeadFromAlert(button.dataset.dealerOpenAlert || "");
+});
+dealerTodayWorkEl?.addEventListener("click", async (event) => {
+  const filterButton = event.target.closest("[data-dealer-filter-shortcut]");
+  if (filterButton) {
+    dealerLeadFilter = filterButton.dataset.dealerFilterShortcut || "due";
+    dealerLeadFilterButtons.forEach((button) => button.classList.toggle("active", button.dataset.dealerFilter === dealerLeadFilter));
+    renderDealerLeads(dealerLeadsCache, dealerLeadRole);
+    return;
+  }
+
+  const button = event.target.closest("[data-dealer-open-lead]");
+  if (!button) return;
+  await openDealerLead(button.dataset.dealerOpenLead || "");
 });
 setLookupMode("free", { openModal: false });
 
@@ -1092,6 +1106,7 @@ async function loadDealerLeads(options = {}) {
     dealerLeadRole = data.role || "dealer";
     renderDealerLeads(dealerLeadsCache, dealerLeadRole);
     renderDealerLeadAlerts();
+    renderDealerTodayWork(dealerLeadsCache);
   } catch (error) {
     dealerLeadsStatus.textContent = error.message || "Unable to load assigned leads";
     dealerLeadsList.innerHTML = "";
@@ -1278,6 +1293,36 @@ function renderDealerLeadSummary(leads) {
       <small>${escapeHtml(hint)}</small>
     </article>
   `).join("");
+}
+
+function renderDealerTodayWork(leads) {
+  if (!dealerTodayWorkEl) return;
+  const dueLeads = leads
+    .filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"))
+    .slice(0, 5);
+  dealerTodayWorkEl.hidden = dueLeads.length === 0;
+  dealerTodayWorkEl.innerHTML = dueLeads.length ? `
+    <header>
+      <div>
+        <span>Today</span>
+        <strong>${dueLeads.length} follow-up${dueLeads.length === 1 ? "" : "s"} due</strong>
+      </div>
+      <button type="button" data-dealer-filter-shortcut="due">View all due</button>
+    </header>
+    <div class="dealer-today-list">
+      ${dueLeads.map((lead) => {
+        const input = lead.input || {};
+        const valuation = lead.valuation || {};
+        const title = cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || "Vehicle lead", isBuyerLead(lead));
+        return `
+          <button type="button" data-dealer-open-lead="${escapeHtml(lead.id || "")}">
+            <b>${escapeHtml(title)}</b>
+            <span>${escapeHtml(lead.next_follow_up_at ? formatDateTime(lead.next_follow_up_at) : "No follow-up time")}</span>
+          </button>
+        `;
+      }).join("")}
+    </div>
+  ` : "";
 }
 
 function filterDealerLeads(leads) {
@@ -1546,6 +1591,7 @@ async function checkDealerLeadUpdates() {
     dealerLeadsCache = data.leads || [];
     renderDealerLeadAlerts();
     renderDealerLeadSummary(dealerLeadsCache);
+    renderDealerTodayWork(dealerLeadsCache);
     if (newCount) {
       dealerLeadsStatus.textContent = `${newCount} new assigned lead${newCount === 1 ? "" : "s"}. Click the update above to open.`;
     } else if (updatedCount) {
@@ -1583,6 +1629,10 @@ function renderDealerLeadAlerts() {
 }
 
 async function openDealerLeadFromAlert(id) {
+  await openDealerLead(id, { fromAlert: true });
+}
+
+async function openDealerLead(id, options = {}) {
   if (!id) return;
   if (!dealerLeadsCache.some((lead) => String(lead.id || "") === id)) {
     await loadDealerLeads({ forceActivity: true, suppressAlerts: true });
@@ -1598,17 +1648,19 @@ async function openDealerLeadFromAlert(id) {
     card = dealerLeadsList.querySelector(`.dealer-lead-card[data-lead-id="${cssEscape(id)}"]`);
   }
   if (!card) return;
-  dealerLeadAlertMap.delete(id);
-  renderDealerLeadAlerts();
-  renderDealerLeadSummary(dealerLeadsCache);
-  clearDealerLeadUpdateNotice(card);
+  if (options.fromAlert) {
+    dealerLeadAlertMap.delete(id);
+    renderDealerLeadAlerts();
+    renderDealerLeadSummary(dealerLeadsCache);
+    clearDealerLeadUpdateNotice(card);
+  }
   card.classList.add("lead-card-flash");
   window.setTimeout(() => card.classList.remove("lead-card-flash"), 1600);
   card.scrollIntoView({ behavior: "smooth", block: "center" });
   const details = card.querySelector(".dealer-lead-details");
   if (details) details.open = true;
-  highlightDealerLeadChangeAreas(card);
-  await loadDealerActivity(card, { force: true, highlightLatest: true });
+  if (options.fromAlert) highlightDealerLeadChangeAreas(card);
+  await loadDealerActivity(card, { force: true, highlightLatest: Boolean(options.fromAlert) });
 }
 
 function dealerLeadUpdateToken(lead = {}) {

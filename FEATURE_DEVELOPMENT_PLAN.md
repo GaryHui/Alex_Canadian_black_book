@@ -110,6 +110,8 @@ These are the next areas to keep tightening without making the product heavier:
 - make the Buy page inventory browse feel more like ecommerce: filters/calculator beside listings, easy contact, no bloated form
 - add careful cleanup for old automatically generated duplicate buyer inquiry notes if needed
 - continue testing real admin/dealer role flows after each deploy
+- keep update reminders obvious: new leads and changed leads should be clickable, open the exact card, and highlight the changed area first
+- keep staff work efficient: owner one-click assignment and staff "today due" work lists should stay visible before advanced settings
 
 ## Product Structure
 
@@ -368,11 +370,17 @@ Main fields:
 - Admin backend exists at `/admin.html`.
 - Buy inventory page exists at `/buy.html`.
 - Dealer/admin CRM lead follow-up exists.
+- Admin and dealer workbenches show lead update reminders and progress steps.
+- Admin can one-click assign a lead to active dealer staff.
+- Dealer workbench shows a today/due follow-up list.
 - Admin can publish a valuation lead into `vehicle_listings`.
 - Admin can list, edit, publish, mark sold, or archive inventory listings.
 - Buy page reads published listings from `/api/inventory`.
 - Buy page falls back to sample inventory only when no published listings are available.
 - Database schema is prepared for inventory, listing photos, buyer inquiries, and finance estimates.
+- Inventory publish flow is functional, but direct inventory photo management is still partial: photos can come from lead uploads when selected at publish time; editing listing photos directly inside Inventory management is not finished.
+- Buyer inquiries currently enter the unified CRM lead workflow for assignment/follow-up. A separate `buyer_inquiries` table exists in the schema/API history, but the preferred MVP UX is unified Leads rather than a second inbox.
+- Finance calculator values can be sent with buyer intent, but saving standalone `finance_estimates` rows is still future work.
 
 ## Current Page Map
 
@@ -580,8 +588,11 @@ Tasks:
 - add admin inventory list: done
 - edit listing price/status/description: done
 - archive listing: done
-- add listing photo support
-- connect listing photos from Google Drive or future storage
+- publish seller lead into inventory: done
+- show published inventory on Buy page: done
+- add listing photo support: partial
+- connect listing photos from Google Drive or future storage: partial
+- edit listing photos directly from Inventory management: not done
 
 ### Phase 2: Buyer Inquiry
 
@@ -589,11 +600,13 @@ Goal: buyer can contact dealer from `/buy.html`.
 
 Tasks:
 
-- add inquiry form
-- save to `buyer_inquiries`
-- show buyer inquiries in admin CRM
-- allow assignment to staff
-- add notes/tasks for buyer inquiries
+- add inquiry form: done
+- package vehicle, purchase/lease/cash intent, calculator estimate, timeline, and contact preference: done
+- save inquiry into unified CRM lead workflow: done
+- show buyer inquiries in admin CRM: done
+- allow assignment to staff: done
+- add notes/tasks for buyer inquiries: done
+- save separate `buyer_inquiries` rows: deferred unless a second inbox/reporting need appears
 
 ### Phase 3: CRM Unification
 
@@ -601,10 +614,12 @@ Goal: seller leads and buyer inquiries share one staff follow-up model.
 
 Tasks:
 
-- create unified activity component
-- show seller leads and buyer inquiries in separate tabs
-- add overdue / due today filters
-- add "complete follow-up" workflow
+- create unified activity component: done
+- show seller leads and buyer inquiries in separated BUY/SELL groups and filters: done
+- add overdue / due today filters: done
+- add "complete follow-up" workflow: partial; staff can set next follow-up, see due list, and complete tasks, but there is no single "complete current follow-up" button yet
+- add owner/staff update reminders: done
+- add owner one-click assignment: done
 
 ### Phase 4: Finance Module
 
@@ -612,9 +627,9 @@ Goal: monthly payment calculator becomes a real lead source.
 
 Tasks:
 
-- save finance estimates to `finance_estimates`
-- link estimate to listing or buyer inquiry
-- show estimate in admin
+- save finance estimates to `finance_estimates`: not done
+- link estimate to listing or buyer inquiry: partial through buyer lead payload, not standalone finance rows
+- show estimate in admin: done for buyer lead purchase plan/payment target
 - later connect lender / broker API
 
 ### Phase 5: External CRM

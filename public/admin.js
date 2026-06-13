@@ -37,6 +37,7 @@ let adminLeadFilter = "all";
 let adminLeadTokenMap = new Map();
 let adminLeadAlertMap = new Map();
 let adminLeadSnapshotReady = false;
+let dealerStaffEmails = [];
 
 reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", () => loadLeads({ forceOpenActivity: true }));
@@ -213,7 +214,12 @@ async function loadDealers() {
     dealersStatusEl.textContent = `${data.staff.length} approved dealer email(s).`;
   }
 
+  dealerStaffEmails = (data.staff || [])
+    .filter((staff) => staff.active !== false)
+    .map((staff) => String(staff.email || "").trim().toLowerCase())
+    .filter(Boolean);
   dealersEl.innerHTML = (data.staff || []).map(renderDealer).join("") || "<p>No dealer emails yet.</p>";
+  if (adminLeadsCache.length) renderLeadWorkbench(adminLeadsCache);
 }
 
 async function loadInventory() {
@@ -686,6 +692,15 @@ function renderLead(lead) {
   const actionButtons = leadStatusActions(buyer, status)
     .map((action) => `<button type="button" data-lead-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
     .join("");
+  const quickAssign = dealerStaffEmails.length ? `
+      <div class="quick-assign-row" aria-label="Quick assign lead">
+        <span>Assign</span>
+        ${dealerStaffEmails.map((email) => `
+          <button type="button" data-quick-assign="${escapeHtml(email)}" ${email === assignedTo ? "disabled" : ""}>
+            ${escapeHtml(shortEmail(email))}
+          </button>
+        `).join("")}
+      </div>` : "";
   const statusOptions = leadStatusOptions(buyer)
     .map((item) => `<option value="${item.value}" ${status === item.value ? "selected" : ""}>${escapeHtml(item.label)}</option>`)
     .join("");
@@ -793,6 +808,7 @@ function renderLead(lead) {
       </header>
       ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
       ${progressSteps}
+      ${quickAssign}
       ${actionButtons ? `<div class="lead-action-row">${actionButtons}</div>` : ""}
       <details class="lead-manage">
         <summary>Manage lead</summary>
@@ -1165,6 +1181,12 @@ leadsEl.addEventListener("click", async (event) => {
     return;
   }
 
+  const quickAssignButton = event.target.closest("[data-quick-assign]");
+  if (quickAssignButton) {
+    await quickAssignLead(quickAssignButton);
+    return;
+  }
+
   const deleteButton = event.target.closest("[data-delete-lead]");
   if (deleteButton) {
     await deleteSingleLead(deleteButton);
@@ -1218,6 +1240,43 @@ leadsEl.addEventListener("click", async (event) => {
   statusEl.textContent = data.ok ? "Lead status updated." : (data.error || "Unable to update lead status.");
   if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
 });
+
+async function quickAssignLead(button) {
+  const card = button.closest(".lead-card");
+  const email = String(button.dataset.quickAssign || "").trim().toLowerCase();
+  if (!card?.dataset?.id || !email) return;
+
+  button.disabled = true;
+  statusEl.textContent = `Assigning lead to ${email}...`;
+  try {
+    const response = await fetch("/api/leads", {
+      method: "PATCH",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: card.dataset.id,
+        assignedTo: email,
+        status: "assigned"
+      })
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(formatApiError(data, "Unable to assign lead."));
+    await fetch("/api/lead-activity", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId: card.dataset.id,
+        type: "note",
+        noteType: "internal",
+        note: `Admin assigned this lead to ${email}.`
+      })
+    }).catch(() => null);
+    statusEl.textContent = `Lead assigned to ${email}.`;
+    await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+  } catch (error) {
+    statusEl.textContent = error.message || "Unable to assign lead.";
+    button.disabled = false;
+  }
+}
 
 leadsEl.addEventListener("toggle", async (event) => {
   const details = event.target.closest(".lead-manage");
@@ -1586,4 +1645,10 @@ function cssToken(value) {
 function cssEscape(value) {
   if (window.CSS?.escape) return window.CSS.escape(String(value));
   return String(value).replace(/["\\]/g, "\\$&");
+}
+
+function shortEmail(email) {
+  const [name, domain] = String(email || "").split("@");
+  if (!domain) return email;
+  return `${name.slice(0, 12)}@${domain.split(".")[0]}`;
 }

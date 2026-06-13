@@ -1489,6 +1489,50 @@ select {
   margin: 8px 0 12px;
 }
 
+.quick-assign-row {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 10px;
+  padding: 8px;
+}
+
+.quick-assign-row span {
+  color: #516174;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.quick-assign-row button {
+  background: #fff;
+  border: 1px solid #b9c7d8;
+  border-radius: 999px;
+  color: #1f3652;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+.quick-assign-row button:hover {
+  background: #eef6ff;
+  border-color: #0b4f9c;
+  color: #0b4f9c;
+}
+
+.quick-assign-row button:disabled {
+  background: #eaf5ff;
+  border-color: #93c5fd;
+  color: #0b4f9c;
+  cursor: default;
+}
+
 .lead-action-row button,
 .dealer-lead-actions button {
   background: #fff;
@@ -1664,6 +1708,67 @@ select {
   background: #f7fbff;
   border-color: #7fb2e5;
   color: #0b4f9c;
+}
+
+.dealer-today-work {
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-left: 6px solid #f59e0b;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 14px;
+}
+
+.dealer-today-work header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.dealer-today-work header span {
+  color: #92400e;
+  display: block;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.dealer-today-work header strong {
+  color: #1f2937;
+}
+
+.dealer-today-work header button,
+.dealer-today-list button {
+  background: #fff;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  color: #92400e;
+  cursor: pointer;
+  font-weight: 900;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.dealer-today-list {
+  display: grid;
+  gap: 8px;
+}
+
+.dealer-today-list button {
+  align-items: center;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.dealer-today-list span {
+  color: #6b7280;
+  font-size: 12px;
+  margin-left: 10px;
 }
 
 .lead-type-pill {
