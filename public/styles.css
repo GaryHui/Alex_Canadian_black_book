@@ -1125,7 +1125,7 @@ select {
 .admin-overview {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   margin: 16px 0;
 }
 
@@ -1199,8 +1199,16 @@ select {
   border-left-color: #d90429;
 }
 
+.overview-owner {
+  border-left-color: #7c3aed;
+}
+
 .overview-unassigned {
   border-left-color: #f59e0b;
+}
+
+.overview-closed {
+  border-left-color: #64748b;
 }
 
 .admin-section {
@@ -1381,11 +1389,42 @@ select {
   justify-content: flex-end;
 }
 
+.admin-lead-toolbar {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 8px;
+}
+
+.admin-lead-search {
+  background: #f8fbff;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.admin-lead-search span {
+  color: #516174;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.admin-lead-search input {
+  border: 1px solid #b9c7d8;
+  border-radius: 6px;
+  font-size: 15px;
+  min-height: 42px;
+  padding: 0 12px;
+  width: 100%;
+}
+
 .admin-lead-filters {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 16px 0 8px;
+  margin: 10px 0 8px;
 }
 
 .admin-lead-filters button {
@@ -2227,25 +2266,54 @@ select {
   justify-self: start;
 }
 
+.lead-card-closed {
+  opacity: .82;
+}
+
+.lead-card-closed .lead-summary {
+  background: #f8fafc;
+}
+
+.inventory-step-card {
+  position: relative;
+}
+
+.inventory-step-number {
+  align-items: center;
+  background: #0b4f9c;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 900;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.inventory-step-body {
+  min-width: 0;
+}
+
+.inventory-step-body h3 {
+  margin: 0 0 4px;
+}
+
+.inventory-step-body p {
+  color: #555;
+  margin: 0;
+}
+
 .lead-photo-manager {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px 260px auto;
+  grid-template-columns: auto minmax(220px, 1fr) 210px 250px auto;
   gap: 10px;
-  align-items: end;
+  align-items: center;
   margin-top: 14px;
   padding: 14px;
   background: #f8fbff;
   border: 1px solid #d9e1ec;
   border-radius: 8px;
-}
-
-.lead-photo-manager h3 {
-  margin: 0 0 4px;
-}
-
-.lead-photo-manager p {
-  margin: 0;
-  color: #555;
 }
 
 .lead-photo-manager label {
@@ -2297,15 +2365,16 @@ select {
   border-radius: 8px;
 }
 
-.inventory-publish-form h3 {
-  grid-column: 1 / -1;
-  margin: 0;
+.inventory-publish-form .inventory-step-number {
+  left: 14px;
+  position: absolute;
+  top: 14px;
 }
 
-.inventory-helper {
+.inventory-step-heading {
   grid-column: 1 / -1;
-  margin: -2px 0 4px;
-  color: #555;
+  min-height: 28px;
+  padding-left: 38px;
 }
 
 .inventory-publish-form label {
@@ -3136,6 +3205,7 @@ select {
 
   .lead-summary,
   .owner-review,
+  .lead-photo-manager,
   .inventory-publish-form,
   .inventory-edit-grid,
   .lead-note-form,
@@ -3143,6 +3213,14 @@ select {
   .dealer-note-form,
   .dealer-task-form {
     grid-template-columns: 1fr;
+  }
+
+  .inventory-step-heading,
+  .inventory-publish-form .review-notes,
+  .inventory-public-options,
+  .inventory-publish-form button,
+  .inventory-publish-status {
+    grid-column: 1 / -1;
   }
 
   .lead-summary {

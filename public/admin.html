@@ -59,13 +59,22 @@
             <button id="clear-leads" class="danger-outline" type="button">Clear all leads</button>
           </div>
         </div>
+        <div class="admin-lead-toolbar">
+          <label class="admin-lead-search">
+            <span>Search leads</span>
+            <input id="admin-lead-search" type="search" placeholder="Name, vehicle, VIN, email, phone, staff, note..." autocomplete="off" />
+          </label>
+        </div>
         <div class="admin-lead-filters" aria-label="Lead filters">
-          <button class="active" type="button" data-admin-lead-filter="all">All</button>
+          <button class="active" type="button" data-admin-lead-filter="active">Active</button>
+          <button type="button" data-admin-lead-filter="owner-unread">Owner unread</button>
           <button type="button" data-admin-lead-filter="needs-follow-up">Needs follow-up</button>
           <button type="button" data-admin-lead-filter="buyer">BUY</button>
           <button type="button" data-admin-lead-filter="seller">SELL</button>
           <button type="button" data-admin-lead-filter="unassigned">Unassigned</button>
           <button type="button" data-admin-lead-filter="urgent">Urgent</button>
+          <button type="button" data-admin-lead-filter="closed">Closed</button>
+          <button type="button" data-admin-lead-filter="all">All</button>
         </div>
         <p id="admin-status" class="status">Loading...</p>
         <div id="admin-leads" class="admin-leads"></div>

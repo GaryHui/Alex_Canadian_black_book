@@ -14,6 +14,7 @@ const adminOverviewEl = document.querySelector("#admin-overview");
 const adminLeadAlertsEl = document.querySelector("#admin-lead-alerts");
 const adminTodayListEl = document.querySelector("#admin-today-list");
 const adminLeadFilterButtons = [...document.querySelectorAll("[data-admin-lead-filter]")];
+const adminLeadSearchInput = document.querySelector("#admin-lead-search");
 const dealerStaffForm = document.querySelector("#dealer-staff-form");
 const reloadDealersButton = document.querySelector("#reload-dealers");
 const reloadUsersButton = document.querySelector("#reload-users");
@@ -36,7 +37,8 @@ let adminTurnstileGate = null;
 let clearLeadsConfirmEl = null;
 let adminRefreshTimer = null;
 let adminLeadsCache = [];
-let adminLeadFilter = "all";
+let adminLeadFilter = "active";
+let adminLeadSearch = "";
 let inventoryCache = [];
 let inventoryFilter = "active";
 let adminLeadTokenMap = new Map();
@@ -61,6 +63,10 @@ adminLeadFilterButtons.forEach((button) => {
     setAdminLeadFilter(button.dataset.adminLeadFilter || "all");
     renderLeadWorkbench(adminLeadsCache);
   });
+});
+adminLeadSearchInput?.addEventListener("input", () => {
+  adminLeadSearch = adminLeadSearchInput.value || "";
+  renderLeadWorkbench(adminLeadsCache);
 });
 adminLeadAlertsEl?.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-admin-open-alert]");
@@ -668,7 +674,10 @@ function renderLeadWorkbench(leads) {
   const filtered = filterAdminLeads(leads);
   const buyerCount = leads.filter(isBuyerLead).length;
   const sellerCount = leads.length - buyerCount;
-  statusEl.textContent = `${filtered.length} shown of ${leads.length} lead(s): ${buyerCount} BUY, ${sellerCount} SELL.`;
+  const activeCount = leads.filter((lead) => !isClosedLead(lead)).length;
+  const closedCount = leads.length - activeCount;
+  const searchLabel = adminLeadSearch.trim() ? ` Search: "${adminLeadSearch.trim()}".` : "";
+  statusEl.textContent = `${filtered.length} shown. ${activeCount} active / ${closedCount} closed. ${buyerCount} BUY / ${sellerCount} SELL.${searchLabel}`;
   leadsEl.innerHTML = renderLeadGroups(filtered);
 }
 
@@ -687,28 +696,46 @@ function setInventoryFilter(filter) {
 }
 
 function filterAdminLeads(leads) {
-  if (adminLeadFilter === "buyer") return leads.filter(isBuyerLead);
-  if (adminLeadFilter === "seller") return leads.filter((lead) => !isBuyerLead(lead));
-  if (adminLeadFilter === "unassigned") return leads.filter((lead) => !String(lead.assigned_to || "").trim());
-  if (adminLeadFilter === "urgent") return leads.filter((lead) => String(lead.priority || "").toLowerCase() === "urgent");
+  let filtered = leads;
+  if (adminLeadFilter === "active") filtered = leads.filter((lead) => !isClosedLead(lead));
+  if (adminLeadFilter === "closed") filtered = leads.filter(isClosedLead);
+  if (adminLeadFilter === "owner-unread") filtered = leads.filter((lead) => Boolean(lead.owner_review?.unread));
+  if (adminLeadFilter === "buyer") filtered = leads.filter((lead) => !isClosedLead(lead) && isBuyerLead(lead));
+  if (adminLeadFilter === "seller") filtered = leads.filter((lead) => !isClosedLead(lead) && !isBuyerLead(lead));
+  if (adminLeadFilter === "unassigned") filtered = leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim());
+  if (adminLeadFilter === "urgent") filtered = leads.filter((lead) => !isClosedLead(lead) && String(lead.priority || "").toLowerCase() === "urgent");
   if (adminLeadFilter === "needs-follow-up") {
-    return leads.filter((lead) => isFollowUpDue(lead.next_follow_up_at, lead.status || "new"));
+    filtered = leads.filter((lead) => !isClosedLead(lead) && isFollowUpDue(lead.next_follow_up_at, lead.status || "new"));
   }
-  return leads;
+  const query = adminLeadSearch.trim().toLowerCase();
+  if (!query) return filtered;
+  const terms = query.split(/\s+/).filter(Boolean);
+  return filtered.filter((lead) => {
+    const haystack = searchableLeadText(lead);
+    return terms.every((term) => haystack.includes(term));
+  });
 }
 
 function renderAdminOverview(leads) {
   if (!adminOverviewEl) return;
   const buyerCount = leads.filter(isBuyerLead).length;
   const sellerCount = leads.length - buyerCount;
-  const unassignedCount = leads.filter((lead) => !String(lead.assigned_to || "").trim()).length;
-  const followUpCount = leads.filter((lead) => isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).length;
-  const urgentCount = leads.filter((lead) => String(lead.priority || "").toLowerCase() === "urgent").length;
+  const activeCount = leads.filter((lead) => !isClosedLead(lead)).length;
+  const closedCount = leads.length - activeCount;
+  const ownerUnreadCount = leads.filter((lead) => Boolean(lead.owner_review?.unread)).length;
+  const unassignedCount = leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim()).length;
+  const followUpCount = leads.filter((lead) => !isClosedLead(lead) && isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).length;
+  const urgentCount = leads.filter((lead) => !isClosedLead(lead) && String(lead.priority || "").toLowerCase() === "urgent").length;
   adminOverviewEl.innerHTML = `
-    <button class="admin-overview-card overview-total" type="button" data-admin-set-filter="all">
-      <span>Total leads</span>
-      <strong>${leads.length}</strong>
+    <button class="admin-overview-card overview-total" type="button" data-admin-set-filter="active">
+      <span>Active leads</span>
+      <strong>${activeCount}</strong>
       <small>${buyerCount} BUY / ${sellerCount} SELL</small>
+    </button>
+    <button class="admin-overview-card overview-owner" type="button" data-admin-set-filter="owner-unread">
+      <span>Owner unread</span>
+      <strong>${ownerUnreadCount}</strong>
+      <small>Needs review</small>
     </button>
     <button class="admin-overview-card overview-follow" type="button" data-admin-set-filter="needs-follow-up">
       <span>Needs follow-up</span>
@@ -724,6 +751,11 @@ function renderAdminOverview(leads) {
       <span>Urgent</span>
       <strong>${urgentCount}</strong>
       <small>High attention</small>
+    </button>
+    <button class="admin-overview-card overview-closed" type="button" data-admin-set-filter="closed">
+      <span>Closed</span>
+      <strong>${closedCount}</strong>
+      <small>Won, lost, or archived</small>
     </button>
   `;
   renderAdminToday(leads);
@@ -809,7 +841,13 @@ function buildAdminAttentionItems(leads) {
 }
 
 function renderLeadGroups(leads) {
-  if (!leads.length) return "<p>No leads yet.</p>";
+  if (!leads.length) {
+    const hasSearch = adminLeadSearch.trim();
+    if (hasSearch) return `<p>No matching leads for "${escapeHtml(adminLeadSearch.trim())}". Try VIN, vehicle, email, phone, staff, or status.</p>`;
+    if (adminLeadFilter === "closed") return "<p>No closed leads yet.</p>";
+    if (adminLeadFilter === "active") return "<p>No active leads right now. Closed leads are saved under the Closed filter.</p>";
+    return "<p>No leads in this view.</p>";
+  }
   const buyerLeads = leads.filter(isBuyerLead);
   const sellerLeads = leads.filter((lead) => !isBuyerLead(lead));
   const groups = [
@@ -876,6 +914,43 @@ function isBuyerLead(lead) {
   return input.leadType === "buyer_inquiry" || valuation.source === "buyer_inquiry";
 }
 
+function isClosedLead(lead) {
+  return ["won", "lost", "closed", "deleted"].includes(String(lead?.status || "").toLowerCase());
+}
+
+function searchableLeadText(lead) {
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  const ownerReview = lead?.owner_review || {};
+  return [
+    lead?.id,
+    lead?.status,
+    lead?.priority,
+    lead?.assigned_to,
+    lead?.notes,
+    ownerReview.reason,
+    ownerReview.by,
+    input.name,
+    input.email,
+    input.phone,
+    input.vin,
+    input.uvc,
+    input.year,
+    input.make,
+    input.model,
+    input.series,
+    input.style,
+    input.color,
+    input.region,
+    input.purchaseIntent,
+    input.buyingTimeline,
+    input.preferredContact,
+    input.ownershipType,
+    valuation.title,
+    valuation.source
+  ].filter(Boolean).join(" ").toLowerCase();
+}
+
 function cleanLeadTitle(title, buyer) {
   const value = String(title || "").trim();
   return buyer ? value.replace(/^Buyer inquiry\s*-\s*/i, "") : value;
@@ -911,7 +986,7 @@ function renderLead(lead) {
     .join("");
   const warehouseAction = buyer ? "" : inventoryListing
     ? `<button type="button" data-view-inventory="${escapeHtml(inventoryListing.id || "")}">View inventory</button>`
-    : `<button type="button" data-quick-inventory="${escapeHtml(lead.id || "")}">Add draft inventory</button>`;
+    : `<button type="button" data-quick-inventory="${escapeHtml(lead.id || "")}">Create inventory draft</button>`;
   const quickAssign = dealerStaffEmails.length ? `
       <div class="quick-assign-row" aria-label="Quick assign lead">
         <span>Assign</span>
@@ -938,10 +1013,11 @@ function renderLead(lead) {
             <input name="reason" value="${escapeHtml(adjustment.reason || "")}" placeholder="Why adjust this value?" />
           </label>`;
   const sellerPhotoManager = buyer ? "" : `
-        <section class="lead-photo-manager">
-          <div>
-            <h3>Vehicle photos for intake</h3>
-            <p>Upload customer or inspection photos here while the vehicle is still a lead. If photos are selected as public when publishing, they can be shown on the Buy page.</p>
+        <section class="lead-photo-manager inventory-step-card">
+          <div class="inventory-step-number">1</div>
+          <div class="inventory-step-body">
+            <h3>Upload intake photos</h3>
+            <p>Add inspection or customer photos first. Keep private by default; choose public later only if the listing is ready.</p>
           </div>
           <label>
             <span>Photo type</span>
@@ -962,13 +1038,16 @@ function renderLead(lead) {
             <span>Choose photos</span>
             <input name="leadPhotos" type="file" accept="image/*" multiple />
           </label>
-          <button type="button" data-upload-lead-photos="${escapeHtml(lead.id || "")}">Upload photos to Drive</button>
+          <button type="button" data-upload-lead-photos="${escapeHtml(lead.id || "")}">Upload photos</button>
           <p class="lead-photo-status" aria-live="polite"></p>
         </section>`;
   const sellerPublishForm = buyer ? "" : `
-        <form class="inventory-publish-form">
-          <h3>Publish to buy page</h3>
-          <p class="inventory-helper">Choose what buyers can see before sending this lead into inventory. Once it is in inventory, use Inventory management to edit price, upload photos, unpublish, mark sold, or remove it from inventory.</p>
+        <form class="inventory-publish-form inventory-step-card">
+          <div class="inventory-step-number">2</div>
+          <div class="inventory-step-body inventory-step-heading">
+            <h3>Create inventory listing</h3>
+            <p class="inventory-helper">Save as Draft while pricing/photos are not ready. Publish only when buyers should see it on the Buy page.</p>
+          </div>
           <label>
             <span>Listing title</span>
             <input name="title" value="${escapeHtml(title)}" />
@@ -978,10 +1057,10 @@ function renderLead(lead) {
             <input name="askingPrice" type="number" min="0" step="1" value="${escapeHtml(retail || wholesale || "")}" placeholder="Listing price" />
           </label>
           <label>
-            <span>Status</span>
+            <span>Visibility</span>
             <select name="status">
-              <option value="published">Published</option>
-              <option value="draft">Draft</option>
+              <option value="draft">Draft - internal only</option>
+              <option value="published">Published - visible to buyers</option>
             </select>
           </label>
           <label class="review-notes">
@@ -998,7 +1077,7 @@ function renderLead(lead) {
             <label><input type="checkbox" name="showMaintenance" /> Publish selected maintenance / repair activity</label>
             <label><input type="checkbox" name="showPhotos" /> Publish photos uploaded in this lead</label>
           </fieldset>
-          <button type="submit">Publish inventory listing</button>
+          <button type="submit">Save inventory listing</button>
           <p class="inventory-publish-status" aria-live="polite"></p>
         </form>`;
   const valueRows = buyer ? `
@@ -1019,7 +1098,7 @@ function renderLead(lead) {
         <span>Owner reviewed ${escapeHtml(formatDateTime(ownerReview.read_at))}${ownerReview.read_by ? ` by ${escapeHtml(ownerReview.read_by)}` : ""}</span>
       </section>` : "";
   return `
-    <article class="lead-card lead-card-${leadType} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "lead-card-updated" : ""}" data-id="${escapeHtml(lead.id || "")}">
+    <article class="lead-card lead-card-${leadType} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "lead-card-updated" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <header class="lead-summary">
         <div>
           <div class="lead-title-row">
