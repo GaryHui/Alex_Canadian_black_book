@@ -43,9 +43,11 @@ const text = {
     searchPlaceholder: "Lexus, SUV, 2024...",
     budgetLabel: "Max price",
     filterButton: "Filter",
+    filterEyebrow: "Vehicle search",
     inventoryEyebrow: "Available vehicles",
     inventoryTitle: "Current marketplace preview",
-    inventoryIntro: "This MVP uses sample inventory until the admin inventory module is connected.",
+    inventoryIntro: "Browse dealer-reviewed vehicles when they are available.",
+    inventoryEmptyIntro: "New dealer-reviewed vehicles will appear here when they are published.",
     financeEyebrow: "Finance estimate",
     financeTitle: "Monthly payment calculator",
     priceLabel: "Vehicle price",
@@ -57,7 +59,7 @@ const text = {
     contactDealer: "Contact dealer",
     viewDetails: "View details",
     inventoryReal: "Showing published dealer inventory.",
-    inventoryEmpty: "No published vehicles yet. Publish a vehicle from the admin inventory panel to show it here.",
+    inventoryEmpty: "No vehicles are available right now.",
     inventoryDemo: "Demo inventory is shown because the inventory backend is not configured or unavailable.",
     detailEyebrow: "Vehicle details",
     detailPrice: "Price",
@@ -95,9 +97,11 @@ const text = {
     searchPlaceholder: "Lexus, VUS, 2024...",
     budgetLabel: "Prix maximum",
     filterButton: "Filtrer",
+    filterEyebrow: "Recherche de vehicule",
     inventoryEyebrow: "Vehicules disponibles",
     inventoryTitle: "Apercu du marche",
-    inventoryIntro: "Ce MVP utilise un inventaire exemple jusqu'a la connexion du module admin.",
+    inventoryIntro: "Consultez les vehicules verifies par le concessionnaire lorsqu'ils sont disponibles.",
+    inventoryEmptyIntro: "Les vehicules verifies par le concessionnaire apparaitront ici lorsqu'ils seront publies.",
     financeEyebrow: "Estimation de financement",
     financeTitle: "Calculateur de paiement mensuel",
     priceLabel: "Prix du vehicule",
@@ -109,7 +113,7 @@ const text = {
     contactDealer: "Contacter le concessionnaire",
     viewDetails: "Voir les details",
     inventoryReal: "Inventaire publie par l'equipe du concessionnaire.",
-    inventoryEmpty: "Aucun vehicule publie pour le moment. Publiez un vehicule dans le panneau admin pour l'afficher ici.",
+    inventoryEmpty: "Aucun vehicule disponible pour le moment.",
     inventoryDemo: "Un inventaire de demo est affiche parce que le backend d'inventaire n'est pas configure ou disponible.",
     detailEyebrow: "Details du vehicule",
     detailPrice: "Prix",
@@ -164,7 +168,7 @@ function money(value) {
 function renderInventory() {
   if (!filteredInventory.length) {
     const emptyText = inventorySource === "supabase-empty" ? text[language].inventoryEmpty : text[language].noResults;
-    inventoryList.innerHTML = `<p class="status">${escapeHtml(emptyText)}</p>`;
+    inventoryList.innerHTML = `<div class="inventory-empty"><strong>${escapeHtml(emptyText)}</strong><p>${escapeHtml(text[language].inventoryEmptyIntro)}</p></div>`;
     return;
   }
 
@@ -217,7 +221,7 @@ function updateInventoryIntro() {
   if (inventorySource === "supabase") {
     intro.textContent = text[language].inventoryReal;
   } else if (inventorySource === "supabase-empty") {
-    intro.textContent = text[language].inventoryEmpty;
+    intro.textContent = text[language].inventoryEmptyIntro;
   } else {
     intro.textContent = text[language].inventoryIntro;
   }
@@ -228,7 +232,7 @@ function updateInventorySourceStatus() {
   if (inventorySource === "supabase") {
     inventorySourceStatus.textContent = text[language].inventoryReal;
   } else if (inventorySource === "supabase-empty") {
-    inventorySourceStatus.textContent = text[language].inventoryEmpty;
+    inventorySourceStatus.textContent = "";
   } else {
     inventorySourceStatus.textContent = text[language].inventoryDemo;
   }

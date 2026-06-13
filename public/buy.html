@@ -21,26 +21,66 @@
 
     <main>
       <section class="inventory-hero">
-        <div>
+        <div class="inventory-hero-copy">
           <p class="eyebrow" data-i18n="eyebrow">Dealer-reviewed inventory</p>
           <h1 data-i18n="headline">Find your next vehicle</h1>
           <p class="lead" data-i18n="subhead">Browse available vehicles, estimate monthly payments, and contact the dealer when you are ready.</p>
         </div>
-        <form class="inventory-filter" id="inventory-filter">
-          <label>
-            <span data-i18n="searchLabel">Search</span>
-            <input name="query" placeholder="Lexus, SUV, 2024..." data-i18n-placeholder="searchPlaceholder" />
-          </label>
-          <label>
-            <span data-i18n="budgetLabel">Max price</span>
-            <input name="maxPrice" type="number" inputmode="numeric" placeholder="50000" />
-          </label>
-          <button class="primary-button" type="submit" data-i18n="filterButton">Filter</button>
-        </form>
+        <aside class="inventory-control-stack" aria-label="Inventory tools">
+          <form class="inventory-filter" id="inventory-filter">
+            <p class="eyebrow" data-i18n="filterEyebrow">Vehicle search</p>
+            <label>
+              <span data-i18n="searchLabel">Search</span>
+              <input name="query" placeholder="Lexus, SUV, 2024..." data-i18n-placeholder="searchPlaceholder" />
+            </label>
+            <label>
+              <span data-i18n="budgetLabel">Max price</span>
+              <input name="maxPrice" type="number" inputmode="numeric" placeholder="50000" />
+            </label>
+            <button class="primary-button" type="submit" data-i18n="filterButton">Filter</button>
+          </form>
+
+          <section class="finance-panel">
+            <p class="eyebrow" data-i18n="financeEyebrow">Finance estimate</p>
+            <h2 data-i18n="financeTitle">Monthly payment calculator</h2>
+            <form id="finance-form" class="finance-form">
+              <label>
+                <span data-i18n="priceLabel">Vehicle price</span>
+                <input name="price" type="number" value="45000" />
+              </label>
+              <label>
+                <span data-i18n="downLabel">Down payment</span>
+                <input name="downPayment" type="number" value="5000" />
+              </label>
+              <div class="finance-row">
+                <label>
+                  <span data-i18n="rateLabel">Annual rate</span>
+                  <input name="annualRate" type="number" step="0.01" value="7.99" />
+                </label>
+                <label>
+                  <span data-i18n="taxLabel">Tax rate</span>
+                  <input name="taxRate" type="number" step="0.01" value="12" />
+                </label>
+              </div>
+              <label>
+                <span data-i18n="termLabel">Term</span>
+                <select name="termMonths">
+                  <option value="36">36 months</option>
+                  <option value="48">48 months</option>
+                  <option value="60">60 months</option>
+                  <option value="72" selected>72 months</option>
+                  <option value="84">84 months</option>
+                </select>
+              </label>
+              <output id="payment-output" class="payment-output">$0 / mo</output>
+              <p class="fine-print" data-i18n="financeNote">Estimate only. Final approval, rate, term, and fees depend on the dealer and lender.</p>
+            </form>
+          </section>
+        </aside>
       </section>
 
       <section class="inventory-layout">
-        <div>
+        <div class="inventory-main-panel">
           <div class="section-heading inventory-heading">
             <p class="eyebrow" data-i18n="inventoryEyebrow">Available vehicles</p>
             <h2 data-i18n="inventoryTitle">Current marketplace preview</h2>
@@ -49,41 +89,6 @@
           </div>
           <div id="inventory-list" class="inventory-list"></div>
         </div>
-
-        <aside class="finance-panel">
-          <p class="eyebrow" data-i18n="financeEyebrow">Finance estimate</p>
-          <h2 data-i18n="financeTitle">Monthly payment calculator</h2>
-          <form id="finance-form" class="finance-form">
-            <label>
-              <span data-i18n="priceLabel">Vehicle price</span>
-              <input name="price" type="number" value="45000" />
-            </label>
-            <label>
-              <span data-i18n="downLabel">Down payment</span>
-              <input name="downPayment" type="number" value="5000" />
-            </label>
-            <label>
-              <span data-i18n="rateLabel">Annual rate</span>
-              <input name="annualRate" type="number" step="0.01" value="7.99" />
-            </label>
-            <label>
-              <span data-i18n="termLabel">Term</span>
-              <select name="termMonths">
-                <option value="36">36 months</option>
-                <option value="48">48 months</option>
-                <option value="60">60 months</option>
-                <option value="72" selected>72 months</option>
-                <option value="84">84 months</option>
-              </select>
-            </label>
-            <label>
-              <span data-i18n="taxLabel">Tax rate</span>
-              <input name="taxRate" type="number" step="0.01" value="12" />
-            </label>
-            <output id="payment-output" class="payment-output">$0 / mo</output>
-            <p class="fine-print" data-i18n="financeNote">Estimate only. Final approval, rate, term, and fees depend on the dealer and lender.</p>
-          </form>
-        </aside>
       </section>
     </main>
 
