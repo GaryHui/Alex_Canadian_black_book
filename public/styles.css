@@ -1821,6 +1821,65 @@ select {
   cursor: default;
 }
 
+.lead-warehouse-handoff {
+  align-items: center;
+  background: #ecfdf5;
+  border: 1px solid #99f6e4;
+  border-left: 5px solid #0f766e;
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 10px 0;
+  padding: 12px;
+}
+
+.lead-warehouse-linked {
+  background: #eef6ff;
+  border-color: #bfdbfe;
+  border-left-color: #0b4f9c;
+}
+
+.lead-warehouse-handoff div {
+  display: grid;
+  gap: 3px;
+}
+
+.lead-warehouse-handoff span {
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.lead-warehouse-linked span {
+  color: #0b4f9c;
+}
+
+.lead-warehouse-handoff strong {
+  color: #123;
+}
+
+.lead-warehouse-handoff small {
+  color: #516174;
+}
+
+.lead-warehouse-handoff button {
+  background: #0f766e;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 900;
+  min-height: 40px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.lead-warehouse-linked button {
+  background: #0b4f9c;
+}
+
 .lead-action-row button,
 .dealer-lead-actions button {
   background: #fff;
@@ -3267,6 +3326,7 @@ select {
   }
 
   .admin-section-head,
+  .lead-warehouse-handoff,
   .admin-overview,
   .admin-today-grid,
   .inventory-summary,

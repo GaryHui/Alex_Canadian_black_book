@@ -980,7 +980,7 @@ function renderLeadGroups(leads) {
     const hasSearch = adminLeadSearch.trim();
     if (hasSearch) return `<p>No matching leads for "${escapeHtml(adminLeadSearch.trim())}". Try VIN, vehicle, email, phone, staff, or status.</p>`;
     if (adminLeadFilter === "closed") return "<p>No closed leads yet.</p>";
-    if (adminLeadFilter === "active") return "<p>No active leads right now. Closed leads are saved under the Closed filter.</p>";
+    if (adminLeadFilter === "active") return "<p>No active leads right now. Seller vehicles moved to Warehouse are saved under Closed / All, and the vehicle itself is managed in Inventory.</p>";
     return "<p>No leads in this view.</p>";
   }
   const buyerLeads = leads.filter(isBuyerLead);
@@ -1120,9 +1120,23 @@ function renderLead(lead) {
   const actionButtons = leadStatusActions(buyer, status)
     .map((action) => `<button type="button" data-lead-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
     .join("");
-  const warehouseAction = buyer ? "" : inventoryListing
-    ? `<button type="button" data-view-inventory="${escapeHtml(inventoryListing.id || "")}">View inventory</button>`
-    : `<button type="button" data-quick-inventory="${escapeHtml(lead.id || "")}">Move to warehouse</button>`;
+  const warehousePanel = buyer ? "" : inventoryListing ? `
+      <section class="lead-warehouse-handoff lead-warehouse-linked">
+        <div>
+          <span>Warehouse</span>
+          <strong>This seller vehicle is already in inventory.</strong>
+          <small>Photos, listing details, price, public visibility, sold/archive actions are managed in Warehouse.</small>
+        </div>
+        <button type="button" data-view-inventory="${escapeHtml(inventoryListing.id || "")}">Open warehouse listing</button>
+      </section>` : `
+      <section class="lead-warehouse-handoff">
+        <div>
+          <span>Warehouse handoff</span>
+          <strong>Ready to manage this vehicle as inventory?</strong>
+          <small>Create a draft listing first. The seller lead will leave Active CRM and stay traceable in Closed / All.</small>
+        </div>
+        <button type="button" data-quick-inventory="${escapeHtml(lead.id || "")}">Move to warehouse</button>
+      </section>`;
   const quickAssign = dealerStaffEmails.length ? `
       <div class="quick-assign-row" aria-label="Quick assign lead">
         <span>Assign</span>
@@ -1189,7 +1203,8 @@ function renderLead(lead) {
       ${ownerReviewBanner}
       ${progressSteps}
       ${quickAssign}
-      ${(warehouseAction || actionButtons) ? `<div class="lead-action-row">${warehouseAction}${actionButtons}</div>` : ""}
+      ${actionButtons ? `<div class="lead-action-row">${actionButtons}</div>` : ""}
+      ${warehousePanel}
       <details class="lead-manage">
         <summary>Open lead workspace</summary>
         <section class="lead-detail-section lead-detail-summary">
@@ -2038,7 +2053,7 @@ function renderActivity(data, options = {}) {
   const notes = (data.notes || []).filter((note) => note.note_type !== "owner_read").map((note) => `
     <article class="activity-item ${latestKey === `note:${note.id}` ? "activity-highlight" : ""}">
       <div>
-        <strong>${escapeHtml(note.note_type === "owner_review" ? "owner review request" : note.note_type || "note")} by ${escapeHtml(note.author_email || "-")}</strong>
+        <strong>${escapeHtml(activityNoteLabel(note.note_type))} by ${escapeHtml(note.author_email || "-")}</strong>
         <span>${escapeHtml(formatDateTime(note.created_at))}</span>
         <p>${linkifyNote(note.note || "")}</p>
       </div>
@@ -2068,6 +2083,18 @@ function latestActivityKey(data) {
     .map((item) => ({ ...item, time: new Date(item.at || 0).getTime() }))
     .filter((item) => item.key && !Number.isNaN(item.time))
     .sort((a, b) => b.time - a.time)[0]?.key || "";
+}
+
+function activityNoteLabel(type) {
+  const value = String(type || "note").trim().toLowerCase();
+  const labels = {
+    owner_review: "owner review request",
+    correction: "correction request",
+    internal: "internal note",
+    inspection: "inspection note",
+    offer: "offer note"
+  };
+  return labels[value] || value || "note";
 }
 
 function highlightLeadChangeAreas(card) {

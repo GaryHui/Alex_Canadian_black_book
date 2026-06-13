@@ -113,8 +113,13 @@ async function createNote(body, user, role) {
 
   const result = await insertJson(`${client.url}/rest/v1/lead_notes`, client.key, payload);
   if (!result.ok) return result;
-  if (role !== "admin" && payload.note_type === "offer") {
-    await createOwnerReview(client, leadId, user, "Quote or offer added by staff.");
+  if (role !== "admin" && ["offer", "correction"].includes(payload.note_type)) {
+    await createOwnerReview(
+      client,
+      leadId,
+      user,
+      payload.note_type === "correction" ? "Vehicle detail correction requested by staff." : "Quote or offer added by staff."
+    );
   }
   await touchLead(client, leadId);
   return { ok: true, note: result.data?.[0] || null };
@@ -335,7 +340,7 @@ async function insertJson(url, key, payload) {
 
 function normalizeNoteType(value) {
   const type = String(value || "internal").trim().toLowerCase();
-  return ["call", "email", "sms", "inspection", "offer", "internal"].includes(type) ? type : "internal";
+  return ["call", "email", "sms", "inspection", "correction", "offer", "internal"].includes(type) ? type : "internal";
 }
 
 function normalizeLeadStatus(value) {

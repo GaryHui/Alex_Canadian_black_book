@@ -2270,14 +2270,21 @@ async function createLeadActivity(body, user, role) {
 
   const note = String(body.note || "").trim();
   if (!note) return { ok: false, status: 400, error: "Note is required" };
+  const noteType = normalizeNoteType(body.noteType);
   const result = await insertSupabaseJson(`${url}/rest/v1/lead_notes`, key, {
     lead_id: leadId,
     author_email: String(user?.email || "").trim().toLowerCase(),
-    note_type: normalizeNoteType(body.noteType),
+    note_type: noteType,
     note
   });
-  if (result.ok && role !== "admin" && normalizeNoteType(body.noteType) === "offer") {
-    await createOwnerReviewNote({ url, key, leadId, authorEmail: user?.email || "", reason: "Quote or offer added by staff." });
+  if (result.ok && role !== "admin" && ["offer", "correction"].includes(noteType)) {
+    await createOwnerReviewNote({
+      url,
+      key,
+      leadId,
+      authorEmail: user?.email || "",
+      reason: noteType === "correction" ? "Vehicle detail correction requested by staff." : "Quote or offer added by staff."
+    });
   }
   if (result.ok) await touchLeadActivity({ url, key, leadId });
   return result.ok ? { ok: true, note: result.data?.[0] || null } : result;
@@ -2463,7 +2470,7 @@ function normalizePriority(value) {
 
 function normalizeNoteType(value) {
   const type = String(value || "internal").trim().toLowerCase();
-  return ["call", "email", "sms", "inspection", "offer", "internal"].includes(type) ? type : "internal";
+  return ["call", "email", "sms", "inspection", "correction", "offer", "internal"].includes(type) ? type : "internal";
 }
 
 function normalizeLeadStatus(value) {

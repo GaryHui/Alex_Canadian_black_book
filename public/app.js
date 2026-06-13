@@ -1261,6 +1261,7 @@ function renderDealerLeads(leads, role) {
               <option value="email">Email</option>
               <option value="sms">SMS</option>
               <option value="inspection">Inspection</option>
+              <option value="correction">Correction request</option>
               <option value="offer">Offer</option>
               <option value="internal">Internal note</option>
             </select>
