@@ -1391,19 +1391,212 @@ async function createBuyerInquiry(body) {
   const phone = String(body.phone || "").trim();
   const name = String(body.name || "").trim();
   const message = String(body.message || "").trim();
+  const listing = await findInventoryListingForInquiry(listingId, { url, key });
+  const vehicle = buyerInquiryVehicleContext(body.vehicle || {}, listing);
+  const finance = buyerInquiryFinanceContext(body.finance || {});
+  const purchase = buyerInquiryPurchaseContext(body.purchase || body, finance, vehicle);
   if (!listingId) return { ok: false, status: 400, error: "Vehicle listing is required" };
   if (!email && !phone) return { ok: false, status: 400, error: "Please provide an email or phone number" };
 
   const result = await insertSupabaseJson(`${url}/rest/v1/buyer_inquiries`, key, {
-    listing_id: listingId,
+    listing_id: isUuid(listingId) ? listingId : null,
     customer_email: email,
     customer_phone: phone,
     customer_name: name,
-    message,
+    message: buyerInquiryMessageWithContext({ message, vehicle, finance, purchase }),
     source: "buy_page",
     status: "new"
   });
-  return result.ok ? { ok: true, inquiry: result.data?.[0] || null } : result;
+  if (!result.ok) return result;
+
+  const lead = buildBuyerInquiryLead({
+    inquiry: result.data?.[0] || null,
+    name,
+    email,
+    phone,
+    message,
+    listingId,
+    vehicle,
+    finance,
+    purchase
+  });
+  const savedLead = await saveLeadToSupabase(lead);
+  if (savedLead.ok && savedLead.lead?.id) {
+    await createLeadActivity({
+      leadId: savedLead.lead.id,
+      type: "note",
+      noteType: "call",
+      note: buyerInquiryActivityNote({ name, email, phone, message, vehicle, finance, purchase })
+    }, { email: "buy-page@autoswitch.local" }).catch(() => null);
+  }
+
+  return {
+    ok: true,
+    inquiry: publicBuyerInquiryRow(result.data?.[0] || {}),
+    lead: savedLead.lead || null,
+    leadCreated: Boolean(savedLead.ok && savedLead.lead?.id),
+    leadStorage: savedLead.storage || ""
+  };
+}
+
+async function findInventoryListingForInquiry(listingId, supabase) {
+  if (!isUuid(listingId)) return null;
+  const result = await fetchSupabaseJson(
+    `${supabase.url}/rest/v1/vehicle_listings?select=*&id=eq.${encodeURIComponent(listingId)}&limit=1`,
+    supabase.key
+  );
+  if (!result.ok) return null;
+  return result.data?.[0] || null;
+}
+
+function buyerInquiryVehicleContext(clientVehicle, listing) {
+  const row = listing || {};
+  const client = clientVehicle || {};
+  return {
+    id: String(row.id || client.id || "").trim(),
+    sourceLeadId: String(row.source_lead_id || client.sourceLeadId || "").trim(),
+    title: String(row.title || client.title || "").trim(),
+    price: numberOrNull(row.asking_price) ?? numberOrNull(client.price) ?? 0,
+    monthlyPaymentEstimate: numberOrNull(row.monthly_payment_estimate) ?? numberOrNull(client.monthlyPaymentEstimate) ?? 0,
+    kilometers: numberOrNull(row.kilometers) ?? numberOrNull(client.kilometers) ?? 0,
+    region: String(row.region || client.region || "").trim(),
+    color: String(row.color || client.color || "").trim(),
+    vin: cleanVin(row.vin || client.vin || ""),
+    uvc: String(row.uvc || client.uvc || "").trim(),
+    year: String(row.vehicle_year || client.year || "").trim(),
+    make: String(row.make || client.make || "").trim(),
+    model: String(row.model || client.model || "").trim(),
+    series: String(row.series || client.series || "").trim(),
+    style: String(row.style || client.style || "").trim()
+  };
+}
+
+function buyerInquiryFinanceContext(finance) {
+  return {
+    price: numberOrNull(finance.price) ?? 0,
+    downPayment: numberOrNull(finance.downPayment) ?? 0,
+    annualRate: numberOrNull(finance.annualRate) ?? 0,
+    taxRate: numberOrNull(finance.taxRate) ?? 0,
+    termMonths: numberOrNull(finance.termMonths) ?? 0,
+    monthlyPayment: numberOrNull(finance.monthlyPayment) ?? 0
+  };
+}
+
+function buyerInquiryPurchaseContext(purchase, finance, vehicle) {
+  const intent = String(purchase.purchaseIntent || purchase.intent || "finance").trim().toLowerCase();
+  return {
+    intent: ["cash", "finance", "lease", "undecided"].includes(intent) ? intent : "finance",
+    buyingTimeline: String(purchase.buyingTimeline || "").trim(),
+    preferredContact: String(purchase.preferredContact || "").trim(),
+    vehiclePrice: numberOrNull(purchase.vehiclePrice) ?? finance.price ?? vehicle.price ?? 0,
+    downPayment: numberOrNull(purchase.downPayment) ?? finance.downPayment ?? 0,
+    annualRate: numberOrNull(purchase.annualRate) ?? finance.annualRate ?? 0,
+    taxRate: numberOrNull(purchase.taxRate) ?? finance.taxRate ?? 0,
+    termMonths: numberOrNull(purchase.termMonths) ?? finance.termMonths ?? 0,
+    monthlyPayment: numberOrNull(purchase.monthlyPayment) ?? finance.monthlyPayment ?? 0
+  };
+}
+
+function buildBuyerInquiryLead({ inquiry, name, email, phone, message, listingId, vehicle, finance, purchase }) {
+  const title = vehicle.title || "Buyer inquiry";
+  const now = new Date().toISOString();
+  return {
+    created_at: now,
+    input: {
+      leadType: "buyer_inquiry",
+      inquiryId: inquiry?.id || "",
+      listingId,
+      sourceLeadId: vehicle.sourceLeadId || "",
+      email,
+      phone,
+      buyerName: name,
+      message,
+      vin: vehicle.vin,
+      uvc: vehicle.uvc,
+      year: vehicle.year,
+      make: vehicle.make,
+      model: vehicle.model,
+      series: vehicle.series,
+      style: vehicle.style,
+      kilometers: vehicle.kilometers,
+      ownershipType: "buyer",
+      ownsVehicle: false,
+      color: vehicle.color,
+      conditionNotes: message,
+      region: vehicle.region,
+      country: "C",
+      askingPrice: vehicle.price,
+      monthlyPaymentEstimate: vehicle.monthlyPaymentEstimate,
+      financeEstimate: finance,
+      purchaseIntent: purchase.intent,
+      buyingTimeline: purchase.buyingTimeline,
+      preferredContact: purchase.preferredContact,
+      buyerPlan: purchase
+    },
+    auth_user: {},
+    valuation: {
+      source: "buyer_inquiry",
+      title: `Buyer inquiry - ${title}`,
+      vin: vehicle.vin,
+      kilometers: vehicle.kilometers,
+      region: vehicle.region,
+      country: "C",
+      values: {
+        retail: {
+          adjusted: {
+            avg: vehicle.price || finance.price || 0
+          }
+        }
+      },
+      listing: vehicle,
+      financeEstimate: finance,
+      buyerPlan: purchase
+    },
+    auth_user_id: "",
+    auth_email: email,
+    valuation_year: new Date().getFullYear(),
+    status: "new",
+    assigned_to: "",
+    priority: "high",
+    next_follow_up_at: null,
+    last_activity_at: now,
+    notes: buyerInquiryActivityNote({ name, email, phone, message, vehicle, finance, purchase }),
+    owner_adjustment: {}
+  };
+}
+
+function buyerInquiryMessageWithContext({ message, vehicle, finance, purchase }) {
+  const context = buyerInquiryActivityNote({ name: "", email: "", phone: "", message: "", vehicle, finance, purchase });
+  return [message || "Buyer did not include a message.", context].filter(Boolean).join("\n\n---\n");
+}
+
+function buyerInquiryActivityNote({ name, email, phone, message, vehicle, finance, purchase }) {
+  const lines = [
+    "Buyer inquiry from public Buy page",
+    name ? `Buyer: ${name}` : "",
+    email ? `Email: ${email}` : "",
+    phone ? `Phone: ${phone}` : "",
+    purchase?.intent ? `Purchase intent: ${purchase.intent}` : "",
+    purchase?.buyingTimeline ? `Buying timeline: ${purchase.buyingTimeline}` : "",
+    purchase?.preferredContact ? `Preferred contact: ${purchase.preferredContact}` : "",
+    vehicle.title ? `Vehicle: ${vehicle.title}` : "",
+    vehicle.price ? `Asking price: ${vehicle.price}` : "",
+    vehicle.vin ? `VIN: ${vehicle.vin}` : "",
+    vehicle.uvc ? `UVC: ${vehicle.uvc}` : "",
+    vehicle.id ? `Listing ID: ${vehicle.id}` : "",
+    vehicle.sourceLeadId ? `Source lead: ${vehicle.sourceLeadId}` : "",
+    purchase?.intent === "finance" && purchase.monthlyPayment ? `Finance plan: ${purchase.monthlyPayment}/mo, ${purchase.downPayment} down, ${purchase.termMonths} months, ${purchase.annualRate}% APR` : "",
+    purchase?.intent === "lease" && purchase.monthlyPayment ? `Lease interest: target around ${purchase.monthlyPayment}/mo, ${purchase.downPayment} down, ${purchase.termMonths} months` : "",
+    purchase?.intent === "cash" ? `Cash plan: buyer selected cash purchase` : "",
+    purchase?.intent === "undecided" ? `Buyer plan: undecided between cash, finance, and lease` : "",
+    finance.monthlyPayment ? `Calculator estimate: ${finance.monthlyPayment}/mo, ${finance.termMonths} months, ${finance.annualRate}% APR` : "",
+    message ? `Message: ${message}` : ""
+  ].filter(Boolean);
+  return lines.join("\n");
+}
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
 }
 
 async function listBuyerInquiries() {

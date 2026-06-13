@@ -20,14 +20,27 @@
     </header>
 
     <main>
-      <section class="inventory-hero">
-        <div class="inventory-hero-copy">
-          <p class="eyebrow" data-i18n="eyebrow">Dealer-reviewed inventory</p>
-          <h1 data-i18n="headline">Find your next vehicle</h1>
-          <p class="lead" data-i18n="subhead">Browse available vehicles, estimate monthly payments, and contact the dealer when you are ready.</p>
+      <section class="inventory-layout">
+        <div class="inventory-main-panel">
+          <div class="section-heading inventory-heading">
+            <p class="eyebrow" data-i18n="eyebrow">Dealer-reviewed inventory</p>
+            <h1 data-i18n="headline">Find your next vehicle</h1>
+            <p data-i18n="subhead">Browse available vehicles, estimate monthly payments, and contact the dealer when you are ready.</p>
+            <div class="inventory-hero-points" aria-label="Buyer highlights">
+              <span data-i18n="heroPointOne">Verified listings</span>
+              <span data-i18n="heroPointTwo">Transparent pricing</span>
+              <span data-i18n="heroPointThree">Dealer follow-up</span>
+            </div>
+            <div class="inventory-results-bar">
+              <strong id="inventory-results-count"></strong>
+              <span id="inventory-source-status" class="status"></span>
+            </div>
+          </div>
+          <div id="inventory-list" class="inventory-list"></div>
         </div>
-        <aside class="inventory-control-stack" aria-label="Inventory tools">
-          <form class="inventory-filter" id="inventory-filter">
+
+        <aside class="inventory-sidebar" aria-label="Inventory tools">
+          <form class="inventory-filter" id="inventory-filter" aria-label="Vehicle search">
             <p class="eyebrow" data-i18n="filterEyebrow">Vehicle search</p>
             <label>
               <span data-i18n="searchLabel">Search</span>
@@ -37,7 +50,7 @@
               <span data-i18n="budgetLabel">Max price</span>
               <input name="maxPrice" type="number" inputmode="numeric" placeholder="50000" />
             </label>
-            <button class="primary-button" type="submit" data-i18n="filterButton">Filter</button>
+            <button class="primary-button" type="submit" data-i18n="filterButton">Search inventory</button>
           </form>
 
           <section class="finance-panel">
@@ -74,21 +87,10 @@
               </label>
               <output id="payment-output" class="payment-output">$0 / mo</output>
               <p class="fine-print" data-i18n="financeNote">Estimate only. Final approval, rate, term, and fees depend on the dealer and lender.</p>
+              <button id="send-estimate-button" class="primary-button" type="button" disabled data-i18n="sendEstimateButton">Send this estimate to dealer</button>
             </form>
           </section>
         </aside>
-      </section>
-
-      <section class="inventory-layout">
-        <div class="inventory-main-panel">
-          <div class="section-heading inventory-heading">
-            <p class="eyebrow" data-i18n="inventoryEyebrow">Available vehicles</p>
-            <h2 data-i18n="inventoryTitle">Current marketplace preview</h2>
-            <p data-i18n="inventoryIntro">This MVP uses sample inventory until the admin inventory module is connected.</p>
-            <p id="inventory-source-status" class="status"></p>
-          </div>
-          <div id="inventory-list" class="inventory-list"></div>
-        </div>
       </section>
     </main>
 
@@ -104,13 +106,61 @@
 
     <div id="contact-dealer-modal" class="modal-shell" hidden>
       <button class="modal-backdrop" type="button" data-close-contact aria-label="Close"></button>
-      <section class="modal-card vehicle-detail-card" role="dialog" aria-modal="true" aria-labelledby="contact-dealer-title">
-        <button class="close-button" type="button" data-close-contact aria-label="Close">x</button>
-        <p class="eyebrow" data-i18n="contactEyebrow">Dealer message</p>
-        <h2 id="contact-dealer-title" data-i18n="contactTitle">Contact the dealer</h2>
+      <section class="modal-card vehicle-detail-card contact-dealer-card" role="dialog" aria-modal="true" aria-labelledby="contact-dealer-title">
+        <header class="modal-card-head">
+          <div>
+            <p class="eyebrow" data-i18n="contactEyebrow">Dealer message</p>
+            <h2 id="contact-dealer-title" data-i18n="contactTitle">Contact the dealer</h2>
+          </div>
+          <button class="close-button" type="button" data-close-contact aria-label="Close">×</button>
+        </header>
         <form id="contact-dealer-form" class="contact-dealer-form">
           <input name="listingId" type="hidden" />
-          <p id="contact-vehicle-title" class="contact-vehicle-title"></p>
+          <section class="contact-vehicle-summary" aria-label="Selected vehicle">
+            <p id="contact-vehicle-title" class="contact-vehicle-title"></p>
+            <div id="contact-vehicle-context" class="contact-vehicle-context"></div>
+          </section>
+          <section class="contact-buying-plan" aria-label="Buying plan">
+            <h3 data-i18n="purchaseTitle">Buying plan</h3>
+            <div class="purchase-choice-grid">
+              <label>
+                <input type="radio" name="purchaseIntent" value="finance" checked />
+                <span data-i18n="purchaseFinance">Finance</span>
+              </label>
+              <label>
+                <input type="radio" name="purchaseIntent" value="lease" />
+                <span data-i18n="purchaseLease">Lease</span>
+              </label>
+              <label>
+                <input type="radio" name="purchaseIntent" value="cash" />
+                <span data-i18n="purchaseCash">Cash</span>
+              </label>
+              <label>
+                <input type="radio" name="purchaseIntent" value="undecided" />
+                <span data-i18n="purchaseUndecided">Not sure</span>
+              </label>
+            </div>
+            <div id="contact-finance-summary" class="contact-finance-summary"></div>
+            <div class="contact-quick-fields">
+              <label>
+                <span data-i18n="timelineLabel">Buying timeline</span>
+                <select name="buyingTimeline">
+                  <option value="asap" data-i18n="timelineAsap">As soon as possible</option>
+                  <option value="this_week" data-i18n="timelineWeek">This week</option>
+                  <option value="this_month" data-i18n="timelineMonth">This month</option>
+                  <option value="just_researching" data-i18n="timelineResearch">Just researching</option>
+                </select>
+              </label>
+              <label>
+                <span data-i18n="preferredContactLabel">Preferred contact</span>
+                <select name="preferredContact">
+                  <option value="phone" data-i18n="preferredPhone">Phone</option>
+                  <option value="email" data-i18n="preferredEmail">Email</option>
+                  <option value="either" data-i18n="preferredEither">Either</option>
+                </select>
+              </label>
+            </div>
+          </section>
           <label>
             <span data-i18n="contactName">Name</span>
             <input name="name" autocomplete="name" />
@@ -127,8 +177,10 @@
             <span data-i18n="contactMessage">Message</span>
             <textarea name="message" rows="4"></textarea>
           </label>
-          <p id="contact-dealer-status" class="status"></p>
-          <button class="primary-button" type="submit" data-i18n="contactSubmit">Send message</button>
+          <footer class="contact-form-footer">
+            <p id="contact-dealer-status" class="status"></p>
+            <button class="primary-button" type="submit" data-i18n="contactSubmit">Send message</button>
+          </footer>
         </form>
       </section>
     </div>

@@ -39,10 +39,15 @@ const text = {
     eyebrow: "Dealer-reviewed inventory",
     headline: "Find your next vehicle",
     subhead: "Browse available vehicles, estimate monthly payments, and contact the dealer when you are ready.",
+    heroPointOne: "Verified listings",
+    heroPointTwo: "Transparent pricing",
+    heroPointThree: "Dealer follow-up",
     searchLabel: "Search",
     searchPlaceholder: "Lexus, SUV, 2024...",
     budgetLabel: "Max price",
-    filterButton: "Filter",
+    filterButton: "Search inventory",
+    sendEstimateButton: "Send this estimate to dealer",
+    sendEstimateDisabled: "Choose a vehicle first",
     filterEyebrow: "Vehicle search",
     inventoryEyebrow: "Available vehicles",
     inventoryTitle: "Current marketplace preview",
@@ -61,6 +66,10 @@ const text = {
     inventoryReal: "Showing published dealer inventory.",
     inventoryEmpty: "No vehicles are available right now.",
     inventoryDemo: "Demo inventory is shown because the inventory backend is not configured or unavailable.",
+    resultsLabel: "vehicle available",
+    resultsLabelPlural: "vehicles available",
+    resultsFilteredLabel: "matching vehicle",
+    resultsFilteredLabelPlural: "matching vehicles",
     detailEyebrow: "Vehicle details",
     detailPrice: "Price",
     detailMonthly: "Finance estimate",
@@ -71,14 +80,33 @@ const text = {
     detailUvc: "UVC",
     detailSource: "Source lead",
     detailDescription: "Description",
-    detailUseCalculator: "Use this price in calculator",
+    detailUseCalculator: "Estimate payment",
     contactEyebrow: "Dealer message",
-    contactTitle: "Contact the dealer",
+    contactTitle: "Send buying intent",
+    purchaseTitle: "Buying plan",
+    purchaseFinance: "Finance",
+    purchaseLease: "Lease",
+    purchaseCash: "Cash",
+    purchaseUndecided: "Not sure",
+    purchaseFinanceSummary: "Finance estimate",
+    purchaseLeaseSummary: "Lease interest",
+    purchaseCashSummary: "Cash purchase",
+    purchaseUndecidedSummary: "Buyer is still deciding between cash, finance, and lease.",
+    timelineLabel: "Buying timeline",
+    timelineAsap: "As soon as possible",
+    timelineWeek: "This week",
+    timelineMonth: "This month",
+    timelineResearch: "Just researching",
+    preferredContactLabel: "Preferred contact",
+    preferredPhone: "Phone",
+    preferredEmail: "Email",
+    preferredEither: "Either",
     contactName: "Name",
     contactEmail: "Email",
     contactPhone: "Phone",
     contactMessage: "Message",
     contactSubmit: "Send message",
+    contactDefaultMessage: "Hi, I am interested in this vehicle. Please contact me with availability and next steps.",
     contactNeedInfo: "Please provide an email or phone number.",
     contactSending: "Sending message...",
     contactSent: "Message sent. The dealer team can review it in the admin inbox.",
@@ -93,10 +121,15 @@ const text = {
     eyebrow: "Inventaire revise par le concessionnaire",
     headline: "Trouvez votre prochain vehicule",
     subhead: "Consultez les vehicules disponibles, estimez les paiements mensuels et contactez le concessionnaire.",
+    heroPointOne: "Annonces verifiees",
+    heroPointTwo: "Prix transparents",
+    heroPointThree: "Suivi concessionnaire",
     searchLabel: "Recherche",
     searchPlaceholder: "Lexus, VUS, 2024...",
     budgetLabel: "Prix maximum",
-    filterButton: "Filtrer",
+    filterButton: "Rechercher",
+    sendEstimateButton: "Envoyer cette estimation",
+    sendEstimateDisabled: "Choisissez d'abord un vehicule",
     filterEyebrow: "Recherche de vehicule",
     inventoryEyebrow: "Vehicules disponibles",
     inventoryTitle: "Apercu du marche",
@@ -115,6 +148,10 @@ const text = {
     inventoryReal: "Inventaire publie par l'equipe du concessionnaire.",
     inventoryEmpty: "Aucun vehicule disponible pour le moment.",
     inventoryDemo: "Un inventaire de demo est affiche parce que le backend d'inventaire n'est pas configure ou disponible.",
+    resultsLabel: "vehicule disponible",
+    resultsLabelPlural: "vehicules disponibles",
+    resultsFilteredLabel: "vehicule trouve",
+    resultsFilteredLabelPlural: "vehicules trouves",
     detailEyebrow: "Details du vehicule",
     detailPrice: "Prix",
     detailMonthly: "Estimation de financement",
@@ -125,14 +162,33 @@ const text = {
     detailUvc: "UVC",
     detailSource: "Lead source",
     detailDescription: "Description",
-    detailUseCalculator: "Utiliser ce prix dans le calculateur",
+    detailUseCalculator: "Estimer le paiement",
     contactEyebrow: "Message au concessionnaire",
-    contactTitle: "Contacter le concessionnaire",
+    contactTitle: "Envoyer mon intention d'achat",
+    purchaseTitle: "Plan d'achat",
+    purchaseFinance: "Financement",
+    purchaseLease: "Location",
+    purchaseCash: "Comptant",
+    purchaseUndecided: "Pas certain",
+    purchaseFinanceSummary: "Estimation de financement",
+    purchaseLeaseSummary: "Interet pour la location",
+    purchaseCashSummary: "Achat comptant",
+    purchaseUndecidedSummary: "L'acheteur hesite encore entre comptant, financement et location.",
+    timelineLabel: "Delai d'achat",
+    timelineAsap: "Des que possible",
+    timelineWeek: "Cette semaine",
+    timelineMonth: "Ce mois-ci",
+    timelineResearch: "Recherche seulement",
+    preferredContactLabel: "Contact prefere",
+    preferredPhone: "Telephone",
+    preferredEmail: "Courriel",
+    preferredEither: "Les deux",
     contactName: "Nom",
     contactEmail: "Courriel",
     contactPhone: "Telephone",
     contactMessage: "Message",
     contactSubmit: "Envoyer le message",
+    contactDefaultMessage: "Bonjour, ce vehicule m'interesse. Veuillez me contacter avec la disponibilite et les prochaines etapes.",
     contactNeedInfo: "Veuillez fournir un courriel ou un numero de telephone.",
     contactSending: "Envoi du message...",
     contactSent: "Message envoye. L'equipe du concessionnaire peut le voir dans l'administration.",
@@ -152,7 +208,9 @@ const inventoryList = document.querySelector("#inventory-list");
 const inventoryFilter = document.querySelector("#inventory-filter");
 const financeForm = document.querySelector("#finance-form");
 const paymentOutput = document.querySelector("#payment-output");
+const sendEstimateButton = document.querySelector("#send-estimate-button");
 const inventorySourceStatus = document.querySelector("#inventory-source-status");
+const inventoryResultsCount = document.querySelector("#inventory-results-count");
 const vehicleDetailModal = document.querySelector("#vehicle-detail-modal");
 const vehicleDetailTitle = document.querySelector("#vehicle-detail-title");
 const vehicleDetailBody = document.querySelector("#vehicle-detail-body");
@@ -160,12 +218,17 @@ const contactDealerModal = document.querySelector("#contact-dealer-modal");
 const contactDealerForm = document.querySelector("#contact-dealer-form");
 const contactDealerStatus = document.querySelector("#contact-dealer-status");
 const contactVehicleTitle = document.querySelector("#contact-vehicle-title");
+const contactVehicleContext = document.querySelector("#contact-vehicle-context");
+const contactFinanceSummary = document.querySelector("#contact-finance-summary");
+let currentContactVehicle = null;
+let selectedFinanceVehicle = null;
 
 function money(value) {
   return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(Number(value || 0));
 }
 
 function renderInventory() {
+  updateInventoryResultsCount();
   if (!filteredInventory.length) {
     const emptyText = inventorySource === "supabase-empty" ? text[language].inventoryEmpty : text[language].noResults;
     inventoryList.innerHTML = `<div class="inventory-empty"><strong>${escapeHtml(emptyText)}</strong><p>${escapeHtml(text[language].inventoryEmptyIntro)}</p></div>`;
@@ -176,17 +239,21 @@ function renderInventory() {
     <article class="inventory-card">
       ${vehicleImageMarkup(vehicle)}
       <div class="inventory-card-body">
-        <div>
+        <div class="inventory-card-copy">
           <h3>${escapeHtml(vehicle.title)}</h3>
           <p>${escapeHtml(publicSummary(vehicle))}</p>
         </div>
-        <strong>${money(vehicle.price)}</strong>
+        <div class="inventory-card-price">
+          <strong>${money(vehicle.price)}</strong>
+          ${vehicle.monthlyPaymentEstimate ? `<span>${escapeHtml(money(vehicle.monthlyPaymentEstimate))} / mo</span>` : ""}
+        </div>
         <div class="inventory-tags">
           ${vehicle.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
         </div>
         <div class="inventory-card-actions">
+          <button class="primary-button" type="button" data-contact-vehicle="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].contactDealer)}</button>
           <button class="secondary-button" type="button" data-view-vehicle="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].viewDetails)}</button>
-          <button class="secondary-button" type="button" data-fill-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].contactDealer)}</button>
+          <button class="secondary-button compact" type="button" data-fill-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].detailUseCalculator)}</button>
         </div>
       </div>
     </article>
@@ -236,6 +303,17 @@ function updateInventorySourceStatus() {
   } else {
     inventorySourceStatus.textContent = text[language].inventoryDemo;
   }
+}
+
+function updateInventoryResultsCount() {
+  if (!inventoryResultsCount) return;
+  const count = filteredInventory.length;
+  const data = inventoryFilter ? new FormData(inventoryFilter) : null;
+  const hasFilters = Boolean(String(data?.get("query") || "").trim() || String(data?.get("maxPrice") || "").trim());
+  const key = hasFilters
+    ? count === 1 ? "resultsFilteredLabel" : "resultsFilteredLabelPlural"
+    : count === 1 ? "resultsLabel" : "resultsLabelPlural";
+  inventoryResultsCount.textContent = `${count} ${text[language][key]}`;
 }
 
 function normalizeInventoryVehicle(vehicle) {
@@ -307,6 +385,22 @@ function calculatePayment() {
   paymentOutput.textContent = `${money(payment)} / mo`;
 }
 
+function selectVehicleForFinance(vehicle) {
+  if (!vehicle || !financeForm) return;
+  selectedFinanceVehicle = vehicle;
+  financeForm.elements.price.value = vehicle.price;
+  calculatePayment();
+  updateSendEstimateButton();
+}
+
+function updateSendEstimateButton() {
+  if (!sendEstimateButton) return;
+  sendEstimateButton.disabled = !selectedFinanceVehicle;
+  sendEstimateButton.textContent = selectedFinanceVehicle
+    ? text[language].sendEstimateButton
+    : text[language].sendEstimateDisabled;
+}
+
 function applyFilters(event) {
   event?.preventDefault();
   const data = new FormData(inventoryFilter);
@@ -337,6 +431,7 @@ function setLanguage(nextLanguage) {
   updateInventoryIntro();
   updateInventorySourceStatus();
   renderInventory();
+  updateSendEstimateButton();
 }
 
 function showVehicleDetails(vehicle) {
@@ -366,7 +461,10 @@ function showVehicleDetails(vehicle) {
       <span>${escapeHtml(text[language].detailDescription)}</span>
       <p>${escapeHtml(vehicle.description || text[language].notAvailable)}</p>
     </div>
-    <button class="primary-button" type="button" data-detail-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].detailUseCalculator)}</button>
+    <div class="vehicle-detail-actions">
+      <button class="primary-button" type="button" data-detail-contact="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].contactDealer)}</button>
+      <button class="secondary-button" type="button" data-detail-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].detailUseCalculator)}</button>
+    </div>
   `;
   vehicleDetailModal.hidden = false;
 }
@@ -410,15 +508,25 @@ function closeVehicleDetails() {
 
 function openContactDealer(vehicle) {
   if (!contactDealerModal || !contactDealerForm) return;
+  currentContactVehicle = vehicle;
+  selectVehicleForFinance(vehicle);
   contactDealerForm.reset();
   contactDealerForm.elements.listingId.value = vehicle.id;
+  const financeChoice = contactDealerForm.querySelector("input[name='purchaseIntent'][value='finance']");
+  if (financeChoice) financeChoice.checked = true;
   if (contactVehicleTitle) contactVehicleTitle.textContent = vehicle.title;
+  if (contactVehicleContext) contactVehicleContext.innerHTML = contactVehicleContextMarkup(vehicle);
+  if (contactDealerForm.elements.message) {
+    contactDealerForm.elements.message.value = `${text[language].contactDefaultMessage}\n\n${vehicle.title} - ${money(vehicle.price)}${vehicle.vin ? `\nVIN: ${vehicle.vin}` : ""}`;
+  }
+  updateContactBuyingSummary();
   if (contactDealerStatus) contactDealerStatus.textContent = "";
   contactDealerModal.hidden = false;
 }
 
 function closeContactDealer() {
   if (contactDealerModal) contactDealerModal.hidden = true;
+  currentContactVehicle = null;
 }
 
 async function submitDealerContact(event) {
@@ -429,16 +537,115 @@ async function submitDealerContact(event) {
     return;
   }
   contactDealerStatus.textContent = text[language].contactSending;
+  const vehicle = currentContactVehicle || inventory.find((item) => item.id === data.listingId) || {};
   const response = await fetch("/api/buyer-inquiries", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data)
+    body: JSON.stringify({
+      ...data,
+      vehicle: buyerVehiclePayload(vehicle),
+      finance: financeEstimatePayload(),
+      purchase: purchaseIntentPayload(data)
+    })
   });
   const result = await response.json().catch(() => ({}));
   contactDealerStatus.textContent = result.ok ? text[language].contactSent : (result.error || text[language].contactFailed);
   if (result.ok) {
     window.setTimeout(closeContactDealer, 1200);
   }
+}
+
+function contactVehicleContextMarkup(vehicle) {
+  const parts = [
+    vehicle.price ? money(vehicle.price) : "",
+    isPublicFieldVisible(vehicle, "showKilometers") && vehicle.kilometers ? `${vehicle.kilometers.toLocaleString("en-CA")} km` : "",
+    isPublicFieldVisible(vehicle, "showRegion") ? vehicle.region : "",
+    isPublicFieldVisible(vehicle, "showColor") ? vehicle.color : "",
+    vehicle.monthlyPaymentEstimate ? `${money(vehicle.monthlyPaymentEstimate)} / mo` : ""
+  ].filter(Boolean);
+  return parts.map((item) => `<span>${escapeHtml(item)}</span>`).join("");
+}
+
+function updateContactBuyingSummary() {
+  if (!contactFinanceSummary || !contactDealerForm) return;
+  const data = Object.fromEntries(new FormData(contactDealerForm).entries());
+  const purchase = purchaseIntentPayload(data);
+  if (purchase.intent === "cash") {
+    contactFinanceSummary.innerHTML = `
+      <strong>${escapeHtml(text[language].purchaseCashSummary)}</strong>
+      <span>${escapeHtml(money(purchase.vehiclePrice || currentContactVehicle?.price || 0))}</span>
+    `;
+    return;
+  }
+  if (purchase.intent === "lease") {
+    contactFinanceSummary.innerHTML = `
+      <strong>${escapeHtml(text[language].purchaseLeaseSummary)}</strong>
+      <span>${escapeHtml(money(purchase.monthlyPayment))} / mo target</span>
+      <small>${escapeHtml(money(purchase.downPayment))} down | ${escapeHtml(String(purchase.termMonths || ""))} months | calculator budget</small>
+    `;
+    return;
+  }
+  if (purchase.intent === "undecided") {
+    contactFinanceSummary.innerHTML = `
+      <strong>${escapeHtml(text[language].purchaseUndecidedSummary)}</strong>
+      <span>${escapeHtml(money(purchase.vehiclePrice || currentContactVehicle?.price || 0))} vehicle</span>
+    `;
+    return;
+  }
+  contactFinanceSummary.innerHTML = `
+    <strong>${escapeHtml(text[language].purchaseFinanceSummary)}</strong>
+    <span>${escapeHtml(money(purchase.monthlyPayment))} / mo</span>
+    <small>${escapeHtml(money(purchase.downPayment))} down | ${escapeHtml(String(purchase.termMonths || ""))} months | ${escapeHtml(String(purchase.annualRate || 0))}% APR</small>
+  `;
+}
+
+function purchaseIntentPayload(formData = {}) {
+  const finance = financeEstimatePayload();
+  return {
+    intent: String(formData.purchaseIntent || "finance").trim(),
+    buyingTimeline: String(formData.buyingTimeline || "").trim(),
+    preferredContact: String(formData.preferredContact || "").trim(),
+    vehiclePrice: finance.price || Number(currentContactVehicle?.price || 0),
+    downPayment: finance.downPayment,
+    annualRate: finance.annualRate,
+    taxRate: finance.taxRate,
+    termMonths: finance.termMonths,
+    monthlyPayment: finance.monthlyPayment
+  };
+}
+
+function buyerVehiclePayload(vehicle) {
+  return {
+    id: vehicle.id || "",
+    title: vehicle.title || "",
+    price: Number(vehicle.price || 0),
+    kilometers: Number(vehicle.kilometers || 0),
+    region: vehicle.region || "",
+    color: vehicle.color || "",
+    vin: vehicle.vin || "",
+    uvc: vehicle.uvc || "",
+    year: vehicle.year || "",
+    make: vehicle.make || "",
+    model: vehicle.model || "",
+    series: vehicle.series || "",
+    style: vehicle.style || "",
+    sourceLeadId: vehicle.sourceLeadId || "",
+    monthlyPaymentEstimate: Number(vehicle.monthlyPaymentEstimate || 0),
+    publicOptions: vehicle.publicOptions || {}
+  };
+}
+
+function financeEstimatePayload() {
+  if (!financeForm) return {};
+  const data = new FormData(financeForm);
+  return {
+    price: Number(data.get("price") || 0),
+    downPayment: Number(data.get("downPayment") || 0),
+    annualRate: Number(data.get("annualRate") || 0),
+    taxRate: Number(data.get("taxRate") || 0),
+    termMonths: Number(data.get("termMonths") || 0),
+    monthlyPayment: paymentOutput ? Number(paymentOutput.textContent.replace(/[^0-9.]/g, "")) : 0
+  };
 }
 
 function escapeHtml(value) {
@@ -453,6 +660,12 @@ function escapeHtml(value) {
 languageToggle?.addEventListener("click", () => setLanguage(language === "en" ? "fr" : "en"));
 inventoryFilter?.addEventListener("submit", applyFilters);
 financeForm?.addEventListener("input", calculatePayment);
+financeForm?.addEventListener("input", () => {
+  if (contactDealerModal && !contactDealerModal.hidden) updateContactBuyingSummary();
+});
+sendEstimateButton?.addEventListener("click", () => {
+  if (selectedFinanceVehicle) openContactDealer(selectedFinanceVehicle);
+});
 inventoryList?.addEventListener("click", (event) => {
   const detailButton = event.target.closest("[data-view-vehicle]");
   if (detailButton) {
@@ -461,11 +674,19 @@ inventoryList?.addEventListener("click", (event) => {
     return;
   }
 
+  const contactButton = event.target.closest("[data-contact-vehicle]");
+  if (contactButton) {
+    const vehicle = inventory.find((item) => item.id === contactButton.dataset.contactVehicle);
+    if (vehicle) openContactDealer(vehicle);
+    return;
+  }
+
   const button = event.target.closest("[data-fill-finance]");
   if (!button) return;
   const vehicle = inventory.find((item) => item.id === button.dataset.fillFinance);
   if (!vehicle) return;
-  openContactDealer(vehicle);
+  selectVehicleForFinance(vehicle);
+  document.querySelector(".finance-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
 });
 
 vehicleDetailModal?.addEventListener("click", (event) => {
@@ -473,12 +694,21 @@ vehicleDetailModal?.addEventListener("click", (event) => {
     closeVehicleDetails();
     return;
   }
+  const contactButton = event.target.closest("[data-detail-contact]");
+  if (contactButton) {
+    const vehicle = inventory.find((item) => item.id === contactButton.dataset.detailContact);
+    if (vehicle) {
+      closeVehicleDetails();
+      openContactDealer(vehicle);
+    }
+    return;
+  }
+
   const financeButton = event.target.closest("[data-detail-finance]");
   if (!financeButton) return;
   const vehicle = inventory.find((item) => item.id === financeButton.dataset.detailFinance);
   if (!vehicle) return;
-  financeForm.elements.price.value = vehicle.price;
-  calculatePayment();
+  selectVehicleForFinance(vehicle);
   closeVehicleDetails();
   document.querySelector(".finance-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
 });
@@ -487,6 +717,7 @@ contactDealerModal?.addEventListener("click", (event) => {
   if (event.target.closest("[data-close-contact]")) closeContactDealer();
 });
 
+contactDealerForm?.addEventListener("change", updateContactBuyingSummary);
 contactDealerForm?.addEventListener("submit", submitDealerContact);
 
 document.addEventListener("keydown", (event) => {
@@ -499,6 +730,7 @@ async function init() {
   await loadInventory();
   applyFilters();
   calculatePayment();
+  updateSendEstimateButton();
 }
 
 init();
