@@ -1336,9 +1336,22 @@ function buildListingFromLead(lead, body, user) {
     asking_price: askingPrice,
     monthly_payment_estimate: numberOrNull(body.monthlyPaymentEstimate),
     description: String(body.description || lead.notes || "").trim(),
-    published_at: new Date().toISOString(),
+    public_options: buildListingPublicOptions(body),
+    published_at: String(body.status || "published").trim() === "published" ? new Date().toISOString() : null,
     created_by: String(user?.email || "").trim(),
     updated_at: new Date().toISOString()
+  };
+}
+
+function buildListingPublicOptions(body) {
+  return {
+    showVin: body.showVin === "on" || body.showVin === true,
+    showUvc: body.showUvc === "on" || body.showUvc === true,
+    showKilometers: body.showKilometers === "on" || body.showKilometers === true,
+    showRegion: body.showRegion === "on" || body.showRegion === true,
+    showColor: body.showColor === "on" || body.showColor === true,
+    showMaintenance: body.showMaintenance === "on" || body.showMaintenance === true,
+    showPhotos: body.showPhotos === "on" || body.showPhotos === true
   };
 }
 
@@ -1369,6 +1382,7 @@ function publicInventoryRow(row) {
     price: Number(row.asking_price || 0),
     monthlyPaymentEstimate: Number(row.monthly_payment_estimate || 0),
     description: row.description || "",
+    publicOptions: row.public_options || {},
     publishedAt: row.published_at || row.created_at || ""
   };
 }

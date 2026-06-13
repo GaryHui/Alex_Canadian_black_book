@@ -55,6 +55,22 @@ const text = {
     taxLabel: "Tax rate",
     financeNote: "Estimate only. Final approval, rate, term, and fees depend on the dealer and lender.",
     contactDealer: "Contact dealer",
+    viewDetails: "View details",
+    inventoryReal: "Showing published dealer inventory.",
+    inventoryEmpty: "No published vehicles yet. Publish a vehicle from the admin inventory panel to show it here.",
+    inventoryDemo: "Demo inventory is shown because the inventory backend is not configured or unavailable.",
+    detailEyebrow: "Vehicle details",
+    detailPrice: "Price",
+    detailMonthly: "Finance estimate",
+    detailKilometers: "Kilometers",
+    detailRegion: "Region",
+    detailColor: "Color",
+    detailVin: "VIN",
+    detailUvc: "UVC",
+    detailSource: "Source lead",
+    detailDescription: "Description",
+    detailUseCalculator: "Use this price in calculator",
+    notAvailable: "Not available",
     noResults: "No vehicles match the current filters."
   },
   fr: {
@@ -80,6 +96,22 @@ const text = {
     taxLabel: "Taux de taxe",
     financeNote: "Estimation seulement. L'approbation, le taux, la duree et les frais dependent du concessionnaire et du preteur.",
     contactDealer: "Contacter le concessionnaire",
+    viewDetails: "Voir les details",
+    inventoryReal: "Inventaire publie par l'equipe du concessionnaire.",
+    inventoryEmpty: "Aucun vehicule publie pour le moment. Publiez un vehicule dans le panneau admin pour l'afficher ici.",
+    inventoryDemo: "Un inventaire de demo est affiche parce que le backend d'inventaire n'est pas configure ou disponible.",
+    detailEyebrow: "Details du vehicule",
+    detailPrice: "Prix",
+    detailMonthly: "Estimation de financement",
+    detailKilometers: "Kilometres",
+    detailRegion: "Region",
+    detailColor: "Couleur",
+    detailVin: "NIV",
+    detailUvc: "UVC",
+    detailSource: "Lead source",
+    detailDescription: "Description",
+    detailUseCalculator: "Utiliser ce prix dans le calculateur",
+    notAvailable: "Non disponible",
     noResults: "Aucun vehicule ne correspond aux filtres."
   }
 };
@@ -94,6 +126,10 @@ const inventoryList = document.querySelector("#inventory-list");
 const inventoryFilter = document.querySelector("#inventory-filter");
 const financeForm = document.querySelector("#finance-form");
 const paymentOutput = document.querySelector("#payment-output");
+const inventorySourceStatus = document.querySelector("#inventory-source-status");
+const vehicleDetailModal = document.querySelector("#vehicle-detail-modal");
+const vehicleDetailTitle = document.querySelector("#vehicle-detail-title");
+const vehicleDetailBody = document.querySelector("#vehicle-detail-body");
 
 function money(value) {
   return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -101,7 +137,8 @@ function money(value) {
 
 function renderInventory() {
   if (!filteredInventory.length) {
-    inventoryList.innerHTML = `<p class="status">${text[language].noResults}</p>`;
+    const emptyText = inventorySource === "supabase-empty" ? text[language].inventoryEmpty : text[language].noResults;
+    inventoryList.innerHTML = `<p class="status">${escapeHtml(emptyText)}</p>`;
     return;
   }
 
@@ -113,13 +150,16 @@ function renderInventory() {
       <div class="inventory-card-body">
         <div>
           <h3>${escapeHtml(vehicle.title)}</h3>
-          <p>${escapeHtml(vehicle.kilometers.toLocaleString("en-CA"))} km | ${escapeHtml(vehicle.region)} | ${escapeHtml(vehicle.color)}</p>
+          <p>${escapeHtml(publicSummary(vehicle))}</p>
         </div>
         <strong>${money(vehicle.price)}</strong>
         <div class="inventory-tags">
           ${vehicle.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
         </div>
-        <button class="secondary-button" type="button" data-fill-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].contactDealer)}</button>
+        <div class="inventory-card-actions">
+          <button class="secondary-button" type="button" data-view-vehicle="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].viewDetails)}</button>
+          <button class="secondary-button" type="button" data-fill-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].contactDealer)}</button>
+        </div>
       </div>
     </article>
   `).join("");
@@ -129,23 +169,45 @@ async function loadInventory() {
   try {
     const response = await fetch("/api/inventory");
     const data = await response.json();
-    if (data.ok && Array.isArray(data.inventory) && data.inventory.length) {
-      inventorySource = "supabase";
-      inventory = data.inventory.map(normalizeInventoryVehicle);
+    if (data.ok && data.storage === "supabase" && Array.isArray(data.inventory)) {
+      inventorySource = data.inventory.length ? "supabase" : "supabase-empty";
+      inventory = data.inventory.map(normalizeInventoryVehicle).filter((vehicle) => vehicle.title);
       filteredInventory = [...inventory];
       updateInventoryIntro();
+      updateInventorySourceStatus();
+      return;
     }
   } catch (error) {
     console.warn("Unable to load inventory", error);
   }
+  inventorySource = "sample";
+  inventory = [...sampleInventory];
+  filteredInventory = [...inventory];
+  updateInventoryIntro();
+  updateInventorySourceStatus();
 }
 
 function updateInventoryIntro() {
   const intro = document.querySelector("[data-i18n='inventoryIntro']");
-  if (!intro || inventorySource !== "supabase") return;
-  intro.textContent = language === "fr"
-    ? "Inventaire publie par l'equipe du concessionnaire."
-    : "Published inventory from the dealer team.";
+  if (!intro) return;
+  if (inventorySource === "supabase") {
+    intro.textContent = text[language].inventoryReal;
+  } else if (inventorySource === "supabase-empty") {
+    intro.textContent = text[language].inventoryEmpty;
+  } else {
+    intro.textContent = text[language].inventoryIntro;
+  }
+}
+
+function updateInventorySourceStatus() {
+  if (!inventorySourceStatus) return;
+  if (inventorySource === "supabase") {
+    inventorySourceStatus.textContent = text[language].inventoryReal;
+  } else if (inventorySource === "supabase-empty") {
+    inventorySourceStatus.textContent = text[language].inventoryEmpty;
+  } else {
+    inventorySourceStatus.textContent = text[language].inventoryDemo;
+  }
 }
 
 function normalizeInventoryVehicle(vehicle) {
@@ -162,9 +224,36 @@ function normalizeInventoryVehicle(vehicle) {
     kilometers: Number(vehicle.kilometers || 0),
     region: vehicle.region || "",
     color: vehicle.color || "",
+    vin: vehicle.vin || "",
+    uvc: vehicle.uvc || "",
+    year: vehicle.year || "",
+    make: vehicle.make || "",
+    model: vehicle.model || "",
+    series: vehicle.series || "",
+    style: vehicle.style || "",
+    description: vehicle.description || "",
+    monthlyPaymentEstimate: vehicle.monthlyPaymentEstimate || "",
+    sourceLeadId: vehicle.sourceLeadId || "",
+    publicOptions: vehicle.publicOptions || {},
     tags: tags.length ? tags : ["Dealer reviewed"],
     photoTone: photoToneFor(vehicle.color || vehicle.make || title)
   };
+}
+
+function publicSummary(vehicle) {
+  const parts = [];
+  if (isPublicFieldVisible(vehicle, "showKilometers") && vehicle.kilometers) {
+    parts.push(`${vehicle.kilometers.toLocaleString("en-CA")} km`);
+  }
+  if (isPublicFieldVisible(vehicle, "showRegion") && vehicle.region) parts.push(vehicle.region);
+  if (isPublicFieldVisible(vehicle, "showColor") && vehicle.color) parts.push(vehicle.color);
+  return parts.join(" | ") || text[language].notAvailable;
+}
+
+function isPublicFieldVisible(vehicle, key) {
+  const options = vehicle.publicOptions || {};
+  if (!Object.keys(options).length) return true;
+  return options[key] === true;
 }
 
 function photoToneFor(value) {
@@ -217,7 +306,52 @@ function setLanguage(nextLanguage) {
     if (text[language][key]) node.placeholder = text[language][key];
   });
   updateInventoryIntro();
+  updateInventorySourceStatus();
   renderInventory();
+}
+
+function showVehicleDetails(vehicle) {
+  if (!vehicleDetailModal || !vehicleDetailTitle || !vehicleDetailBody) return;
+  vehicleDetailTitle.textContent = vehicle.title;
+  vehicleDetailBody.innerHTML = `
+    <div class="vehicle-detail-price">
+      <span>${escapeHtml(text[language].detailPrice)}</span>
+      <strong>${money(vehicle.price)}</strong>
+    </div>
+    <div class="vehicle-detail-grid">
+      ${detailItem(text[language].detailKilometers, isPublicFieldVisible(vehicle, "showKilometers") && vehicle.kilometers ? `${vehicle.kilometers.toLocaleString("en-CA")} km` : "")}
+      ${detailItem(text[language].detailRegion, isPublicFieldVisible(vehicle, "showRegion") ? vehicle.region : "")}
+      ${detailItem(text[language].detailColor, isPublicFieldVisible(vehicle, "showColor") ? vehicle.color : "")}
+      ${detailItem(text[language].detailVin, isPublicFieldVisible(vehicle, "showVin") ? vehicle.vin : "")}
+      ${detailItem(text[language].detailUvc, isPublicFieldVisible(vehicle, "showUvc") ? vehicle.uvc : "")}
+      ${detailItem(text[language].detailMonthly, vehicle.monthlyPaymentEstimate ? money(vehicle.monthlyPaymentEstimate) : "")}
+      ${detailItem("Year", vehicle.year)}
+      ${detailItem("Make", vehicle.make)}
+      ${detailItem("Model", vehicle.model)}
+      ${detailItem("Series / Trim", vehicle.series)}
+      ${detailItem("Style", vehicle.style)}
+      ${detailItem(text[language].detailSource, vehicle.sourceLeadId)}
+    </div>
+    <div class="vehicle-detail-description">
+      <span>${escapeHtml(text[language].detailDescription)}</span>
+      <p>${escapeHtml(vehicle.description || text[language].notAvailable)}</p>
+    </div>
+    <button class="primary-button" type="button" data-detail-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].detailUseCalculator)}</button>
+  `;
+  vehicleDetailModal.hidden = false;
+}
+
+function detailItem(label, value) {
+  return `
+    <div>
+      <span>${escapeHtml(label)}</span>
+      <b>${escapeHtml(value || text[language].notAvailable)}</b>
+    </div>
+  `;
+}
+
+function closeVehicleDetails() {
+  if (vehicleDetailModal) vehicleDetailModal.hidden = true;
 }
 
 function escapeHtml(value) {
@@ -233,6 +367,13 @@ languageToggle?.addEventListener("click", () => setLanguage(language === "en" ? 
 inventoryFilter?.addEventListener("submit", applyFilters);
 financeForm?.addEventListener("input", calculatePayment);
 inventoryList?.addEventListener("click", (event) => {
+  const detailButton = event.target.closest("[data-view-vehicle]");
+  if (detailButton) {
+    const vehicle = inventory.find((item) => item.id === detailButton.dataset.viewVehicle);
+    if (vehicle) showVehicleDetails(vehicle);
+    return;
+  }
+
   const button = event.target.closest("[data-fill-finance]");
   if (!button) return;
   const vehicle = inventory.find((item) => item.id === button.dataset.fillFinance);
@@ -240,6 +381,25 @@ inventoryList?.addEventListener("click", (event) => {
   financeForm.elements.price.value = vehicle.price;
   calculatePayment();
   document.querySelector(".finance-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+});
+
+vehicleDetailModal?.addEventListener("click", (event) => {
+  if (event.target.closest("[data-close-detail]")) {
+    closeVehicleDetails();
+    return;
+  }
+  const financeButton = event.target.closest("[data-detail-finance]");
+  if (!financeButton) return;
+  const vehicle = inventory.find((item) => item.id === financeButton.dataset.detailFinance);
+  if (!vehicle) return;
+  financeForm.elements.price.value = vehicle.price;
+  calculatePayment();
+  closeVehicleDetails();
+  document.querySelector(".finance-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeVehicleDetails();
 });
 
 async function init() {

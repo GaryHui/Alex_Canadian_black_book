@@ -45,6 +45,7 @@
             <p class="eyebrow" data-i18n="inventoryEyebrow">Available vehicles</p>
             <h2 data-i18n="inventoryTitle">Current marketplace preview</h2>
             <p data-i18n="inventoryIntro">This MVP uses sample inventory until the admin inventory module is connected.</p>
+            <p id="inventory-source-status" class="status"></p>
           </div>
           <div id="inventory-list" class="inventory-list"></div>
         </div>
@@ -85,6 +86,16 @@
         </aside>
       </section>
     </main>
+
+    <div id="vehicle-detail-modal" class="modal-shell" hidden>
+      <button class="modal-backdrop" type="button" data-close-detail aria-label="Close"></button>
+      <section class="modal-card vehicle-detail-card" role="dialog" aria-modal="true" aria-labelledby="vehicle-detail-title">
+        <button class="close-button" type="button" data-close-detail aria-label="Close">x</button>
+        <p class="eyebrow" data-i18n="detailEyebrow">Vehicle details</p>
+        <h2 id="vehicle-detail-title"></h2>
+        <div id="vehicle-detail-body" class="vehicle-detail-body"></div>
+      </section>
+    </div>
 
     <script src="/buy.js"></script>
   </body>

@@ -44,7 +44,7 @@ service_role key
 
 Do not expose the `service_role` key in frontend code. It is only used as a Vercel server environment variable.
 
-## 2. Create Database Table
+## 2. Create Database Tables
 
 Open:
 
@@ -58,20 +58,29 @@ Run the SQL from:
 supabase.sql
 ```
 
-If the table already exists, run `supabase.sql` again. It includes `alter table ... add column if not exists` for newer fields such as:
+If the tables already exist, run `supabase.sql` again. It includes `create table if not exists` and `alter table ... add column if not exists` statements for newer fields such as:
 
 ```text
 auth_user
 owner_adjustment
 ```
 
-It creates:
+It creates or updates these main tables:
 
 ```text
 valuation_leads
+lead_activity
+lead_tasks
+lead_emails
+dealer_staff
+user_limits
+vehicle_listings
+listing_photos
+buyer_inquiries
+finance_estimates
 ```
 
-This table stores:
+`valuation_leads` stores:
 
 ```text
 customer email
@@ -85,6 +94,34 @@ Black Book valuation result
 lead status
 admin notes
 ```
+
+`vehicle_listings` stores vehicles published to the public Buy page.
+
+`buyer_inquiries` and `finance_estimates` are reserved for the buy-side marketplace and future CRM/finance workflow.
+
+### Inventory Table Missing Error
+
+If the admin page shows:
+
+```text
+Could not find the table 'public.vehicle_listings' in the schema cache
+```
+
+it means the inventory tables have not been created in Supabase yet, or Supabase has not refreshed the schema cache.
+
+Fix it in this order:
+
+```text
+1. Open Supabase > SQL Editor.
+2. Open this project file: supabase.sql.
+3. Copy the full SQL file, not only the first section.
+4. Paste it into SQL Editor and click Run.
+5. Wait 30-60 seconds.
+6. Reload /admin.html.
+7. Click Reload inventory.
+```
+
+After this, `Publish inventory listing` should create or update a row in `vehicle_listings`.
 
 ## 3. Enable Google Login
 

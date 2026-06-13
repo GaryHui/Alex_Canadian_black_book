@@ -150,11 +150,15 @@ create table if not exists vehicle_listings (
   asking_price numeric,
   monthly_payment_estimate numeric,
   description text not null default '',
+  public_options jsonb not null default '{}'::jsonb,
   published_at timestamptz,
   created_by text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table vehicle_listings
+add column if not exists public_options jsonb not null default '{}'::jsonb;
 
 create index if not exists vehicle_listings_status_idx
 on vehicle_listings (status);

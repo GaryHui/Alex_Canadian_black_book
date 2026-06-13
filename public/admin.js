@@ -487,6 +487,7 @@ function renderLead(lead) {
         </form>
         <form class="inventory-publish-form">
           <h3>Publish to buy page</h3>
+          <p class="inventory-helper">Published listings appear on the public Buy page. Use Inventory management to unpublish by changing status to draft, sold, or archived.</p>
           <label>
             <span>Listing title</span>
             <input name="title" value="${escapeHtml(title)}" />
@@ -506,7 +507,18 @@ function renderLead(lead) {
             <span>Listing description</span>
             <textarea name="description" placeholder="Short public description for buyers...">${escapeHtml(lead.notes || "")}</textarea>
           </label>
+          <fieldset class="inventory-public-options">
+            <legend>Public information</legend>
+            <label><input type="checkbox" name="showVin" checked /> VIN</label>
+            <label><input type="checkbox" name="showUvc" /> UVC</label>
+            <label><input type="checkbox" name="showKilometers" checked /> Kilometers</label>
+            <label><input type="checkbox" name="showRegion" checked /> Region</label>
+            <label><input type="checkbox" name="showColor" checked /> Color</label>
+            <label><input type="checkbox" name="showMaintenance" /> Publish selected maintenance / repair activity</label>
+            <label><input type="checkbox" name="showPhotos" /> Publish selected vehicle photos when public photo URLs are available</label>
+          </fieldset>
           <button type="submit">Publish inventory listing</button>
+          <p class="inventory-publish-status" aria-live="polite"></p>
         </form>
         <section class="lead-activity-panel">
           <div class="lead-activity-head">
@@ -626,19 +638,23 @@ leadsEl.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const card = form.closest(".lead-card");
+  const formStatus = form.querySelector(".inventory-publish-status");
   const payload = {
     leadId: card.dataset.id,
     ...Object.fromEntries(new FormData(form).entries())
   };
+  if (formStatus) formStatus.textContent = "Publishing inventory listing...";
   const response = await fetch("/api/inventory/from-lead", {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
   const data = await response.json();
-  statusEl.textContent = data.ok
+  const message = data.ok
     ? `Inventory listing ${data.updated ? "updated" : "published"}.`
     : formatApiError(data, "Unable to publish inventory listing.");
+  statusEl.textContent = message;
+  if (formStatus) formStatus.textContent = message;
   if (data.ok) await loadInventory();
 });
 
@@ -903,6 +919,9 @@ function formatApiError(data, fallback) {
   const value = data?.error || data?.details || data;
   if (!value) return fallback;
   if (typeof value === "string") return value;
+  if (isMissingInventoryTable(value)) {
+    return "Supabase is missing public.vehicle_listings. Open Supabase SQL Editor, run the latest supabase.sql, then reload this page.";
+  }
   if (value.message) return value.message;
   if (value.error_description) return value.error_description;
   if (value.details && typeof value.details === "string") return value.details;
@@ -911,6 +930,11 @@ function formatApiError(data, fallback) {
   } catch {
     return fallback;
   }
+}
+
+function isMissingInventoryTable(value) {
+  const text = JSON.stringify(value || {}).toLowerCase();
+  return text.includes("vehicle_listings") && (text.includes("schema cache") || text.includes("could not find"));
 }
 
 function formatNumber(value) {

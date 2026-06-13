@@ -1611,6 +1611,7 @@ input::placeholder {
 .modal-backdrop {
   position: absolute;
   inset: 0;
+  border: 0;
   background: rgba(20, 32, 51, 0.52);
 }
 
@@ -1642,6 +1643,66 @@ input::placeholder {
   background: transparent;
   border: 0;
   font-size: 24px;
+}
+
+.vehicle-detail-card {
+  width: min(720px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
+}
+
+.vehicle-detail-body {
+  display: grid;
+  gap: 16px;
+}
+
+.vehicle-detail-price {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px;
+  background: linear-gradient(180deg, #fff, #f7fbff);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.vehicle-detail-price span,
+.vehicle-detail-grid span,
+.vehicle-detail-description span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.vehicle-detail-price strong {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.vehicle-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.vehicle-detail-grid div,
+.vehicle-detail-description {
+  padding: 12px;
+  background: #fbfdff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.vehicle-detail-grid b {
+  display: block;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.vehicle-detail-description p {
+  margin: 8px 0 0;
 }
 
 .sr-only {
@@ -1766,6 +1827,12 @@ input::placeholder {
   font-size: 26px;
 }
 
+.inventory-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .inventory-tags {
   display: flex;
   flex-wrap: wrap;
@@ -1862,6 +1929,7 @@ input::placeholder {
   .review-grid,
   .vin-guide-layout,
   .photo-slots,
+  .vehicle-detail-grid,
   .tool-grid {
     grid-template-columns: 1fr;
   }
