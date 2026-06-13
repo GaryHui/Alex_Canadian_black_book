@@ -1651,6 +1651,55 @@ input::placeholder {
   overflow: auto;
 }
 
+.vehicle-detail-dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 0;
+  overflow: hidden;
+}
+
+.vehicle-detail-sticky-head {
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 22px 26px 18px;
+  position: relative;
+  z-index: 2;
+}
+
+.vehicle-detail-title-block {
+  min-width: 0;
+}
+
+.vehicle-detail-title-block .eyebrow {
+  margin-bottom: 8px;
+}
+
+.vehicle-detail-sticky-head h2 {
+  margin: 0;
+  padding-right: 0;
+}
+
+.vehicle-detail-sticky-head .close-button {
+  position: static;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  color: var(--blue-dark);
+  background: #f7fbff;
+  border: 1px solid #bcd2ea;
+  border-radius: 50%;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.vehicle-detail-sticky-head .vehicle-detail-price {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
 .contact-dealer-card {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -1695,6 +1744,8 @@ input::placeholder {
 .vehicle-detail-body {
   display: grid;
   gap: 16px;
+  overflow: auto;
+  padding: 18px 26px 26px;
 }
 
 .vehicle-detail-price {

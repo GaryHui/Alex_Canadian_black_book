@@ -213,6 +213,7 @@ const inventorySourceStatus = document.querySelector("#inventory-source-status")
 const inventoryResultsCount = document.querySelector("#inventory-results-count");
 const vehicleDetailModal = document.querySelector("#vehicle-detail-modal");
 const vehicleDetailTitle = document.querySelector("#vehicle-detail-title");
+const vehicleDetailPriceSummary = document.querySelector("#vehicle-detail-price-summary");
 const vehicleDetailBody = document.querySelector("#vehicle-detail-body");
 const contactDealerModal = document.querySelector("#contact-dealer-modal");
 const contactDealerForm = document.querySelector("#contact-dealer-form");
@@ -463,11 +464,13 @@ function setLanguage(nextLanguage) {
 function showVehicleDetails(vehicle) {
   if (!vehicleDetailModal || !vehicleDetailTitle || !vehicleDetailBody) return;
   vehicleDetailTitle.textContent = vehicle.title;
-  vehicleDetailBody.innerHTML = `
-    <div class="vehicle-detail-price">
+  if (vehicleDetailPriceSummary) {
+    vehicleDetailPriceSummary.innerHTML = `
       <span>${escapeHtml(text[language].detailPrice)}</span>
       <strong>${money(vehicle.price)}</strong>
-    </div>
+    `;
+  }
+  vehicleDetailBody.innerHTML = `
     ${vehicle.photos?.length ? `<figure class="vehicle-detail-photo"><img src="${escapeHtml(photoDisplayUrl(vehicle.photos[0].url))}" alt="${escapeHtml(vehicle.title)}" /><figcaption>${escapeHtml(vehicle.photos[0].label || "Vehicle photo")}</figcaption></figure>` : ""}
     <div class="vehicle-detail-grid">
       ${detailItem(text[language].detailKilometers, isPublicFieldVisible(vehicle, "showKilometers") && vehicle.kilometers ? `${vehicle.kilometers.toLocaleString("en-CA")} km` : "")}

@@ -105,10 +105,15 @@
 
     <div id="vehicle-detail-modal" class="modal-shell" hidden>
       <button class="modal-backdrop" type="button" data-close-detail aria-label="Close"></button>
-      <section class="modal-card vehicle-detail-card" role="dialog" aria-modal="true" aria-labelledby="vehicle-detail-title">
-        <button class="close-button" type="button" data-close-detail aria-label="Close">x</button>
-        <p class="eyebrow" data-i18n="detailEyebrow">Vehicle details</p>
-        <h2 id="vehicle-detail-title"></h2>
+      <section class="modal-card vehicle-detail-card vehicle-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="vehicle-detail-title">
+        <header class="vehicle-detail-sticky-head">
+          <div class="vehicle-detail-title-block">
+            <p class="eyebrow" data-i18n="detailEyebrow">Vehicle details</p>
+            <h2 id="vehicle-detail-title"></h2>
+          </div>
+          <button class="close-button" type="button" data-close-detail aria-label="Close">x</button>
+          <div id="vehicle-detail-price-summary" class="vehicle-detail-price"></div>
+        </header>
         <div id="vehicle-detail-body" class="vehicle-detail-body"></div>
       </section>
     </div>
