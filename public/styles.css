@@ -1416,6 +1416,16 @@ select {
   opacity: .65;
 }
 
+.dealer-follow-up-actions {
+  margin-top: -4px;
+}
+
+.dealer-follow-up-actions button {
+  background: #f7fbff;
+  border-color: #7fb2e5;
+  color: #0b4f9c;
+}
+
 .lead-type-pill {
   padding: 5px 8px;
   border-radius: 999px;

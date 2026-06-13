@@ -179,6 +179,12 @@ dealerLeadsList?.addEventListener("click", async (event) => {
   const statusButton = event.target.closest("[data-dealer-status]");
   if (statusButton) {
     await updateDealerLeadStatus(statusButton);
+    return;
+  }
+
+  const followUpButton = event.target.closest("[data-dealer-follow-up]");
+  if (followUpButton) {
+    await updateDealerFollowUp(followUpButton);
   }
 });
 
@@ -1123,6 +1129,26 @@ function renderDealerLeads(leads, role) {
     const retailAvg = historyMarketAverage(valuation, "retail");
     const dealerWholesale = ownerAdjustment.wholesale ?? "";
     const dealerRetail = ownerAdjustment.retail ?? "";
+    const buyerPlanSummary = buyerLead ? `
+          <section class="dealer-review-summary dealer-buyer-plan">
+            <h3>Buyer plan</h3>
+            <dl class="history-meta">
+              <div><dt>Intent</dt><dd>${escapeHtml(purchase.intent || input.purchaseIntent || "-")}</dd></div>
+              <div><dt>Timeline</dt><dd>${escapeHtml(purchase.buyingTimeline || input.buyingTimeline || "-")}</dd></div>
+              <div><dt>Preferred contact</dt><dd>${escapeHtml(purchase.preferredContact || input.preferredContact || "-")}</dd></div>
+              <div><dt>Payment target</dt><dd>${purchase.monthlyPayment ? `$${escapeHtml(formatNumber(purchase.monthlyPayment))} / mo` : "-"}</dd></div>
+            </dl>
+            ${adminNotes ? `<div class="dealer-admin-notes"><strong>Owner notes</strong><p>${escapeHtml(adminNotes)}</p></div>` : ""}
+          </section>` : `
+          <section class="dealer-review-summary">
+            <h3>Owner review from admin</h3>
+            <dl class="history-meta">
+              <div><dt>Owner wholesale</dt><dd>${dealerWholesale !== "" && dealerWholesale !== null ? `$${escapeHtml(formatNumber(dealerWholesale))}` : "-"}</dd></div>
+              <div><dt>Owner retail</dt><dd>${dealerRetail !== "" && dealerRetail !== null ? `$${escapeHtml(formatNumber(dealerRetail))}` : "-"}</dd></div>
+              <div><dt>Reason</dt><dd>${escapeHtml(ownerAdjustment.reason || "-")}</dd></div>
+            </dl>
+            ${adminNotes ? `<div class="dealer-admin-notes"><strong>Owner notes</strong><p>${escapeHtml(adminNotes)}</p></div>` : ""}
+          </section>`;
     const dealerEmailOptionsId = `dealer-email-options-${cssToken(lead.id || String(Math.random()))}`;
     const dealerEmailOptions = dealerDirectoryEmails.map((email) => `<option value="${escapeHtml(email)}"></option>`).join("");
     const vehicleDetails = [
@@ -1142,13 +1168,16 @@ function renderDealerLeads(leads, role) {
       buyerLead ? ["Buying timeline", purchase.buyingTimeline || input.buyingTimeline || ""] : null,
       buyerLead ? ["Preferred contact", purchase.preferredContact || input.preferredContact || ""] : null,
       buyerLead ? ["Payment target", purchase.monthlyPayment ? `$${formatNumber(purchase.monthlyPayment)} / mo` : ""] : null,
-      ["CBB wholesale AVG", wholesaleAvg ? `$${formatNumber(wholesaleAvg)}` : ""],
-      ["CBB retail AVG", retailAvg ? `$${formatNumber(retailAvg)}` : ""]
+      buyerLead ? ["Asking price", retailAvg ? `$${formatNumber(retailAvg)}` : input.askingPrice ? `$${formatNumber(input.askingPrice)}` : ""] : ["CBB wholesale AVG", wholesaleAvg ? `$${formatNumber(wholesaleAvg)}` : ""],
+      buyerLead ? null : ["CBB retail AVG", retailAvg ? `$${formatNumber(retailAvg)}` : ""]
     ].filter(Boolean).filter(([, value]) => value !== "" && value !== null && value !== undefined);
 
     const updateToken = dealerLeadUpdateToken(lead);
     const actionButtons = dealerStatusActions(buyerLead, status)
       .map((action) => `<button type="button" data-dealer-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
+      .join("");
+    const followUpButtons = dealerFollowUpActions()
+      .map((action) => `<button type="button" data-dealer-follow-up="${escapeHtml(action.key)}">${escapeHtml(action.label)}</button>`)
       .join("");
 
     return `
@@ -1175,6 +1204,9 @@ function renderDealerLeads(leads, role) {
           <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "-")}</dd></div>
         </dl>
         ${actionButtons ? `<div class="dealer-lead-actions">${actionButtons}</div>` : ""}
+        <div class="dealer-lead-actions dealer-follow-up-actions" aria-label="Set next follow-up">
+          ${followUpButtons}
+        </div>
         <details class="dealer-lead-details">
           <summary>Open lead details, tasks, and activity</summary>
           <section class="dealer-info-block">
@@ -1185,15 +1217,7 @@ function renderDealerLeads(leads, role) {
               `).join("")}
             </dl>
           </section>
-          <section class="dealer-review-summary">
-            <h3>Owner review from admin</h3>
-            <dl class="history-meta">
-              <div><dt>Owner wholesale</dt><dd>${dealerWholesale !== "" && dealerWholesale !== null ? `$${escapeHtml(formatNumber(dealerWholesale))}` : "-"}</dd></div>
-              <div><dt>Owner retail</dt><dd>${dealerRetail !== "" && dealerRetail !== null ? `$${escapeHtml(formatNumber(dealerRetail))}` : "-"}</dd></div>
-              <div><dt>Reason</dt><dd>${escapeHtml(ownerAdjustment.reason || "-")}</dd></div>
-            </dl>
-            ${adminNotes ? `<div class="dealer-admin-notes"><strong>Admin notes</strong><p>${escapeHtml(adminNotes)}</p></div>` : ""}
-          </section>
+          ${buyerPlanSummary}
           ${overdue ? `<p class="status overdue-text">Overdue follow-up</p>` : ""}
           <form class="dealer-note-form">
             <select name="noteType">
@@ -1313,6 +1337,57 @@ function dealerStatusActions(buyerLead, status) {
   return actions
     .filter(([next]) => next !== current)
     .map(([next, label]) => ({ status: next, label }));
+}
+
+function dealerFollowUpActions() {
+  return [
+    { key: "tomorrow", label: "Follow up tomorrow" },
+    { key: "next_week", label: "Next week" }
+  ];
+}
+
+function dealerFollowUpDate(key) {
+  const date = new Date();
+  if (key === "next_week") {
+    date.setDate(date.getDate() + 7);
+  } else {
+    date.setDate(date.getDate() + 1);
+  }
+  date.setHours(9, 0, 0, 0);
+  return date.toISOString();
+}
+
+async function updateDealerFollowUp(button) {
+  const card = button.closest(".dealer-lead-card");
+  const leadId = card?.dataset?.leadId || "";
+  const key = button.dataset.dealerFollowUp || "tomorrow";
+  if (!leadId) return;
+
+  const dueAt = dealerFollowUpDate(key);
+  button.disabled = true;
+  dealerLeadsStatus.textContent = "Setting next follow-up...";
+  try {
+    const response = await fetch("/api/lead-activity", {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${authSession?.access_token || ""}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        leadId,
+        action: "follow_up",
+        dueAt,
+        note: `Dealer set next follow-up for ${formatDateTime(dueAt)}.`
+      })
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to set follow-up");
+    dealerLeadsStatus.textContent = "Next follow-up updated.";
+    await loadDealerLeads({ forceActivity: true });
+  } catch (error) {
+    dealerLeadsStatus.textContent = error.message || "Unable to set follow-up";
+    button.disabled = false;
+  }
 }
 
 async function updateDealerLeadStatus(button) {

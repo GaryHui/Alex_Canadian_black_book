@@ -591,6 +591,11 @@ function renderLead(lead) {
           <button type="submit">Publish inventory listing</button>
           <p class="inventory-publish-status" aria-live="polite"></p>
         </form>`;
+  const valueRows = buyer ? `
+          <span>Asking price</span><b>${retail ? formatNumber(retail) : input.askingPrice ? formatNumber(input.askingPrice) : "-"}</b>
+          <span>Payment target</span><b>${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)} / mo` : "-"}</b>` : `
+          <span>AVG Wholesale</span><b>${wholesale ? formatNumber(wholesale) : "-"}</b>
+          <span>AVG Retail</span><b>${retail ? formatNumber(retail) : "-"}</b>`;
   return `
     <article class="lead-card lead-card-${leadType} ${overdue ? "lead-overdue" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <header class="lead-summary">
@@ -630,8 +635,7 @@ function renderLead(lead) {
           <span>Ownership</span><b>${escapeHtml(input.ownershipType || (input.ownsVehicle ? "Owned" : "-"))}</b>
           <span>Color</span><b>${escapeHtml(input.color || "-")}</b>
           <span>Region</span><b>${escapeHtml(input.region || valuation.region || "-")}</b>
-          <span>AVG Wholesale</span><b>${wholesale ? formatNumber(wholesale) : "-"}</b>
-          <span>AVG Retail</span><b>${retail ? formatNumber(retail) : "-"}</b>
+          ${valueRows}
         </div>
         ${sellerPhotoManager}
         <form class="owner-review">

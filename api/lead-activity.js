@@ -26,7 +26,9 @@ export default async function handler(req, res) {
     if (!access.ok) return res.status(access.status || 403).json(access);
     const result = body.action === "status"
       ? await updateLeadStatus(body, dealer.user)
-      : await updateTask(body, dealer.user);
+      : body.action === "follow_up"
+        ? await updateLeadFollowUp(body, dealer.user)
+        : await updateTask(body, dealer.user);
     return res.status(result.ok ? 200 : result.status || 400).json(result);
   }
 
@@ -216,6 +218,41 @@ async function updateLeadStatus(body, user) {
   if (!response.ok) return { ok: false, status: response.status, error: data };
 
   const note = String(body.note || `Status changed to ${status.replaceAll("_", " ")}.`).trim();
+  await insertJson(`${client.url}/rest/v1/lead_notes`, client.key, {
+    lead_id: leadId,
+    author_email: String(user?.email || "").trim().toLowerCase(),
+    note_type: "internal",
+    note
+  }).catch(() => null);
+
+  return { ok: true, lead: data?.[0] || null };
+}
+
+async function updateLeadFollowUp(body, user) {
+  const client = supabaseClient();
+  if (!client.ok) return client;
+
+  const leadId = String(body.leadId || "").trim();
+  const dueAt = dateOrNull(body.dueAt);
+  if (!leadId) return { ok: false, status: 400, error: "Lead id is required" };
+  if (!dueAt) return { ok: false, status: 400, error: "Valid follow-up date is required" };
+
+  const response = await fetch(`${client.url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: {
+      ...authHeaders(client.key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify({
+      next_follow_up_at: dueAt,
+      last_activity_at: new Date().toISOString()
+    })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+
+  const note = String(body.note || `Next follow-up set for ${dueAt}.`).trim();
   await insertJson(`${client.url}/rest/v1/lead_notes`, client.key, {
     lead_id: leadId,
     author_email: String(user?.email || "").trim().toLowerCase(),

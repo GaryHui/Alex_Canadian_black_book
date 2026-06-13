@@ -315,7 +315,9 @@ const server = http.createServer(async (req, res) => {
         if (!access.ok) return sendJson(res, access.status || 403, access);
         const result = body.action === "status"
           ? await updateLeadStatusFromActivity(body, dealer.user)
-          : await updateLeadTask(body);
+          : body.action === "follow_up"
+            ? await updateLeadFollowUpFromActivity(body, dealer.user)
+            : await updateLeadTask(body);
         return sendJson(res, result.ok ? 200 : result.status || 400, result);
       }
     }
@@ -2172,6 +2174,41 @@ async function updateLeadStatusFromActivity(body, user) {
   if (!response.ok) return { ok: false, status: response.status, error: data };
 
   const note = String(body.note || `Status changed to ${status.replaceAll("_", " ")}.`).trim();
+  await insertSupabaseJson(`${url}/rest/v1/lead_notes`, key, {
+    lead_id: leadId,
+    author_email: String(user?.email || "").trim().toLowerCase(),
+    note_type: "internal",
+    note
+  }).catch(() => null);
+
+  return { ok: true, lead: data?.[0] || null };
+}
+
+async function updateLeadFollowUpFromActivity(body, user) {
+  const leadId = String(body.leadId || "").trim();
+  const dueAt = dateOrNull(body.dueAt);
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!leadId) return { ok: false, status: 400, error: "Lead id is required" };
+  if (!dueAt) return { ok: false, status: 400, error: "Valid follow-up date is required" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify({
+      next_follow_up_at: dueAt,
+      last_activity_at: new Date().toISOString()
+    })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+
+  const note = String(body.note || `Next follow-up set for ${dueAt}.`).trim();
   await insertSupabaseJson(`${url}/rest/v1/lead_notes`, key, {
     lead_id: leadId,
     author_email: String(user?.email || "").trim().toLowerCase(),
