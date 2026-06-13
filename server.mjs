@@ -1367,21 +1367,17 @@ async function updateInventoryListing(body, user) {
   }
   if (user?.email) patch.created_by = String(user.email || "").trim();
 
-  const response = await fetch(`${url}/rest/v1/vehicle_listings?id=eq.${encodeURIComponent(id)}`, {
+  const saveResult = await saveVehicleListingWithRetry({
+    url: `${url}/rest/v1/vehicle_listings?id=eq.${encodeURIComponent(id)}`,
+    key,
     method: "PATCH",
-    headers: {
-      ...supabaseServiceHeaders(key),
-      "Content-Type": "application/json",
-      Prefer: "return=representation"
-    },
-    body: JSON.stringify(patch)
+    payload: patch
   });
-  const data = await response.json().catch(() => null);
-  if (!response.ok) return { ok: false, status: response.status, error: data };
+  if (!saveResult.ok) return saveResult;
   if (Array.isArray(body.selectedPhotoUrls)) {
     await syncSelectedListingPhotos({ url, key }, id, String(body.sourceLeadId || "").trim(), body.selectedPhotoUrls);
   }
-  return { ok: true, listing: publicInventoryRow(data?.[0] || {}) };
+  return { ok: true, listing: publicInventoryRow(saveResult.data?.[0] || { ...saveResult.payload, id }) };
 }
 
 async function deleteInventoryListing(id, user) {

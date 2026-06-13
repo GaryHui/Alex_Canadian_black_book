@@ -51,21 +51,16 @@ export async function updateInventoryListing(body, user) {
   patch.published_at = status === "published" ? new Date().toISOString() : null;
   if (user?.email) patch.created_by = String(user.email || "").trim();
 
-  const response = await fetch(`${client.url}/rest/v1/vehicle_listings?id=eq.${encodeURIComponent(id)}`, {
+  const saveResult = await saveVehicleListing(client, {
+    endpoint: `${client.url}/rest/v1/vehicle_listings?id=eq.${encodeURIComponent(id)}`,
     method: "PATCH",
-    headers: {
-      ...serviceHeaders(client.key),
-      "Content-Type": "application/json",
-      Prefer: "return=representation"
-    },
-    body: JSON.stringify(patch)
+    payload: patch
   });
-  const data = await response.json().catch(() => null);
-  if (!response.ok) return { ok: false, status: response.status, error: data };
+  if (!saveResult.ok) return saveResult;
   if (Array.isArray(body.selectedPhotoUrls)) {
     await syncSelectedListingPhotos(client, id, String(body.sourceLeadId || "").trim(), body.selectedPhotoUrls);
   }
-  return { ok: true, listing: publicInventoryRow(data?.[0] || {}) };
+  return { ok: true, listing: publicInventoryRow(saveResult.data?.[0] || { ...saveResult.payload, id }) };
 }
 
 export async function deleteInventoryListing(id, user) {
