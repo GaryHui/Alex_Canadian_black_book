@@ -1288,6 +1288,65 @@ select {
   justify-self: start;
 }
 
+.lead-photo-manager {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px 260px auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 14px;
+  padding: 14px;
+  background: #f8fbff;
+  border: 1px solid #d9e1ec;
+  border-radius: 8px;
+}
+
+.lead-photo-manager h3 {
+  margin: 0 0 4px;
+}
+
+.lead-photo-manager p {
+  margin: 0;
+  color: #555;
+}
+
+.lead-photo-manager label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.lead-photo-manager span {
+  color: #666;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.lead-photo-manager select,
+.lead-photo-manager input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+}
+
+.lead-photo-manager button {
+  min-height: 38px;
+  padding: 0 14px;
+  color: #fff;
+  background: #0f4f9a;
+  border: 0;
+  border-radius: 4px;
+  font-weight: 800;
+}
+
+.lead-photo-status {
+  grid-column: 1 / -1;
+  min-height: 20px;
+  margin: 0;
+  color: #555;
+}
+
 .inventory-publish-form {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1489,7 +1548,7 @@ select {
   resize: vertical;
 }
 
-.inventory-photo-manager {
+.inventory-photo-summary {
   grid-column: 1 / -1;
   display: grid;
   gap: 10px;
@@ -1499,11 +1558,11 @@ select {
   border-radius: 6px;
 }
 
-.inventory-photo-manager h4 {
+.inventory-photo-summary h4 {
   margin: 0;
 }
 
-.inventory-photo-manager p {
+.inventory-photo-summary p {
   margin: 0;
   color: #555;
 }

@@ -219,6 +219,13 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, result.ok ? 200 : result.status || 400, result);
     }
 
+    if (req.method === "POST" && url.pathname === "/api/lead-photos") {
+      const admin = await requireAdmin(req);
+      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+      const result = await uploadLeadPhotos(await readJson(req), admin.user);
+      return sendJson(res, result.ok ? 200 : result.status || 400, result);
+    }
+
     if (req.method === "POST" && url.pathname === "/api/valuation") {
       const body = await readJson(req);
       const result = await fetchValuation(body);
@@ -1367,7 +1374,11 @@ async function publishLeadToInventory(body, user) {
 
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
-  return { ok: true, listing: publicInventoryRow(data?.[0] || listing), updated: Boolean(existingId) };
+  const savedListing = data?.[0] || listing;
+  if (isPublicOptionEnabled(savedListing.public_options || listing.public_options, "showPhotos")) {
+    await attachLeadPhotosToListing(leadId, savedListing.id || existingId, { url, key });
+  }
+  return { ok: true, listing: publicInventoryRow(savedListing), updated: Boolean(existingId) };
 }
 
 async function createBuyerInquiry(body) {
@@ -1421,6 +1432,149 @@ function publicBuyerInquiryRow(row) {
     source: row.source || "",
     createdAt: row.created_at || ""
   };
+}
+
+async function uploadLeadPhotos(body, user) {
+  const leadId = String(body.leadId || "").trim();
+  const files = sanitizePhotoFiles(body.files || []);
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!leadId) return { ok: false, status: 400, error: "Lead id is required" };
+  if (!files.length) return { ok: false, status: 400, error: "At least one photo is required" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const leadResult = await fetchSupabaseJson(
+    `${url}/rest/v1/valuation_leads?select=*&id=eq.${encodeURIComponent(leadId)}&limit=1`,
+    key
+  );
+  if (!leadResult.ok) return leadResult;
+  const lead = leadResult.data?.[0];
+  if (!lead) return { ok: false, status: 404, error: "Lead not found" };
+
+  const webhook = await submitLeadPhotosToWebhook(lead, files, user);
+  if (!webhook.submitted) {
+    return { ok: false, status: 502, error: webhook.error || webhook.reason || "Google Drive upload webhook is not configured" };
+  }
+
+  const parsed = webhook.data || parseJson(webhook.response) || {};
+  const savedFiles = Array.isArray(parsed.savedFiles) ? parsed.savedFiles : [];
+  if (!savedFiles.length) return { ok: false, status: 502, error: "Google Drive did not return saved file URLs" };
+
+  const lines = savedFiles.map((file, index) => {
+    const label = files[index]?.role || files[index]?.angle || file.name || `Photo ${index + 1}`;
+    const url = file.url || file.webViewLink || "";
+    return `${label}: ${url}`;
+  });
+  await createLeadActivity({
+    leadId,
+    type: "note",
+    noteType: "inspection",
+    note: `Vehicle photo upload:\n${lines.join("\n")}`
+  }, user);
+
+  return { ok: true, photos: savedFiles, webhook };
+}
+
+async function submitLeadPhotosToWebhook(lead, files, user) {
+  const webhookUrl = String(process.env.LEAD_WEBHOOK_URL || "").trim();
+  if (!webhookUrl) return { submitted: false, skipped: true, reason: "LEAD_WEBHOOK_URL is not configured" };
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+  const payload = {
+    email: String(input.email || lead.auth_email || user?.email || "lead-photo@autoswitch.local").trim(),
+    phone: input.phone || "",
+    vin: input.vin || valuation.vin || "",
+    uvc: input.uvc || "",
+    year: input.year || "",
+    make: input.make || "",
+    model: input.model || "",
+    series: input.series || "",
+    style: input.style || "",
+    kilometers: input.kilometers || "",
+    color: input.color || "",
+    region: input.region || valuation.region || "",
+    country: input.country || "C",
+    wholesaleAvg: marketAverage(valuation, "wholesale") || "",
+    retailAvg: marketAverage(valuation, "retail") || "",
+    tradeInAvg: marketAverage(valuation, "tradeIn") || "",
+    id: lead.id || "",
+    status: "lead-photo-upload",
+    authEmail: String(user?.email || "").trim(),
+    photoCount: files.length,
+    photoNames: files.map((file) => file.name).join(", "),
+    files,
+    raw: {
+      lead,
+      uploadedBy: user || {}
+    }
+  };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const text = await response.text();
+    return {
+      submitted: response.ok,
+      status: response.status,
+      response: text,
+      data: parseJson(text),
+      error: response.ok ? "" : `Lead webhook rejected the photo upload (${response.status})`
+    };
+  } catch (error) {
+    return { submitted: false, error: error.message || "Lead photo webhook failed" };
+  }
+}
+
+async function attachLeadPhotosToListing(leadId, listingId, supabase) {
+  if (!leadId || !listingId) return;
+  const links = await findLeadPhotoLinks(leadId, supabase);
+  if (!links.length) return;
+
+  const existing = await fetchSupabaseJson(
+    `${supabase.url}/rest/v1/listing_photos?select=url&listing_id=eq.${encodeURIComponent(listingId)}&limit=200`,
+    supabase.key
+  );
+  if (!existing.ok) return;
+  const existingUrls = new Set((existing.data || []).map((row) => String(row.url || "").trim()).filter(Boolean));
+  const rows = links
+    .filter((photo) => photo.url && !existingUrls.has(photo.url))
+    .map((photo, index) => ({
+      listing_id: listingId,
+      url: photo.url,
+      label: photo.label || `Vehicle photo ${index + 1}`,
+      sort_order: existingUrls.size + index
+    }));
+  if (!rows.length) return;
+
+  await fetch(`${supabase.url}/rest/v1/listing_photos`, {
+    method: "POST",
+    headers: {
+      ...supabaseServiceHeaders(supabase.key),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(rows)
+  }).catch(() => null);
+}
+
+async function findLeadPhotoLinks(leadId, supabase) {
+  const result = await fetchSupabaseJson(
+    `${supabase.url}/rest/v1/lead_notes?select=note&lead_id=eq.${encodeURIComponent(leadId)}&note_type=eq.inspection&order=created_at.desc&limit=50`,
+    supabase.key
+  );
+  if (!result.ok) return [];
+  const photos = [];
+  for (const row of result.data || []) {
+    const note = String(row.note || "");
+    if (!note.includes("Vehicle photo upload:")) continue;
+    for (const line of note.split(/\r?\n/)) {
+      const match = line.match(/^([^:]+):\s*(https?:\/\/\S+)/);
+      if (match) photos.push({ label: match[1].trim(), url: match[2].trim() });
+    }
+  }
+  return photos;
 }
 
 async function uploadInventoryPhotos(body, user) {
