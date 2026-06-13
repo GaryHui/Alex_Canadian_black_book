@@ -1084,6 +1084,9 @@ select {
   gap: 8px;
   margin: 0 0 16px;
   padding: 10px;
+  position: sticky;
+  top: 10px;
+  z-index: 10;
 }
 
 .admin-module-nav a {
