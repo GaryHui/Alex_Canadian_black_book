@@ -25,13 +25,29 @@
         </div>
       </header>
       <section id="admin-content" hidden>
-      <section class="admin-overview" id="admin-overview" aria-label="Lead overview"></section>
-      <nav class="admin-module-nav" aria-label="Admin modules">
-        <a href="#crm-leads">CRM leads</a>
-        <a href="#inventory-warehouse">Inventory warehouse</a>
-        <a href="#operations-settings">Operations settings</a>
-      </nav>
-      <section id="admin-lead-alerts" class="lead-alerts" aria-live="polite" hidden></section>
+      <div class="admin-workbench-layout">
+      <aside class="admin-sidebar" aria-label="Admin workspace">
+        <nav class="admin-module-nav" aria-label="Admin modules">
+          <a href="#admin-today">Today</a>
+          <a href="#crm-leads">CRM leads</a>
+          <a href="#inventory-warehouse">Inventory</a>
+          <a href="#operations-settings">Settings</a>
+        </nav>
+      </aside>
+      <div class="admin-workspace-main">
+      <section id="admin-today" class="admin-section admin-section-today">
+        <div class="admin-section-head">
+          <div>
+            <p class="section-kicker">Owner desk</p>
+            <h2>Today needs attention</h2>
+            <p>Start here for new updates, overdue follow-ups, unassigned leads, urgent leads, and inventory drafts.</p>
+          </div>
+          <button id="reload-leads" type="button">Reload workbench</button>
+        </div>
+        <section class="admin-overview" id="admin-overview" aria-label="Lead overview"></section>
+        <section id="admin-lead-alerts" class="lead-alerts" aria-live="polite" hidden></section>
+        <div id="admin-today-list" class="admin-today-list" aria-live="polite"></div>
+      </section>
       <section id="crm-leads" class="admin-section admin-section-leads">
         <div class="admin-section-head">
           <div>
@@ -40,7 +56,6 @@
             <p>Assign BUY and SELL leads, track status, and move seller vehicles into warehouse drafts when they are ready.</p>
           </div>
           <div class="admin-section-actions">
-            <button id="reload-leads" type="button">Reload leads</button>
             <button id="clear-leads" class="danger-outline" type="button">Clear all leads</button>
           </div>
         </div>
@@ -50,6 +65,7 @@
           <button type="button" data-admin-lead-filter="buyer">BUY</button>
           <button type="button" data-admin-lead-filter="seller">SELL</button>
           <button type="button" data-admin-lead-filter="unassigned">Unassigned</button>
+          <button type="button" data-admin-lead-filter="urgent">Urgent</button>
         </div>
         <p id="admin-status" class="status">Loading...</p>
         <div id="admin-leads" class="admin-leads"></div>
@@ -118,6 +134,8 @@
         <div id="admin-inquiries" class="admin-inquiries"></div>
       </section>
       </details>
+      </div>
+      </div>
       </section>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

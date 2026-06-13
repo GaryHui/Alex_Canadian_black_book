@@ -12,6 +12,7 @@ const inquiriesStatusEl = document.querySelector("#inquiries-status");
 const inquiriesEl = document.querySelector("#admin-inquiries");
 const adminOverviewEl = document.querySelector("#admin-overview");
 const adminLeadAlertsEl = document.querySelector("#admin-lead-alerts");
+const adminTodayListEl = document.querySelector("#admin-today-list");
 const adminLeadFilterButtons = [...document.querySelectorAll("[data-admin-lead-filter]")];
 const dealerStaffForm = document.querySelector("#dealer-staff-form");
 const reloadDealersButton = document.querySelector("#reload-dealers");
@@ -44,7 +45,10 @@ let adminLeadSnapshotReady = false;
 let dealerStaffEmails = [];
 
 reloadUsersButton.addEventListener("click", loadUsers);
-reloadLeadsButton.addEventListener("click", () => loadLeads({ forceOpenActivity: true }));
+reloadLeadsButton.addEventListener("click", () => Promise.all([
+  loadLeads({ forceOpenActivity: true }),
+  loadInventory()
+]));
 reloadDealersButton.addEventListener("click", loadDealers);
 reloadInventoryButton?.addEventListener("click", loadInventory);
 reloadInquiriesButton?.addEventListener("click", loadInquiries);
@@ -54,8 +58,7 @@ adminLoginButton.addEventListener("click", signInAdmin);
 adminLogoutButton.addEventListener("click", signOutAdmin);
 adminLeadFilterButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    adminLeadFilter = button.dataset.adminLeadFilter || "all";
-    adminLeadFilterButtons.forEach((item) => item.classList.toggle("active", item === button));
+    setAdminLeadFilter(button.dataset.adminLeadFilter || "all");
     renderLeadWorkbench(adminLeadsCache);
   });
 });
@@ -64,10 +67,38 @@ adminLeadAlertsEl?.addEventListener("click", async (event) => {
   if (!button) return;
   await openAdminLeadFromAlert(button.dataset.adminOpenAlert || "");
 });
+adminOverviewEl?.addEventListener("click", (event) => {
+  const filterButton = event.target.closest("[data-admin-set-filter]");
+  if (!filterButton) return;
+  setAdminLeadFilter(filterButton.dataset.adminSetFilter || "all");
+  renderLeadWorkbench(adminLeadsCache);
+  document.querySelector("#crm-leads")?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+adminTodayListEl?.addEventListener("click", async (event) => {
+  const leadButton = event.target.closest("[data-admin-open-lead]");
+  if (leadButton) {
+    await openAdminLeadFromAlert(leadButton.dataset.adminOpenLead || "");
+    return;
+  }
+
+  const filterButton = event.target.closest("[data-admin-set-filter]");
+  if (filterButton) {
+    setAdminLeadFilter(filterButton.dataset.adminSetFilter || "all");
+    renderLeadWorkbench(adminLeadsCache);
+    document.querySelector("#crm-leads")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  const inventoryButton = event.target.closest("[data-open-inventory-filter]");
+  if (inventoryButton) {
+    setInventoryFilter(inventoryButton.dataset.openInventoryFilter || "active");
+    renderInventoryWarehouse(inventoryCache);
+    document.querySelector("#inventory-warehouse")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+});
 inventoryFilterButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    inventoryFilter = button.dataset.inventoryFilter || "active";
-    inventoryFilterButtons.forEach((item) => item.classList.toggle("active", item === button));
+    setInventoryFilter(button.dataset.inventoryFilter || "active");
     renderInventoryWarehouse(inventoryCache);
   });
 });
@@ -259,6 +290,7 @@ async function loadInventory() {
 function renderInventoryWarehouse(inventory) {
   const filtered = filterInventory(inventory);
   renderInventorySummary(inventory);
+  if (adminLeadsCache.length) renderAdminToday(adminLeadsCache);
   inventoryStatusEl.textContent = `${filtered.length} shown of ${inventory.length} inventory listing(s).`;
   inventoryEl.innerHTML = renderInventoryGroups(filtered) || "<p>No inventory listings in this view. Add a SELL lead as a draft inventory item first.</p>";
 }
@@ -600,6 +632,7 @@ function renderAdminLeadAlerts() {
       `).join("")}
     </div>
   ` : "";
+  if (adminLeadsCache.length) renderAdminToday(adminLeadsCache);
 }
 
 async function openAdminLeadFromAlert(id) {
@@ -608,8 +641,7 @@ async function openAdminLeadFromAlert(id) {
     await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
   }
   if (adminLeadFilter !== "all") {
-    adminLeadFilter = "all";
-    adminLeadFilterButtons.forEach((button) => button.classList.toggle("active", button.dataset.adminLeadFilter === "all"));
+    setAdminLeadFilter("all");
     renderLeadWorkbench(adminLeadsCache);
   }
   const card = leadsEl.querySelector(`.lead-card[data-id="${cssEscape(id)}"]`);
@@ -634,10 +666,25 @@ function renderLeadWorkbench(leads) {
   leadsEl.innerHTML = renderLeadGroups(filtered);
 }
 
+function setAdminLeadFilter(filter) {
+  adminLeadFilter = filter || "all";
+  adminLeadFilterButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.adminLeadFilter === adminLeadFilter);
+  });
+}
+
+function setInventoryFilter(filter) {
+  inventoryFilter = filter || "active";
+  inventoryFilterButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.inventoryFilter === inventoryFilter);
+  });
+}
+
 function filterAdminLeads(leads) {
   if (adminLeadFilter === "buyer") return leads.filter(isBuyerLead);
   if (adminLeadFilter === "seller") return leads.filter((lead) => !isBuyerLead(lead));
   if (adminLeadFilter === "unassigned") return leads.filter((lead) => !String(lead.assigned_to || "").trim());
+  if (adminLeadFilter === "urgent") return leads.filter((lead) => String(lead.priority || "").toLowerCase() === "urgent");
   if (adminLeadFilter === "needs-follow-up") {
     return leads.filter((lead) => isFollowUpDue(lead.next_follow_up_at, lead.status || "new"));
   }
@@ -652,27 +699,107 @@ function renderAdminOverview(leads) {
   const followUpCount = leads.filter((lead) => isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).length;
   const urgentCount = leads.filter((lead) => String(lead.priority || "").toLowerCase() === "urgent").length;
   adminOverviewEl.innerHTML = `
-    <article class="admin-overview-card overview-total">
+    <button class="admin-overview-card overview-total" type="button" data-admin-set-filter="all">
       <span>Total leads</span>
       <strong>${leads.length}</strong>
       <small>${buyerCount} BUY / ${sellerCount} SELL</small>
-    </article>
-    <article class="admin-overview-card overview-follow">
+    </button>
+    <button class="admin-overview-card overview-follow" type="button" data-admin-set-filter="needs-follow-up">
       <span>Needs follow-up</span>
       <strong>${followUpCount}</strong>
       <small>Due or overdue</small>
-    </article>
-    <article class="admin-overview-card overview-unassigned">
+    </button>
+    <button class="admin-overview-card overview-unassigned" type="button" data-admin-set-filter="unassigned">
       <span>Unassigned</span>
       <strong>${unassignedCount}</strong>
       <small>Needs owner</small>
-    </article>
-    <article class="admin-overview-card overview-urgent">
+    </button>
+    <button class="admin-overview-card overview-urgent" type="button" data-admin-set-filter="urgent">
       <span>Urgent</span>
       <strong>${urgentCount}</strong>
       <small>High attention</small>
-    </article>
+    </button>
   `;
+  renderAdminToday(leads);
+}
+
+function renderAdminToday(leads) {
+  if (!adminTodayListEl) return;
+  const attention = buildAdminAttentionItems(leads);
+  const draftCount = inventoryCache.filter((item) => ["draft", "review"].includes(String(item.status || "").toLowerCase())).length;
+  const soldCount = inventoryCache.filter((item) => String(item.status || "").toLowerCase() === "sold").length;
+  const attentionMarkup = attention.length
+    ? attention.map((item) => `
+        <button type="button" class="admin-today-item admin-today-${escapeHtml(item.tone)}" data-admin-open-lead="${escapeHtml(item.id)}">
+          <span>${escapeHtml(item.reason)}</span>
+          <b>${escapeHtml(item.title)}</b>
+          <small>${escapeHtml(item.meta)}</small>
+        </button>
+      `).join("")
+    : `<div class="admin-today-empty">
+        <b>No urgent lead work right now.</b>
+        <span>Use CRM leads for the full pipeline or Inventory for warehouse work.</span>
+      </div>`;
+
+  adminTodayListEl.innerHTML = `
+    <div class="admin-today-grid">
+      <section>
+        <header>
+          <span>Lead attention queue</span>
+          <b>${attention.length}</b>
+        </header>
+        <div class="admin-today-items">${attentionMarkup}</div>
+      </section>
+      <section>
+        <header>
+          <span>Warehouse decisions</span>
+          <b>${draftCount + soldCount}</b>
+        </header>
+        <div class="admin-today-actions">
+          <button type="button" data-open-inventory-filter="draft">
+            <b>${draftCount}</b>
+            <span>Draft / review vehicles</span>
+          </button>
+          <button type="button" data-open-inventory-filter="sold">
+            <b>${soldCount}</b>
+            <span>Sold vehicles to close or archive</span>
+          </button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function buildAdminAttentionItems(leads) {
+  const seen = new Set();
+  const items = [];
+  const add = (lead, reason, tone) => {
+    const id = String(lead.id || "");
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    const buyer = isBuyerLead(lead);
+    const input = lead.input || {};
+    const valuation = lead.valuation || {};
+    const title = cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), buyer) || "Vehicle lead";
+    const owner = lead.assigned_to ? `Owner ${shortEmail(lead.assigned_to)}` : "Unassigned";
+    const next = lead.next_follow_up_at ? `Next ${formatDateTime(lead.next_follow_up_at)}` : "No next follow-up";
+    items.push({
+      id,
+      reason,
+      tone,
+      title: `${buyer ? "BUY" : "SELL"} - ${title}`,
+      meta: `${owner} | ${leadStatusLabel(lead.status || "new", buyer)} | ${next}`
+    });
+  };
+
+  for (const alert of adminLeadAlertMap.values()) {
+    const lead = leads.find((item) => String(item.id || "") === String(alert.id || ""));
+    if (lead) add(lead, alert.type === "new" ? "New lead" : "Updated lead", "update");
+  }
+  leads.filter((lead) => isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).forEach((lead) => add(lead, "Follow-up due", "due"));
+  leads.filter((lead) => !String(lead.assigned_to || "").trim()).forEach((lead) => add(lead, "Needs assignment", "assign"));
+  leads.filter((lead) => String(lead.priority || "").toLowerCase() === "urgent").forEach((lead) => add(lead, "Urgent", "urgent"));
+  return items.slice(0, 8);
 }
 
 function renderLeadGroups(leads) {
@@ -1406,8 +1533,7 @@ async function quickAddDraftInventory(button) {
 function openInventoryListing(id) {
   if (!id) return;
   if (inventoryFilter !== "all" && !filterInventory(inventoryCache).some((item) => item.id === id)) {
-    inventoryFilter = "all";
-    inventoryFilterButtons.forEach((button) => button.classList.toggle("active", button.dataset.inventoryFilter === "all"));
+    setInventoryFilter("all");
     renderInventoryWarehouse(inventoryCache);
   }
   const card = inventoryEl.querySelector(`.inventory-card-admin[data-id="${cssEscape(id)}"]`);
