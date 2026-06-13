@@ -1410,11 +1410,12 @@ async function deleteInventoryListing(id, user) {
   if (!response.ok) return { ok: false, status: response.status, error: data };
 
   if (listing.source_lead_id) {
+    const restoredStatus = await restoreLeadFromInventory({ url, key }, listing.source_lead_id);
     await createLeadActivity({
       leadId: listing.source_lead_id,
       type: "note",
       noteType: "internal",
-      note: `Inventory listing removed by ${user?.email || "admin"}. Staff can update the lead details, then an admin can publish it again.`
+      note: `Inventory listing removed by ${user?.email || "admin"}. Lead restored to ${restoredStatus}. Staff can update the lead details, then an admin can publish it again.`
     }, user);
   }
 
@@ -1932,6 +1933,53 @@ async function syncSelectedListingPhotos(supabase, listingId, leadId, selectedUr
     },
     body: JSON.stringify(rows)
   }).catch(() => null);
+}
+
+async function restoreLeadFromInventory(supabase, leadId) {
+  const previousStatus = await previousLeadStatusBeforeInventory(supabase, leadId);
+  const status = normalizeRestoredLeadStatus(previousStatus) || "assigned";
+  await fetch(`${supabase.url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: {
+      ...supabaseServiceHeaders(supabase.key),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      status,
+      last_activity_at: new Date().toISOString()
+    })
+  }).catch(() => null);
+  return status;
+}
+
+async function previousLeadStatusBeforeInventory(supabase, leadId) {
+  const result = await fetchSupabaseJson(
+    `${supabase.url}/rest/v1/lead_notes?select=note&lead_id=eq.${encodeURIComponent(leadId)}&order=created_at.desc&limit=100`,
+    supabase.key
+  );
+  if (!result.ok) return "";
+  for (const row of result.data || []) {
+    const match = String(row.note || "").match(/Previous CRM status:\s*([a-z_]+)/i);
+    if (match) return match[1].toLowerCase();
+  }
+  return "";
+}
+
+function normalizeRestoredLeadStatus(value) {
+  const status = String(value || "").trim().toLowerCase();
+  return [
+    "new",
+    "assigned",
+    "contacted",
+    "waiting_for_customer",
+    "inspection_booked",
+    "appointment_booked",
+    "finance_sent",
+    "offer_sent",
+    "won",
+    "lost",
+    "closed"
+  ].includes(status) ? status : "";
 }
 
 async function findLeadPhotoLinks(leadId, supabase) {

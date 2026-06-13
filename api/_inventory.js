@@ -93,7 +93,13 @@ export async function deleteInventoryListing(id, user) {
   if (!response.ok) return { ok: false, status: response.status, error: data };
 
   if (listing.source_lead_id) {
-    await createLeadNote(client, listing.source_lead_id, user, `Inventory listing removed by ${user?.email || "admin"}. Staff can update the lead details, then an admin can publish it again.`);
+    const restoredStatus = await restoreLeadFromInventory(client, listing.source_lead_id);
+    await createLeadNote(
+      client,
+      listing.source_lead_id,
+      user,
+      `Inventory listing removed by ${user?.email || "admin"}. Lead restored to ${restoredStatus}. Staff can update the lead details, then an admin can publish it again.`
+    );
   }
 
   return { ok: true, deleted: Array.isArray(data) ? data.length : 1, listing: publicInventoryRow(listing) };
@@ -372,6 +378,53 @@ async function createLeadNote(client, leadId, user, note) {
       note
     })
   }).catch(() => null);
+}
+
+async function restoreLeadFromInventory(client, leadId) {
+  const previousStatus = await previousLeadStatusBeforeInventory(client, leadId);
+  const status = normalizeRestoredLeadStatus(previousStatus) || "assigned";
+  await fetch(`${client.url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: {
+      ...serviceHeaders(client.key),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      status,
+      last_activity_at: new Date().toISOString()
+    })
+  }).catch(() => null);
+  return status;
+}
+
+async function previousLeadStatusBeforeInventory(client, leadId) {
+  const result = await fetchSupabaseJson(
+    `${client.url}/rest/v1/lead_notes?select=note&lead_id=eq.${encodeURIComponent(leadId)}&order=created_at.desc&limit=100`,
+    client.key
+  );
+  if (!result.ok) return "";
+  for (const row of result.data || []) {
+    const match = String(row.note || "").match(/Previous CRM status:\s*([a-z_]+)/i);
+    if (match) return match[1].toLowerCase();
+  }
+  return "";
+}
+
+function normalizeRestoredLeadStatus(value) {
+  const status = String(value || "").trim().toLowerCase();
+  return [
+    "new",
+    "assigned",
+    "contacted",
+    "waiting_for_customer",
+    "inspection_booked",
+    "appointment_booked",
+    "finance_sent",
+    "offer_sent",
+    "won",
+    "lost",
+    "closed"
+  ].includes(status) ? status : "";
 }
 
 async function fetchSupabaseJson(url, key) {

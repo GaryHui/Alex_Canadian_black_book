@@ -1487,7 +1487,7 @@ async function removeInventoryListing(button) {
     headers: authHeaders()
   });
   const data = await response.json();
-  inventoryStatusEl.textContent = data.ok ? "Inventory listing removed. The original lead remains available for follow-up." : formatApiError(data, "Unable to remove inventory listing.");
+  inventoryStatusEl.textContent = data.ok ? "Inventory listing removed. The seller lead was restored to the CRM Active queue." : formatApiError(data, "Unable to remove inventory listing.");
   if (data.ok) {
     await Promise.all([loadInventory(), loadLeads({ suppressAlerts: true, forceOpenActivity: true })]);
   }
@@ -1818,6 +1818,8 @@ async function quickAddDraftInventory(button) {
   const card = button.closest(".lead-card");
   const leadId = button.dataset.quickInventory || card?.dataset?.id || "";
   if (!leadId) return;
+  const lead = adminLeadsCache.find((item) => String(item.id || "") === String(leadId));
+  const previousStatus = String(lead?.status || "assigned").trim().toLowerCase() || "assigned";
 
   button.disabled = true;
   statusEl.textContent = "Moving vehicle to warehouse draft...";
@@ -1839,7 +1841,7 @@ async function quickAddDraftInventory(button) {
         leadId,
         action: "status",
         status: "in_inventory",
-        note: "Admin moved this seller lead into the warehouse. Vehicle details, photos, price, and publishing are now managed from Inventory."
+        note: `Admin moved this seller lead into the warehouse. Previous CRM status: ${previousStatus}. Vehicle details, photos, price, and publishing are now managed from Inventory.`
       })
     }).catch(() => null);
     statusEl.textContent = "Warehouse draft created. The SELL lead was moved out of Active leads.";
