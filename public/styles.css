@@ -1216,6 +1216,89 @@ select {
   color: #b00020;
 }
 
+.lead-group {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.lead-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 8px;
+}
+
+.lead-group-head h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.lead-group-head p {
+  margin: 3px 0 0;
+  color: #555;
+}
+
+.lead-group-head b {
+  min-width: 42px;
+  padding: 8px 10px;
+  text-align: center;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.lead-group-buyer .lead-group-head {
+  background: #eaf5ff;
+  border: 1px solid #b9d7f4;
+}
+
+.lead-group-seller .lead-group-head {
+  background: #fff3f0;
+  border: 1px solid #f1c2b8;
+}
+
+.lead-group-list {
+  display: grid;
+  gap: 12px;
+}
+
+.lead-card-buyer {
+  border-left: 6px solid #0f6fc6;
+}
+
+.lead-card-seller {
+  border-left: 6px solid var(--red);
+}
+
+.lead-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.lead-type-pill {
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.lead-type-buyer {
+  color: #07457d;
+  background: #d9efff;
+  border: 1px solid #9bc8ef;
+}
+
+.lead-type-seller {
+  color: #9b1c26;
+  background: #ffe8e3;
+  border: 1px solid #f2b2a8;
+}
+
 .lead-grid {
   display: grid;
   gap: 8px 14px;

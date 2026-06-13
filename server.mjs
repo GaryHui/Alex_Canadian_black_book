@@ -2277,13 +2277,13 @@ async function getUsedCount({ url, key, userId, email, year }) {
   const filter = userId
     ? `auth_user_id=eq.${encodeURIComponent(userId)}`
     : `auth_email=eq.${encodeURIComponent(email)}`;
-  const response = await fetch(`${url}/rest/v1/valuation_leads?select=id&${filter}&valuation_year=eq.${year}`, {
+  const response = await fetch(`${url}/rest/v1/valuation_leads?select=id,input,valuation&${filter}&valuation_year=eq.${year}`, {
     headers: supabaseServiceHeaders(key)
   });
   const rows = await response.json().catch(() => []);
   if (!response.ok) return { error: `Unable to load valuation usage (${response.status})` };
 
-  return { count: Array.isArray(rows) ? rows.length : 0 };
+  return { count: Array.isArray(rows) ? rows.filter((row) => !isBuyerInquiryLead(row)).length : 0 };
 }
 
 async function listUserLimits(year) {
@@ -2292,7 +2292,7 @@ async function listUserLimits(year) {
   if (!url || !key) return { ok: true, storage: "not_configured", users: [] };
 
   const [leadsResult, limitsResult, accessRoleResult] = await Promise.all([
-    fetchSupabaseJson(`${url}/rest/v1/valuation_leads?select=auth_user_id,auth_email&valuation_year=eq.${year}`, key),
+    fetchSupabaseJson(`${url}/rest/v1/valuation_leads?select=auth_user_id,auth_email,input,valuation&valuation_year=eq.${year}`, key),
     fetchSupabaseJson(`${url}/rest/v1/valuation_user_limits?select=*&valuation_year=eq.${year}`, key),
     accessRolesForDisplay({ url, key })
   ]);
@@ -2305,6 +2305,7 @@ async function listUserLimits(year) {
   const usersById = new Map();
 
   for (const lead of leadsResult.data || []) {
+    if (isBuyerInquiryLead(lead)) continue;
     const userId = lead.auth_user_id || lead.auth_email;
     if (!userId) continue;
     const current = usersById.get(userId) || { userId, email: lead.auth_email || "", used: 0 };
@@ -2357,6 +2358,12 @@ async function listUserLimits(year) {
     users,
     staffFilterWarning: accessRoleResult.warning || ""
   };
+}
+
+function isBuyerInquiryLead(lead) {
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  return input.leadType === "buyer_inquiry" || valuation.source === "buyer_inquiry";
 }
 
 function mergeUsersByEmail(users) {

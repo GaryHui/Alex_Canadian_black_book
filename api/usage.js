@@ -95,7 +95,7 @@ async function getUsedCount({ url, key, userId, email, year }) {
   if (normalizedEmail) queries.push(`auth_email=eq.${encodeURIComponent(normalizedEmail)}`);
 
   const responses = await Promise.all(queries.map(async (filter) => {
-    const response = await fetch(`${url}/rest/v1/valuation_leads?select=id&${filter}&valuation_year=eq.${year}`, {
+    const response = await fetch(`${url}/rest/v1/valuation_leads?select=id,input,valuation&${filter}&valuation_year=eq.${year}`, {
       headers: authHeaders(key)
     });
     const rows = await response.json().catch(() => []);
@@ -108,10 +108,17 @@ async function getUsedCount({ url, key, userId, email, year }) {
 
   const rowsById = new Map();
   for (const row of responses.flatMap((result) => result.rows)) {
+    if (isBuyerInquiryLead(row)) continue;
     if (row?.id) rowsById.set(row.id, row);
   }
 
   return { count: rowsById.size };
+}
+
+function isBuyerInquiryLead(lead) {
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  return input.leadType === "buyer_inquiry" || valuation.source === "buyer_inquiry";
 }
 
 function normalizeEmail(value) {

@@ -27,7 +27,7 @@ async function listUserLimits(year) {
   if (!url || !key) return { ok: true, storage: "not_configured", users: [] };
 
   const [leadsResult, limitsResult] = await Promise.all([
-    fetchJson(`${url}/rest/v1/valuation_leads?select=auth_user_id,auth_email&valuation_year=eq.${year}`, key),
+    fetchJson(`${url}/rest/v1/valuation_leads?select=auth_user_id,auth_email,input,valuation&valuation_year=eq.${year}`, key),
     fetchJson(`${url}/rest/v1/valuation_user_limits?select=*&valuation_year=eq.${year}`, key)
   ]);
 
@@ -38,6 +38,7 @@ async function listUserLimits(year) {
   const usersById = new Map();
 
   for (const lead of leadsResult.data || []) {
+    if (isBuyerInquiryLead(lead)) continue;
     const userId = lead.auth_user_id || lead.auth_email;
     if (!userId) continue;
     const current = usersById.get(userId) || {
@@ -78,6 +79,12 @@ async function listUserLimits(year) {
     .sort((a, b) => (a.email || a.userId).localeCompare(b.email || b.userId));
 
   return { ok: true, storage: "supabase", year, users };
+}
+
+function isBuyerInquiryLead(lead) {
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  return input.leadType === "buyer_inquiry" || valuation.source === "buyer_inquiry";
 }
 
 function mergeUsersByEmail(users) {

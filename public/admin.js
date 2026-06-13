@@ -142,7 +142,7 @@ async function setAdminSession(session) {
   }
 
   adminAuthStatus.textContent = `Signed in as ${session.user.email}`;
-  await Promise.all([loadLeads(), loadUsers(), loadDealers(), loadInventory(), loadInquiries()]);
+  await Promise.all([loadLeads(), loadUsers(), loadDealers(), loadInventory()]);
   startAdminAutoRefresh();
 }
 
@@ -405,11 +405,37 @@ async function loadLeads(options = {}) {
   if (data.storage === "not_configured") {
     statusEl.textContent = "Lead storage is not configured on this deployment. Add Supabase env vars to persist leads.";
   } else {
-    statusEl.textContent = `${data.leads.length} lead(s) captured.`;
+    const buyerCount = (data.leads || []).filter(isBuyerLead).length;
+    const sellerCount = (data.leads || []).length - buyerCount;
+    statusEl.textContent = `${data.leads.length} lead(s): ${buyerCount} buyer, ${sellerCount} seller.`;
   }
 
-  leadsEl.innerHTML = data.leads.map(renderLead).join("") || "<p>No leads yet.</p>";
+  leadsEl.innerHTML = renderLeadGroups(data.leads || []);
   await restoreOpenLeads(openIds, { forceActivity: Boolean(options.forceOpenActivity) });
+}
+
+function renderLeadGroups(leads) {
+  if (!leads.length) return "<p>No leads yet.</p>";
+  const buyerLeads = leads.filter(isBuyerLead);
+  const sellerLeads = leads.filter((lead) => !isBuyerLead(lead));
+  const groups = [
+    { title: "BUY - Buyer leads", caption: "People asking about vehicles on the Buy page.", leads: buyerLeads, kind: "buyer" },
+    { title: "SELL - Seller leads", caption: "People submitting vehicles for valuation or sale.", leads: sellerLeads, kind: "seller" }
+  ].filter((group) => group.leads.length);
+  return groups.map((group) => `
+    <section class="lead-group lead-group-${group.kind}">
+      <header class="lead-group-head">
+        <div>
+          <h3>${escapeHtml(group.title)}</h3>
+          <p>${escapeHtml(group.caption)}</p>
+        </div>
+        <b>${group.leads.length}</b>
+      </header>
+      <div class="lead-group-list">
+        ${group.leads.map(renderLead).join("")}
+      </div>
+    </section>
+  `).join("");
 }
 
 function startAdminAutoRefresh() {
@@ -450,36 +476,54 @@ async function restoreOpenLeads(openIds, options = {}) {
   await Promise.all(cards.map((card) => loadLeadActivity(card, { force: Boolean(options.forceActivity) })));
 }
 
+function isBuyerLead(lead) {
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  return input.leadType === "buyer_inquiry" || valuation.source === "buyer_inquiry";
+}
+
+function cleanLeadTitle(title, buyer) {
+  const value = String(title || "").trim();
+  return buyer ? value.replace(/^Buyer inquiry\s*-\s*/i, "") : value;
+}
+
 function renderLead(lead) {
   const input = lead.input || {};
   const authUser = lead.auth_user || {};
   const valuation = lead.valuation || {};
   const adjustment = lead.owner_adjustment || {};
+  const buyer = isBuyerLead(lead);
+  const leadType = buyer ? "buyer" : "seller";
+  const leadTypeLabel = buyer ? "Buyer lead" : "Seller lead";
   const wholesale = valuation.values?.wholesale?.adjusted?.avg;
   const retail = valuation.values?.retail?.adjusted?.avg;
-  const title = valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" ") || "Vehicle lead";
+  const title = cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), buyer) || "Vehicle lead";
   const customerEmail = input.email || authUser.email || lead.auth_email || "-";
   const vin = input.vin || valuation.vin || "-";
   const status = lead.status || "new";
   const assignedTo = lead.assigned_to || "";
   const priority = lead.priority || "normal";
+  const purchase = input.buyerPlan || valuation.buyerPlan || {};
   const followUp = lead.next_follow_up_at || "";
   const overdue = isOverdue(followUp, status);
   const statusClass = overdue ? "status-overdue" : `status-${cssToken(status)}`;
   const statusLabel = overdue ? "Overdue" : status.replaceAll("_", " ");
   return `
-    <article class="lead-card ${overdue ? "lead-overdue" : ""}" data-id="${escapeHtml(lead.id || "")}">
+    <article class="lead-card lead-card-${leadType} ${overdue ? "lead-overdue" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <header class="lead-summary">
         <div>
-          <strong>${escapeHtml(title)}</strong>
+          <div class="lead-title-row">
+            <b class="lead-type-pill lead-type-${leadType}">${escapeHtml(leadTypeLabel)}</b>
+            <strong>${escapeHtml(title)}</strong>
+          </div>
           <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
         </div>
         <div class="lead-summary-metrics">
           <span>${escapeHtml(customerEmail)}</span>
           <span>VIN ${escapeHtml(vin)}</span>
           <span>Owner ${escapeHtml(assignedTo || "Unassigned")}</span>
-          <span>Wholesale ${wholesale ? formatNumber(wholesale) : "-"}</span>
-          <span>Retail ${retail ? formatNumber(retail) : "-"}</span>
+          ${buyer ? `<span>Intent ${escapeHtml(purchase.intent || input.purchaseIntent || "-")}</span>` : `<span>Wholesale ${wholesale ? formatNumber(wholesale) : "-"}</span>`}
+          ${buyer ? `<span>Budget ${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)}/mo` : retail ? formatNumber(retail) : "-"}</span>` : `<span>Retail ${retail ? formatNumber(retail) : "-"}</span>`}
           <b class="priority-pill priority-${escapeHtml(priority)}">${escapeHtml(priority)}</b>
           <b class="status-pill ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
         </div>
@@ -490,6 +534,11 @@ function renderLead(lead) {
           <span>Email</span><b>${escapeHtml(input.email || "-")}</b>
           <span>Google user</span><b>${escapeHtml(authUser.email || "-")}</b>
           <span>Phone</span><b>${escapeHtml(input.phone || "-")}</b>
+          ${buyer ? `<span>Lead type</span><b>Buyer inquiry</b>` : ""}
+          ${buyer ? `<span>Purchase intent</span><b>${escapeHtml(purchase.intent || input.purchaseIntent || "-")}</b>` : ""}
+          ${buyer ? `<span>Buying timeline</span><b>${escapeHtml(purchase.buyingTimeline || input.buyingTimeline || "-")}</b>` : ""}
+          ${buyer ? `<span>Preferred contact</span><b>${escapeHtml(purchase.preferredContact || input.preferredContact || "-")}</b>` : ""}
+          ${buyer ? `<span>Payment target</span><b>${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)} / mo` : "-"}</b>` : ""}
           <span>VIN</span><b>${escapeHtml(vin)}</b>
           <span>UVC</span><b>${escapeHtml(input.uvc || "-")}</b>
           <span>Vehicle</span><b>${escapeHtml([input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" ") || "-")}</b>
