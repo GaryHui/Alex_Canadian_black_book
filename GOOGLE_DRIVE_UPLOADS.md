@@ -14,7 +14,7 @@ When a customer clicks `Generate` successfully:
 6. Apps Script saves uploaded photos into that vehicle folder.
 7. Apps Script creates a PDF summary with the customer, vehicle, and valuation information.
 8. Apps Script writes the Drive folder URL and PDF URL back into the `Leads` sheet.
-9. Full raw JSON goes into the `CBB Raw` sheet, not into the readable `Leads` sheet.
+9. Full raw JSON stays in the website backend/Supabase. Google Sheet only keeps the readable `Leads` table.
 
 ## Folder Structure
 
@@ -55,37 +55,21 @@ Important:
 The customer page compresses photos before sending them:
 
 ```text
-Max photos: 9
+Max photos for customer page: 1
 Max long edge: 1400 px
 Format sent to Apps Script: JPEG
 ```
 
-The customer page asks for these optional photo angles:
+The customer page asks for one optional photo:
 
 ```text
-Front exterior
-Rear exterior
-Driver side
-Passenger side
-Odometer
-Interior
-Engine bay
-Wheels and tires
-Damage or wear
+Vehicle photo
 ```
 
-Each uploaded photo is automatically renamed before it is sent to Google Drive. Examples:
+The uploaded photo is automatically renamed before it is sent to Google Drive. Example:
 
 ```text
-front-exterior-original-name.jpg
-rear-exterior-original-name.jpg
-driver-side-original-name.jpg
-passenger-side-original-name.jpg
-odometer-original-name.jpg
-interior-original-name.jpg
-engine-bay-original-name.jpg
-wheels-tires-original-name.jpg
-damage-wear-original-name.jpg
+vehicle-photo-original-name.jpg
 ```
 
 This makes the Drive folder easier for the dealer to review without opening every image.
@@ -105,7 +89,7 @@ const DRIVE_ROOT_FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID";
 ```
 
 5. Click `Run`, choose `installHeaders`, and authorize it.
-6. Confirm the `Leads` and `CBB Raw` sheet tabs now have clean headers.
+6. Confirm the `Leads` sheet tab now has clean headers.
 7. Click `Deploy > New deployment`.
 8. Type: `Web app`.
 9. Execute as: `Me`.
@@ -142,7 +126,7 @@ const DRIVE_ROOT_FOLDER_ID = "PASTE_GOOGLE_DRIVE_FOLDER_ID_HERE";
 11. Approve Google permissions if prompted.
 12. Check the Google Sheet:
     - `Leads` should have readable columns.
-    - `CBB Raw` should exist for raw JSON.
+    - Full raw JSON is kept by the website backend/Supabase, not by Google Sheet.
 13. Click `Deploy > New deployment`.
 14. Select `Web app`.
 15. Set `Execute as` to `Me`.
@@ -218,7 +202,7 @@ After changing `LEAD_WEBHOOK_URL` in Vercel:
 3. Run a test valuation.
 4. Confirm:
    - One readable row appears in `Leads`.
-   - Raw JSON appears in `CBB Raw`.
+   - The website backend still has the raw response if the admin opens the raw lead summary.
    - Photos and PDF appear under the correct Google Drive folder.
 
 ## Optional CRM Webhook
@@ -269,7 +253,6 @@ const SPREADSHEET_ID = "YOUR_GOOGLE_SHEET_ID";
 const DRIVE_ROOT_FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID";
 
 const LEADS_SHEET_NAME = "Leads";
-const RAW_SHEET_NAME = "CBB Raw";
 
 const LEADS_HEADERS = [
   "Received At",
@@ -307,26 +290,13 @@ const LEADS_HEADERS = [
   "Spreadsheet"
 ];
 
-const RAW_HEADERS = [
-  "Received At",
-  "Lead ID",
-  "VIN",
-  "UVC",
-  "Full CBB JSON",
-  "Raw Payload JSON"
-];
-
 function installHeaders() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const leadsSheet = getOrCreateSheet_(ss, LEADS_SHEET_NAME);
-  const rawSheet = getOrCreateSheet_(ss, RAW_SHEET_NAME);
 
   leadsSheet.getRange(1, 1, 1, LEADS_HEADERS.length).setValues([LEADS_HEADERS]);
-  rawSheet.getRange(1, 1, 1, RAW_HEADERS.length).setValues([RAW_HEADERS]);
   leadsSheet.setFrozenRows(1);
-  rawSheet.setFrozenRows(1);
   leadsSheet.autoResizeColumns(1, LEADS_HEADERS.length);
-  rawSheet.autoResizeColumns(1, RAW_HEADERS.length);
 }
 
 function doPost(e) {
@@ -334,10 +304,8 @@ function doPost(e) {
   const receivedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const leadsSheet = getOrCreateSheet_(ss, LEADS_SHEET_NAME);
-  const rawSheet = getOrCreateSheet_(ss, RAW_SHEET_NAME);
 
   ensureHeaders_(leadsSheet, LEADS_HEADERS);
-  ensureHeaders_(rawSheet, RAW_HEADERS);
 
   const driveResult = saveDriveFilesAndPdf_(data, receivedAt);
 
@@ -375,15 +343,6 @@ function doPost(e) {
     driveResult.leadFolderUrl || "",
     driveResult.pdfUrl || "",
     driveResult.spreadsheetUrl || ""
-  ]);
-
-  rawSheet.appendRow([
-    receivedAt,
-    data.id || "",
-    data.vin || "",
-    data.uvc || "",
-    data.cbbJson || "",
-    JSON.stringify(redactFileContent_(data))
   ]);
 
   return ContentService
@@ -610,21 +569,6 @@ function summaryFileName_(data, ext) {
   return vehicleId + "-valuation-summary." + ext;
 }
 
-function redactFileContent_(data) {
-  const copy = JSON.parse(JSON.stringify(data || {}));
-  copy.files = (copy.files || []).map(function(file) {
-    return {
-      name: file.name || "",
-      originalName: file.originalName || "",
-      mimeType: file.mimeType || "",
-      size: file.size || "",
-      width: file.width || "",
-      height: file.height || ""
-    };
-  });
-  return copy;
-}
-
 function sanitizeName_(value) {
   return String(value || "")
     .replace(/[\\/:*?"<>|#%{}~&]/g, "-")
@@ -643,7 +587,13 @@ After deployment:
 3. Confirm the `Leads` sheet has a new row.
 4. Confirm `Drive Folder` and `PDF` columns have URLs.
 5. Open the Drive folder and confirm the photo and PDF were created.
-6. Open `CBB Raw` and confirm raw JSON is there, while the readable `Leads` sheet is not stretched by raw JSON.
+6. Open the website admin lead detail if raw technical data is needed. The Google Sheet intentionally stays readable and does not store full raw JSON.
+
+## About Removing `CBB Raw`
+
+The `CBB Raw` Google Sheet tab is no longer required.
+
+You can delete the `CBB Raw` tab from Google Sheet after deploying the script above. This does not delete or affect the website backend raw data, because the admin raw summary comes from Supabase/the website database, not from Google Sheet.
 
 ## Troubleshooting: Sheet Row Exists But Drive Folder/PDF/Photos Are Missing
 

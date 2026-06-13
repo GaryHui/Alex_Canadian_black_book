@@ -60,6 +60,26 @@ select {
   margin: 24px;
 }
 
+.dealer-page-links {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin: 24px 24px 0;
+}
+
+.dealer-page-links a {
+  border: 1px solid #c7d2e1;
+  border-radius: 6px;
+  color: #0f3b78;
+  font-weight: 700;
+  padding: 9px 12px;
+  text-decoration: none;
+}
+
+.dealer-page-links a:hover {
+  background: #eef6ff;
+}
+
 .section-subtitle {
   color: #586a80;
   margin: 0 0 18px;

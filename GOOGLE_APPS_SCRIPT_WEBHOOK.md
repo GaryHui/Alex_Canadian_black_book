@@ -2,7 +2,8 @@
 
 > Current recommendation: use `GOOGLE_DRIVE_UPLOADS.md` for the final working setup.
 > That newer document includes Google Drive photo upload, per-customer folders, vehicle PDF creation, `DRIVE_ROOT_FOLDER_ID`, and the current `LEAD_WEBHOOK_URL` deployment order.
-> This file is kept only for the older Sheet-only webhook reference.
+> This file is kept only for the older Sheet-only webhook reference. Do not copy the Apps Script in this file for the current production setup.
+> The current production Google Sheet should only use the readable `Leads` tab. The old `CBB Raw` tab can be deleted because raw technical data is stored by the website backend/Supabase.
 
 This document explains how to send successful Black Book valuation leads into a website owner's Google Sheet.
 
