@@ -28,6 +28,8 @@ const dealerWorkbench = document.querySelector("#dealer-workbench");
 const dealerLeadsStatus = document.querySelector("#dealer-leads-status");
 const dealerLeadsList = document.querySelector("#dealer-leads-list");
 const reloadDealerLeadsButton = document.querySelector("#reload-dealer-leads");
+const dealerLeadSummary = document.querySelector("#dealer-lead-summary");
+const dealerLeadFilterButtons = document.querySelectorAll("[data-dealer-filter]");
 const saveValuationLeadButton = document.querySelector("#save-valuation-lead");
 const DEALER_REFRESH_MS = 30000;
 const drilldownSuggestions = {
@@ -82,6 +84,9 @@ let pendingDealerLeadCapture = null;
 let currentLookupMode = "free";
 let dealerRefreshTimer = null;
 let dealerDirectoryEmails = [];
+let dealerLeadsCache = [];
+let dealerLeadRole = "dealer";
+let dealerLeadFilter = "all";
 
 initializeDatalists();
 initializeAuth();
@@ -92,6 +97,13 @@ document.addEventListener("visibilitychange", () => {
 reloadHistoryButton.addEventListener("click", loadHistory);
 reloadDealerLeadsButton?.addEventListener("click", () => loadDealerLeads({ forceActivity: true }));
 saveValuationLeadButton?.addEventListener("click", savePendingDealerLead);
+dealerLeadFilterButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    dealerLeadFilter = button.dataset.dealerFilter || "all";
+    dealerLeadFilterButtons.forEach((item) => item.classList.toggle("active", item === button));
+    renderDealerLeads(dealerLeadsCache, dealerLeadRole);
+  });
+});
 setLookupMode("free", { openModal: false });
 
 dealerLeadsList?.addEventListener("submit", async (event) => {
@@ -892,6 +904,7 @@ async function setSession(session) {
 
   if (session?.user) {
     const email = session.user.email || "";
+    if (dealerWorkbench) dealerWorkbench.hidden = false;
     authTitle.textContent = `Signed in as ${email}`;
     logoutButton.hidden = false;
     emailField.value = email;
@@ -902,7 +915,9 @@ async function setSession(session) {
       disableDealerTools(true);
       quotaPanel.hidden = true;
       historyPanel.hidden = true;
-      if (dealerWorkbench) dealerWorkbench.hidden = true;
+      if (dealerLeadSummary) dealerLeadSummary.innerHTML = "";
+      if (dealerLeadsList) dealerLeadsList.innerHTML = "";
+      if (dealerLeadsStatus) dealerLeadsStatus.textContent = dealer.error || "Dealer access denied.";
       statusEl.textContent = "Ask the site owner to add this email in Admin > Dealer portal access.";
       return;
     }
@@ -1053,7 +1068,9 @@ async function loadDealerLeads(options = {}) {
     const data = await response.json();
     if (!data.ok) throw new Error(data.error || "Unable to load assigned leads");
 
-    renderDealerLeads(data.leads || [], data.role || "dealer");
+    dealerLeadsCache = data.leads || [];
+    dealerLeadRole = data.role || "dealer";
+    renderDealerLeads(dealerLeadsCache, dealerLeadRole);
   } catch (error) {
     dealerLeadsStatus.textContent = error.message || "Unable to load assigned leads";
     dealerLeadsList.innerHTML = "";
@@ -1061,6 +1078,7 @@ async function loadDealerLeads(options = {}) {
 }
 
 function renderDealerLeads(leads, role) {
+  renderDealerLeadSummary(leads);
   if (!leads.length) {
     dealerLeadsStatus.textContent = role === "admin"
       ? "No active leads yet."
@@ -1069,18 +1087,31 @@ function renderDealerLeads(leads, role) {
     return;
   }
 
-  dealerLeadsStatus.textContent = `${leads.length} assigned lead${leads.length === 1 ? "" : "s"}.`;
-  dealerLeadsList.innerHTML = leads.map((lead) => {
+  const visibleLeads = filterDealerLeads(leads);
+  if (!visibleLeads.length) {
+    dealerLeadsStatus.textContent = `No ${dealerLeadFilter.replace("-", " ")} leads in this view.`;
+    dealerLeadsList.innerHTML = "";
+    return;
+  }
+
+  dealerLeadsStatus.textContent = `${visibleLeads.length} shown of ${leads.length} assigned lead${leads.length === 1 ? "" : "s"}.`;
+  dealerLeadsList.innerHTML = renderDealerLeadGroups(visibleLeads, (lead) => {
     const input = lead.input || {};
     const valuation = lead.valuation || {};
     const ownerAdjustment = lead.owner_adjustment || {};
-    const title = valuation.title || historyVehicleTitle(input) || "Vehicle lead";
+    const buyerLead = isBuyerLead(lead);
+    const leadKind = buyerLead ? "buyer" : "seller";
+    const leadTypeLabel = buyerLead ? "BUY lead" : "SELL lead";
+    const purchase = input.buyerPlan || valuation.buyerPlan || {};
+    const adminNotes = buyerLead && isAutoBuyerInquiryNote(lead.notes) ? "" : lead.notes;
+    const title = cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || "Vehicle lead", buyerLead);
     const customerEmail = input.email || lead.auth_email || lead.auth_user?.email || "-";
     const followUp = lead.next_follow_up_at || "";
     const status = lead.status || "new";
+    const dueNow = isDealerLeadDueNow(followUp, status);
     const overdue = isDealerLeadOverdue(followUp, status);
-    const statusLabel = overdue ? "Overdue" : status.replaceAll("_", " ");
-    const statusClass = overdue ? "status-overdue" : `status-${cssToken(status)}`;
+    const statusLabel = overdue ? "Overdue" : dueNow ? "Due today" : status.replaceAll("_", " ");
+    const statusClass = overdue ? "status-overdue" : dueNow ? "status-due" : `status-${cssToken(status)}`;
     const wholesaleAvg = historyMarketAverage(valuation, "wholesale");
     const retailAvg = historyMarketAverage(valuation, "retail");
     const dealerWholesale = ownerAdjustment.wholesale ?? "";
@@ -1100,17 +1131,24 @@ function renderDealerLeads(leads, role) {
       ["Color", input.color || ""],
       ["Ownership", input.ownershipType || input.ownership || ""],
       ["Condition notes", input.conditionNotes || input.condition_notes || ""],
+      buyerLead ? ["Purchase intent", purchase.intent || input.purchaseIntent || ""] : null,
+      buyerLead ? ["Buying timeline", purchase.buyingTimeline || input.buyingTimeline || ""] : null,
+      buyerLead ? ["Preferred contact", purchase.preferredContact || input.preferredContact || ""] : null,
+      buyerLead ? ["Payment target", purchase.monthlyPayment ? `$${formatNumber(purchase.monthlyPayment)} / mo` : ""] : null,
       ["CBB wholesale AVG", wholesaleAvg ? `$${formatNumber(wholesaleAvg)}` : ""],
       ["CBB retail AVG", retailAvg ? `$${formatNumber(retailAvg)}` : ""]
-    ].filter(([, value]) => value !== "" && value !== null && value !== undefined);
+    ].filter(Boolean).filter(([, value]) => value !== "" && value !== null && value !== undefined);
 
     const updateToken = dealerLeadUpdateToken(lead);
 
     return `
-      <article class="history-card dealer-lead-card ${overdue ? "lead-overdue" : ""}" data-lead-id="${escapeHtml(lead.id || "")}" data-update-token="${escapeHtml(updateToken)}">
+      <article class="history-card dealer-lead-card dealer-lead-${leadKind} ${overdue ? "lead-overdue" : ""}" data-lead-id="${escapeHtml(lead.id || "")}" data-update-token="${escapeHtml(updateToken)}">
         <div class="dealer-lead-top">
           <div>
-            <strong>${escapeHtml(title)}</strong>
+            <div class="dealer-lead-title">
+              <b class="dealer-type-pill dealer-type-${leadKind}">${escapeHtml(leadTypeLabel)}</b>
+              <strong>${escapeHtml(title)}</strong>
+            </div>
             <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
           </div>
           <b class="dealer-status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
@@ -1120,6 +1158,8 @@ function renderDealerLeads(leads, role) {
           <div><dt>Customer</dt><dd>${escapeHtml(customerEmail)}</dd></div>
           <div><dt>Phone</dt><dd>${escapeHtml(input.phone || "-")}</dd></div>
           <div><dt>VIN</dt><dd>${escapeHtml(valuation.vin || input.vin || "-")}</dd></div>
+          <div><dt>Lead type</dt><dd>${escapeHtml(leadTypeLabel)}</dd></div>
+          ${buyerLead ? `<div><dt>Buyer intent</dt><dd>${escapeHtml(purchase.intent || input.purchaseIntent || "-")}</dd></div>` : ""}
           <div><dt>Status</dt><dd>${escapeHtml(status)}</dd></div>
           <div><dt>Priority</dt><dd>${escapeHtml(lead.priority || "normal")}</dd></div>
           <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "-")}</dd></div>
@@ -1141,7 +1181,7 @@ function renderDealerLeads(leads, role) {
               <div><dt>Owner retail</dt><dd>${dealerRetail !== "" && dealerRetail !== null ? `$${escapeHtml(formatNumber(dealerRetail))}` : "-"}</dd></div>
               <div><dt>Reason</dt><dd>${escapeHtml(ownerAdjustment.reason || "-")}</dd></div>
             </dl>
-            ${lead.notes ? `<div class="dealer-admin-notes"><strong>Admin notes</strong><p>${escapeHtml(lead.notes)}</p></div>` : ""}
+            ${adminNotes ? `<div class="dealer-admin-notes"><strong>Admin notes</strong><p>${escapeHtml(adminNotes)}</p></div>` : ""}
           </section>
           ${overdue ? `<p class="status overdue-text">Overdue follow-up</p>` : ""}
           <form class="dealer-note-form">
@@ -1169,7 +1209,77 @@ function renderDealerLeads(leads, role) {
         </details>
       </article>
     `;
-  }).join("");
+  });
+}
+
+function renderDealerLeadSummary(leads) {
+  if (!dealerLeadSummary) return;
+  const buyer = leads.filter(isBuyerLead).length;
+  const seller = leads.length - buyer;
+  const due = leads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new")).length;
+  const updated = [...dealerLeadsList.querySelectorAll(".dealer-lead-updated")].length;
+  dealerLeadSummary.innerHTML = [
+    ["Total", leads.length, "All assigned active leads"],
+    ["BUY", buyer, "Buyer inquiries from inventory"],
+    ["SELL", seller, "Seller valuation leads"],
+    ["Needs follow-up", due, "Overdue or due today"],
+    ["Updated", updated, "Changed since last refresh"]
+  ].map(([label, value, hint]) => `
+    <article>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(String(value))}</strong>
+      <small>${escapeHtml(hint)}</small>
+    </article>
+  `).join("");
+}
+
+function filterDealerLeads(leads) {
+  if (dealerLeadFilter === "buyer") return leads.filter(isBuyerLead);
+  if (dealerLeadFilter === "seller") return leads.filter((lead) => !isBuyerLead(lead));
+  if (dealerLeadFilter === "due") {
+    return leads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"));
+  }
+  return leads;
+}
+
+function renderDealerLeadGroups(leads, cardRenderer) {
+  const buyerLeads = leads.filter(isBuyerLead);
+  const sellerLeads = leads.filter((lead) => !isBuyerLead(lead));
+  const groups = [
+    { title: "BUY leads", caption: "Inventory shoppers asking about a specific vehicle.", kind: "buyer", leads: buyerLeads },
+    { title: "SELL leads", caption: "Customers selling or valuing their own vehicle.", kind: "seller", leads: sellerLeads }
+  ].filter((group) => group.leads.length);
+
+  return groups.map((group) => `
+    <section class="dealer-lead-group dealer-lead-group-${group.kind}">
+      <header>
+        <div>
+          <h2>${escapeHtml(group.title)}</h2>
+          <p>${escapeHtml(group.caption)}</p>
+        </div>
+        <b>${group.leads.length}</b>
+      </header>
+      <div class="dealer-lead-group-list">
+        ${group.leads.map(cardRenderer).join("")}
+      </div>
+    </section>
+  `).join("");
+}
+
+function isBuyerLead(lead) {
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  return input.leadType === "buyer_inquiry" || valuation.source === "buyer_inquiry";
+}
+
+function cleanDealerLeadTitle(title, buyerLead) {
+  const value = String(title || "").trim();
+  return buyerLead ? value.replace(/^Buyer inquiry\s*-\s*/i, "") : value;
+}
+
+function isAutoBuyerInquiryNote(note) {
+  const value = String(note || "").trim();
+  return /^Buyer inquiry from public Buy page/i.test(value) || /^Buyer inquiry for /i.test(value);
 }
 
 function startDealerAutoRefresh() {
@@ -1460,6 +1570,17 @@ function isDealerLeadOverdue(value, status) {
   if (closedStatuses.has(String(status || "").toLowerCase())) return false;
   const date = new Date(value);
   return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
+}
+
+function isDealerLeadDueNow(value, status) {
+  if (!value) return false;
+  const closedStatuses = new Set(["won", "lost", "closed", "deleted"]);
+  if (closedStatuses.has(String(status || "").toLowerCase())) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  return date.getTime() <= endOfToday.getTime();
 }
 
 function canUseValuation() {

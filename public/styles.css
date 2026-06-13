@@ -38,26 +38,58 @@ select {
 .search-panel {
   background: #fff;
   border-bottom: 1px solid #e4e4e4;
-  order: 1;
+  order: 3;
   padding: 24px;
 }
 
 #details {
-  order: 2;
+  order: 4;
 }
 
 #history-panel {
-  order: 3;
+  order: 5;
 }
 
 #dealer-workbench {
-  order: 4;
+  order: 1;
 }
 
 .dealer-valuation-panel {
   border: 1px solid #d8e2ef;
   border-radius: 8px;
   margin: 24px;
+  padding: 0;
+}
+
+.dealer-valuation-details {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+}
+
+.dealer-valuation-details > summary {
+  align-items: center;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.dealer-valuation-details > summary b,
+.dealer-valuation-details > summary small {
+  display: block;
+}
+
+.dealer-valuation-details > summary b {
+  color: #0f3b78;
+  font-size: 18px;
+}
+
+.dealer-valuation-details > summary small {
+  color: #586a80;
+  margin-top: 3px;
 }
 
 .dealer-page-links {
@@ -749,6 +781,77 @@ select {
 
 .dealer-leads-panel {
   border-left-color: #0b4f9c;
+  order: 1;
+}
+
+.dealer-workbench-head {
+  align-items: flex-start;
+}
+
+.dealer-workbench-head h1 {
+  font-size: 30px;
+  margin: 0 0 6px;
+}
+
+.dealer-workbench-head p:not(.eyebrow) {
+  color: #586a80;
+  margin: 0;
+}
+
+.dealer-auth-panel {
+  margin: 18px 0;
+}
+
+.dealer-lead-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 16px 0;
+}
+
+.dealer-lead-summary article {
+  background: #f8fafc;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.dealer-lead-summary span,
+.dealer-lead-summary small {
+  color: #586a80;
+  font-size: 12px;
+}
+
+.dealer-lead-summary strong {
+  color: #162234;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.dealer-lead-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dealer-lead-filters button {
+  background: #fff;
+  border: 1px solid #b9c7d8;
+  border-radius: 999px;
+  color: #234;
+  cursor: pointer;
+  font-weight: 800;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+.dealer-lead-filters button.active {
+  background: #0b4f9c;
+  border-color: #0b4f9c;
+  color: #fff;
 }
 
 #history-panel {
@@ -1788,6 +1891,93 @@ select {
   gap: 12px;
 }
 
+.dealer-leads-list {
+  display: grid;
+  gap: 18px;
+}
+
+.dealer-lead-group {
+  display: grid;
+  gap: 12px;
+}
+
+.dealer-lead-group > header {
+  align-items: center;
+  border-radius: 8px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.dealer-lead-group > header h2 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.dealer-lead-group > header p {
+  color: #586a80;
+  margin: 3px 0 0;
+}
+
+.dealer-lead-group > header b {
+  background: #fff;
+  border-radius: 999px;
+  min-width: 42px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.dealer-lead-group-buyer > header {
+  background: #eaf5ff;
+  border: 1px solid #b9d7f4;
+}
+
+.dealer-lead-group-seller > header {
+  background: #fff3f0;
+  border: 1px solid #f1c2b8;
+}
+
+.dealer-lead-group-list {
+  display: grid;
+  gap: 12px;
+}
+
+.dealer-lead-buyer {
+  border-left: 6px solid #0f6fc6;
+}
+
+.dealer-lead-seller {
+  border-left: 6px solid var(--red);
+}
+
+.dealer-lead-title {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dealer-type-pill {
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 5px 8px;
+}
+
+.dealer-type-buyer {
+  background: #d9efff;
+  border: 1px solid #9bc8ef;
+  color: #07457d;
+}
+
+.dealer-type-seller {
+  background: #ffe8e3;
+  border: 1px solid #f2b2a8;
+  color: #9b1c26;
+}
+
 .dealer-lead-updated {
   border-color: #f59e0b;
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.16);
@@ -1854,6 +2044,11 @@ select {
 .status-offer-sent {
   background: #fef9c3;
   color: #854d0e;
+}
+
+.status-due {
+  background: #fff7ed;
+  color: #9a3412;
 }
 
 .status-won {
@@ -2030,5 +2225,16 @@ select {
 
   .lead-summary-metrics {
     justify-content: flex-start;
+  }
+
+  .dealer-lead-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dealer-lead-top,
+  .dealer-workbench-head,
+  .dealer-lead-group > header {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

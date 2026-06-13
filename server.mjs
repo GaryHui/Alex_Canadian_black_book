@@ -1560,9 +1560,26 @@ function buildBuyerInquiryLead({ inquiry, name, email, phone, message, listingId
     priority: "high",
     next_follow_up_at: null,
     last_activity_at: now,
-    notes: buyerInquiryActivityNote({ name, email, phone, message, vehicle, finance, purchase }),
+    notes: buyerInquiryLeadSummary({ name, email, phone, message, vehicle, finance, purchase }),
     owner_adjustment: {}
   };
+}
+
+function buyerInquiryLeadSummary({ name, email, phone, message, vehicle, finance, purchase }) {
+  const contact = [name, email, phone].filter(Boolean).join(" / ");
+  const plan = [
+    purchase?.intent ? `Intent: ${purchase.intent}` : "",
+    purchase?.buyingTimeline ? `Timeline: ${purchase.buyingTimeline}` : "",
+    purchase?.preferredContact ? `Preferred contact: ${purchase.preferredContact}` : "",
+    purchase?.monthlyPayment ? `Target: ${purchase.monthlyPayment}/mo` : finance.monthlyPayment ? `Calculator: ${finance.monthlyPayment}/mo` : ""
+  ].filter(Boolean).join(" | ");
+  const customerMessage = message ? `Message: ${message}` : "No custom buyer message.";
+  return [
+    `Buyer inquiry for ${vehicle.title || "selected inventory vehicle"}.`,
+    contact ? `Contact: ${contact}` : "",
+    plan,
+    customerMessage
+  ].filter(Boolean).join("\n");
 }
 
 function buyerInquiryMessageWithContext({ message, vehicle, finance, purchase }) {

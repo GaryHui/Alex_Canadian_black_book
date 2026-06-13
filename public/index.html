@@ -12,14 +12,16 @@
         <a href="/">Customer home</a>
         <a href="/admin.html">Admin backend</a>
       </nav>
-      <section class="search-panel dealer-valuation-panel">
-        <div>
-          <p class="eyebrow">Dealer valuation tool</p>
-          <h1>Create a vehicle estimate</h1>
-          <p class="section-subtitle">Use this area when a dealer staff member wants to search a vehicle and create a new valuation.</p>
+      <section id="dealer-workbench" class="history-panel dealer-leads-panel" hidden>
+        <div class="history-head dealer-workbench-head">
+          <div>
+            <p class="eyebrow">Dealer workbench</p>
+            <h1>Assigned BUY / SELL leads</h1>
+            <p>Track customers assigned by the owner, record follow-up, complete tasks, and keep the owner updated.</p>
+          </div>
+          <button id="reload-dealer-leads" type="button">Reload leads</button>
         </div>
-
-        <section class="auth-panel">
+        <section class="auth-panel dealer-auth-panel">
           <div>
             <strong id="auth-title">Checking sign in...</strong>
             <span id="auth-subtitle">Google sign-in is required before valuation.</span>
@@ -31,8 +33,32 @@
           </div>
           <button id="logout" type="button" hidden>Sign out</button>
         </section>
+        <div id="dealer-lead-summary" class="dealer-lead-summary"></div>
+        <div class="dealer-lead-filters" role="tablist" aria-label="Lead filters">
+          <button class="active" type="button" data-dealer-filter="all">All</button>
+          <button type="button" data-dealer-filter="due">Needs follow-up</button>
+          <button type="button" data-dealer-filter="buyer">BUY leads</button>
+          <button type="button" data-dealer-filter="seller">SELL leads</button>
+        </div>
+        <p id="dealer-leads-status" class="status">Loading assigned leads...</p>
+        <div id="dealer-leads-list" class="history-list dealer-leads-list"></div>
+      </section>
 
-        <div class="lookup-layout">
+      <section class="search-panel dealer-valuation-panel">
+        <details class="dealer-valuation-details">
+          <summary>
+            <span>
+              <b>Create valuation</b>
+              <small>Open this sub-tool only when staff needs to price a vehicle manually.</small>
+            </span>
+          </summary>
+          <div>
+            <p class="eyebrow">Dealer valuation tool</p>
+            <h2>Create a vehicle estimate</h2>
+            <p class="section-subtitle">Use this area when a dealer staff member wants to search a vehicle and create a new valuation.</p>
+          </div>
+
+          <div class="lookup-layout">
           <div class="lookup-menu" aria-label="Lookup modes">
             <button class="lookup-mode active" type="button" data-mode="free">
               <strong>Free Form</strong>
@@ -127,12 +153,13 @@
           <button type="submit">Generate</button>
             </form>
           </div>
-        </div>
+          </div>
 
-        <p id="status" class="status">Ready.</p>
-        <button id="save-valuation-lead" class="save-valuation-lead" type="button" hidden>Save valuation to leads</button>
-        <div id="inline-choice-list" class="choice-list inline-choice-list" hidden></div>
-        <p class="admin-link"><a href="/admin.html" target="_blank" rel="noreferrer">View captured leads</a></p>
+          <p id="status" class="status">Ready.</p>
+          <button id="save-valuation-lead" class="save-valuation-lead" type="button" hidden>Save valuation to leads</button>
+          <div id="inline-choice-list" class="choice-list inline-choice-list" hidden></div>
+          <p class="admin-link"><a href="/admin.html" target="_blank" rel="noreferrer">View captured leads</a></p>
+        </details>
       </section>
 
       <section id="history-panel" class="history-panel" hidden>
@@ -145,19 +172,6 @@
         </div>
         <p id="history-status" class="status">Loading quote history...</p>
         <div id="history-list" class="history-list"></div>
-      </section>
-
-      <section id="dealer-workbench" class="history-panel dealer-leads-panel" hidden>
-        <div class="history-head">
-          <div>
-            <p class="eyebrow">Assigned leads</p>
-            <h2>My assigned leads</h2>
-            <p>Use this area to follow up on customers assigned by an admin, review admin notes, add activity, and set next tasks.</p>
-          </div>
-          <button id="reload-dealer-leads" type="button">Reload</button>
-        </div>
-        <p id="dealer-leads-status" class="status">Loading assigned leads...</p>
-        <div id="dealer-leads-list" class="history-list"></div>
       </section>
 
       <div id="search-modal" class="search-modal" hidden>
