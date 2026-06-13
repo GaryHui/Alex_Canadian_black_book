@@ -29,6 +29,7 @@ const dealerLeadsStatus = document.querySelector("#dealer-leads-status");
 const dealerLeadsList = document.querySelector("#dealer-leads-list");
 const reloadDealerLeadsButton = document.querySelector("#reload-dealer-leads");
 const dealerLeadSummary = document.querySelector("#dealer-lead-summary");
+const dealerLeadAlertsEl = document.querySelector("#dealer-lead-alerts");
 const dealerLeadFilterButtons = document.querySelectorAll("[data-dealer-filter]");
 const saveValuationLeadButton = document.querySelector("#save-valuation-lead");
 const DEALER_REFRESH_MS = 30000;
@@ -87,6 +88,7 @@ let dealerDirectoryEmails = [];
 let dealerLeadsCache = [];
 let dealerLeadRole = "dealer";
 let dealerLeadFilter = "all";
+let dealerLeadAlertMap = new Map();
 
 initializeDatalists();
 initializeAuth();
@@ -103,6 +105,11 @@ dealerLeadFilterButtons.forEach((button) => {
     dealerLeadFilterButtons.forEach((item) => item.classList.toggle("active", item === button));
     renderDealerLeads(dealerLeadsCache, dealerLeadRole);
   });
+});
+dealerLeadAlertsEl?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-dealer-open-alert]");
+  if (!button) return;
+  await openDealerLeadFromAlert(button.dataset.dealerOpenAlert || "");
 });
 setLookupMode("free", { openModal: false });
 
@@ -1084,6 +1091,7 @@ async function loadDealerLeads(options = {}) {
     dealerLeadsCache = data.leads || [];
     dealerLeadRole = data.role || "dealer";
     renderDealerLeads(dealerLeadsCache, dealerLeadRole);
+    renderDealerLeadAlerts();
   } catch (error) {
     dealerLeadsStatus.textContent = error.message || "Unable to load assigned leads";
     dealerLeadsList.innerHTML = "";
@@ -1125,6 +1133,7 @@ function renderDealerLeads(leads, role) {
     const overdue = isDealerLeadOverdue(followUp, status);
     const statusLabel = overdue ? "Overdue" : dueNow ? "Due today" : status.replaceAll("_", " ");
     const statusClass = overdue ? "status-overdue" : dueNow ? "status-due" : `status-${cssToken(status)}`;
+    const pendingAlert = dealerLeadAlertMap.has(String(lead.id || ""));
     const wholesaleAvg = historyMarketAverage(valuation, "wholesale");
     const retailAvg = historyMarketAverage(valuation, "retail");
     const dealerWholesale = ownerAdjustment.wholesale ?? "";
@@ -1173,6 +1182,7 @@ function renderDealerLeads(leads, role) {
     ].filter(Boolean).filter(([, value]) => value !== "" && value !== null && value !== undefined);
 
     const updateToken = dealerLeadUpdateToken(lead);
+    const progressSteps = renderDealerLeadProgress(buyerLead, status);
     const actionButtons = dealerStatusActions(buyerLead, status)
       .map((action) => `<button type="button" data-dealer-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
       .join("");
@@ -1181,7 +1191,7 @@ function renderDealerLeads(leads, role) {
       .join("");
 
     return `
-      <article class="history-card dealer-lead-card dealer-lead-${leadKind} ${overdue ? "lead-overdue" : ""}" data-lead-id="${escapeHtml(lead.id || "")}" data-update-token="${escapeHtml(updateToken)}">
+      <article class="history-card dealer-lead-card dealer-lead-${leadKind} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "dealer-lead-updated" : ""}" data-lead-id="${escapeHtml(lead.id || "")}" data-update-token="${escapeHtml(updateToken)}">
         <div class="dealer-lead-top">
           <div>
             <div class="dealer-lead-title">
@@ -1192,7 +1202,8 @@ function renderDealerLeads(leads, role) {
           </div>
           <b class="dealer-status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
         </div>
-        <p class="dealer-update-notice" hidden>Task or follow-up activity changed. Open this lead to review the latest update.</p>
+        ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-dealer-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
+        <p class="dealer-update-notice" ${pendingAlert ? "" : "hidden"}>Task or follow-up activity changed. Open this lead to review the latest update.</p>
         <dl class="history-meta">
           <div><dt>Customer</dt><dd>${escapeHtml(customerEmail)}</dd></div>
           <div><dt>Phone</dt><dd>${escapeHtml(input.phone || "-")}</dd></div>
@@ -1203,6 +1214,7 @@ function renderDealerLeads(leads, role) {
           <div><dt>Priority</dt><dd>${escapeHtml(lead.priority || "normal")}</dd></div>
           <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "-")}</dd></div>
         </dl>
+        ${progressSteps}
         ${actionButtons ? `<div class="dealer-lead-actions">${actionButtons}</div>` : ""}
         <div class="dealer-lead-actions dealer-follow-up-actions" aria-label="Set next follow-up">
           ${followUpButtons}
@@ -1252,7 +1264,7 @@ function renderDealerLeadSummary(leads) {
   const buyer = leads.filter(isBuyerLead).length;
   const seller = leads.length - buyer;
   const due = leads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new")).length;
-  const updated = [...dealerLeadsList.querySelectorAll(".dealer-lead-updated")].length;
+  const updated = dealerLeadAlertMap.size;
   dealerLeadSummary.innerHTML = [
     ["Total", leads.length, "All assigned active leads"],
     ["BUY", buyer, "Buyer inquiries from inventory"],
@@ -1337,6 +1349,45 @@ function dealerStatusActions(buyerLead, status) {
   return actions
     .filter(([next]) => next !== current)
     .map(([next, label]) => ({ status: next, label }));
+}
+
+function dealerLeadProgressSteps(buyerLead) {
+  return buyerLead
+    ? [
+        ["new", "New"],
+        ["assigned", "Assigned"],
+        ["contacted", "Contacted"],
+        ["appointment_booked", "Appointment"],
+        ["finance_sent", "Finance"],
+        ["won", "Won"]
+      ]
+    : [
+        ["new", "New"],
+        ["assigned", "Assigned"],
+        ["contacted", "Contacted"],
+        ["inspection_booked", "Inspection"],
+        ["offer_sent", "Offer"],
+        ["won", "Purchased"]
+      ];
+}
+
+function renderDealerLeadProgress(buyerLead, status) {
+  const current = String(status || "new").toLowerCase();
+  const steps = dealerLeadProgressSteps(buyerLead);
+  const currentIndex = steps.findIndex(([value]) => value === current);
+  const closedLost = ["lost", "closed", "deleted"].includes(current);
+  return `
+    <ol class="lead-progress ${closedLost ? "lead-progress-closed" : ""}" aria-label="Lead progress">
+      ${steps.map(([value, label], index) => {
+        const complete = !closedLost && currentIndex >= 0 && index < currentIndex;
+        const active = !closedLost && value === current;
+        return `<li class="${complete ? "complete" : ""} ${active ? "active" : ""}">
+          <span></span><b>${escapeHtml(label)}</b>
+        </li>`;
+      }).join("")}
+      ${closedLost ? `<li class="active closed"><span></span><b>${escapeHtml(current.replaceAll("_", " "))}</b></li>` : ""}
+    </ol>
+  `;
 }
 
 function dealerFollowUpActions() {
@@ -1451,7 +1502,9 @@ async function checkDealerLeadUpdates() {
   const cardsById = new Map([...dealerLeadsList.querySelectorAll(".dealer-lead-card")]
     .map((card) => [card.dataset.leadId, card])
     .filter(([id]) => Boolean(id)));
-  if (!cardsById.size) return;
+  const previousTokens = new Map(dealerLeadsCache
+    .map((lead) => [String(lead.id || ""), dealerLeadUpdateToken(lead)])
+    .filter(([id]) => Boolean(id)));
 
   try {
     const response = await fetch("/api/dealer-leads", {
@@ -1462,29 +1515,99 @@ async function checkDealerLeadUpdates() {
     const data = await response.json();
     if (!data.ok) return;
     let updatedCount = 0;
-    let hasNewLead = false;
+    let newCount = 0;
     for (const lead of data.leads || []) {
       const id = String(lead.id || "");
       const card = cardsById.get(id);
-      if (!card) {
-        hasNewLead = true;
+      const previousToken = previousTokens.get(id);
+      if (!previousToken) {
+        dealerLeadAlertMap.set(id, {
+          id,
+          type: "new",
+          title: dealerLeadAlertTitle(lead),
+          message: "New assigned lead"
+        });
+        newCount += 1;
         continue;
       }
       const nextToken = dealerLeadUpdateToken(lead);
-      if (nextToken && card.dataset.updateToken && nextToken !== card.dataset.updateToken) {
-        card.dataset.pendingUpdateToken = nextToken;
-        showDealerLeadUpdateNotice(card);
+      if (nextToken && previousToken !== nextToken) {
+        if (card) card.dataset.pendingUpdateToken = nextToken;
+        dealerLeadAlertMap.set(id, {
+          id,
+          type: "updated",
+          title: dealerLeadAlertTitle(lead),
+          message: "Lead changed"
+        });
+        if (card) showDealerLeadUpdateNotice(card);
         updatedCount += 1;
       }
     }
-    if (hasNewLead) {
-      dealerLeadsStatus.textContent = "New assigned leads are available. Click Reload to view them.";
+    dealerLeadsCache = data.leads || [];
+    renderDealerLeadAlerts();
+    renderDealerLeadSummary(dealerLeadsCache);
+    if (newCount) {
+      dealerLeadsStatus.textContent = `${newCount} new assigned lead${newCount === 1 ? "" : "s"}. Click the update above to open.`;
     } else if (updatedCount) {
       dealerLeadsStatus.textContent = `${updatedCount} lead${updatedCount === 1 ? "" : "s"} updated. Open highlighted leads to review task or follow-up changes.`;
     }
   } catch {
     // Background checks should not interrupt active follow-up work.
   }
+}
+
+function dealerLeadAlertTitle(lead = {}) {
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+  return cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || "Vehicle lead", isBuyerLead(lead));
+}
+
+function renderDealerLeadAlerts() {
+  if (!dealerLeadAlertsEl) return;
+  const alerts = [...dealerLeadAlertMap.values()];
+  dealerLeadAlertsEl.hidden = alerts.length === 0;
+  dealerLeadAlertsEl.innerHTML = alerts.length ? `
+    <div>
+      <strong>${alerts.length} lead update${alerts.length === 1 ? "" : "s"}</strong>
+      <span>Click an update to open the lead.</span>
+    </div>
+    <div class="lead-alert-list">
+      ${alerts.map((alert) => `
+        <button type="button" data-dealer-open-alert="${escapeHtml(alert.id)}" class="lead-alert-item lead-alert-${escapeHtml(alert.type)}">
+          <b>${escapeHtml(alert.message)}</b>
+          <span>${escapeHtml(alert.title)}</span>
+        </button>
+      `).join("")}
+    </div>
+  ` : "";
+}
+
+async function openDealerLeadFromAlert(id) {
+  if (!id) return;
+  if (!dealerLeadsCache.some((lead) => String(lead.id || "") === id)) {
+    await loadDealerLeads({ forceActivity: true, suppressAlerts: true });
+  }
+  if (dealerLeadFilter !== "all") {
+    dealerLeadFilter = "all";
+    dealerLeadFilterButtons.forEach((button) => button.classList.toggle("active", button.dataset.dealerFilter === "all"));
+    renderDealerLeads(dealerLeadsCache, dealerLeadRole);
+  }
+  let card = dealerLeadsList.querySelector(`.dealer-lead-card[data-lead-id="${cssEscape(id)}"]`);
+  if (!card) {
+    renderDealerLeads(dealerLeadsCache, dealerLeadRole);
+    card = dealerLeadsList.querySelector(`.dealer-lead-card[data-lead-id="${cssEscape(id)}"]`);
+  }
+  if (!card) return;
+  dealerLeadAlertMap.delete(id);
+  renderDealerLeadAlerts();
+  renderDealerLeadSummary(dealerLeadsCache);
+  clearDealerLeadUpdateNotice(card);
+  card.classList.add("lead-card-flash");
+  window.setTimeout(() => card.classList.remove("lead-card-flash"), 1600);
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  const details = card.querySelector(".dealer-lead-details");
+  if (details) details.open = true;
+  await loadDealerActivity(card, { force: true });
 }
 
 function dealerLeadUpdateToken(lead = {}) {
@@ -1509,12 +1632,15 @@ function showDealerLeadUpdateNotice(card) {
 function clearDealerLeadUpdateNotice(card) {
   card.classList.remove("dealer-lead-updated");
   card.dataset.activityLoaded = "false";
+  if (card.dataset.leadId) dealerLeadAlertMap.delete(card.dataset.leadId);
   if (card.dataset.pendingUpdateToken) {
     card.dataset.updateToken = card.dataset.pendingUpdateToken;
     delete card.dataset.pendingUpdateToken;
   }
   const notice = card.querySelector(".dealer-update-notice");
   if (notice) notice.hidden = true;
+  renderDealerLeadAlerts();
+  renderDealerLeadSummary(dealerLeadsCache);
 }
 
 async function loadDealerActivity(card, options = {}) {
@@ -1744,4 +1870,9 @@ function escapeHtml(value) {
 
 function cssToken(value) {
   return String(value || "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function cssEscape(value) {
+  if (window.CSS?.escape) return window.CSS.escape(String(value));
+  return String(value).replace(/["\\]/g, "\\$&");
 }

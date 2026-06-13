@@ -9,6 +9,7 @@ const inventoryEl = document.querySelector("#admin-inventory");
 const inquiriesStatusEl = document.querySelector("#inquiries-status");
 const inquiriesEl = document.querySelector("#admin-inquiries");
 const adminOverviewEl = document.querySelector("#admin-overview");
+const adminLeadAlertsEl = document.querySelector("#admin-lead-alerts");
 const adminLeadFilterButtons = [...document.querySelectorAll("[data-admin-lead-filter]")];
 const dealerStaffForm = document.querySelector("#dealer-staff-form");
 const reloadDealersButton = document.querySelector("#reload-dealers");
@@ -33,6 +34,9 @@ let clearLeadsConfirmEl = null;
 let adminRefreshTimer = null;
 let adminLeadsCache = [];
 let adminLeadFilter = "all";
+let adminLeadTokenMap = new Map();
+let adminLeadAlertMap = new Map();
+let adminLeadSnapshotReady = false;
 
 reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", () => loadLeads({ forceOpenActivity: true }));
@@ -49,6 +53,11 @@ adminLeadFilterButtons.forEach((button) => {
     adminLeadFilterButtons.forEach((item) => item.classList.toggle("active", item === button));
     renderLeadWorkbench(adminLeadsCache);
   });
+});
+adminLeadAlertsEl?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-admin-open-alert]");
+  if (!button) return;
+  await openAdminLeadFromAlert(button.dataset.adminOpenAlert || "");
 });
 
 initializeAdminAuth();
@@ -414,13 +423,118 @@ async function loadLeads(options = {}) {
   }
 
   adminLeadsCache = data.leads || [];
+  if (!options.suppressAlerts) collectAdminLeadAlerts(adminLeadsCache);
+  else rememberAdminLeadTokens(adminLeadsCache);
   renderAdminOverview(adminLeadsCache);
+  renderAdminLeadAlerts();
 
   renderLeadWorkbench(adminLeadsCache);
   if (data.storage === "not_configured") {
     statusEl.textContent = "Lead storage is not configured on this deployment. Add Supabase env vars to persist leads.";
   }
   await restoreOpenLeads(openIds, { forceActivity: Boolean(options.forceOpenActivity) });
+}
+
+function collectAdminLeadAlerts(leads) {
+  if (!adminLeadSnapshotReady) {
+    rememberAdminLeadTokens(leads);
+    adminLeadSnapshotReady = true;
+    return;
+  }
+  const nextMap = new Map();
+  for (const lead of leads) {
+    const id = String(lead.id || "");
+    if (!id) continue;
+    const token = leadUpdateToken(lead);
+    const previousToken = adminLeadTokenMap.get(id);
+    nextMap.set(id, token);
+    if (!previousToken) {
+      adminLeadAlertMap.set(id, {
+        id,
+        type: "new",
+        title: leadAlertTitle(lead),
+        message: "New lead received"
+      });
+    } else if (previousToken !== token) {
+      adminLeadAlertMap.set(id, {
+        id,
+        type: "updated",
+        title: leadAlertTitle(lead),
+        message: "Lead changed"
+      });
+    }
+  }
+  adminLeadTokenMap = nextMap;
+}
+
+function rememberAdminLeadTokens(leads) {
+  adminLeadTokenMap = new Map(leads
+    .map((lead) => [String(lead.id || ""), leadUpdateToken(lead)])
+    .filter(([id]) => Boolean(id)));
+  adminLeadSnapshotReady = true;
+}
+
+function leadUpdateToken(lead = {}) {
+  return [
+    lead.updated_at || "",
+    lead.last_activity_at || "",
+    lead.status || "",
+    lead.assigned_to || "",
+    lead.priority || "",
+    lead.next_follow_up_at || "",
+    JSON.stringify(lead.owner_adjustment || {}),
+    lead.notes || ""
+  ].join("|");
+}
+
+function leadAlertTitle(lead = {}) {
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+  const buyer = isBuyerLead(lead);
+  return cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), buyer) || "Vehicle lead";
+}
+
+function renderAdminLeadAlerts() {
+  if (!adminLeadAlertsEl) return;
+  const alerts = [...adminLeadAlertMap.values()];
+  adminLeadAlertsEl.hidden = alerts.length === 0;
+  adminLeadAlertsEl.innerHTML = alerts.length ? `
+    <div>
+      <strong>${alerts.length} lead update${alerts.length === 1 ? "" : "s"}</strong>
+      <span>Click an update to open the lead.</span>
+    </div>
+    <div class="lead-alert-list">
+      ${alerts.map((alert) => `
+        <button type="button" data-admin-open-alert="${escapeHtml(alert.id)}" class="lead-alert-item lead-alert-${escapeHtml(alert.type)}">
+          <b>${escapeHtml(alert.message)}</b>
+          <span>${escapeHtml(alert.title)}</span>
+        </button>
+      `).join("")}
+    </div>
+  ` : "";
+}
+
+async function openAdminLeadFromAlert(id) {
+  if (!id) return;
+  if (!adminLeadsCache.some((lead) => String(lead.id || "") === id)) {
+    await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+  }
+  if (adminLeadFilter !== "all") {
+    adminLeadFilter = "all";
+    adminLeadFilterButtons.forEach((button) => button.classList.toggle("active", button.dataset.adminLeadFilter === "all"));
+    renderLeadWorkbench(adminLeadsCache);
+  }
+  const card = leadsEl.querySelector(`.lead-card[data-id="${cssEscape(id)}"]`);
+  if (!card) return;
+  adminLeadAlertMap.delete(id);
+  renderAdminLeadAlerts();
+  card.classList.remove("lead-card-updated");
+  card.classList.add("lead-card-flash");
+  window.setTimeout(() => card.classList.remove("lead-card-flash"), 1600);
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  const details = card.querySelector(".lead-manage");
+  if (details) details.open = true;
+  await loadLeadActivity(card, { force: true });
 }
 
 function renderLeadWorkbench(leads) {
@@ -566,6 +680,8 @@ function renderLead(lead) {
   const overdue = isOverdue(followUp, status);
   const statusClass = overdue ? "status-overdue" : `status-${cssToken(status)}`;
   const statusLabel = overdue ? "Overdue" : leadStatusLabel(status, buyer);
+  const pendingAlert = adminLeadAlertMap.has(String(lead.id || ""));
+  const progressSteps = renderLeadProgress(buyer, status);
   const actionButtons = leadStatusActions(buyer, status)
     .map((action) => `<button type="button" data-lead-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
     .join("");
@@ -655,7 +771,7 @@ function renderLead(lead) {
           <span>AVG Wholesale</span><b>${wholesale ? formatNumber(wholesale) : "-"}</b>
           <span>AVG Retail</span><b>${retail ? formatNumber(retail) : "-"}</b>`;
   return `
-    <article class="lead-card lead-card-${leadType} ${overdue ? "lead-overdue" : ""}" data-id="${escapeHtml(lead.id || "")}">
+    <article class="lead-card lead-card-${leadType} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "lead-card-updated" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <header class="lead-summary">
         <div>
           <div class="lead-title-row">
@@ -674,6 +790,8 @@ function renderLead(lead) {
           <b class="status-pill ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
         </div>
       </header>
+      ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
+      ${progressSteps}
       ${actionButtons ? `<div class="lead-action-row">${actionButtons}</div>` : ""}
       <details class="lead-manage">
         <summary>Manage lead</summary>
@@ -819,6 +937,45 @@ function leadStatusActions(buyer, status) {
     .map(([next, label]) => ({ status: next, label }));
 }
 
+function leadProgressSteps(buyer) {
+  return buyer
+    ? [
+        ["new", "New"],
+        ["assigned", "Assigned"],
+        ["contacted", "Contacted"],
+        ["appointment_booked", "Appointment"],
+        ["finance_sent", "Finance"],
+        ["won", "Won"]
+      ]
+    : [
+        ["new", "New"],
+        ["assigned", "Assigned"],
+        ["contacted", "Contacted"],
+        ["inspection_booked", "Inspection"],
+        ["offer_sent", "Offer"],
+        ["won", "Purchased"]
+      ];
+}
+
+function renderLeadProgress(buyer, status) {
+  const current = String(status || "new").toLowerCase();
+  const steps = leadProgressSteps(buyer);
+  const currentIndex = steps.findIndex(([value]) => value === current);
+  const closedLost = ["lost", "closed", "deleted"].includes(current);
+  return `
+    <ol class="lead-progress ${closedLost ? "lead-progress-closed" : ""}" aria-label="Lead progress">
+      ${steps.map(([value, label], index) => {
+        const complete = !closedLost && currentIndex >= 0 && index < currentIndex;
+        const active = !closedLost && value === current;
+        return `<li class="${complete ? "complete" : ""} ${active ? "active" : ""}">
+          <span></span><b>${escapeHtml(label)}</b>
+        </li>`;
+      }).join("")}
+      ${closedLost ? `<li class="active closed"><span></span><b>${escapeHtml(leadStatusLabel(current, buyer))}</b></li>` : ""}
+    </ol>
+  `;
+}
+
 leadsEl.addEventListener("submit", async (event) => {
   const form = event.target.closest(".owner-review");
   if (!form) return;
@@ -836,7 +993,7 @@ leadsEl.addEventListener("submit", async (event) => {
   });
   const data = await response.json();
   statusEl.textContent = data.ok ? "Owner review saved." : (data.error || "Unable to save owner review.");
-  if (data.ok) await loadLeads();
+  if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
 });
 
 inventoryEl?.addEventListener("submit", async (event) => {
@@ -899,7 +1056,7 @@ async function removeInventoryListing(button) {
   const data = await response.json();
   inventoryStatusEl.textContent = data.ok ? "Inventory listing removed. The original lead remains available for follow-up." : formatApiError(data, "Unable to remove inventory listing.");
   if (data.ok) {
-    await Promise.all([loadInventory(), loadLeads({ forceOpenActivity: true })]);
+    await Promise.all([loadInventory(), loadLeads({ suppressAlerts: true, forceOpenActivity: true })]);
   }
   button.disabled = false;
 }
@@ -972,7 +1129,7 @@ leadsEl.addEventListener("submit", async (event) => {
   statusEl.textContent = message;
   if (formStatus) formStatus.textContent = message;
   if (data.ok) {
-    await Promise.all([loadInventory(), loadLeads({ forceOpenActivity: true })]);
+    await Promise.all([loadInventory(), loadLeads({ suppressAlerts: true, forceOpenActivity: true })]);
   }
 });
 
@@ -1001,6 +1158,12 @@ leadsEl.addEventListener("submit", async (event) => {
 });
 
 leadsEl.addEventListener("click", async (event) => {
+  const alertButton = event.target.closest("[data-admin-open-alert]");
+  if (alertButton) {
+    await openAdminLeadFromAlert(alertButton.dataset.adminOpenAlert || "");
+    return;
+  }
+
   const deleteButton = event.target.closest("[data-delete-lead]");
   if (deleteButton) {
     await deleteSingleLead(deleteButton);
@@ -1052,7 +1215,7 @@ leadsEl.addEventListener("click", async (event) => {
   });
   const data = await response.json();
   statusEl.textContent = data.ok ? "Lead status updated." : (data.error || "Unable to update lead status.");
-  if (data.ok) await loadLeads({ forceOpenActivity: true });
+  if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
 });
 
 leadsEl.addEventListener("toggle", async (event) => {
@@ -1060,7 +1223,13 @@ leadsEl.addEventListener("toggle", async (event) => {
   if (!details || !details.open) return;
 
   const card = details.closest(".lead-card");
-  if (!card || card.dataset.activityLoaded === "true") return;
+  if (!card) return;
+  if (card.dataset.id && adminLeadAlertMap.has(card.dataset.id)) {
+    adminLeadAlertMap.delete(card.dataset.id);
+    renderAdminLeadAlerts();
+    card.classList.remove("lead-card-updated");
+  }
+  if (card.dataset.activityLoaded === "true") return;
   await loadLeadActivity(card, { force: true });
 }, true);
 
@@ -1082,7 +1251,7 @@ async function deleteSingleLead(button) {
   });
   const data = await response.json();
   statusEl.textContent = data.ok ? `Deleted ${data.deleted || 0} lead record.` : formatApiError(data, "Unable to delete lead.");
-  if (data.ok) await loadLeads();
+  if (data.ok) await loadLeads({ suppressAlerts: true });
   button.disabled = false;
 }
 
@@ -1181,7 +1350,7 @@ async function confirmClearAllLeads() {
     statusEl.textContent = data.ok ? `Deleted ${data.deleted || 0} lead record(s).` : formatApiError(data, "Unable to clear leads.");
     if (data.ok) {
       cancelClearAllLeads();
-      await loadLeads();
+      await loadLeads({ suppressAlerts: true });
     }
   } catch (error) {
     statusEl.textContent = error.message || "Unable to clear leads.";
@@ -1388,4 +1557,9 @@ function escapeHtml(value) {
 
 function cssToken(value) {
   return String(value || "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function cssEscape(value) {
+  if (window.CSS?.escape) return window.CSS.escape(String(value));
+  return String(value).replace(/["\\]/g, "\\$&");
 }

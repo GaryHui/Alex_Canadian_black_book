@@ -1515,6 +1515,147 @@ select {
   opacity: .65;
 }
 
+.lead-alerts {
+  align-items: flex-start;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-left: 6px solid #f97316;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 14px;
+}
+
+.lead-alerts > div:first-child {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lead-alerts strong {
+  color: #7c2d12;
+}
+
+.lead-alerts span {
+  color: #7a4a20;
+}
+
+.lead-alert-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lead-alert-item,
+.lead-inline-alert {
+  background: #fff;
+  border: 1px solid #fb923c;
+  border-radius: 999px;
+  color: #7c2d12;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  align-items: center;
+}
+
+.lead-alert-item b,
+.lead-inline-alert {
+  font-weight: 900;
+}
+
+.lead-alert-item span {
+  color: #9a3412;
+}
+
+.lead-inline-alert {
+  margin: 4px 0 8px;
+}
+
+.lead-card-updated {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, .18);
+}
+
+.lead-card-flash {
+  animation: leadFlash 1.4s ease-out;
+}
+
+@keyframes leadFlash {
+  0% {
+    box-shadow: 0 0 0 4px rgba(249, 115, 22, .32);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+.lead-progress {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  list-style: none;
+  margin: 10px 0 12px;
+  padding: 0;
+}
+
+.lead-progress li {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #d8e2ef;
+  border-radius: 999px;
+  color: #64748b;
+  display: flex;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 9px;
+}
+
+.lead-progress span {
+  background: #cbd5e1;
+  border-radius: 999px;
+  height: 8px;
+  width: 8px;
+}
+
+.lead-progress b {
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.lead-progress li.complete {
+  background: #ecfdf5;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.lead-progress li.complete span {
+  background: #22c55e;
+}
+
+.lead-progress li.active {
+  background: #eaf5ff;
+  border-color: #93c5fd;
+  color: #0b4f9c;
+}
+
+.lead-progress li.active span {
+  background: #0b4f9c;
+}
+
+.lead-progress li.closed {
+  background: #fff1f2;
+  border-color: #fda4af;
+  color: #9f1239;
+}
+
+.lead-progress li.closed span {
+  background: #e11d48;
+}
+
 .dealer-follow-up-actions {
   margin-top: -4px;
 }
