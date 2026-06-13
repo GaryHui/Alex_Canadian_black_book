@@ -1000,19 +1000,21 @@ select {
 }
 
 .admin-shell {
-  background: #fff;
+  background: #f6f8fb;
   min-height: 100vh;
   padding: 24px;
 }
 
 .admin-head {
   align-items: center;
-  border-bottom: 1px solid #ddd;
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
   display: flex;
   gap: 16px;
   justify-content: space-between;
   margin-bottom: 18px;
-  padding-bottom: 12px;
+  padding: 16px 18px;
 }
 
 .admin-actions {
@@ -1039,10 +1041,61 @@ select {
   padding: 0 12px;
 }
 
+.admin-overview {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 16px;
+}
+
+.admin-overview-card {
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-left: 5px solid #64748b;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+}
+
+.admin-overview-card span {
+  color: #516174;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-overview-card strong {
+  color: #16243a;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.admin-overview-card small {
+  color: #64748b;
+}
+
+.overview-total {
+  border-left-color: #0b4f9c;
+}
+
+.overview-follow,
+.overview-urgent {
+  border-left-color: #d90429;
+}
+
+.overview-unassigned {
+  border-left-color: #f59e0b;
+}
+
 .admin-section {
-  border-bottom: 1px solid #eee;
-  margin-bottom: 22px;
-  padding-bottom: 22px;
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-left: 6px solid #64748b;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .04);
+  margin-bottom: 18px;
+  padding: 18px;
 }
 
 .admin-section-head {
@@ -1078,6 +1131,52 @@ select {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.admin-lead-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 8px;
+}
+
+.admin-lead-filters button {
+  background: #fff;
+  border: 1px solid #b9c7d8;
+  border-radius: 999px;
+  color: #234;
+  cursor: pointer;
+  font-weight: 800;
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+.admin-lead-filters button.active {
+  background: #0b4f9c;
+  border-color: #0b4f9c;
+  color: #fff;
+}
+
+.admin-operations {
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  margin: 18px 0;
+  padding: 0;
+}
+
+.admin-operations > summary {
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 900;
+  padding: 16px 18px;
+}
+
+.admin-operations > .admin-section {
+  border-left-width: 6px;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
 }
 
 .danger-outline {
@@ -2246,6 +2345,7 @@ select {
   }
 
   .admin-section-head,
+  .admin-overview,
   .user-limit-card,
   .history-meta {
     align-items: stretch;

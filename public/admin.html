@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Captured Leads</title>
+    <title>Admin workbench</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -11,7 +11,7 @@
       <header class="admin-head">
         <div>
           <p class="eyebrow">Internal</p>
-          <h1>Captured valuation leads</h1>
+          <h1>Admin workbench</h1>
         </div>
         <div class="admin-actions">
           <span id="admin-auth-status">Checking admin sign-in...</span>
@@ -25,6 +25,41 @@
         </div>
       </header>
       <section id="admin-content" hidden>
+      <section class="admin-overview" id="admin-overview" aria-label="Lead overview"></section>
+      <section class="admin-section admin-section-leads">
+        <div class="admin-section-head">
+          <div>
+            <h2>Lead workbench</h2>
+            <p>Assign BUY and SELL leads, track status, and spot follow-ups before they go cold.</p>
+          </div>
+          <div class="admin-section-actions">
+            <button id="reload-leads" type="button">Reload leads</button>
+            <button id="clear-leads" class="danger-outline" type="button">Clear all leads</button>
+          </div>
+        </div>
+        <div class="admin-lead-filters" aria-label="Lead filters">
+          <button class="active" type="button" data-admin-lead-filter="all">All</button>
+          <button type="button" data-admin-lead-filter="needs-follow-up">Needs follow-up</button>
+          <button type="button" data-admin-lead-filter="buyer">BUY</button>
+          <button type="button" data-admin-lead-filter="seller">SELL</button>
+          <button type="button" data-admin-lead-filter="unassigned">Unassigned</button>
+        </div>
+        <p id="admin-status" class="status">Loading...</p>
+        <div id="admin-leads" class="admin-leads"></div>
+      </section>
+      <section class="admin-section admin-section-inventory">
+        <div class="admin-section-head">
+          <div>
+            <h2>Inventory management</h2>
+            <p>Manage vehicles already visible or ready for the Buy page.</p>
+          </div>
+          <button id="reload-inventory" type="button">Reload inventory</button>
+        </div>
+        <p id="inventory-status" class="status">Loading inventory...</p>
+        <div id="admin-inventory" class="admin-inventory"></div>
+      </section>
+      <details class="admin-operations">
+        <summary>Operations settings</summary>
       <section class="admin-section admin-section-access">
         <div class="admin-section-head">
           <div>
@@ -54,17 +89,6 @@
         <p id="users-status" class="status">Loading users...</p>
         <div id="admin-users" class="admin-users"></div>
       </section>
-      <section class="admin-section admin-section-inventory">
-        <div class="admin-section-head">
-          <div>
-            <h2>Inventory management</h2>
-            <p>Manage vehicles already in inventory: publish, unpublish, mark sold, update asking price, or remove from inventory.</p>
-          </div>
-          <button id="reload-inventory" type="button">Reload inventory</button>
-        </div>
-        <p id="inventory-status" class="status">Loading inventory...</p>
-        <div id="admin-inventory" class="admin-inventory"></div>
-      </section>
       <section class="admin-section admin-section-inquiries" hidden>
         <div class="admin-section-head">
           <div>
@@ -76,20 +100,7 @@
         <p id="inquiries-status" class="status">Loading inquiries...</p>
         <div id="admin-inquiries" class="admin-inquiries"></div>
       </section>
-      <section class="admin-section admin-section-leads">
-        <div class="admin-section-head">
-          <div>
-            <h2>Captured leads</h2>
-            <p>Intake workspace for new vehicles: review details, assign staff, upload photos, track activity, then publish to inventory when ready.</p>
-          </div>
-          <div class="admin-section-actions">
-            <button id="reload-leads" type="button">Reload leads</button>
-            <button id="clear-leads" class="danger-outline" type="button">Clear all leads</button>
-          </div>
-        </div>
-      <p id="admin-status" class="status">Loading...</p>
-      <div id="admin-leads" class="admin-leads"></div>
-      </section>
+      </details>
       </section>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

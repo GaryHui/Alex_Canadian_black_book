@@ -8,6 +8,8 @@ const inventoryStatusEl = document.querySelector("#inventory-status");
 const inventoryEl = document.querySelector("#admin-inventory");
 const inquiriesStatusEl = document.querySelector("#inquiries-status");
 const inquiriesEl = document.querySelector("#admin-inquiries");
+const adminOverviewEl = document.querySelector("#admin-overview");
+const adminLeadFilterButtons = [...document.querySelectorAll("[data-admin-lead-filter]")];
 const dealerStaffForm = document.querySelector("#dealer-staff-form");
 const reloadDealersButton = document.querySelector("#reload-dealers");
 const reloadUsersButton = document.querySelector("#reload-users");
@@ -29,6 +31,8 @@ let adminSession = null;
 let adminTurnstileGate = null;
 let clearLeadsConfirmEl = null;
 let adminRefreshTimer = null;
+let adminLeadsCache = [];
+let adminLeadFilter = "all";
 
 reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", () => loadLeads({ forceOpenActivity: true }));
@@ -39,6 +43,13 @@ clearLeadsButton?.addEventListener("click", clearAllLeads);
 dealerStaffForm.addEventListener("submit", addDealer);
 adminLoginButton.addEventListener("click", signInAdmin);
 adminLogoutButton.addEventListener("click", signOutAdmin);
+adminLeadFilterButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    adminLeadFilter = button.dataset.adminLeadFilter || "all";
+    adminLeadFilterButtons.forEach((item) => item.classList.toggle("active", item === button));
+    renderLeadWorkbench(adminLeadsCache);
+  });
+});
 
 initializeAdminAuth();
 document.addEventListener("visibilitychange", () => {
@@ -402,16 +413,63 @@ async function loadLeads(options = {}) {
     return;
   }
 
+  adminLeadsCache = data.leads || [];
+  renderAdminOverview(adminLeadsCache);
+
+  renderLeadWorkbench(adminLeadsCache);
   if (data.storage === "not_configured") {
     statusEl.textContent = "Lead storage is not configured on this deployment. Add Supabase env vars to persist leads.";
-  } else {
-    const buyerCount = (data.leads || []).filter(isBuyerLead).length;
-    const sellerCount = (data.leads || []).length - buyerCount;
-    statusEl.textContent = `${data.leads.length} lead(s): ${buyerCount} buyer, ${sellerCount} seller.`;
   }
-
-  leadsEl.innerHTML = renderLeadGroups(data.leads || []);
   await restoreOpenLeads(openIds, { forceActivity: Boolean(options.forceOpenActivity) });
+}
+
+function renderLeadWorkbench(leads) {
+  const filtered = filterAdminLeads(leads);
+  const buyerCount = leads.filter(isBuyerLead).length;
+  const sellerCount = leads.length - buyerCount;
+  statusEl.textContent = `${filtered.length} shown of ${leads.length} lead(s): ${buyerCount} BUY, ${sellerCount} SELL.`;
+  leadsEl.innerHTML = renderLeadGroups(filtered);
+}
+
+function filterAdminLeads(leads) {
+  if (adminLeadFilter === "buyer") return leads.filter(isBuyerLead);
+  if (adminLeadFilter === "seller") return leads.filter((lead) => !isBuyerLead(lead));
+  if (adminLeadFilter === "unassigned") return leads.filter((lead) => !String(lead.assigned_to || "").trim());
+  if (adminLeadFilter === "needs-follow-up") {
+    return leads.filter((lead) => isFollowUpDue(lead.next_follow_up_at, lead.status || "new"));
+  }
+  return leads;
+}
+
+function renderAdminOverview(leads) {
+  if (!adminOverviewEl) return;
+  const buyerCount = leads.filter(isBuyerLead).length;
+  const sellerCount = leads.length - buyerCount;
+  const unassignedCount = leads.filter((lead) => !String(lead.assigned_to || "").trim()).length;
+  const followUpCount = leads.filter((lead) => isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).length;
+  const urgentCount = leads.filter((lead) => String(lead.priority || "").toLowerCase() === "urgent").length;
+  adminOverviewEl.innerHTML = `
+    <article class="admin-overview-card overview-total">
+      <span>Total leads</span>
+      <strong>${leads.length}</strong>
+      <small>${buyerCount} BUY / ${sellerCount} SELL</small>
+    </article>
+    <article class="admin-overview-card overview-follow">
+      <span>Needs follow-up</span>
+      <strong>${followUpCount}</strong>
+      <small>Due or overdue</small>
+    </article>
+    <article class="admin-overview-card overview-unassigned">
+      <span>Unassigned</span>
+      <strong>${unassignedCount}</strong>
+      <small>Needs owner</small>
+    </article>
+    <article class="admin-overview-card overview-urgent">
+      <span>Urgent</span>
+      <strong>${urgentCount}</strong>
+      <small>High attention</small>
+    </article>
+  `;
 }
 
 function renderLeadGroups(leads) {
@@ -1299,6 +1357,17 @@ function isOverdue(value, status) {
   if (closedStatuses.has(String(status || "").toLowerCase())) return false;
   const date = new Date(value);
   return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
+}
+
+function isFollowUpDue(value, status) {
+  if (!value) return false;
+  const closedStatuses = new Set(["won", "lost", "closed", "deleted"]);
+  if (closedStatuses.has(String(status || "").toLowerCase())) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  return date.getTime() <= endOfToday.getTime();
 }
 
 function authHeaders() {
