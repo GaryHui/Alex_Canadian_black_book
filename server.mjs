@@ -1353,7 +1353,7 @@ async function publishLeadToInventory(body, user) {
 
   const listing = buildListingFromLead(lead, body, user);
   const existing = await fetchSupabaseJson(
-    `${url}/rest/v1/vehicle_listings?select=id&source_lead_id=eq.${encodeURIComponent(leadId)}&limit=1`,
+    `${url}/rest/v1/vehicle_listings?select=id,status,updated_at,created_at&source_lead_id=eq.${encodeURIComponent(leadId)}&order=updated_at.desc.nullslast,created_at.desc&limit=1`,
     key
   );
   if (!existing.ok) return existing;
@@ -1374,7 +1374,7 @@ async function publishLeadToInventory(body, user) {
 
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
-  const savedListing = data?.[0] || listing;
+  const savedListing = data?.[0] || { ...listing, id: existingId };
   if (isPublicOptionEnabled(savedListing.public_options || listing.public_options, "showPhotos")) {
     await attachLeadPhotosToListing(leadId, savedListing.id || existingId, { url, key });
   }

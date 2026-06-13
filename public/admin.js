@@ -788,11 +788,13 @@ leadsEl.addEventListener("submit", async (event) => {
   });
   const data = await response.json();
   const message = data.ok
-    ? `Inventory listing ${data.updated ? "updated" : "published"}.`
+    ? `Inventory listing ${data.updated ? "updated" : "published"}. Inventory management has been refreshed.`
     : formatApiError(data, "Unable to publish inventory listing.");
   statusEl.textContent = message;
   if (formStatus) formStatus.textContent = message;
-  if (data.ok) await loadInventory();
+  if (data.ok) {
+    await Promise.all([loadInventory(), loadLeads({ forceOpenActivity: true })]);
+  }
 });
 
 leadsEl.addEventListener("submit", async (event) => {
