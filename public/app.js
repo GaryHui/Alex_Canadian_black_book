@@ -1607,7 +1607,8 @@ async function openDealerLeadFromAlert(id) {
   card.scrollIntoView({ behavior: "smooth", block: "center" });
   const details = card.querySelector(".dealer-lead-details");
   if (details) details.open = true;
-  await loadDealerActivity(card, { force: true });
+  highlightDealerLeadChangeAreas(card);
+  await loadDealerActivity(card, { force: true, highlightLatest: true });
 }
 
 function dealerLeadUpdateToken(lead = {}) {
@@ -1658,20 +1659,21 @@ async function loadDealerActivity(card, options = {}) {
     const data = await response.json();
     if (!data.ok) throw new Error(data.error || "Unable to load activity");
     card.dataset.activityLoaded = "true";
-    if (list) list.innerHTML = renderDealerActivity(data);
+    if (list) list.innerHTML = renderDealerActivity(data, { highlightLatest: Boolean(options.highlightLatest) });
   } catch (error) {
     if (list) list.textContent = error.message || "Unable to load activity";
   }
 }
 
-function renderDealerActivity(data) {
+function renderDealerActivity(data, options = {}) {
+  const latestKey = options.highlightLatest ? latestDealerActivityKey(data) : "";
   const tasks = (data.tasks || []).map((task) => {
     const dueText = task.due_at ? ` - Due ${escapeHtml(formatDateTime(task.due_at))}` : " - No due date";
     const action = task.completed_at
       ? `<span class="task-complete-note">Completed ${escapeHtml(formatDateTime(task.completed_at))}</span>`
       : `<button type="button" data-complete-dealer-task="${escapeHtml(task.id || "")}">Mark complete</button>`;
     return `
-      <article class="activity-item ${task.completed_at ? "activity-done" : ""}">
+      <article class="activity-item ${task.completed_at ? "activity-done" : ""} ${latestKey === `task:${task.id}` ? "activity-highlight" : ""}">
         <div>
           <strong>${escapeHtml(task.title || "Task")}</strong>
           <span>Assigned to ${escapeHtml(task.assigned_to || "unassigned")}${dueText}</span>
@@ -1682,7 +1684,7 @@ function renderDealerActivity(data) {
   });
 
   const notes = (data.notes || []).map((note) => `
-    <article class="activity-item">
+    <article class="activity-item ${latestKey === `note:${note.id}` ? "activity-highlight" : ""}">
       <div>
         <strong>${escapeHtml(note.note_type || "note")} by ${escapeHtml(note.author_email || "-")}</strong>
         <span>${escapeHtml(formatDateTime(note.created_at))}</span>
@@ -1692,6 +1694,27 @@ function renderDealerActivity(data) {
   `);
 
   return [...tasks, ...notes].join("") || "<p>No activity yet.</p>";
+}
+
+function latestDealerActivityKey(data) {
+  const items = [
+    ...(data.tasks || []).map((item) => ({ key: `task:${item.id}`, at: item.completed_at || item.created_at || item.due_at })),
+    ...(data.notes || []).map((item) => ({ key: `note:${item.id}`, at: item.created_at }))
+  ];
+  return items
+    .map((item) => ({ ...item, time: new Date(item.at || 0).getTime() }))
+    .filter((item) => item.key && !Number.isNaN(item.time))
+    .sort((a, b) => b.time - a.time)[0]?.key || "";
+}
+
+function highlightDealerLeadChangeAreas(card) {
+  [".lead-progress", ".history-meta", ".dealer-buyer-plan", ".dealer-review-summary", ".dealer-activity-list"].forEach((selector) => {
+    const element = card.querySelector(selector);
+    if (!element) return;
+    element.classList.remove("change-focus");
+    window.requestAnimationFrame(() => element.classList.add("change-focus"));
+    window.setTimeout(() => element.classList.remove("change-focus"), 2200);
+  });
 }
 
 function renderHistory(leads) {

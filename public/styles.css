@@ -2160,6 +2160,27 @@ select {
   text-decoration: line-through;
 }
 
+.activity-highlight {
+  animation: changeFocus 2.1s ease-out;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, .18);
+}
+
+.change-focus {
+  animation: changeFocus 2.1s ease-out;
+}
+
+@keyframes changeFocus {
+  0% {
+    background-color: #fff7ed;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, .22);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
 .task-complete-note {
   align-self: center;
   background: #edf7ed;

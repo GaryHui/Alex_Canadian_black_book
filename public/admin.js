@@ -534,7 +534,8 @@ async function openAdminLeadFromAlert(id) {
   card.scrollIntoView({ behavior: "smooth", block: "center" });
   const details = card.querySelector(".lead-manage");
   if (details) details.open = true;
-  await loadLeadActivity(card, { force: true });
+  highlightLeadChangeAreas(card);
+  await loadLeadActivity(card, { force: true, highlightLatest: true });
 }
 
 function renderLeadWorkbench(leads) {
@@ -1385,12 +1386,13 @@ async function loadLeadActivity(card, options = {}) {
   }
 
   card.dataset.activityLoaded = "true";
-  if (list) list.innerHTML = renderActivity(data);
+  if (list) list.innerHTML = renderActivity(data, { highlightLatest: Boolean(options.highlightLatest) });
 }
 
-function renderActivity(data) {
+function renderActivity(data, options = {}) {
+  const latestKey = options.highlightLatest ? latestActivityKey(data) : "";
   const tasks = (data.tasks || []).map((task) => `
-    <article class="activity-item ${task.completed_at ? "activity-done" : ""}">
+    <article class="activity-item ${task.completed_at ? "activity-done" : ""} ${latestKey === `task:${task.id}` ? "activity-highlight" : ""}">
       <div>
         <strong>${escapeHtml(task.title || "Task")}</strong>
         <span>Task for ${escapeHtml(task.assigned_to || "unassigned")} ${task.due_at ? `due ${escapeHtml(formatDateTime(task.due_at))}` : ""}</span>
@@ -1402,7 +1404,7 @@ function renderActivity(data) {
   `);
 
   const notes = (data.notes || []).map((note) => `
-    <article class="activity-item">
+    <article class="activity-item ${latestKey === `note:${note.id}` ? "activity-highlight" : ""}">
       <div>
         <strong>${escapeHtml(note.note_type || "note")} by ${escapeHtml(note.author_email || "-")}</strong>
         <span>${escapeHtml(formatDateTime(note.created_at))}</span>
@@ -1412,7 +1414,7 @@ function renderActivity(data) {
   `);
 
   const emails = (data.emails || []).map((email) => `
-    <article class="activity-item">
+    <article class="activity-item ${latestKey === `email:${email.id}` ? "activity-highlight" : ""}">
       <div>
         <strong>Email to ${escapeHtml(email.sent_to || "-")}</strong>
         <span>${escapeHtml(email.subject || "")} - ${escapeHtml(formatDateTime(email.created_at))}</span>
@@ -1422,6 +1424,28 @@ function renderActivity(data) {
 
   const content = [...tasks, ...notes, ...emails].join("");
   return content || "<p>No activity yet.</p>";
+}
+
+function latestActivityKey(data) {
+  const items = [
+    ...(data.tasks || []).map((item) => ({ key: `task:${item.id}`, at: item.completed_at || item.created_at || item.due_at })),
+    ...(data.notes || []).map((item) => ({ key: `note:${item.id}`, at: item.created_at })),
+    ...(data.emails || []).map((item) => ({ key: `email:${item.id}`, at: item.created_at }))
+  ];
+  return items
+    .map((item) => ({ ...item, time: new Date(item.at || 0).getTime() }))
+    .filter((item) => item.key && !Number.isNaN(item.time))
+    .sort((a, b) => b.time - a.time)[0]?.key || "";
+}
+
+function highlightLeadChangeAreas(card) {
+  [".lead-progress", ".lead-grid", ".owner-review", ".lead-activity-panel"].forEach((selector) => {
+    const element = card.querySelector(selector);
+    if (!element) return;
+    element.classList.remove("change-focus");
+    window.requestAnimationFrame(() => element.classList.add("change-focus"));
+    window.setTimeout(() => element.classList.remove("change-focus"), 2200);
+  });
 }
 
 usersEl.addEventListener("submit", async (event) => {
