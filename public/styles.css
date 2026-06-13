@@ -1075,6 +1075,32 @@ select {
   color: #64748b;
 }
 
+.admin-module-nav {
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 10px;
+}
+
+.admin-module-nav a {
+  border: 1px solid #b9c7d8;
+  border-radius: 999px;
+  color: #1f3652;
+  font-weight: 900;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.admin-module-nav a:hover {
+  background: #eef6ff;
+  border-color: #0b4f9c;
+  color: #0b4f9c;
+}
+
 .overview-total {
   border-left-color: #0b4f9c;
 }
@@ -1107,6 +1133,15 @@ select {
 
 .admin-section-head h2 {
   margin: 0 0 4px;
+}
+
+.section-kicker {
+  color: #64748b !important;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  margin-bottom: 4px !important;
+  text-transform: uppercase;
 }
 
 .admin-section-head p {
@@ -2013,6 +2048,75 @@ select {
   gap: 12px;
 }
 
+.inventory-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 14px 0 4px;
+}
+
+.inventory-summary article {
+  background: #f8fafc;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+}
+
+.inventory-summary span {
+  color: #516174;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.inventory-summary strong {
+  color: #16243a;
+  font-size: 24px;
+}
+
+.inventory-summary small {
+  color: #64748b;
+}
+
+.inventory-group {
+  display: grid;
+  gap: 10px;
+}
+
+.inventory-group > header {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.inventory-group h3 {
+  margin: 0;
+}
+
+.inventory-group p {
+  color: #64748b;
+  margin: 3px 0 0;
+}
+
+.inventory-group > header b {
+  background: #fff;
+  border-radius: 999px;
+  min-width: 36px;
+  padding: 7px 9px;
+  text-align: center;
+}
+
+.inventory-group-list {
+  display: grid;
+  gap: 10px;
+}
+
 .admin-inquiries {
   display: grid;
   gap: 10px;
@@ -2084,6 +2188,38 @@ select {
 .inventory-card-head span {
   color: #666;
   font-size: 13px;
+}
+
+.inventory-card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventory-card-facts span {
+  border: 1px solid #d8e2ef;
+  border-radius: 6px;
+  color: #516174;
+  padding: 7px 9px;
+}
+
+.inventory-card-facts b {
+  color: #16243a;
+}
+
+.inventory-edit-details {
+  border-top: 1px solid #e8edf3;
+  padding-top: 10px;
+}
+
+.inventory-edit-details > summary {
+  color: #0b4f9c;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.inventory-edit-details > button {
+  margin-top: 10px;
 }
 
 .inventory-edit-grid {
@@ -2619,6 +2755,7 @@ select {
 
   .admin-section-head,
   .admin-overview,
+  .inventory-summary,
   .user-limit-card,
   .history-meta {
     align-items: stretch;

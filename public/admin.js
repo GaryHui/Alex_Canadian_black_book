@@ -6,6 +6,8 @@ const dealersStatusEl = document.querySelector("#dealers-status");
 const dealersEl = document.querySelector("#admin-dealers");
 const inventoryStatusEl = document.querySelector("#inventory-status");
 const inventoryEl = document.querySelector("#admin-inventory");
+const inventorySummaryEl = document.querySelector("#inventory-summary");
+const inventoryFilterButtons = [...document.querySelectorAll("[data-inventory-filter]")];
 const inquiriesStatusEl = document.querySelector("#inquiries-status");
 const inquiriesEl = document.querySelector("#admin-inquiries");
 const adminOverviewEl = document.querySelector("#admin-overview");
@@ -34,6 +36,8 @@ let clearLeadsConfirmEl = null;
 let adminRefreshTimer = null;
 let adminLeadsCache = [];
 let adminLeadFilter = "all";
+let inventoryCache = [];
+let inventoryFilter = "active";
 let adminLeadTokenMap = new Map();
 let adminLeadAlertMap = new Map();
 let adminLeadSnapshotReady = false;
@@ -59,6 +63,13 @@ adminLeadAlertsEl?.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-admin-open-alert]");
   if (!button) return;
   await openAdminLeadFromAlert(button.dataset.adminOpenAlert || "");
+});
+inventoryFilterButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    inventoryFilter = button.dataset.inventoryFilter || "active";
+    inventoryFilterButtons.forEach((item) => item.classList.toggle("active", item === button));
+    renderInventoryWarehouse(inventoryCache);
+  });
 });
 
 initializeAdminAuth();
@@ -240,8 +251,74 @@ async function loadInventory() {
     return;
   }
 
-  inventoryStatusEl.textContent = `${data.inventory.length} inventory listing(s).`;
-  inventoryEl.innerHTML = (data.inventory || []).map(renderInventoryListing).join("") || "<p>No inventory listings yet. Publish a lead from Captured leads first.</p>";
+  inventoryCache = data.inventory || [];
+  renderInventoryWarehouse(inventoryCache);
+  if (adminLeadsCache.length) renderLeadWorkbench(adminLeadsCache);
+}
+
+function renderInventoryWarehouse(inventory) {
+  const filtered = filterInventory(inventory);
+  renderInventorySummary(inventory);
+  inventoryStatusEl.textContent = `${filtered.length} shown of ${inventory.length} inventory listing(s).`;
+  inventoryEl.innerHTML = renderInventoryGroups(filtered) || "<p>No inventory listings in this view. Add a SELL lead as a draft inventory item first.</p>";
+}
+
+function filterInventory(inventory) {
+  if (inventoryFilter === "all") return inventory;
+  if (inventoryFilter === "active") return inventory.filter((item) => !["sold", "archived"].includes(String(item.status || "").toLowerCase()));
+  if (inventoryFilter === "draft") return inventory.filter((item) => ["draft", "review"].includes(String(item.status || "").toLowerCase()));
+  return inventory.filter((item) => String(item.status || "").toLowerCase() === inventoryFilter);
+}
+
+function renderInventorySummary(inventory) {
+  if (!inventorySummaryEl) return;
+  const counts = {
+    published: inventory.filter((item) => item.status === "published").length,
+    draft: inventory.filter((item) => ["draft", "review"].includes(item.status)).length,
+    sold: inventory.filter((item) => item.status === "sold").length,
+    archived: inventory.filter((item) => item.status === "archived").length
+  };
+  inventorySummaryEl.innerHTML = [
+    ["Published", counts.published, "Visible on Buy page"],
+    ["Draft / review", counts.draft, "Not public yet"],
+    ["Sold", counts.sold, "Closed stock"],
+    ["Archived", counts.archived, "Hidden history"]
+  ].map(([label, value, hint]) => `
+    <article>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(String(value))}</strong>
+      <small>${escapeHtml(hint)}</small>
+    </article>
+  `).join("");
+}
+
+function renderInventoryGroups(inventory) {
+  const groups = [
+    { title: "Published", caption: "Live on the Buy page.", status: "published" },
+    { title: "Draft / review", caption: "Warehouse vehicles not public yet.", status: "draft" },
+    { title: "Sold", caption: "Sold vehicles kept for owner history.", status: "sold" },
+    { title: "Archived", caption: "Hidden listings no longer active.", status: "archived" }
+  ].map((group) => ({
+    ...group,
+    listings: group.status === "draft"
+      ? inventory.filter((item) => ["draft", "review"].includes(String(item.status || "").toLowerCase()))
+      : inventory.filter((item) => String(item.status || "").toLowerCase() === group.status)
+  })).filter((group) => group.listings.length);
+
+  return groups.map((group) => `
+    <section class="inventory-group inventory-group-${escapeHtml(group.status)}">
+      <header>
+        <div>
+          <h3>${escapeHtml(group.title)}</h3>
+          <p>${escapeHtml(group.caption)}</p>
+        </div>
+        <b>${group.listings.length}</b>
+      </header>
+      <div class="inventory-group-list">
+        ${group.listings.map(renderInventoryListing).join("")}
+      </div>
+    </section>
+  `).join("");
 }
 
 async function loadInquiries() {
@@ -287,6 +364,8 @@ function renderInquiry(inquiry) {
 function renderInventoryListing(listing) {
   const photos = Array.isArray(listing.photos) ? listing.photos : [];
   const canUnpublish = listing.status === "published";
+  const canPublish = listing.status !== "published" && listing.status !== "sold";
+  const canArchive = listing.status !== "archived";
   return `
     <form class="inventory-card-admin" data-id="${escapeHtml(listing.id || "")}">
       <div class="inventory-card-head">
@@ -296,53 +375,56 @@ function renderInventoryListing(listing) {
         </div>
         <b class="status-pill status-${escapeHtml(cssToken(listing.status || "draft"))}">${escapeHtml(listing.status || "draft")}</b>
       </div>
-      <div class="inventory-edit-grid">
-        <label>
-          <span>Title</span>
-          <input name="title" value="${escapeHtml(listing.title || "")}" />
-        </label>
-        <label>
-          <span>Asking price</span>
-          <input name="askingPrice" type="number" min="0" step="1" value="${escapeHtml(listing.price || "")}" />
-        </label>
-        <label>
-          <span>Monthly estimate</span>
-          <input name="monthlyPaymentEstimate" type="number" min="0" step="1" value="${escapeHtml(listing.monthlyPaymentEstimate || "")}" />
-        </label>
-        <label>
-          <span>Status</span>
-          <select name="status">
-            ${["draft", "review", "published", "sold", "archived"].map((status) =>
-              `<option value="${status}" ${listing.status === status ? "selected" : ""}>${status}</option>`
-            ).join("")}
-          </select>
-        </label>
-        <label>
-          <span>Kilometers</span>
-          <input value="${escapeHtml(formatNumber(listing.kilometers || 0))}" disabled />
-        </label>
-        <label>
-          <span>Region</span>
-          <input value="${escapeHtml(listing.region || "-")}" disabled />
-        </label>
-        <label class="inventory-description">
-          <span>Description</span>
-          <textarea name="description">${escapeHtml(listing.description || "")}</textarea>
-        </label>
-        <section class="inventory-photo-summary">
-          <h4>Published photos</h4>
-          <p>Photos are managed in Captured leads before the vehicle is sent to inventory.</p>
-          <div class="inventory-photo-list">
-            ${photos.map((photo) => `<a href="${escapeHtml(photo.url)}" target="_blank" rel="noreferrer">${escapeHtml(photo.label || "Vehicle photo")}</a>`).join("") || "<span>No photos attached yet.</span>"}
-          </div>
-        </section>
+      <div class="inventory-card-facts">
+        <span>Price <b>${listing.price ? `$${formatNumber(listing.price)}` : "-"}</b></span>
+        <span>KM <b>${formatNumber(listing.kilometers || 0)}</b></span>
+        <span>Region <b>${escapeHtml(listing.region || "-")}</b></span>
+        <span>Photos <b>${photos.length}</b></span>
       </div>
       <div class="inventory-actions">
-        <button type="submit">Save listing</button>
+        <button type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="published" ${canPublish ? "" : "disabled"}>Publish</button>
         <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="draft" ${canUnpublish ? "" : "disabled"}>Unpublish</button>
         <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="sold">Mark sold</button>
+        <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="archived" ${canArchive ? "" : "disabled"}>Archive</button>
         <button class="danger-outline" type="button" data-remove-inventory="${escapeHtml(listing.id || "")}">Remove from inventory</button>
       </div>
+      <details class="inventory-edit-details">
+        <summary>Edit listing details</summary>
+        <div class="inventory-edit-grid">
+          <label>
+            <span>Title</span>
+            <input name="title" value="${escapeHtml(listing.title || "")}" />
+          </label>
+          <label>
+            <span>Asking price</span>
+            <input name="askingPrice" type="number" min="0" step="1" value="${escapeHtml(listing.price || "")}" />
+          </label>
+          <label>
+            <span>Monthly estimate</span>
+            <input name="monthlyPaymentEstimate" type="number" min="0" step="1" value="${escapeHtml(listing.monthlyPaymentEstimate || "")}" />
+          </label>
+          <label>
+            <span>Status</span>
+            <select name="status">
+              ${["draft", "review", "published", "sold", "archived"].map((status) =>
+                `<option value="${status}" ${listing.status === status ? "selected" : ""}>${status}</option>`
+              ).join("")}
+            </select>
+          </label>
+          <label class="inventory-description">
+            <span>Description</span>
+            <textarea name="description">${escapeHtml(listing.description || "")}</textarea>
+          </label>
+          <section class="inventory-photo-summary">
+            <h4>Published photos</h4>
+            <p>Photos are managed from the source lead or future inventory photo tools.</p>
+            <div class="inventory-photo-list">
+              ${photos.map((photo) => `<a href="${escapeHtml(photo.url)}" target="_blank" rel="noreferrer">${escapeHtml(photo.label || "Vehicle photo")}</a>`).join("") || "<span>No photos attached yet.</span>"}
+            </div>
+          </section>
+        </div>
+        <button type="submit">Save listing details</button>
+      </details>
     </form>
   `;
 }
@@ -689,9 +771,13 @@ function renderLead(lead) {
   const statusLabel = overdue ? "Overdue" : leadStatusLabel(status, buyer);
   const pendingAlert = adminLeadAlertMap.has(String(lead.id || ""));
   const progressSteps = renderLeadProgress(buyer, status);
+  const inventoryListing = inventoryCache.find((item) => item.sourceLeadId && item.sourceLeadId === lead.id);
   const actionButtons = leadStatusActions(buyer, status)
     .map((action) => `<button type="button" data-lead-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
     .join("");
+  const warehouseAction = buyer ? "" : inventoryListing
+    ? `<button type="button" data-view-inventory="${escapeHtml(inventoryListing.id || "")}">View inventory</button>`
+    : `<button type="button" data-quick-inventory="${escapeHtml(lead.id || "")}">Add draft inventory</button>`;
   const quickAssign = dealerStaffEmails.length ? `
       <div class="quick-assign-row" aria-label="Quick assign lead">
         <span>Assign</span>
@@ -809,7 +895,7 @@ function renderLead(lead) {
       ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
       ${progressSteps}
       ${quickAssign}
-      ${actionButtons ? `<div class="lead-action-row">${actionButtons}</div>` : ""}
+      ${(warehouseAction || actionButtons) ? `<div class="lead-action-row">${warehouseAction}${actionButtons}</div>` : ""}
       <details class="lead-manage">
         <summary>Manage lead</summary>
         <div class="lead-grid">
@@ -1028,8 +1114,7 @@ inventoryEl?.addEventListener("click", async (event) => {
     const nextStatus = statusButton.dataset.status || "draft";
     const label = nextStatus === "draft" ? "unpublish this listing" : `mark this listing as ${nextStatus}`;
     if (!window.confirm(`Confirm ${label}?`)) return;
-    form.elements.status.value = nextStatus;
-    await saveInventoryListing(form);
+    await saveInventoryListing(form, { status: nextStatus });
     return;
   }
 
@@ -1039,10 +1124,11 @@ inventoryEl?.addEventListener("click", async (event) => {
   }
 });
 
-async function saveInventoryListing(form) {
+async function saveInventoryListing(form, overrides = {}) {
   const payload = {
     id: form.dataset.id,
-    ...Object.fromEntries(new FormData(form).entries())
+    ...Object.fromEntries(new FormData(form).entries()),
+    ...overrides
   };
   inventoryStatusEl.textContent = "Saving inventory listing...";
   const response = await fetch("/api/admin-inventory", {
@@ -1187,6 +1273,18 @@ leadsEl.addEventListener("click", async (event) => {
     return;
   }
 
+  const quickInventoryButton = event.target.closest("[data-quick-inventory]");
+  if (quickInventoryButton) {
+    await quickAddDraftInventory(quickInventoryButton);
+    return;
+  }
+
+  const viewInventoryButton = event.target.closest("[data-view-inventory]");
+  if (viewInventoryButton) {
+    openInventoryListing(viewInventoryButton.dataset.viewInventory || "");
+    return;
+  }
+
   const deleteButton = event.target.closest("[data-delete-lead]");
   if (deleteButton) {
     await deleteSingleLead(deleteButton);
@@ -1276,6 +1374,47 @@ async function quickAssignLead(button) {
     statusEl.textContent = error.message || "Unable to assign lead.";
     button.disabled = false;
   }
+}
+
+async function quickAddDraftInventory(button) {
+  const card = button.closest(".lead-card");
+  const leadId = button.dataset.quickInventory || card?.dataset?.id || "";
+  if (!leadId) return;
+
+  button.disabled = true;
+  statusEl.textContent = "Adding vehicle to inventory drafts...";
+  try {
+    const response = await fetch("/api/inventory/from-lead", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId,
+        status: "draft"
+      })
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(formatApiError(data, "Unable to add inventory draft."));
+    statusEl.textContent = "Inventory draft created. Review it in the warehouse before publishing.";
+    await Promise.all([loadInventory(), loadLeads({ suppressAlerts: true, forceOpenActivity: true })]);
+    document.querySelector("#inventory-warehouse")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
+    statusEl.textContent = error.message || "Unable to add inventory draft.";
+    button.disabled = false;
+  }
+}
+
+function openInventoryListing(id) {
+  if (!id) return;
+  if (inventoryFilter !== "all" && !filterInventory(inventoryCache).some((item) => item.id === id)) {
+    inventoryFilter = "all";
+    inventoryFilterButtons.forEach((button) => button.classList.toggle("active", button.dataset.inventoryFilter === "all"));
+    renderInventoryWarehouse(inventoryCache);
+  }
+  const card = inventoryEl.querySelector(`.inventory-card-admin[data-id="${cssEscape(id)}"]`);
+  if (!card) return;
+  document.querySelector("#inventory-warehouse")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  card.classList.add("lead-card-flash");
+  window.setTimeout(() => card.classList.remove("lead-card-flash"), 1600);
 }
 
 leadsEl.addEventListener("toggle", async (event) => {

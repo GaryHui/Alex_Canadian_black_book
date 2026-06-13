@@ -26,12 +26,18 @@
       </header>
       <section id="admin-content" hidden>
       <section class="admin-overview" id="admin-overview" aria-label="Lead overview"></section>
+      <nav class="admin-module-nav" aria-label="Admin modules">
+        <a href="#crm-leads">CRM leads</a>
+        <a href="#inventory-warehouse">Inventory warehouse</a>
+        <a href="#operations-settings">Operations settings</a>
+      </nav>
       <section id="admin-lead-alerts" class="lead-alerts" aria-live="polite" hidden></section>
-      <section class="admin-section admin-section-leads">
+      <section id="crm-leads" class="admin-section admin-section-leads">
         <div class="admin-section-head">
           <div>
-            <h2>Lead workbench</h2>
-            <p>Assign BUY and SELL leads, track status, and spot follow-ups before they go cold.</p>
+            <p class="section-kicker">CRM</p>
+            <h2>Leads follow-up</h2>
+            <p>Assign BUY and SELL leads, track status, and move seller vehicles into warehouse drafts when they are ready.</p>
           </div>
           <div class="admin-section-actions">
             <button id="reload-leads" type="button">Reload leads</button>
@@ -48,18 +54,28 @@
         <p id="admin-status" class="status">Loading...</p>
         <div id="admin-leads" class="admin-leads"></div>
       </section>
-      <section class="admin-section admin-section-inventory">
+      <section id="inventory-warehouse" class="admin-section admin-section-inventory">
         <div class="admin-section-head">
           <div>
-            <h2>Inventory management</h2>
-            <p>Manage vehicles already visible or ready for the Buy page.</p>
+            <p class="section-kicker">Warehouse</p>
+            <h2>Inventory warehouse</h2>
+            <p>Review draft vehicles, publish public listings, mark sold, or archive old stock.</p>
           </div>
           <button id="reload-inventory" type="button">Reload inventory</button>
+        </div>
+        <div id="inventory-summary" class="inventory-summary"></div>
+        <div class="admin-lead-filters" aria-label="Inventory filters">
+          <button class="active" type="button" data-inventory-filter="active">Active</button>
+          <button type="button" data-inventory-filter="published">Published</button>
+          <button type="button" data-inventory-filter="draft">Draft / review</button>
+          <button type="button" data-inventory-filter="sold">Sold</button>
+          <button type="button" data-inventory-filter="archived">Archived</button>
+          <button type="button" data-inventory-filter="all">All</button>
         </div>
         <p id="inventory-status" class="status">Loading inventory...</p>
         <div id="admin-inventory" class="admin-inventory"></div>
       </section>
-      <details class="admin-operations">
+      <details id="operations-settings" class="admin-operations">
         <summary>Operations settings</summary>
       <section class="admin-section admin-section-access">
         <div class="admin-section-head">
