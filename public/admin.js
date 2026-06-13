@@ -410,15 +410,17 @@ function renderInventoryListing(listing) {
   const publicOptionInputs = renderInventoryPublicOptionInputs(listing.publicOptions || {});
   const selectablePhotos = availablePhotos.length ? `
             <fieldset class="inventory-photo-picker">
-              <legend>Show on Buy page</legend>
+              <legend>Replace public photos</legend>
               <input type="hidden" name="photoSelectionPresent" value="1" />
               ${availablePhotos.map((photo, index) => {
                 const url = String(photo.url || "").trim();
                 return `
                   <label>
                     <input type="checkbox" name="selectedPhotoUrls" value="${escapeHtml(url)}" ${selectedPhotoUrls.has(url) ? "checked" : ""} />
+                    <img src="${escapeHtml(adminPhotoPreviewUrl(url))}" alt="${escapeHtml(photo.label || `Vehicle photo ${index + 1}`)}" loading="lazy" />
                     <span>${escapeHtml(photo.label || `Vehicle photo ${index + 1}`)}</span>
                     <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Open</a>
+                    <button type="button" class="link-danger" data-remove-inventory-photo="${escapeHtml(url)}">Remove from Buy page</button>
                   </label>
                 `;
               }).join("")}
@@ -426,7 +428,7 @@ function renderInventoryListing(listing) {
   const photoManager = listing.sourceLeadId ? `
           <section class="inventory-photo-summary inventory-photo-manager">
             <h4>Vehicle photos</h4>
-            <p>Choose which Drive photos appear on the Buy page. New uploads go to the same vehicle lead folder and become selectable here.</p>
+            <p>Choose which Drive photos appear on the Buy page. Saving this listing replaces the public photo set with the checked photos.</p>
             <div class="inventory-photo-upload">
               <label>
                 <span>Photo type</span>
@@ -534,6 +536,14 @@ function renderInventoryPublicOptionInputs(options) {
     const enabled = Object.prototype.hasOwnProperty.call(options || {}, key) ? options[key] === true : defaultValue;
     return enabled ? `<input type="hidden" name="${escapeHtml(key)}" value="on" />` : "";
   }).join("");
+}
+
+function adminPhotoPreviewUrl(url) {
+  const value = String(url || "");
+  const fileMatch = value.match(/\/d\/([^/]+)/);
+  const idMatch = value.match(/[?&]id=([^&]+)/);
+  const id = fileMatch?.[1] || idMatch?.[1] || "";
+  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w240` : value;
 }
 
 function renderDealer(staff) {
@@ -1437,6 +1447,13 @@ inventoryEl?.addEventListener("click", async (event) => {
     return;
   }
 
+  const removePhotoButton = event.target.closest("[data-remove-inventory-photo]");
+  if (removePhotoButton) {
+    event.preventDefault();
+    await removeInventoryPublicPhoto(removePhotoButton);
+    return;
+  }
+
   const statusButton = event.target.closest("[data-inventory-status]");
   if (statusButton) {
     const form = statusButton.closest(".inventory-card-admin");
@@ -1453,6 +1470,30 @@ inventoryEl?.addEventListener("click", async (event) => {
     await removeInventoryListing(removeButton);
   }
 });
+
+async function removeInventoryPublicPhoto(button) {
+  const form = button.closest(".inventory-card-admin");
+  const url = String(button.dataset.removeInventoryPhoto || "").trim();
+  if (!form || !url) return;
+  const label = button.closest("label")?.querySelector("span")?.textContent || "this photo";
+  const confirmed = window.confirm(
+    `Remove "${label}" from the Buy page?\n\nThe original file stays in the vehicle Drive folder, but shoppers will no longer see it on this listing.`
+  );
+  if (!confirmed) return;
+
+  const selectedUrls = [...form.querySelectorAll("input[name='selectedPhotoUrls']:checked")]
+    .map((input) => String(input.value || "").trim())
+    .filter(Boolean)
+    .filter((selectedUrl) => selectedUrl !== url);
+
+  button.disabled = true;
+  inventoryStatusEl.textContent = "Removing photo from Buy page...";
+  await saveInventoryListing(form, {
+    selectedPhotoUrls: selectedUrls,
+    showPhotos: selectedUrls.length > 0
+  });
+  button.disabled = false;
+}
 
 async function saveInventoryListing(form, overrides = {}) {
   const payload = {

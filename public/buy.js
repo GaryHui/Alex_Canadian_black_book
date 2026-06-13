@@ -516,7 +516,7 @@ function photoDisplayUrl(url) {
   const fileMatch = value.match(/\/d\/([^/]+)/);
   const idMatch = value.match(/[?&]id=([^&]+)/);
   const id = fileMatch?.[1] || idMatch?.[1] || "";
-  return id ? `https://drive.google.com/uc?export=view&id=${encodeURIComponent(id)}` : value;
+  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1200` : value;
 }
 
 function detailItem(label, value) {

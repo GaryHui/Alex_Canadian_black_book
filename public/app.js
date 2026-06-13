@@ -1332,32 +1332,19 @@ function renderDealerTodayWork(leads) {
     .filter((lead, index, list) => list.findIndex((item) => item.id === lead.id) === index)
     .slice(0, 5);
   dealerTodayWorkEl.hidden = false;
-  const quickList = priorityLeads.length ? priorityLeads : dueLeads.length ? dueLeads : updatedLeads;
-  const todayTitle = priorityLeads.length
-    ? `${priorityLeads.length} high priority lead${priorityLeads.length === 1 ? "" : "s"}`
-    : dueLeads.length
-      ? `${dueLeads.length} follow-up${dueLeads.length === 1 ? "" : "s"} due`
-      : `${updatedLeads.length} updated lead${updatedLeads.length === 1 ? "" : "s"}`;
-  dealerTodayWorkEl.innerHTML = quickList.length ? `
+  const totalAttention = priorityLeads.length + dueLeads.length + updatedLeads.length;
+  dealerTodayWorkEl.innerHTML = totalAttention ? `
     <header>
       <div>
         <span>Today</span>
-        <strong>${todayTitle}</strong>
+        <strong>${totalAttention} item${totalAttention === 1 ? "" : "s"} need attention</strong>
       </div>
-      <button type="button" data-dealer-filter-shortcut="${priorityLeads.length ? "priority" : dueLeads.length ? "due" : "active"}">${priorityLeads.length ? "View priority" : dueLeads.length ? "View all due" : "View active"}</button>
+      <button type="button" data-dealer-filter-shortcut="${priorityLeads.length ? "priority" : dueLeads.length ? "due" : "active"}">${priorityLeads.length ? "View priority" : dueLeads.length ? "View due" : "View active"}</button>
     </header>
-    <div class="dealer-today-list">
-      ${quickList.map((lead) => {
-        const input = lead.input || {};
-        const valuation = lead.valuation || {};
-        const title = cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || "Vehicle lead", isBuyerLead(lead));
-        return `
-          <button type="button" data-dealer-open-lead="${escapeHtml(lead.id || "")}">
-            <b>${escapeHtml(title)}</b>
-            <span>${escapeHtml(lead.next_follow_up_at ? formatDateTime(lead.next_follow_up_at) : "No follow-up time")}</span>
-          </button>
-        `;
-      }).join("")}
+    <div class="dealer-today-sections">
+      ${renderDealerTodaySection("Priority", "Urgent or high leads from owner", priorityLeads, "priority")}
+      ${renderDealerTodaySection("Due", "Overdue or due today", dueLeads, "due")}
+      ${renderDealerTodaySection("Updated", "New notes, tasks, or owner changes", updatedLeads, "active")}
     </div>
   ` : `
     <header>
@@ -1371,6 +1358,38 @@ function renderDealerTodayWork(leads) {
       <b>Your current queue is clear.</b>
       <span>Use Assigned leads for the full pipeline or Valuation when you need to price a vehicle manually.</span>
     </div>
+  `;
+}
+
+function renderDealerTodaySection(label, hint, leads, filter) {
+  return `
+    <section class="dealer-today-section dealer-today-section-${escapeHtml(cssToken(label))}">
+      <header>
+        <div>
+          <span>${escapeHtml(label)}</span>
+          <strong>${leads.length}</strong>
+          <small>${escapeHtml(hint)}</small>
+        </div>
+        <button type="button" data-dealer-filter-shortcut="${escapeHtml(filter)}">Open</button>
+      </header>
+      <div class="dealer-today-list">
+        ${leads.length ? leads.map(renderDealerTodayLeadButton).join("") : `<p>No ${escapeHtml(label.toLowerCase())} items.</p>`}
+      </div>
+    </section>
+  `;
+}
+
+function renderDealerTodayLeadButton(lead) {
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+  const title = cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || "Vehicle lead", isBuyerLead(lead));
+  const priority = String(lead.priority || "normal").toLowerCase();
+  const due = lead.next_follow_up_at ? formatDateTime(lead.next_follow_up_at) : "No follow-up time";
+  return `
+    <button type="button" data-dealer-open-lead="${escapeHtml(lead.id || "")}">
+      <b>${escapeHtml(title)}</b>
+      <span>${escapeHtml(priority === "urgent" || priority === "high" ? `${priority.toUpperCase()} - ${due}` : due)}</span>
+    </button>
   `;
 }
 

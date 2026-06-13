@@ -2176,6 +2176,60 @@ select {
   margin-left: 10px;
 }
 
+.dealer-today-sections {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dealer-today-section {
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.dealer-today-section header {
+  align-items: start;
+  border-bottom: 1px solid #eef2f7;
+  padding-bottom: 8px;
+}
+
+.dealer-today-section header strong {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.dealer-today-section header small {
+  color: #64748b;
+  display: block;
+  font-size: 12px;
+}
+
+.dealer-today-section-priority {
+  border-color: #fecdd3;
+  border-left: 5px solid #e11d48;
+}
+
+.dealer-today-section-priority header span {
+  color: #be123c;
+}
+
+.dealer-today-section-due {
+  border-left: 5px solid #f59e0b;
+}
+
+.dealer-today-section-updated {
+  border-left: 5px solid #0b4f9c;
+}
+
+.dealer-today-list p {
+  color: #64748b;
+  margin: 0;
+}
+
 .dealer-today-empty {
   background: #fff;
   border: 1px dashed #b9c7d8;
@@ -2820,13 +2874,22 @@ select {
   border-radius: 6px;
   display: grid;
   gap: 8px;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto 64px minmax(0, 1fr) auto auto;
   padding: 8px 10px;
 }
 
 .inventory-photo-picker input {
   height: 18px;
   width: 18px;
+}
+
+.inventory-photo-picker img {
+  aspect-ratio: 4 / 3;
+  background: #eaf5ff;
+  border-radius: 6px;
+  height: 48px;
+  object-fit: cover;
+  width: 64px;
 }
 
 .inventory-photo-picker span {
@@ -2837,6 +2900,20 @@ select {
 .inventory-photo-picker a {
   color: #0b4f9c;
   font-weight: 800;
+}
+
+.inventory-photo-picker .link-danger {
+  background: transparent;
+  border: 0;
+  color: #dc2626;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 4px 0;
+  text-align: left;
+}
+
+.inventory-photo-picker .link-danger:hover {
+  text-decoration: underline;
 }
 
 .inventory-photo-list {
@@ -3378,6 +3455,7 @@ select {
   .lead-photo-manager,
   .inventory-publish-form,
   .inventory-photo-upload,
+  .dealer-today-sections,
   .inventory-edit-grid,
   .lead-note-form,
   .lead-task-form,
@@ -3404,6 +3482,15 @@ select {
 
   .dealer-lead-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .inventory-photo-picker label {
+    grid-template-columns: auto 64px minmax(0, 1fr);
+  }
+
+  .inventory-photo-picker a,
+  .inventory-photo-picker .link-danger {
+    grid-column: 3 / -1;
   }
 
   .dealer-lead-top,

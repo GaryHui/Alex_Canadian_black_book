@@ -112,6 +112,8 @@ These are the next areas to keep tightening without making the product heavier:
 - continue testing real admin/dealer role flows after each deploy
 - keep update reminders obvious: new leads and changed leads should be clickable, open the exact card, and highlight the changed area first
 - keep staff work efficient: owner one-click assignment and staff "today due" work lists should stay visible before advanced settings
+- staff Today work should mirror the owner's urgency model: separate urgent/high-priority leads, due follow-ups, and updated leads so owner-dispatched urgent work is not hidden in a long list
+- inventory photos need two layers: original Drive folder assets stay preserved for audit/reuse, while the Buy page photo set can be replaced or pruned from the warehouse listing without deleting source files
 
 ## Product Structure
 
