@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     const body = req.body || {};
     const access = await canAccessLead(body.leadId, dealer);
     if (!access.ok) return res.status(access.status || 403).json(access);
-    const result = await createActivity(body, dealer.user);
+    const result = await createActivity(body, dealer.user, dealer.role);
     return res.status(result.ok ? 200 : result.status || 400).json(result);
   }
 
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     const access = await canAccessLead(body.leadId, dealer);
     if (!access.ok) return res.status(access.status || 403).json(access);
     const result = body.action === "status"
-      ? await updateLeadStatus(body, dealer.user)
+      ? await updateLeadStatus(body, dealer.user, dealer.role)
       : body.action === "follow_up"
         ? await updateLeadFollowUp(body, dealer.user)
         : await updateTask(body, dealer.user);
@@ -86,17 +86,17 @@ async function canAccessLead(leadId, dealer) {
   return { ok: false, status: 403, error: "This lead is not assigned to your dealer account." };
 }
 
-async function createActivity(body, user) {
+async function createActivity(body, user, role) {
   const leadId = String(body.leadId || "").trim();
   const type = String(body.type || "note").trim().toLowerCase();
   if (!leadId) return { ok: false, status: 400, error: "Lead id is required" };
 
   if (type === "task") return createTask(body, user);
   if (type === "email") return recordEmail(body, user);
-  return createNote(body, user);
+  return createNote(body, user, role);
 }
 
-async function createNote(body, user) {
+async function createNote(body, user, role) {
   const client = supabaseClient();
   if (!client.ok) return client;
 
@@ -113,6 +113,9 @@ async function createNote(body, user) {
 
   const result = await insertJson(`${client.url}/rest/v1/lead_notes`, client.key, payload);
   if (!result.ok) return result;
+  if (role !== "admin" && payload.note_type === "offer") {
+    await createOwnerReview(client, leadId, user, "Quote or offer added by staff.");
+  }
   await touchLead(client, leadId);
   return { ok: true, note: result.data?.[0] || null };
 }
@@ -192,7 +195,7 @@ async function updateTask(body, user) {
   return { ok: true, task: data?.[0] || null };
 }
 
-async function updateLeadStatus(body, user) {
+async function updateLeadStatus(body, user, role) {
   const client = supabaseClient();
   if (!client.ok) return client;
 
@@ -224,6 +227,10 @@ async function updateLeadStatus(body, user) {
     note_type: "internal",
     note
   }).catch(() => null);
+  if (role !== "admin") {
+    const reason = ownerReviewReason(status);
+    if (reason) await createOwnerReview(client, leadId, user, reason);
+  }
 
   return { ok: true, lead: data?.[0] || null };
 }
@@ -272,6 +279,28 @@ async function touchLead(client, leadId) {
     },
     body: JSON.stringify({ last_activity_at: new Date().toISOString() })
   }).catch(() => null);
+}
+
+async function createOwnerReview(client, leadId, user, reason) {
+  await insertJson(`${client.url}/rest/v1/lead_notes`, client.key, {
+    lead_id: leadId,
+    author_email: String(user?.email || "").trim().toLowerCase(),
+    note_type: "owner_review",
+    note: reason
+  }).catch(() => null);
+}
+
+function ownerReviewReason(status) {
+  const value = String(status || "").trim().toLowerCase();
+  const labels = {
+    inspection_booked: "Inspection appointment booked by staff.",
+    appointment_booked: "Buyer appointment booked by staff.",
+    finance_sent: "Finance quote sent by staff.",
+    offer_sent: "Purchase offer sent by staff.",
+    won: "Lead marked won by staff.",
+    lost: "Lead marked lost by staff."
+  };
+  return labels[value] || "";
 }
 
 function supabaseClient() {

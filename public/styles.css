@@ -1873,6 +1873,64 @@ select {
   box-shadow: 0 0 0 2px rgba(245, 158, 11, .18);
 }
 
+.owner-review-required {
+  align-items: center;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-left: 6px solid #f97316;
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 8px 0;
+  padding: 12px;
+}
+
+.owner-review-required div {
+  display: grid;
+  gap: 4px;
+}
+
+.owner-review-required span,
+.owner-review-read span {
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.owner-review-required strong {
+  color: #1f2937;
+}
+
+.owner-review-required small {
+  color: #7a4a20;
+}
+
+.owner-review-required button {
+  background: #fff;
+  border: 1px solid #f97316;
+  border-radius: 999px;
+  color: #9a3412;
+  cursor: pointer;
+  font-weight: 900;
+  min-height: 34px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.owner-review-read {
+  background: #ecfdf5;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  margin: 8px 0;
+  padding: 10px 12px;
+}
+
+.owner-review-read span {
+  color: #166534;
+}
+
 .lead-card-flash {
   animation: leadFlash 1.4s ease-out;
 }
@@ -2083,6 +2141,43 @@ select {
 .lead-manage[open] summary,
 .lead-raw[open] summary {
   margin-bottom: 10px;
+}
+
+.lead-detail-section {
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px;
+}
+
+.lead-detail-section > header {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.lead-detail-section > header h3 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.lead-detail-section > header span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.lead-detail-summary {
+  border-left: 5px solid #0b4f9c;
+}
+
+.lead-detail-inventory {
+  border-left: 5px solid #0f766e;
 }
 
 .lead-card pre {

@@ -12,7 +12,9 @@ export default async function handler(req, res) {
   if (req.method === "PATCH") {
     const admin = await requireAdmin(req);
     if (!admin.ok) return res.status(admin.status).json({ ok: false, error: admin.error });
-    const result = await updateLead(req.body || {});
+    const result = req.body?.action === "owner_read"
+      ? await markOwnerRead(req.body || {}, admin.user)
+      : await updateLead(req.body || {});
     return res.status(result.ok ? 200 : 400).json(result);
   }
 
@@ -38,6 +40,15 @@ export default async function handler(req, res) {
 
     const saved = await saveToSupabase(lead);
     const savedLead = { ...lead, id: saved.lead?.id || "" };
+    if (saved.ok && savedLead.id) {
+      await createOwnerReviewNote({
+        url: process.env.SUPABASE_URL,
+        key: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        leadId: savedLead.id,
+        authorEmail: "system",
+        reason: "New lead received."
+      });
+    }
     const webhook = await submitLeadToWebhook(savedLead, uploadFiles);
     const crm = await submitLeadToCrm(savedLead, webhook);
     if (saved.ok) return res.status(200).json({ ...saved, webhook, crm });
@@ -284,7 +295,86 @@ async function listFromSupabase() {
 
   const leads = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: leads, leads: [] };
-  return { ok: true, storage: "supabase", leads };
+  return { ok: true, storage: "supabase", leads: await attachOwnerReviewState(leads, { url, key }) };
+}
+
+async function attachOwnerReviewState(leads, client) {
+  if (!Array.isArray(leads) || !leads.length) return [];
+  const ids = leads.map((lead) => String(lead.id || "").trim()).filter(Boolean);
+  if (!ids.length) return leads;
+
+  const encodedIds = ids.map(encodeURIComponent).join(",");
+  const [reviewResult, readResult] = await Promise.all([
+    fetch(`${client.url}/rest/v1/lead_notes?select=id,lead_id,created_at,author_email,note&lead_id=in.(${encodedIds})&note_type=eq.owner_review&order=created_at.desc&limit=500`, {
+      headers: authHeaders(client.key)
+    }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] })),
+    fetch(`${client.url}/rest/v1/lead_notes?select=id,lead_id,created_at,author_email,note&lead_id=in.(${encodedIds})&note_type=eq.owner_read&order=created_at.desc&limit=500`, {
+      headers: authHeaders(client.key)
+    }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] }))
+  ]);
+
+  if (!reviewResult.ok || !readResult.ok) return leads;
+  const latestReview = latestNoteByLead(reviewResult.data || []);
+  const latestRead = latestNoteByLead(readResult.data || []);
+
+  return leads.map((lead) => {
+    const id = String(lead.id || "");
+    const review = latestReview.get(id) || null;
+    const read = latestRead.get(id) || null;
+    const reviewTime = review ? new Date(review.created_at || 0).getTime() : 0;
+    const readTime = read ? new Date(read.created_at || 0).getTime() : 0;
+    return {
+      ...lead,
+      owner_review: {
+        unread: Boolean(review && reviewTime > readTime),
+        reason: review?.note || "",
+        at: review?.created_at || "",
+        by: review?.author_email || "",
+        read_at: read?.created_at || "",
+        read_by: read?.author_email || ""
+      }
+    };
+  });
+}
+
+function latestNoteByLead(notes) {
+  const map = new Map();
+  for (const note of Array.isArray(notes) ? notes : []) {
+    const leadId = String(note.lead_id || "");
+    if (!leadId) continue;
+    const current = map.get(leadId);
+    if (!current || new Date(note.created_at || 0).getTime() > new Date(current.created_at || 0).getTime()) {
+      map.set(leadId, note);
+    }
+  }
+  return map;
+}
+
+async function markOwnerRead(body, user) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const leadId = String(body.id || body.leadId || "").trim();
+  if (!leadId) return { ok: false, error: "Lead id is required" };
+  if (!url || !key) return { ok: false, error: "Supabase is not configured" };
+
+  const result = await insertJson(`${url}/rest/v1/lead_notes`, key, {
+    lead_id: leadId,
+    author_email: String(user?.email || "").trim().toLowerCase(),
+    note_type: "owner_read",
+    note: String(body.note || "Owner reviewed this important update.").trim()
+  });
+  if (!result.ok) return result;
+  return { ok: true, read: result.data?.[0] || null };
+}
+
+async function createOwnerReviewNote({ url, key, leadId, authorEmail, reason }) {
+  if (!url || !key || !leadId) return;
+  await insertJson(`${url}/rest/v1/lead_notes`, key, {
+    lead_id: leadId,
+    author_email: String(authorEmail || "").trim().toLowerCase(),
+    note_type: "owner_review",
+    note: reason
+  }).catch(() => null);
 }
 
 async function deleteLeadRecords(query) {

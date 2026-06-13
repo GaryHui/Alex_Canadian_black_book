@@ -558,6 +558,16 @@ async function loadLeads(options = {}) {
 function collectAdminLeadAlerts(leads) {
   if (!adminLeadSnapshotReady) {
     rememberAdminLeadTokens(leads);
+    for (const lead of leads) {
+      const id = String(lead.id || "");
+      if (!id || !lead.owner_review?.unread) continue;
+      adminLeadAlertMap.set(id, {
+        id,
+        type: "owner",
+        title: leadAlertTitle(lead),
+        message: lead.owner_review.reason || "Owner review required"
+      });
+    }
     adminLeadSnapshotReady = true;
     return;
   }
@@ -566,22 +576,16 @@ function collectAdminLeadAlerts(leads) {
     const id = String(lead.id || "");
     if (!id) continue;
     const token = leadUpdateToken(lead);
-    const previousToken = adminLeadTokenMap.get(id);
     nextMap.set(id, token);
-    if (!previousToken) {
+    if (lead.owner_review?.unread) {
       adminLeadAlertMap.set(id, {
         id,
-        type: "new",
+        type: "owner",
         title: leadAlertTitle(lead),
-        message: "New lead received"
+        message: lead.owner_review.reason || "Owner review required"
       });
-    } else if (previousToken !== token) {
-      adminLeadAlertMap.set(id, {
-        id,
-        type: "updated",
-        title: leadAlertTitle(lead),
-        message: "Lead changed"
-      });
+    } else {
+      adminLeadAlertMap.delete(id);
     }
   }
   adminLeadTokenMap = nextMap;
@@ -603,6 +607,7 @@ function leadUpdateToken(lead = {}) {
     lead.priority || "",
     lead.next_follow_up_at || "",
     JSON.stringify(lead.owner_adjustment || {}),
+    JSON.stringify(lead.owner_review || {}),
     lead.notes || ""
   ].join("|");
 }
@@ -646,9 +651,10 @@ async function openAdminLeadFromAlert(id) {
   }
   const card = leadsEl.querySelector(`.lead-card[data-id="${cssEscape(id)}"]`);
   if (!card) return;
-  adminLeadAlertMap.delete(id);
+  const lead = adminLeadsCache.find((item) => String(item.id || "") === id);
+  if (!lead?.owner_review?.unread) adminLeadAlertMap.delete(id);
   renderAdminLeadAlerts();
-  card.classList.remove("lead-card-updated");
+  if (!lead?.owner_review?.unread) card.classList.remove("lead-card-updated");
   card.classList.add("lead-card-flash");
   window.setTimeout(() => card.classList.remove("lead-card-flash"), 1600);
   card.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -891,12 +897,13 @@ function renderLead(lead) {
   const status = lead.status || "new";
   const assignedTo = lead.assigned_to || "";
   const priority = lead.priority || "normal";
+  const ownerReview = lead.owner_review || {};
   const purchase = input.buyerPlan || valuation.buyerPlan || {};
   const followUp = lead.next_follow_up_at || "";
   const overdue = isOverdue(followUp, status);
   const statusClass = overdue ? "status-overdue" : `status-${cssToken(status)}`;
   const statusLabel = overdue ? "Overdue" : leadStatusLabel(status, buyer);
-  const pendingAlert = adminLeadAlertMap.has(String(lead.id || ""));
+  const pendingAlert = Boolean(ownerReview.unread) || adminLeadAlertMap.has(String(lead.id || ""));
   const progressSteps = renderLeadProgress(buyer, status);
   const inventoryListing = inventoryCache.find((item) => item.sourceLeadId && item.sourceLeadId === lead.id);
   const actionButtons = leadStatusActions(buyer, status)
@@ -999,6 +1006,18 @@ function renderLead(lead) {
           <span>Payment target</span><b>${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)} / mo` : "-"}</b>` : `
           <span>AVG Wholesale</span><b>${wholesale ? formatNumber(wholesale) : "-"}</b>
           <span>AVG Retail</span><b>${retail ? formatNumber(retail) : "-"}</b>`;
+  const ownerReviewBanner = ownerReview.unread ? `
+      <section class="owner-review-required">
+        <div>
+          <span>Owner review required</span>
+          <strong>${escapeHtml(ownerReview.reason || "Important staff update needs review.")}</strong>
+          <small>${escapeHtml(ownerReview.at ? `${formatDateTime(ownerReview.at)}${ownerReview.by ? ` by ${ownerReview.by}` : ""}` : "Unread important update")}</small>
+        </div>
+        <button type="button" data-owner-read="${escapeHtml(lead.id || "")}">Mark reviewed</button>
+      </section>` : ownerReview.read_at ? `
+      <section class="owner-review-read">
+        <span>Owner reviewed ${escapeHtml(formatDateTime(ownerReview.read_at))}${ownerReview.read_by ? ` by ${escapeHtml(ownerReview.read_by)}` : ""}</span>
+      </section>` : "";
   return `
     <article class="lead-card lead-card-${leadType} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "lead-card-updated" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <header class="lead-summary">
@@ -1019,13 +1038,19 @@ function renderLead(lead) {
           <b class="status-pill ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
         </div>
       </header>
-      ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
+      ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${ownerReview.unread ? "Owner review required" : "New update on this lead"}</button>` : ""}
+      ${ownerReviewBanner}
       ${progressSteps}
       ${quickAssign}
       ${(warehouseAction || actionButtons) ? `<div class="lead-action-row">${warehouseAction}${actionButtons}</div>` : ""}
       <details class="lead-manage">
-        <summary>Manage lead</summary>
-        <div class="lead-grid">
+        <summary>Open lead workspace</summary>
+        <section class="lead-detail-section lead-detail-summary">
+          <header>
+            <h3>Customer and vehicle summary</h3>
+            <span>${escapeHtml(leadTypeLabel)}</span>
+          </header>
+          <div class="lead-grid">
           <span>Email</span><b>${escapeHtml(input.email || "-")}</b>
           <span>Google user</span><b>${escapeHtml(authUser.email || "-")}</b>
           <span>Phone</span><b>${escapeHtml(input.phone || "-")}</b>
@@ -1042,8 +1067,14 @@ function renderLead(lead) {
           <span>Color</span><b>${escapeHtml(input.color || "-")}</b>
           <span>Region</span><b>${escapeHtml(input.region || valuation.region || "-")}</b>
           ${valueRows}
-        </div>
+          </div>
+        </section>
         ${sellerPhotoManager}
+        <section class="lead-detail-section">
+          <header>
+            <h3>Owner controls</h3>
+            <span>Status, assignment, priority, and next follow-up</span>
+          </header>
         <form class="owner-review">
           <label>
             <span>Status</span>
@@ -1075,8 +1106,9 @@ function renderLead(lead) {
           <button type="submit">Save owner review</button>
           <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(lead.id || "")}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
         </form>
-        ${sellerPublishForm}
-        <section class="lead-activity-panel">
+        </section>
+        ${sellerPublishForm ? `<section class="lead-detail-section lead-detail-inventory">${sellerPublishForm}</section>` : ""}
+        <section class="lead-detail-section lead-activity-panel">
           <div class="lead-activity-head">
             <h3>Follow-up activity</h3>
             <button type="button" data-load-activity>Refresh activity</button>
@@ -1430,6 +1462,12 @@ leadsEl.addEventListener("click", async (event) => {
     return;
   }
 
+  const ownerReadButton = event.target.closest("[data-owner-read]");
+  if (ownerReadButton) {
+    await markOwnerReviewed(ownerReadButton);
+    return;
+  }
+
   const completeButton = event.target.closest("[data-complete-task]");
   if (completeButton) {
     const card = completeButton.closest(".lead-card");
@@ -1465,6 +1503,32 @@ leadsEl.addEventListener("click", async (event) => {
   statusEl.textContent = data.ok ? "Lead status updated." : (data.error || "Unable to update lead status.");
   if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
 });
+
+async function markOwnerReviewed(button) {
+  const card = button.closest(".lead-card");
+  const leadId = button.dataset.ownerRead || card?.dataset?.id || "";
+  if (!leadId) return;
+  button.disabled = true;
+  statusEl.textContent = "Marking owner update as reviewed...";
+  try {
+    const response = await fetch("/api/leads", {
+      method: "PATCH",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "owner_read",
+        id: leadId
+      })
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(formatApiError(data, "Unable to mark reviewed."));
+    adminLeadAlertMap.delete(leadId);
+    statusEl.textContent = "Owner review marked read.";
+    await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+  } catch (error) {
+    statusEl.textContent = error.message || "Unable to mark reviewed.";
+    button.disabled = false;
+  }
+}
 
 async function quickAssignLead(button) {
   const card = button.closest(".lead-card");
@@ -1727,10 +1791,10 @@ function renderActivity(data, options = {}) {
     </article>
   `);
 
-  const notes = (data.notes || []).map((note) => `
+  const notes = (data.notes || []).filter((note) => note.note_type !== "owner_read").map((note) => `
     <article class="activity-item ${latestKey === `note:${note.id}` ? "activity-highlight" : ""}">
       <div>
-        <strong>${escapeHtml(note.note_type || "note")} by ${escapeHtml(note.author_email || "-")}</strong>
+        <strong>${escapeHtml(note.note_type === "owner_review" ? "owner review request" : note.note_type || "note")} by ${escapeHtml(note.author_email || "-")}</strong>
         <span>${escapeHtml(formatDateTime(note.created_at))}</span>
         <p>${linkifyNote(note.note || "")}</p>
       </div>

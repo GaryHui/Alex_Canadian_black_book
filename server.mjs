@@ -268,7 +268,9 @@ const server = http.createServer(async (req, res) => {
         const admin = await requireAdmin(req);
         if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
         const body = await readJson(req);
-        const result = await updateLead(body);
+        const result = body.action === "owner_read"
+          ? await markOwnerRead(body, admin.user)
+          : await updateLead(body);
         return sendJson(res, result.ok ? 200 : 400, result);
       }
       if (req.method === "POST") {
@@ -306,7 +308,7 @@ const server = http.createServer(async (req, res) => {
         const body = await readJson(req);
         const access = await canAccessLead(body.leadId, dealer);
         if (!access.ok) return sendJson(res, access.status || 403, access);
-        const result = await createLeadActivity(body, dealer.user);
+        const result = await createLeadActivity(body, dealer.user, dealer.role);
         return sendJson(res, result.ok ? 200 : result.status || 400, result);
       }
       if (req.method === "PATCH") {
@@ -314,7 +316,7 @@ const server = http.createServer(async (req, res) => {
         const access = await canAccessLead(body.leadId, dealer);
         if (!access.ok) return sendJson(res, access.status || 403, access);
         const result = body.action === "status"
-          ? await updateLeadStatusFromActivity(body, dealer.user)
+          ? await updateLeadStatusFromActivity(body, dealer.user, dealer.role)
           : body.action === "follow_up"
             ? await updateLeadFollowUpFromActivity(body, dealer.user)
             : await updateLeadTask(body);
@@ -729,6 +731,15 @@ async function saveLead(body) {
     ...lead,
     id: saved.lead?.id || ""
   };
+  if (saved.ok && savedLead.id) {
+    await createOwnerReviewNote({
+      url: process.env.SUPABASE_URL,
+      key: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      leadId: savedLead.id,
+      authorEmail: "system",
+      reason: "New lead received."
+    });
+  }
   const webhook = await submitLeadToWebhook(savedLead, uploadFiles);
   const googleForm = await submitLeadToGoogleForm(savedLead);
   const crm = await submitLeadToCrm(savedLead, webhook);
@@ -1001,7 +1012,52 @@ async function listLeads() {
 
   const leads = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: leads, leads: [] };
-  return { ok: true, storage: "supabase", leads };
+  return { ok: true, storage: "supabase", leads: await attachOwnerReviewState(leads, { url, key }) };
+}
+
+async function attachOwnerReviewState(leads, client) {
+  if (!Array.isArray(leads) || !leads.length) return [];
+  const ids = leads.map((lead) => String(lead.id || "").trim()).filter(Boolean);
+  if (!ids.length) return leads;
+  const encodedIds = ids.map(encodeURIComponent).join(",");
+  const [reviewResult, readResult] = await Promise.all([
+    fetchSupabaseJson(`${client.url}/rest/v1/lead_notes?select=id,lead_id,created_at,author_email,note&lead_id=in.(${encodedIds})&note_type=eq.owner_review&order=created_at.desc&limit=500`, client.key),
+    fetchSupabaseJson(`${client.url}/rest/v1/lead_notes?select=id,lead_id,created_at,author_email,note&lead_id=in.(${encodedIds})&note_type=eq.owner_read&order=created_at.desc&limit=500`, client.key)
+  ]);
+  if (!reviewResult.ok || !readResult.ok) return leads;
+  const latestReview = latestNoteByLead(reviewResult.data || []);
+  const latestRead = latestNoteByLead(readResult.data || []);
+  return leads.map((lead) => {
+    const id = String(lead.id || "");
+    const review = latestReview.get(id) || null;
+    const read = latestRead.get(id) || null;
+    const reviewTime = review ? new Date(review.created_at || 0).getTime() : 0;
+    const readTime = read ? new Date(read.created_at || 0).getTime() : 0;
+    return {
+      ...lead,
+      owner_review: {
+        unread: Boolean(review && reviewTime > readTime),
+        reason: review?.note || "",
+        at: review?.created_at || "",
+        by: review?.author_email || "",
+        read_at: read?.created_at || "",
+        read_by: read?.author_email || ""
+      }
+    };
+  });
+}
+
+function latestNoteByLead(notes) {
+  const map = new Map();
+  for (const note of Array.isArray(notes) ? notes : []) {
+    const leadId = String(note.lead_id || "");
+    if (!leadId) continue;
+    const current = map.get(leadId);
+    if (!current || new Date(note.created_at || 0).getTime() > new Date(current.created_at || 0).getTime()) {
+      map.set(leadId, note);
+    }
+  }
+  return map;
 }
 
 async function deleteLeadRecords(query) {
@@ -1230,6 +1286,22 @@ async function updateLead(body) {
   return { ok: true, lead: data?.[0] || null };
 }
 
+async function markOwnerRead(body, user) {
+  const leadId = String(body.id || body.leadId || "").trim();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!leadId) return { ok: false, error: "Lead id is required" };
+  if (!url || !key) return { ok: false, error: "Supabase is not configured" };
+  const result = await insertSupabaseJson(`${url}/rest/v1/lead_notes`, key, {
+    lead_id: leadId,
+    author_email: String(user?.email || "").trim().toLowerCase(),
+    note_type: "owner_read",
+    note: String(body.note || "Owner reviewed this important update.").trim()
+  });
+  if (!result.ok) return result;
+  return { ok: true, read: result.data?.[0] || null };
+}
+
 async function listPublishedInventory() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1451,6 +1523,13 @@ async function createBuyerInquiry(body) {
   });
   const savedLead = await saveLeadToSupabase(lead);
   if (savedLead.ok && savedLead.lead?.id) {
+    await createOwnerReviewNote({
+      url,
+      key,
+      leadId: savedLead.lead.id,
+      authorEmail: "buy-page@autoswitch.local",
+      reason: "New buyer inquiry received."
+    });
     await createLeadActivity({
       leadId: savedLead.lead.id,
       type: "note",
@@ -2094,7 +2173,7 @@ async function canAccessLead(leadId, dealer) {
   return { ok: false, status: 403, error: "This lead is not assigned to your dealer account." };
 }
 
-async function createLeadActivity(body, user) {
+async function createLeadActivity(body, user, role) {
   const leadId = String(body.leadId || "").trim();
   const type = String(body.type || "note").trim().toLowerCase();
   const url = process.env.SUPABASE_URL;
@@ -2140,6 +2219,9 @@ async function createLeadActivity(body, user) {
     note_type: normalizeNoteType(body.noteType),
     note
   });
+  if (result.ok && role !== "admin" && normalizeNoteType(body.noteType) === "offer") {
+    await createOwnerReviewNote({ url, key, leadId, authorEmail: user?.email || "", reason: "Quote or offer added by staff." });
+  }
   if (result.ok) await touchLeadActivity({ url, key, leadId });
   return result.ok ? { ok: true, note: result.data?.[0] || null } : result;
 }
@@ -2173,7 +2255,7 @@ async function updateLeadTask(body) {
   return { ok: true, task: data?.[0] || null };
 }
 
-async function updateLeadStatusFromActivity(body, user) {
+async function updateLeadStatusFromActivity(body, user, role) {
   const leadId = String(body.leadId || "").trim();
   const status = normalizeLeadStatus(body.status);
   const url = process.env.SUPABASE_URL;
@@ -2205,6 +2287,10 @@ async function updateLeadStatusFromActivity(body, user) {
     note_type: "internal",
     note
   }).catch(() => null);
+  if (role !== "admin") {
+    const reason = ownerReviewReason(status);
+    if (reason) await createOwnerReviewNote({ url, key, leadId, authorEmail: user?.email || "", reason });
+  }
 
   return { ok: true, lead: data?.[0] || null };
 }
@@ -2257,6 +2343,29 @@ async function insertSupabaseJson(url, key, payload) {
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
   return { ok: true, data };
+}
+
+async function createOwnerReviewNote({ url, key, leadId, authorEmail, reason }) {
+  if (!url || !key || !leadId) return;
+  await insertSupabaseJson(`${url}/rest/v1/lead_notes`, key, {
+    lead_id: leadId,
+    author_email: String(authorEmail || "").trim().toLowerCase(),
+    note_type: "owner_review",
+    note: reason
+  }).catch(() => null);
+}
+
+function ownerReviewReason(status) {
+  const value = String(status || "").trim().toLowerCase();
+  const labels = {
+    inspection_booked: "Inspection appointment booked by staff.",
+    appointment_booked: "Buyer appointment booked by staff.",
+    finance_sent: "Finance quote sent by staff.",
+    offer_sent: "Purchase offer sent by staff.",
+    won: "Lead marked won by staff.",
+    lost: "Lead marked lost by staff."
+  };
+  return labels[value] || "";
 }
 
 async function touchLeadActivity({ url, key, leadId }) {
