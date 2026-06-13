@@ -1705,6 +1705,26 @@ input::placeholder {
   margin: 8px 0 0;
 }
 
+.vehicle-detail-photo {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.vehicle-detail-photo img {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+}
+
+.vehicle-detail-photo figcaption {
+  padding: 8px 10px;
+  color: var(--muted);
+  background: #fbfdff;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1807,6 +1827,22 @@ input::placeholder {
 
 .inventory-image-green span {
   background: #2f8f83;
+}
+
+.inventory-photo {
+  min-height: 150px;
+  margin: 0;
+  overflow: hidden;
+  background: #eef6ff;
+  border-radius: 8px;
+}
+
+.inventory-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 150px;
+  object-fit: cover;
 }
 
 .inventory-card-body {

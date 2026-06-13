@@ -195,6 +195,13 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (req.method === "POST" && url.pathname === "/api/inventory-photos") {
+      const admin = await requireAdmin(req);
+      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+      const result = await uploadInventoryPhotos(await readJson(req), admin.user);
+      return sendJson(res, result.ok ? 200 : result.status || 400, result);
+    }
+
     if (req.method === "POST" && url.pathname === "/api/valuation") {
       const body = await readJson(req);
       const result = await fetchValuation(body);
@@ -1206,7 +1213,8 @@ async function listPublishedInventory() {
   );
   const rows = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: rows, inventory: [] };
-  return { ok: true, storage: "supabase", inventory: Array.isArray(rows) ? rows.map(publicInventoryRow) : [] };
+  const inventory = Array.isArray(rows) ? rows.map(publicInventoryRow) : [];
+  return { ok: true, storage: "supabase", inventory: await attachListingPhotos(inventory, true) };
 }
 
 async function listAdminInventory() {
@@ -1220,7 +1228,8 @@ async function listAdminInventory() {
   );
   const rows = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: rows, inventory: [] };
-  return { ok: true, storage: "supabase", inventory: Array.isArray(rows) ? rows.map(publicInventoryRow) : [] };
+  const inventory = Array.isArray(rows) ? rows.map(publicInventoryRow) : [];
+  return { ok: true, storage: "supabase", inventory: await attachListingPhotos(inventory, false) };
 }
 
 async function updateInventoryListing(body, user) {
@@ -1236,6 +1245,7 @@ async function updateInventoryListing(body, user) {
     title: String(body.title || "").trim(),
     asking_price: numberOrNull(body.askingPrice),
     monthly_payment_estimate: numberOrNull(body.monthlyPaymentEstimate),
+    public_options: mergeListingPublicOptions(body),
     description: String(body.description || "").trim(),
     updated_at: new Date().toISOString()
   };
@@ -1305,6 +1315,157 @@ async function publishLeadToInventory(body, user) {
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
   return { ok: true, listing: publicInventoryRow(data?.[0] || listing), updated: Boolean(existingId) };
+}
+
+async function uploadInventoryPhotos(body, user) {
+  const listingId = String(body.listingId || "").trim();
+  const files = sanitizePhotoFiles(body.files || []);
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!listingId) return { ok: false, status: 400, error: "Listing id is required" };
+  if (!files.length) return { ok: false, status: 400, error: "At least one photo is required" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const listingResult = await fetchSupabaseJson(
+    `${url}/rest/v1/vehicle_listings?select=*&id=eq.${encodeURIComponent(listingId)}&limit=1`,
+    key
+  );
+  if (!listingResult.ok) return listingResult;
+  const listing = listingResult.data?.[0];
+  if (!listing) return { ok: false, status: 404, error: "Inventory listing not found" };
+
+  const webhook = await submitInventoryPhotosToWebhook(listing, files, user);
+  if (!webhook.submitted) {
+    return { ok: false, status: 502, error: webhook.error || webhook.reason || "Google Drive upload webhook is not configured" };
+  }
+
+  const savedFiles = Array.isArray(webhook.data?.savedFiles)
+    ? webhook.data.savedFiles
+    : Array.isArray(parseJson(webhook.response)?.savedFiles)
+      ? parseJson(webhook.response).savedFiles
+      : [];
+  if (!savedFiles.length) return { ok: false, status: 502, error: "Google Drive did not return saved file URLs" };
+
+  const rows = savedFiles.map((file, index) => ({
+    listing_id: listingId,
+    url: String(file.url || "").trim(),
+    label: String(files[index]?.role || files[index]?.angle || file.name || `Photo ${index + 1}`).trim(),
+    sort_order: index
+  })).filter((row) => row.url);
+
+  const insert = await fetch(`${url}/rest/v1/listing_photos`, {
+    method: "POST",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(rows)
+  });
+  const data = await insert.json().catch(() => []);
+  if (!insert.ok) return { ok: false, status: insert.status, error: data };
+  return { ok: true, photos: Array.isArray(data) ? data : [], webhook };
+}
+
+async function submitInventoryPhotosToWebhook(listing, files, user) {
+  const webhookUrl = String(process.env.LEAD_WEBHOOK_URL || "").trim();
+  if (!webhookUrl) return { submitted: false, skipped: true, reason: "LEAD_WEBHOOK_URL is not configured" };
+  const payload = {
+    email: String(user?.email || listing.created_by || "inventory@autoswitch.local").trim(),
+    phone: "",
+    vin: listing.vin || "",
+    uvc: listing.uvc || "",
+    year: listing.vehicle_year || "",
+    make: listing.make || "",
+    model: listing.model || "",
+    series: listing.series || "",
+    style: listing.style || "",
+    kilometers: listing.kilometers || "",
+    color: listing.color || "",
+    region: listing.region || "",
+    country: "C",
+    wholesaleAvg: "",
+    retailAvg: listing.asking_price || "",
+    tradeInAvg: "",
+    id: listing.source_lead_id || listing.id || "",
+    status: "inventory-photo-upload",
+    authEmail: String(user?.email || "").trim(),
+    photoCount: files.length,
+    photoNames: files.map((file) => file.name).join(", "),
+    files,
+    raw: {
+      listing,
+      uploadedBy: user || {}
+    }
+  };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const text = await response.text();
+    return {
+      submitted: response.ok,
+      status: response.status,
+      response: text,
+      data: parseJson(text),
+      error: response.ok ? "" : `Lead webhook rejected the photo upload (${response.status})`
+    };
+  } catch (error) {
+    return { submitted: false, error: error.message || "Inventory photo webhook failed" };
+  }
+}
+
+async function attachListingPhotos(inventory, publicOnly) {
+  if (!inventory.length) return inventory;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return inventory;
+  const ids = inventory.map((item) => item.id).filter(Boolean);
+  if (!ids.length) return inventory;
+  const response = await fetch(
+    `${url}/rest/v1/listing_photos?select=*&listing_id=in.(${ids.map(encodeURIComponent).join(",")})&order=sort_order.asc,created_at.asc`,
+    { headers: supabaseServiceHeaders(key) }
+  );
+  const rows = await response.json().catch(() => []);
+  if (!response.ok || !Array.isArray(rows)) return inventory;
+  const photosByListing = new Map();
+  for (const row of rows) {
+    const list = photosByListing.get(row.listing_id) || [];
+    list.push({
+      id: row.id || "",
+      url: row.url || "",
+      label: row.label || "",
+      sortOrder: row.sort_order || 0
+    });
+    photosByListing.set(row.listing_id, list);
+  }
+  return inventory.map((item) => {
+    const showPhotos = !publicOnly || isPublicOptionEnabled(item.publicOptions, "showPhotos");
+    return {
+      ...item,
+      photos: showPhotos ? (photosByListing.get(item.id) || []) : []
+    };
+  });
+}
+
+function mergeListingPublicOptions(body) {
+  return {
+    showVin: body.showVin === "on" || body.showVin === true,
+    showUvc: body.showUvc === "on" || body.showUvc === true,
+    showKilometers: body.showKilometers === "on" || body.showKilometers === true,
+    showRegion: body.showRegion === "on" || body.showRegion === true,
+    showColor: body.showColor === "on" || body.showColor === true,
+    showMaintenance: body.showMaintenance === "on" || body.showMaintenance === true,
+    showPhotos: body.showPhotos === "on" || body.showPhotos === true
+  };
+}
+
+function isPublicOptionEnabled(options, key) {
+  if (!options || !Object.keys(options).length) return true;
+  return options[key] === true;
 }
 
 function buildListingFromLead(lead, body, user) {

@@ -1416,6 +1416,45 @@ select {
   resize: vertical;
 }
 
+.inventory-photo-manager {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #d9e1ec;
+  border-radius: 6px;
+}
+
+.inventory-photo-manager h4 {
+  margin: 0;
+}
+
+.inventory-photo-manager p {
+  margin: 0;
+  color: #555;
+}
+
+.inventory-photo-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventory-photo-list a,
+.inventory-photo-list span {
+  padding: 6px 8px;
+  background: #f4f7fb;
+  border: 1px solid #d9e1ec;
+  border-radius: 4px;
+}
+
+.inventory-photo-status {
+  min-height: 20px;
+  margin: 0;
+  color: #555;
+}
+
 .inventory-actions {
   display: flex;
   flex-wrap: wrap;

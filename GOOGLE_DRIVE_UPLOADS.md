@@ -76,6 +76,41 @@ This makes the Drive folder easier for the dealer to review without opening ever
 
 Supabase stores only photo metadata, not the base64 photo content. The real photos are stored in Google Drive.
 
+## Inventory Photos For Buy Page
+
+The dealer/admin inventory photo workflow uses the same `LEAD_WEBHOOK_URL` and the same Google Drive root folder.
+
+Admin workflow:
+
+```text
+Admin page > Inventory management > Vehicle photos
+```
+
+1. Upload one or more vehicle photos for an inventory listing.
+2. The website sends those photos to the Apps Script webhook.
+3. Apps Script saves the files into Google Drive and returns file URLs.
+4. The website stores those returned URLs in Supabase table `listing_photos`.
+5. The Buy page displays the first photo for a published vehicle only when `Publish photos` is checked for that listing.
+
+This is different from customer valuation photos:
+
+```text
+Customer valuation photos -> stored with the customer lead
+Inventory photos -> attached to vehicle_listings/listing_photos for the public Buy page
+```
+
+If a published vehicle has photos in admin but the Buy page still shows the placeholder car image, check:
+
+```text
+1. The listing status is Published.
+2. The listing has uploaded photos in Inventory management.
+3. Publish photos is checked.
+4. Save listing was clicked after checking Publish photos.
+5. The Google Drive file can be displayed publicly enough for an image tag.
+```
+
+Privacy note: Google Drive files are owned by the website owner's Google account. If the Buy page image does not render, the Drive file may need a sharing setting that allows the public site to load it. For a production marketplace, consider moving public inventory images to Supabase Storage, Cloudflare R2, or another CDN while keeping private customer documents in Google Drive.
+
 ## Apps Script Setup
 
 1. Open the Google Sheet.

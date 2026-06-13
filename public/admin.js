@@ -211,6 +211,8 @@ async function loadInventory() {
 }
 
 function renderInventoryListing(listing) {
+  const options = listing.publicOptions || {};
+  const photos = Array.isArray(listing.photos) ? listing.photos : [];
   return `
     <form class="inventory-card-admin" data-id="${escapeHtml(listing.id || "")}">
       <div class="inventory-card-head">
@@ -253,6 +255,33 @@ function renderInventoryListing(listing) {
           <span>Description</span>
           <textarea name="description">${escapeHtml(listing.description || "")}</textarea>
         </label>
+        <fieldset class="inventory-public-options">
+          <legend>Public information</legend>
+          <label><input type="checkbox" name="showVin" ${checkedOption(options, "showVin")} /> VIN</label>
+          <label><input type="checkbox" name="showUvc" ${checkedOption(options, "showUvc")} /> UVC</label>
+          <label><input type="checkbox" name="showKilometers" ${checkedOption(options, "showKilometers")} /> Kilometers</label>
+          <label><input type="checkbox" name="showRegion" ${checkedOption(options, "showRegion")} /> Region</label>
+          <label><input type="checkbox" name="showColor" ${checkedOption(options, "showColor")} /> Color</label>
+          <label><input type="checkbox" name="showMaintenance" ${checkedOption(options, "showMaintenance", false)} /> Maintenance / repair notes</label>
+          <label><input type="checkbox" name="showPhotos" ${checkedOption(options, "showPhotos", false)} /> Publish photos</label>
+        </fieldset>
+        <section class="inventory-photo-manager">
+          <h4>Vehicle photos</h4>
+          <p>Upload photos to Google Drive, then save this listing with Publish photos checked to show them on the Buy page.</p>
+          <div class="inventory-photo-list">
+            ${photos.map((photo) => `<a href="${escapeHtml(photo.url)}" target="_blank" rel="noreferrer">${escapeHtml(photo.label || "Vehicle photo")}</a>`).join("") || "<span>No photos attached yet.</span>"}
+          </div>
+          <label>
+            <span>Photo label</span>
+            <input name="photoLabel" value="Vehicle photo" />
+          </label>
+          <label>
+            <span>Upload photos</span>
+            <input name="inventoryPhotos" type="file" accept="image/*" multiple />
+          </label>
+          <button type="button" data-upload-inventory-photos="${escapeHtml(listing.id || "")}">Upload photos to Drive</button>
+          <p class="inventory-photo-status" aria-live="polite"></p>
+        </section>
       </div>
       <div class="inventory-actions">
         <button type="submit">Save listing</button>
@@ -260,6 +289,12 @@ function renderInventoryListing(listing) {
       </div>
     </form>
   `;
+}
+
+function checkedOption(options, key, defaultValue = true) {
+  const hasOptions = options && Object.keys(options).length > 0;
+  const enabled = hasOptions ? options[key] === true : defaultValue;
+  return enabled ? "checked" : "";
 }
 
 function renderDealer(staff) {
@@ -582,6 +617,14 @@ inventoryEl?.addEventListener("submit", async (event) => {
 });
 
 inventoryEl?.addEventListener("click", async (event) => {
+  const uploadButton = event.target.closest("[data-upload-inventory-photos]");
+  if (uploadButton) {
+    const form = uploadButton.closest(".inventory-card-admin");
+    if (!form) return;
+    await uploadInventoryPhotos(form, uploadButton);
+    return;
+  }
+
   const button = event.target.closest("[data-archive-listing]");
   if (!button) return;
   const form = button.closest(".inventory-card-admin");
@@ -606,6 +649,62 @@ async function saveInventoryListing(form) {
   const data = await response.json();
   inventoryStatusEl.textContent = data.ok ? "Inventory listing saved." : formatApiError(data, "Unable to save inventory listing.");
   if (data.ok) await loadInventory();
+}
+
+async function uploadInventoryPhotos(form, button) {
+  const fileInput = form.elements.inventoryPhotos;
+  const status = form.querySelector(".inventory-photo-status");
+  const files = Array.from(fileInput?.files || []).slice(0, 6);
+  if (!files.length) {
+    if (status) status.textContent = "Choose at least one photo first.";
+    return;
+  }
+  button.disabled = true;
+  if (status) status.textContent = "Preparing photos...";
+  try {
+    const photoFiles = [];
+    for (const file of files) {
+      photoFiles.push(await fileToBase64Payload(file, form.elements.photoLabel?.value || "Vehicle photo"));
+    }
+    if (status) status.textContent = "Uploading photos to Google Drive...";
+    const response = await fetch("/api/inventory-photos", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        listingId: form.dataset.id,
+        files: photoFiles
+      })
+    });
+    const data = await response.json();
+    const message = data.ok ? `${data.photos.length} photo(s) uploaded.` : formatApiError(data, "Unable to upload photos.");
+    if (status) status.textContent = message;
+    inventoryStatusEl.textContent = message;
+    if (data.ok) await loadInventory();
+  } catch (error) {
+    if (status) status.textContent = error.message || "Unable to upload photos.";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function fileToBase64Payload(file, label) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      resolve({
+        name: file.name,
+        originalName: file.name,
+        role: label,
+        angle: label,
+        mimeType: file.type || "image/jpeg",
+        size: file.size,
+        base64: result.includes(",") ? result.split(",").pop() : result
+      });
+    };
+    reader.onerror = () => reject(new Error("Unable to read photo file."));
+    reader.readAsDataURL(file);
+  });
 }
 
 leadsEl.addEventListener("submit", async (event) => {

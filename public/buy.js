@@ -144,9 +144,7 @@ function renderInventory() {
 
   inventoryList.innerHTML = filteredInventory.map((vehicle) => `
     <article class="inventory-card">
-      <div class="inventory-image inventory-image-${vehicle.photoTone}" aria-hidden="true">
-        <span></span>
-      </div>
+      ${vehicleImageMarkup(vehicle)}
       <div class="inventory-card-body">
         <div>
           <h3>${escapeHtml(vehicle.title)}</h3>
@@ -235,6 +233,7 @@ function normalizeInventoryVehicle(vehicle) {
     monthlyPaymentEstimate: vehicle.monthlyPaymentEstimate || "",
     sourceLeadId: vehicle.sourceLeadId || "",
     publicOptions: vehicle.publicOptions || {},
+    photos: Array.isArray(vehicle.photos) ? vehicle.photos : [],
     tags: tags.length ? tags : ["Dealer reviewed"],
     photoTone: photoToneFor(vehicle.color || vehicle.make || title)
   };
@@ -318,6 +317,7 @@ function showVehicleDetails(vehicle) {
       <span>${escapeHtml(text[language].detailPrice)}</span>
       <strong>${money(vehicle.price)}</strong>
     </div>
+    ${vehicle.photos?.length ? `<figure class="vehicle-detail-photo"><img src="${escapeHtml(photoDisplayUrl(vehicle.photos[0].url))}" alt="${escapeHtml(vehicle.title)}" /><figcaption>${escapeHtml(vehicle.photos[0].label || "Vehicle photo")}</figcaption></figure>` : ""}
     <div class="vehicle-detail-grid">
       ${detailItem(text[language].detailKilometers, isPublicFieldVisible(vehicle, "showKilometers") && vehicle.kilometers ? `${vehicle.kilometers.toLocaleString("en-CA")} km` : "")}
       ${detailItem(text[language].detailRegion, isPublicFieldVisible(vehicle, "showRegion") ? vehicle.region : "")}
@@ -339,6 +339,30 @@ function showVehicleDetails(vehicle) {
     <button class="primary-button" type="button" data-detail-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].detailUseCalculator)}</button>
   `;
   vehicleDetailModal.hidden = false;
+}
+
+function vehicleImageMarkup(vehicle) {
+  const photo = Array.isArray(vehicle.photos) ? vehicle.photos[0] : null;
+  if (photo?.url) {
+    return `
+      <figure class="inventory-photo">
+        <img src="${escapeHtml(photoDisplayUrl(photo.url))}" alt="${escapeHtml(vehicle.title)}" loading="lazy" />
+      </figure>
+    `;
+  }
+  return `
+    <div class="inventory-image inventory-image-${vehicle.photoTone}" aria-hidden="true">
+      <span></span>
+    </div>
+  `;
+}
+
+function photoDisplayUrl(url) {
+  const value = String(url || "");
+  const fileMatch = value.match(/\/d\/([^/]+)/);
+  const idMatch = value.match(/[?&]id=([^&]+)/);
+  const id = fileMatch?.[1] || idMatch?.[1] || "";
+  return id ? `https://drive.google.com/uc?export=view&id=${encodeURIComponent(id)}` : value;
 }
 
 function detailItem(label, value) {
