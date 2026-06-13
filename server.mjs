@@ -26,7 +26,15 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
 
     if (req.method === "GET" && url.pathname === "/") {
+      return sendFile(res, path.join(__dirname, "public", "home.html"), "text/html; charset=utf-8");
+    }
+
+    if (req.method === "GET" && (url.pathname === "/sell" || url.pathname === "/sell.html")) {
       return sendFile(res, path.join(__dirname, "public", "customer.html"), "text/html; charset=utf-8");
+    }
+
+    if (req.method === "GET" && (url.pathname === "/buy" || url.pathname === "/buy.html")) {
+      return sendFile(res, path.join(__dirname, "public", "buy.html"), "text/html; charset=utf-8");
     }
 
     if (req.method === "GET" && (url.pathname === "/dealer" || url.pathname === "/dealer.html")) {
@@ -55,6 +63,14 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/customer.js") {
       return sendFile(res, path.join(__dirname, "public", "customer.js"), "application/javascript; charset=utf-8");
+    }
+
+    if (req.method === "GET" && url.pathname === "/home.js") {
+      return sendFile(res, path.join(__dirname, "public", "home.js"), "application/javascript; charset=utf-8");
+    }
+
+    if (req.method === "GET" && url.pathname === "/buy.js") {
+      return sendFile(res, path.join(__dirname, "public", "buy.js"), "application/javascript; charset=utf-8");
     }
 
     if (req.method === "GET" && url.pathname === "/login.js") {

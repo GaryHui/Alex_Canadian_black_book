@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AutoSwitch Canada | Buy A Car</title>
+    <link rel="stylesheet" href="/customer.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="AutoSwitch Canada">
+        <span class="brand-mark">HC</span>
+        <span data-i18n="brandName">AutoSwitch Canada</span>
+      </a>
+      <nav class="top-nav" aria-label="Primary">
+        <a href="/sell.html" data-i18n="sellNav">Sell</a>
+        <a href="/dealer.html" data-i18n="dealerNav">Dealer portal</a>
+        <button id="language-toggle" class="ghost-button" type="button">FR</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="inventory-hero">
+        <div>
+          <p class="eyebrow" data-i18n="eyebrow">Dealer-reviewed inventory</p>
+          <h1 data-i18n="headline">Find your next vehicle</h1>
+          <p class="lead" data-i18n="subhead">Browse available vehicles, estimate monthly payments, and contact the dealer when you are ready.</p>
+        </div>
+        <form class="inventory-filter" id="inventory-filter">
+          <label>
+            <span data-i18n="searchLabel">Search</span>
+            <input name="query" placeholder="Lexus, SUV, 2024..." data-i18n-placeholder="searchPlaceholder" />
+          </label>
+          <label>
+            <span data-i18n="budgetLabel">Max price</span>
+            <input name="maxPrice" type="number" inputmode="numeric" placeholder="50000" />
+          </label>
+          <button class="primary-button" type="submit" data-i18n="filterButton">Filter</button>
+        </form>
+      </section>
+
+      <section class="inventory-layout">
+        <div>
+          <div class="section-heading inventory-heading">
+            <p class="eyebrow" data-i18n="inventoryEyebrow">Available vehicles</p>
+            <h2 data-i18n="inventoryTitle">Current marketplace preview</h2>
+            <p data-i18n="inventoryIntro">This MVP uses sample inventory until the admin inventory module is connected.</p>
+          </div>
+          <div id="inventory-list" class="inventory-list"></div>
+        </div>
+
+        <aside class="finance-panel">
+          <p class="eyebrow" data-i18n="financeEyebrow">Finance estimate</p>
+          <h2 data-i18n="financeTitle">Monthly payment calculator</h2>
+          <form id="finance-form" class="finance-form">
+            <label>
+              <span data-i18n="priceLabel">Vehicle price</span>
+              <input name="price" type="number" value="45000" />
+            </label>
+            <label>
+              <span data-i18n="downLabel">Down payment</span>
+              <input name="downPayment" type="number" value="5000" />
+            </label>
+            <label>
+              <span data-i18n="rateLabel">Annual rate</span>
+              <input name="annualRate" type="number" step="0.01" value="7.99" />
+            </label>
+            <label>
+              <span data-i18n="termLabel">Term</span>
+              <select name="termMonths">
+                <option value="36">36 months</option>
+                <option value="48">48 months</option>
+                <option value="60">60 months</option>
+                <option value="72" selected>72 months</option>
+                <option value="84">84 months</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="taxLabel">Tax rate</span>
+              <input name="taxRate" type="number" step="0.01" value="12" />
+            </label>
+            <output id="payment-output" class="payment-output">$0 / mo</output>
+            <p class="fine-print" data-i18n="financeNote">Estimate only. Final approval, rate, term, and fees depend on the dealer and lender.</p>
+          </form>
+        </aside>
+      </section>
+    </main>
+
+    <script src="/buy.js"></script>
+  </body>
+</html>

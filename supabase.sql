@@ -131,3 +131,91 @@ create table if not exists lead_emails (
 
 create index if not exists lead_emails_lead_created_idx
 on lead_emails (lead_id, created_at desc);
+
+create table if not exists vehicle_listings (
+  id uuid primary key default gen_random_uuid(),
+  source_lead_id uuid references valuation_leads(id) on delete set null,
+  status text not null default 'draft',
+  title text not null default '',
+  vin text not null default '',
+  uvc text not null default '',
+  vehicle_year integer,
+  make text not null default '',
+  model text not null default '',
+  series text not null default '',
+  style text not null default '',
+  kilometers integer,
+  color text not null default '',
+  region text not null default '',
+  asking_price numeric,
+  monthly_payment_estimate numeric,
+  description text not null default '',
+  published_at timestamptz,
+  created_by text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists vehicle_listings_status_idx
+on vehicle_listings (status);
+
+create index if not exists vehicle_listings_published_idx
+on vehicle_listings (published_at desc);
+
+create index if not exists vehicle_listings_source_lead_idx
+on vehicle_listings (source_lead_id);
+
+create table if not exists listing_photos (
+  id uuid primary key default gen_random_uuid(),
+  listing_id uuid not null references vehicle_listings(id) on delete cascade,
+  url text not null default '',
+  label text not null default '',
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists listing_photos_listing_sort_idx
+on listing_photos (listing_id, sort_order);
+
+create table if not exists buyer_inquiries (
+  id uuid primary key default gen_random_uuid(),
+  listing_id uuid references vehicle_listings(id) on delete set null,
+  customer_email text not null default '',
+  customer_phone text not null default '',
+  customer_name text not null default '',
+  message text not null default '',
+  assigned_to text not null default '',
+  status text not null default 'new',
+  source text not null default 'website',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists buyer_inquiries_listing_idx
+on buyer_inquiries (listing_id);
+
+create index if not exists buyer_inquiries_status_idx
+on buyer_inquiries (status);
+
+create index if not exists buyer_inquiries_assigned_idx
+on buyer_inquiries (assigned_to);
+
+create table if not exists finance_estimates (
+  id uuid primary key default gen_random_uuid(),
+  listing_id uuid references vehicle_listings(id) on delete set null,
+  buyer_inquiry_id uuid references buyer_inquiries(id) on delete set null,
+  vehicle_price numeric not null default 0,
+  down_payment numeric not null default 0,
+  trade_in_value numeric not null default 0,
+  annual_rate numeric not null default 0,
+  term_months integer not null default 60,
+  tax_rate numeric not null default 0,
+  monthly_payment numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists finance_estimates_listing_idx
+on finance_estimates (listing_id);
+
+create index if not exists finance_estimates_buyer_inquiry_idx
+on finance_estimates (buyer_inquiry_id);
