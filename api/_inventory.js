@@ -347,15 +347,23 @@ async function findLeadPhotoLinks(leadId, client) {
   );
   if (!result.ok) return [];
   const photos = [];
+  const deletedUrls = new Set();
   for (const row of result.data || []) {
     const note = String(row.note || "");
+    if (note.includes("Vehicle photo deleted:")) {
+      for (const line of note.split(/\r?\n/)) {
+        const deletedUrl = String(line || "").trim();
+        if (deletedUrl.startsWith("http")) deletedUrls.add(deletedUrl);
+      }
+      continue;
+    }
     if (!note.includes("Vehicle photo upload:")) continue;
     for (const line of note.split(/\r?\n/)) {
       const match = line.match(/^([^:]+):\s*(https?:\/\/\S+)/);
       if (match) photos.push({ label: match[1].trim(), url: match[2].trim() });
     }
   }
-  return photos;
+  return photos.filter((photo) => !deletedUrls.has(photo.url));
 }
 
 async function createLeadNote(client, leadId, user, note) {

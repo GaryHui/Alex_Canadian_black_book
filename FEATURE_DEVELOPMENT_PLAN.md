@@ -113,7 +113,8 @@ These are the next areas to keep tightening without making the product heavier:
 - keep update reminders obvious: new leads and changed leads should be clickable, open the exact card, and highlight the changed area first
 - keep staff work efficient: owner one-click assignment and staff "today due" work lists should stay visible before advanced settings
 - staff Today work should mirror the owner's urgency model: separate urgent/high-priority leads, due follow-ups, and updated leads so owner-dispatched urgent work is not hidden in a long list
-- inventory photos need two layers: original Drive folder assets stay preserved for audit/reuse, while the Buy page photo set can be replaced or pruned from the warehouse listing without deleting source files
+- inventory photos need two layers: original Drive folder assets stay preserved by default for audit/reuse, while the Buy page photo set can be replaced or pruned; true Drive deletion should require a clear admin confirmation and Apps Script Drive permission
+- CRM alerts and work queues should not duplicate each other: alerts are the unread change inbox, while Today / Attention queues are for priority work, due follow-ups, assignment decisions, and warehouse decisions
 
 ## Product Structure
 

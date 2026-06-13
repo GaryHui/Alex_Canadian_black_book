@@ -421,6 +421,7 @@ function renderInventoryListing(listing) {
                     <span>${escapeHtml(photo.label || `Vehicle photo ${index + 1}`)}</span>
                     <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Open</a>
                     <button type="button" class="link-danger" data-remove-inventory-photo="${escapeHtml(url)}">Remove from Buy page</button>
+                    <button type="button" class="link-danger strong-danger" data-delete-inventory-photo="${escapeHtml(url)}">Delete file</button>
                   </label>
                 `;
               }).join("")}
@@ -975,10 +976,6 @@ function buildAdminAttentionItems(leads) {
     });
   };
 
-  for (const alert of adminLeadAlertMap.values()) {
-    const lead = leads.find((item) => String(item.id || "") === String(alert.id || ""));
-    if (lead) add(lead, alert.type === "new" ? "New lead" : "Updated lead", "update");
-  }
   leads.filter((lead) => !isClosedLead(lead) && isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).forEach((lead) => add(lead, "Follow-up due", "due"));
   leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim()).forEach((lead) => add(lead, "Needs assignment", "assign"));
   leads.filter((lead) => !isClosedLead(lead) && String(lead.priority || "").toLowerCase() === "urgent").forEach((lead) => add(lead, "Urgent", "urgent"));
@@ -1454,6 +1451,13 @@ inventoryEl?.addEventListener("click", async (event) => {
     return;
   }
 
+  const deletePhotoButton = event.target.closest("[data-delete-inventory-photo]");
+  if (deletePhotoButton) {
+    event.preventDefault();
+    await deleteInventoryDrivePhoto(deletePhotoButton);
+    return;
+  }
+
   const statusButton = event.target.closest("[data-inventory-status]");
   if (statusButton) {
     const form = statusButton.closest(".inventory-card-admin");
@@ -1493,6 +1497,41 @@ async function removeInventoryPublicPhoto(button) {
     showPhotos: selectedUrls.length > 0
   });
   button.disabled = false;
+}
+
+async function deleteInventoryDrivePhoto(button) {
+  const form = button.closest(".inventory-card-admin");
+  const url = String(button.dataset.deleteInventoryPhoto || "").trim();
+  const listingId = form?.dataset.id || "";
+  const leadId = form?.dataset.sourceLeadId || "";
+  if (!form || !url || !listingId || !leadId) return;
+  const label = button.closest("label")?.querySelector("span")?.textContent || "this photo";
+  const confirmed = window.confirm(
+    `Delete "${label}" from Google Drive?\n\nThis moves the source file to Drive trash and removes it from the Buy page. This should only be used for wrong, duplicate, or private photos.`
+  );
+  if (!confirmed) return;
+
+  button.disabled = true;
+  inventoryStatusEl.textContent = "Deleting Drive photo...";
+  try {
+    const response = await fetch("/api/inventory-photo", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        listingId,
+        leadId,
+        url,
+        fileId: driveFileIdFromUrl(url)
+      })
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(formatApiError(data, "Unable to delete Drive photo."));
+    inventoryStatusEl.textContent = "Drive photo deleted and removed from the Buy page.";
+    await loadInventory();
+  } catch (error) {
+    inventoryStatusEl.textContent = error.message || "Unable to delete Drive photo.";
+    button.disabled = false;
+  }
 }
 
 async function saveInventoryListing(form, overrides = {}) {
@@ -1629,6 +1668,13 @@ function fileToBase64Payload(file, label) {
     reader.onerror = () => reject(new Error("Unable to read photo file."));
     reader.readAsDataURL(file);
   });
+}
+
+function driveFileIdFromUrl(url) {
+  const value = String(url || "");
+  const fileMatch = value.match(/\/d\/([^/]+)/);
+  const idMatch = value.match(/[?&]id=([^&]+)/);
+  return fileMatch?.[1] || idMatch?.[1] || "";
 }
 
 leadsEl.addEventListener("submit", async (event) => {

@@ -34,6 +34,7 @@ const dealerTodayWorkEl = document.querySelector("#dealer-today-work");
 const dealerLeadFilterButtons = document.querySelectorAll("[data-dealer-filter]");
 const saveValuationLeadButton = document.querySelector("#save-valuation-lead");
 const DEALER_REFRESH_MS = 30000;
+const DEALER_LEAD_READ_TOKENS_KEY = "autoswitch-dealer-lead-read-tokens";
 const drilldownSuggestions = {
   Honda: {
     models: ["Accord", "Civic", "CR-V", "HR-V", "Odyssey", "Pilot", "Ridgeline"],
@@ -967,7 +968,7 @@ async function setSession(session) {
     await loadDealerDirectory();
     loadUsage();
     loadHistory();
-    loadDealerLeads({ forceActivity: true });
+    loadDealerLeads({ forceActivity: true, suppressAlerts: true });
     startDealerAutoRefresh();
   } else {
     if (supabaseClient) {
@@ -1110,6 +1111,8 @@ async function loadDealerLeads(options = {}) {
 
     dealerLeadsCache = data.leads || [];
     dealerLeadRole = data.role || "dealer";
+    if (options.suppressAlerts) rememberDealerLeadTokens(dealerLeadsCache);
+    else collectDealerLeadAlerts(dealerLeadsCache);
     renderDealerLeads(dealerLeadsCache, dealerLeadRole);
     renderDealerLeadAlerts();
     renderDealerTodayWork(dealerLeadsCache);
@@ -1117,6 +1120,70 @@ async function loadDealerLeads(options = {}) {
     dealerLeadsStatus.textContent = error.message || "Unable to load assigned leads";
     dealerLeadsList.innerHTML = "";
   }
+}
+
+function collectDealerLeadAlerts(leads) {
+  const readTokens = loadDealerLeadReadTokens();
+  let changed = false;
+  for (const lead of leads) {
+    const id = String(lead.id || "");
+    if (!id) continue;
+    const token = dealerLeadUpdateToken(lead);
+    if (readTokens[id] && readTokens[id] !== token) {
+      dealerLeadAlertMap.set(id, {
+        id,
+        type: "updated",
+        title: dealerLeadAlertTitle(lead),
+        message: "Lead changed since you last opened it"
+      });
+    } else if (!readTokens[id]) {
+      readTokens[id] = token;
+      changed = true;
+    }
+  }
+  if (changed) saveDealerLeadReadTokens(readTokens);
+}
+
+function rememberDealerLeadTokens(leads) {
+  const readTokens = loadDealerLeadReadTokens();
+  let changed = false;
+  for (const lead of leads) {
+    const id = String(lead.id || "");
+    if (!id) continue;
+    readTokens[id] = dealerLeadUpdateToken(lead);
+    dealerLeadAlertMap.delete(id);
+    changed = true;
+  }
+  if (changed) saveDealerLeadReadTokens(readTokens);
+}
+
+function loadDealerLeadReadTokens() {
+  try {
+    return JSON.parse(window.localStorage.getItem(dealerLeadReadTokensKey()) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDealerLeadReadTokens(tokens) {
+  try {
+    window.localStorage.setItem(dealerLeadReadTokensKey(), JSON.stringify(tokens || {}));
+  } catch {
+    // localStorage is best-effort. Alerts will still work during the current session.
+  }
+}
+
+function dealerLeadReadTokensKey() {
+  const email = String(authSession?.user?.email || "unknown").trim().toLowerCase();
+  return `${DEALER_LEAD_READ_TOKENS_KEY}:${email}`;
+}
+
+function markDealerLeadTokenRead(id) {
+  const lead = dealerLeadsCache.find((item) => String(item.id || "") === String(id || ""));
+  if (!lead) return;
+  const readTokens = loadDealerLeadReadTokens();
+  readTokens[String(id)] = dealerLeadUpdateToken(lead);
+  saveDealerLeadReadTokens(readTokens);
 }
 
 function renderDealerLeads(leads, role) {
@@ -1326,25 +1393,19 @@ function renderDealerTodayWork(leads) {
   const dueLeads = activeLeads
     .filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"))
     .slice(0, 5);
-  const updatedLeads = [...dealerLeadAlertMap.values()]
-    .map((alert) => leads.find((lead) => String(lead.id || "") === String(alert.id || "")))
-    .filter(Boolean)
-    .filter((lead, index, list) => list.findIndex((item) => item.id === lead.id) === index)
-    .slice(0, 5);
   dealerTodayWorkEl.hidden = false;
-  const totalAttention = priorityLeads.length + dueLeads.length + updatedLeads.length;
+  const totalAttention = priorityLeads.length + dueLeads.length;
   dealerTodayWorkEl.innerHTML = totalAttention ? `
     <header>
       <div>
         <span>Today</span>
-        <strong>${totalAttention} item${totalAttention === 1 ? "" : "s"} need attention</strong>
+        <strong>${totalAttention} task${totalAttention === 1 ? "" : "s"} to work first</strong>
       </div>
       <button type="button" data-dealer-filter-shortcut="${priorityLeads.length ? "priority" : dueLeads.length ? "due" : "active"}">${priorityLeads.length ? "View priority" : dueLeads.length ? "View due" : "View active"}</button>
     </header>
     <div class="dealer-today-sections">
       ${renderDealerTodaySection("Priority", "Urgent or high leads from owner", priorityLeads, "priority")}
       ${renderDealerTodaySection("Due", "Overdue or due today", dueLeads, "due")}
-      ${renderDealerTodaySection("Updated", "New notes, tasks, or owner changes", updatedLeads, "active")}
     </div>
   ` : `
     <header>
@@ -1567,7 +1628,7 @@ async function updateDealerFollowUp(button) {
     const data = await response.json();
     if (!data.ok) throw new Error(data.error || "Unable to set follow-up");
     dealerLeadsStatus.textContent = "Next follow-up updated.";
-    await loadDealerLeads({ forceActivity: true });
+    await loadDealerLeads({ forceActivity: true, suppressAlerts: true });
   } catch (error) {
     dealerLeadsStatus.textContent = error.message || "Unable to set follow-up";
     button.disabled = false;
@@ -1599,7 +1660,7 @@ async function updateDealerLeadStatus(button) {
     const data = await response.json();
     if (!data.ok) throw new Error(data.error || "Unable to update lead status");
     dealerLeadsStatus.textContent = "Lead status updated.";
-    await loadDealerLeads({ forceActivity: true });
+    await loadDealerLeads({ forceActivity: true, suppressAlerts: true });
   } catch (error) {
     dealerLeadsStatus.textContent = error.message || "Unable to update lead status";
     button.disabled = false;
@@ -1736,6 +1797,7 @@ async function openDealerLead(id, options = {}) {
   }
   if (!card) return;
   if (options.fromAlert) {
+    markDealerLeadTokenRead(id);
     dealerLeadAlertMap.delete(id);
     renderDealerLeadAlerts();
     renderDealerLeadSummary(dealerLeadsCache);

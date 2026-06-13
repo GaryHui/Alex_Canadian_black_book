@@ -336,6 +336,10 @@ function installHeaders() {
 
 function doPost(e) {
   const data = JSON.parse((e.postData && e.postData.contents) || "{}");
+  if (data.action === "delete-drive-file" || data.status === "delete-drive-file") {
+    return deleteDriveFile_(data);
+  }
+
   const receivedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const leadsSheet = getOrCreateSheet_(ss, LEADS_SHEET_NAME);
@@ -389,6 +393,40 @@ function doPost(e) {
       savedFiles: driveResult.files || []
     }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function deleteDriveFile_(data) {
+  const fileId = String(data.fileId || "").trim();
+  if (!fileId) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        ok: false,
+        deleted: false,
+        error: "fileId is required"
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    const file = DriveApp.getFileById(fileId);
+    file.setTrashed(true);
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        ok: true,
+        deleted: true,
+        trashed: true,
+        fileId: fileId
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        ok: false,
+        deleted: false,
+        error: error && error.message ? error.message : String(error)
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function saveDriveFilesAndPdf_(data, receivedAt) {

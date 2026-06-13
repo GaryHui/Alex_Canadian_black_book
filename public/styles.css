@@ -2179,7 +2179,7 @@ select {
 .dealer-today-sections {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .dealer-today-section {
@@ -2874,7 +2874,7 @@ select {
   border-radius: 6px;
   display: grid;
   gap: 8px;
-  grid-template-columns: auto 64px minmax(0, 1fr) auto auto;
+  grid-template-columns: auto 64px minmax(0, 1fr) auto auto auto;
   padding: 8px 10px;
 }
 
@@ -2914,6 +2914,10 @@ select {
 
 .inventory-photo-picker .link-danger:hover {
   text-decoration: underline;
+}
+
+.inventory-photo-picker .strong-danger {
+  color: #991b1b;
 }
 
 .inventory-photo-list {

@@ -219,6 +219,13 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, result.ok ? 200 : result.status || 400, result);
     }
 
+    if (req.method === "POST" && url.pathname === "/api/inventory-photo") {
+      const admin = await requireAdmin(req);
+      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+      const result = await deleteInventoryPhoto(await readJson(req), admin.user);
+      return sendJson(res, result.ok ? 200 : result.status || 400, result);
+    }
+
     if (req.method === "POST" && url.pathname === "/api/lead-photos") {
       const admin = await requireAdmin(req);
       if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
@@ -868,6 +875,13 @@ function parseJson(value) {
   } catch {
     return {};
   }
+}
+
+function parseDriveFileId(value) {
+  const text = String(value || "");
+  const fileMatch = text.match(/\/d\/([^/]+)/);
+  const idMatch = text.match(/[?&]id=([^&]+)/);
+  return fileMatch?.[1] || idMatch?.[1] || "";
 }
 
 async function submitLeadToGoogleForm(lead) {
@@ -1985,15 +1999,23 @@ async function findLeadPhotoLinks(leadId, supabase) {
   );
   if (!result.ok) return [];
   const photos = [];
+  const deletedUrls = new Set();
   for (const row of result.data || []) {
     const note = String(row.note || "");
+    if (note.includes("Vehicle photo deleted:")) {
+      for (const line of note.split(/\r?\n/)) {
+        const deletedUrl = String(line || "").trim();
+        if (deletedUrl.startsWith("http")) deletedUrls.add(deletedUrl);
+      }
+      continue;
+    }
     if (!note.includes("Vehicle photo upload:")) continue;
     for (const line of note.split(/\r?\n/)) {
       const match = line.match(/^([^:]+):\s*(https?:\/\/\S+)/);
       if (match) photos.push({ label: match[1].trim(), url: match[2].trim() });
     }
   }
-  return photos;
+  return photos.filter((photo) => !deletedUrls.has(photo.url));
 }
 
 async function uploadInventoryPhotos(body, user) {
@@ -2044,6 +2066,68 @@ async function uploadInventoryPhotos(body, user) {
   const data = await insert.json().catch(() => []);
   if (!insert.ok) return { ok: false, status: insert.status, error: data };
   return { ok: true, photos: Array.isArray(data) ? data : [], webhook };
+}
+
+async function deleteInventoryPhoto(body, user) {
+  const listingId = String(body.listingId || "").trim();
+  const leadId = String(body.leadId || "").trim();
+  const photoUrl = String(body.url || "").trim();
+  const fileId = String(body.fileId || parseDriveFileId(photoUrl)).trim();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!listingId || !leadId || !photoUrl || !fileId) {
+    return { ok: false, status: 400, error: "Listing id, lead id, photo URL, and Drive file id are required" };
+  }
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const driveDelete = await submitDriveDeleteToWebhook({ listingId, leadId, photoUrl, fileId }, user);
+  if (!driveDelete.ok) return driveDelete;
+
+  await fetch(`${url}/rest/v1/listing_photos?listing_id=eq.${encodeURIComponent(listingId)}&url=eq.${encodeURIComponent(photoUrl)}`, {
+    method: "DELETE",
+    headers: supabaseServiceHeaders(key)
+  }).catch(() => null);
+
+  await createLeadActivity({
+    leadId,
+    type: "note",
+    noteType: "inspection",
+    note: `Vehicle photo deleted:\n${photoUrl}`
+  }, user);
+
+  return { ok: true, deleted: true, fileId, url: photoUrl };
+}
+
+async function submitDriveDeleteToWebhook(payload, user) {
+  const webhookUrl = String(process.env.LEAD_WEBHOOK_URL || "").trim();
+  if (!webhookUrl) return { ok: false, status: 502, error: "LEAD_WEBHOOK_URL is not configured, so Drive files cannot be deleted" };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "delete-drive-file",
+        status: "delete-drive-file",
+        fileId: payload.fileId,
+        photoUrl: payload.photoUrl,
+        listingId: payload.listingId,
+        id: payload.leadId,
+        authEmail: String(user?.email || "").trim()
+      })
+    });
+    const text = await response.text().catch(() => "");
+    const data = parseJson(text) || {};
+    if (!response.ok) {
+      return { ok: false, status: response.status, error: data.error || `Drive delete webhook rejected the request (${response.status})` };
+    }
+    if (data.deleted !== true && data.trashed !== true) {
+      return { ok: false, status: 502, error: "Apps Script did not confirm the Drive file was deleted. Update GOOGLE_DRIVE_UPLOADS.md script and redeploy it." };
+    }
+    return { ok: true, data };
+  } catch (error) {
+    return { ok: false, status: 502, error: error.message || "Drive delete webhook failed" };
+  }
 }
 
 async function submitInventoryPhotosToWebhook(listing, files, user) {
