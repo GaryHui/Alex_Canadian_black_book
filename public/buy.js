@@ -34,6 +34,7 @@ const sampleInventory = [
 const text = {
   en: {
     brandName: "AutoSwitch Canada",
+    homeNav: "Home",
     sellNav: "Sell",
     dealerNav: "Dealer portal",
     eyebrow: "Dealer-reviewed inventory",
@@ -116,6 +117,7 @@ const text = {
   },
   fr: {
     brandName: "AutoSwitch Canada",
+    homeNav: "Accueil",
     sellNav: "Vendre",
     dealerNav: "Portail concessionnaire",
     eyebrow: "Inventaire revise par le concessionnaire",

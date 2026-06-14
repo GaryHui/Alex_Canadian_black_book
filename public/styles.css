@@ -3038,6 +3038,35 @@ select {
   white-space: pre-wrap;
 }
 
+.dealer-note-photo-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin-top: 10px;
+}
+
+.dealer-note-photo {
+  color: inherit;
+  display: grid;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.dealer-note-photo img {
+  aspect-ratio: 4 / 3;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.dealer-note-photo span {
+  color: #516174;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .activity-done {
   opacity: .7;
 }
