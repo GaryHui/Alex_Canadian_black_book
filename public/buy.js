@@ -497,6 +497,7 @@ function showVehicleDetails(vehicle) {
       <button class="secondary-button" type="button" data-detail-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].detailUseCalculator)}</button>
     </div>
   `;
+  vehicleDetailBody.scrollTop = 0;
   vehicleDetailModal.hidden = false;
 }
 
