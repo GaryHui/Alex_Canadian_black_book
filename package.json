@@ -5,5 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node server.mjs"
+  },
+  "dependencies": {
+    "@vercel/speed-insights": "^2.0.0"
   }
 }
