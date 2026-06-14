@@ -1373,6 +1373,17 @@ input::placeholder {
   min-width: 136px;
 }
 
+.review-honeypot {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .result-header h2 {
   margin-bottom: 8px;
   font-size: clamp(28px, 4vw, 42px);
@@ -1815,6 +1826,45 @@ input::placeholder {
   padding: 8px 10px;
   color: var(--muted);
   background: #fbfdff;
+}
+
+.vehicle-detail-thumbnails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.vehicle-detail-thumbnail {
+  width: 84px;
+  height: 60px;
+  padding: 0;
+  overflow: hidden;
+  background: #fbfdff;
+  border: 2px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.vehicle-detail-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vehicle-detail-thumbnail:hover {
+  border-color: #bcd2ea;
+}
+
+.vehicle-detail-thumbnail.is-active {
+  border-color: var(--blue-dark, #14395d);
+  transform: translateY(-1px);
+}
+
+.vehicle-detail-thumbnail:focus-visible {
+  outline: 2px solid var(--blue-dark, #14395d);
+  outline-offset: 2px;
 }
 
 .sr-only {
@@ -2265,6 +2315,17 @@ input::placeholder {
   padding: 14px 22px 18px;
   background: linear-gradient(180deg, rgba(255,255,255,0.92), #fff);
   border-top: 1px solid var(--line);
+}
+
+.contact-honeypot {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .contact-form-footer .status {

@@ -408,6 +408,8 @@ function renderInventoryListing(listing) {
   const canPublish = listing.status !== "published" && listing.status !== "sold";
   const canArchive = listing.status !== "archived";
   const publicOptionInputs = renderInventoryPublicOptionInputs(listing.publicOptions || {});
+  const duplicateSellers = Array.isArray(listing.duplicateSellers) ? listing.duplicateSellers : [];
+  const duplicateWarning = renderDuplicateSellersWarning(duplicateSellers);
   const selectablePhotos = availablePhotos.length ? `
             <fieldset class="inventory-photo-picker">
               <legend>Replace public photos</legend>
@@ -466,9 +468,10 @@ function renderInventoryListing(listing) {
             </div>
           </section>`;
   return `
-    <form class="inventory-card-admin" data-id="${escapeHtml(listing.id || "")}" data-source-lead-id="${escapeHtml(listing.sourceLeadId || "")}">
+    <form class="inventory-card-admin${duplicateSellers.length ? " has-duplicate-warning" : ""}" data-id="${escapeHtml(listing.id || "")}" data-source-lead-id="${escapeHtml(listing.sourceLeadId || "")}">
       <input type="hidden" name="sourceLeadId" value="${escapeHtml(listing.sourceLeadId || "")}" />
       ${publicOptionInputs}
+      ${duplicateWarning}
       <div class="inventory-card-head">
         <div>
           <strong>${escapeHtml(listing.title || "Untitled vehicle")}</strong>
@@ -537,6 +540,36 @@ function renderInventoryPublicOptionInputs(options) {
     const enabled = Object.prototype.hasOwnProperty.call(options || {}, key) ? options[key] === true : defaultValue;
     return enabled ? `<input type="hidden" name="${escapeHtml(key)}" value="on" />` : "";
   }).join("");
+}
+
+function renderDuplicateSellersWarning(duplicates) {
+  if (!duplicates.length) return "";
+  const items = duplicates.map((dup) => {
+    const matchLabel = dup.matchedBy === "vin" ? "same VIN" : "same year / make / model";
+    const status = escapeHtml(dup.status || "draft");
+    const title = escapeHtml(dup.title || `${dup.year || ""} ${dup.make || ""} ${dup.model || ""}`.trim() || "Untitled listing");
+    const price = dup.price ? `$${formatNumber(dup.price)}` : "-";
+    const region = escapeHtml(dup.region || "-");
+    return `
+      <li>
+        <div>
+          <strong>${title}</strong>
+          <span>${escapeHtml(matchLabel)} · ${status} · ${price} · ${region}</span>
+          ${dup.vin ? `<small>VIN ${escapeHtml(dup.vin)}</small>` : ""}
+        </div>
+        ${dup.id ? `<button type="button" class="link-button" data-jump-inventory="${escapeHtml(dup.id)}">View listing</button>` : ""}
+      </li>
+    `;
+  }).join("");
+  return `
+    <aside class="inventory-duplicate-warning" role="alert">
+      <header>
+        <strong>Possible duplicate sellers</strong>
+        <span>${duplicates.length} other listing${duplicates.length === 1 ? "" : "s"} look like the same vehicle. Confirm before buying or marking one as sold.</span>
+      </header>
+      <ul>${items}</ul>
+    </aside>
+  `;
 }
 
 function adminPhotoPreviewUrl(url) {
@@ -1444,6 +1477,13 @@ inventoryEl?.addEventListener("click", async (event) => {
     return;
   }
 
+  const jumpButton = event.target.closest("[data-jump-inventory]");
+  if (jumpButton) {
+    event.preventDefault();
+    jumpToInventoryListing(jumpButton.dataset.jumpInventory);
+    return;
+  }
+
   const removePhotoButton = event.target.closest("[data-remove-inventory-photo]");
   if (removePhotoButton) {
     event.preventDefault();
@@ -1572,6 +1612,25 @@ async function removeInventoryListing(button) {
     await Promise.all([loadInventory(), loadLeads({ suppressAlerts: true, forceOpenActivity: true })]);
   }
   button.disabled = false;
+}
+
+function jumpToInventoryListing(listingId) {
+  if (!listingId || !inventoryEl) return;
+  const target = inventoryEl.querySelector(`.inventory-card-admin[data-id="${cssEscape(listingId)}"]`);
+  if (!target) {
+    inventoryStatusEl.textContent = "Open the matching listing in another filter to compare it side by side.";
+    return;
+  }
+  if (inventoryFilter !== "all") {
+    setInventoryFilter("all");
+  }
+  window.requestAnimationFrame(() => {
+    const refreshed = inventoryEl.querySelector(`.inventory-card-admin[data-id="${cssEscape(listingId)}"]`);
+    const node = refreshed || target;
+    node.scrollIntoView({ behavior: "smooth", block: "start" });
+    node.classList.add("highlight-inventory");
+    window.setTimeout(() => node.classList.remove("highlight-inventory"), 2400);
+  });
 }
 
 async function uploadInventoryPhotos(button) {
@@ -1719,9 +1778,13 @@ leadsEl.addEventListener("submit", async (event) => {
     body: JSON.stringify(payload)
   });
   const data = await response.json();
-  const message = data.ok
+  let message = data.ok
     ? `Inventory listing ${data.updated ? "updated" : "published"}. Inventory management has been refreshed.`
     : formatApiError(data, "Unable to publish inventory listing.");
+  if (data.ok && Array.isArray(data.duplicates) && data.duplicates.length) {
+    const duplicateNote = `Warning: ${data.duplicates.length} other inventory listing(s) look like the same vehicle. Open the Inventory tab to review them.`;
+    message = `${message} ${duplicateNote}`;
+  }
   statusEl.textContent = message;
   if (formStatus) formStatus.textContent = message;
   if (data.ok) {

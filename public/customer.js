@@ -1419,6 +1419,7 @@ function collectReviewInput() {
     style: cleanReviewValue(formData.get("style")),
     color: String(formData.get("color") || "").trim(),
     conditionNotes: String(formData.get("conditionNotes") || "").trim(),
+    website: String(formData.get("website") || "").trim(),
     photoCount: photos.length,
     photoNames: photos.map((photo) => photo.name),
     photoMetadata: photos.map(({ base64, ...photo }) => photo),

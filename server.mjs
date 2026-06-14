@@ -2,6 +2,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkInquiryRateLimit, recordInquirySent, checkLeadRateLimit, recordLeadSaved } from "./api/_ratelimit.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(path.join(__dirname, ".env.local"));
@@ -177,7 +178,17 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/api/buyer-inquiries") {
       if (req.method === "POST") {
-        const result = await createBuyerInquiry(await readJson(req));
+        const body = await readJson(req);
+        const rate = checkInquiryRateLimit(req, body);
+        if (!rate.ok) {
+          if (rate.silent) {
+            return sendJson(res, 200, { ok: true, captured: false, silent: true });
+          }
+          if (rate.retryAfter) res.setHeader("Retry-After", String(rate.retryAfter));
+          return sendJson(res, rate.status || 429, { ok: false, error: rate.error, retryAfter: rate.retryAfter || null });
+        }
+        const result = await createBuyerInquiry(body);
+        if (result?.ok) recordInquirySent(req, body);
         return sendJson(res, result.ok ? 200 : result.status || 400, result);
       }
       if (req.method === "GET") {
@@ -282,7 +293,16 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === "POST") {
         const body = await readJson(req);
+        const rate = checkLeadRateLimit(req, body);
+        if (!rate.ok) {
+          if (rate.silent) {
+            return sendJson(res, 200, { ok: true, captured: false, silent: true });
+          }
+          if (rate.retryAfter) res.setHeader("Retry-After", String(rate.retryAfter));
+          return sendJson(res, rate.status || 429, { ok: false, error: rate.error, retryAfter: rate.retryAfter || null });
+        }
         const result = await saveLead(body);
+        if (result?.ok) recordLeadSaved(req, body);
         return sendJson(res, 200, result);
       }
       if (req.method === "GET") {
