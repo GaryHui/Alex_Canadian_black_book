@@ -127,8 +127,6 @@ const commonModels = {
 const text = {
   en: {
     brandName: "AutoSwitch Canada",
-    homeLink: "Home",
-    buyLink: "Buy",
     dealerLink: "Dealer portal",
     toolsLink: "Tools",
     eyebrow: "Canadian vehicle valuation",
@@ -336,8 +334,6 @@ const text = {
   },
   fr: {
     brandName: "AutoÉchange Canada",
-    homeLink: "Accueil",
-    buyLink: "Acheter",
     dealerLink: "Portail concessionnaire",
     toolsLink: "Outils",
     eyebrow: "Évaluation automobile canadienne",
@@ -1419,7 +1415,6 @@ function collectReviewInput() {
     style: cleanReviewValue(formData.get("style")),
     color: String(formData.get("color") || "").trim(),
     conditionNotes: String(formData.get("conditionNotes") || "").trim(),
-    website: String(formData.get("website") || "").trim(),
     photoCount: photos.length,
     photoNames: photos.map((photo) => photo.name),
     photoMetadata: photos.map(({ base64, ...photo }) => photo),

@@ -34,7 +34,6 @@ const sampleInventory = [
 const text = {
   en: {
     brandName: "AutoSwitch Canada",
-    homeNav: "Home",
     sellNav: "Sell",
     dealerNav: "Dealer portal",
     eyebrow: "Dealer-reviewed inventory",
@@ -117,7 +116,6 @@ const text = {
   },
   fr: {
     brandName: "AutoSwitch Canada",
-    homeNav: "Accueil",
     sellNav: "Vendre",
     dealerNav: "Portail concessionnaire",
     eyebrow: "Inventaire revise par le concessionnaire",
@@ -473,7 +471,7 @@ function showVehicleDetails(vehicle) {
     `;
   }
   vehicleDetailBody.innerHTML = `
-    ${renderVehicleDetailGallery(vehicle)}
+    ${vehicle.photos?.length ? `<figure class="vehicle-detail-photo"><img src="${escapeHtml(photoDisplayUrl(vehicle.photos[0].url))}" alt="${escapeHtml(vehicle.title)}" /><figcaption>${escapeHtml(vehicle.photos[0].label || "Vehicle photo")}</figcaption></figure>` : ""}
     <div class="vehicle-detail-grid">
       ${detailItem(text[language].detailKilometers, isPublicFieldVisible(vehicle, "showKilometers") && vehicle.kilometers ? `${vehicle.kilometers.toLocaleString("en-CA")} km` : "")}
       ${detailItem(text[language].detailRegion, isPublicFieldVisible(vehicle, "showRegion") ? vehicle.region : "")}
@@ -497,7 +495,6 @@ function showVehicleDetails(vehicle) {
       <button class="secondary-button" type="button" data-detail-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].detailUseCalculator)}</button>
     </div>
   `;
-  vehicleDetailBody.scrollTop = 0;
   vehicleDetailModal.hidden = false;
 }
 
@@ -515,52 +512,6 @@ function vehicleImageMarkup(vehicle) {
       <span></span>
     </div>
   `;
-}
-
-function renderVehicleDetailGallery(vehicle) {
-  const photos = Array.isArray(vehicle.photos) ? vehicle.photos.filter((photo) => photo?.url) : [];
-  if (!photos.length) return "";
-  const mainUrl = escapeHtml(photoDisplayUrl(photos[0].url));
-  const mainLabel = escapeHtml(photos[0].label || vehicle.title || "Vehicle photo");
-  const main = `
-    <figure class="vehicle-detail-photo" data-detail-gallery>
-      <img src="${mainUrl}" alt="${mainLabel}" data-detail-main-image />
-      <figcaption data-detail-main-caption>${mainLabel}</figcaption>
-    </figure>
-  `;
-  if (photos.length < 2) return main;
-  const thumbs = photos.map((photo, index) => {
-    const url = escapeHtml(photoDisplayUrl(photo.url));
-    const label = escapeHtml(photo.label || `Photo ${index + 1}`);
-    const alt = escapeHtml(vehicle.title || label);
-    return `
-      <button type="button" class="vehicle-detail-thumbnail${index === 0 ? " is-active" : ""}" data-detail-thumb-index="${index}" data-detail-thumb-url="${url}" data-detail-thumb-label="${label}" data-detail-thumb-alt="${alt}" aria-label="${label}">
-        <img src="${url}" alt="${alt}" loading="lazy" />
-      </button>
-    `;
-  }).join("");
-  return `${main}<div class="vehicle-detail-thumbnails" role="tablist" aria-label="Vehicle photos">${thumbs}</div>`;
-}
-
-function swapVehicleDetailImage(thumb) {
-  if (!thumb) return;
-  const gallery = vehicleDetailBody?.querySelector("[data-detail-gallery]");
-  if (!gallery) return;
-  const mainImage = gallery.querySelector("[data-detail-main-image]");
-  const mainCaption = gallery.querySelector("[data-detail-main-caption]");
-  const url = thumb.dataset.detailThumbUrl;
-  const label = thumb.dataset.detailThumbLabel;
-  const alt = thumb.dataset.detailThumbAlt;
-  if (mainImage) {
-    if (url) mainImage.src = url;
-    if (alt) mainImage.alt = alt;
-  }
-  if (mainCaption) {
-    mainCaption.textContent = label || "";
-  }
-  vehicleDetailBody.querySelectorAll("[data-detail-thumb-index]").forEach((button) => {
-    button.classList.toggle("is-active", button === thumb);
-  });
 }
 
 function photoDisplayUrl(url) {
@@ -621,23 +572,16 @@ async function submitDealerContact(event) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...data,
-      website: String(data.website || "").trim(),
       vehicle: buyerVehiclePayload(vehicle),
       finance: financeEstimatePayload(),
       purchase: purchaseIntentPayload(data)
     })
   });
   const result = await response.json().catch(() => ({}));
-  if (result?.ok) {
-    contactDealerStatus.textContent = text[language].contactSent;
+  contactDealerStatus.textContent = result.ok ? text[language].contactSent : (result.error || text[language].contactFailed);
+  if (result.ok) {
     window.setTimeout(closeContactDealer, 1200);
-    return;
   }
-  if (response.status === 429) {
-    contactDealerStatus.textContent = result.error || "Please slow down and try again shortly.";
-    return;
-  }
-  contactDealerStatus.textContent = result.error || text[language].contactFailed;
 }
 
 function contactVehicleContextMarkup(vehicle) {
@@ -788,12 +732,6 @@ vehicleDetailModal?.addEventListener("click", (event) => {
       closeVehicleDetails();
       openContactDealer(vehicle);
     }
-    return;
-  }
-
-  const thumbButton = event.target.closest("[data-detail-thumb-index]");
-  if (thumbButton) {
-    swapVehicleDetailImage(thumbButton);
     return;
   }
 

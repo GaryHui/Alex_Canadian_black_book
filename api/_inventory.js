@@ -29,8 +29,7 @@ export async function listAdminInventory() {
   if (!result.ok) return { ...result, inventory: [] };
   const inventory = Array.isArray(result.data) ? result.data.map(publicInventoryRow) : [];
   const withListingPhotos = await attachListingPhotos(inventory, false, client);
-  const withLeadPhotos = await attachAvailableLeadPhotos(withListingPhotos, client);
-  return { ok: true, storage: "supabase", inventory: attachDuplicateSellers(withLeadPhotos) };
+  return { ok: true, storage: "supabase", inventory: await attachAvailableLeadPhotos(withListingPhotos, client) };
 }
 
 export async function updateInventoryListing(body, user) {
@@ -136,66 +135,8 @@ export async function publishLeadToInventory(body, user) {
   if (isPublicOptionEnabled(savedListing.public_options || listing.public_options, "showPhotos")) {
     await attachLeadPhotosToListing(leadId, savedListing.id || existingId, client);
   }
-  const duplicates = await findDuplicateListingsInDb({
-    id: savedListing.id || existingId || "",
-    vin: listing.vin,
-    year: listing.vehicle_year,
-    make: listing.make,
-    model: listing.model,
-    series: listing.series,
-    style: listing.style
-  }, client);
-  if (duplicates.length) {
-    await createLeadNote(
-      client,
-      leadId,
-      user,
-      `Duplicate-vehicle warning: ${duplicates.length} other inventory listing(s) appear to be the same vehicle. Review before publishing.`
-    );
-  }
   await createLeadNote(client, leadId, user, `Inventory listing ${existingId ? "updated" : "published"} by ${user?.email || "admin"}.`);
-  return { ok: true, listing: publicInventoryRow(savedListing), updated: Boolean(existingId), duplicates };
-}
-
-async function findDuplicateListingsInDb(target, client) {
-  const id = String(target.id || "").trim();
-  const vin = cleanVin(target.vin || "");
-  if (!vin && !target.year) return [];
-  const seen = new Set();
-  const combined = [];
-  if (vin) {
-    const vinResult = await fetchSupabaseJson(
-      `${client.url}/rest/v1/vehicle_listings?select=*&vin=eq.${encodeURIComponent(vin)}&limit=25`,
-      client.key
-    );
-    if (vinResult.ok && Array.isArray(vinResult.data)) {
-      for (const row of vinResult.data) {
-        if (!row?.id || row.id === id || seen.has(row.id)) continue;
-        seen.add(row.id);
-        combined.push(duplicateSummary(publicInventoryRow(row), vin));
-      }
-    }
-  }
-  if (target.year && target.make && target.model) {
-    const params = new URLSearchParams();
-    params.set("select", "*");
-    params.set("vehicle_year", `eq.${target.year}`);
-    params.set("make", `ilike.${target.make}`);
-    params.set("model", `ilike.${target.model}`);
-    params.set("limit", "25");
-    const identityResult = await fetchSupabaseJson(
-      `${client.url}/rest/v1/vehicle_listings?${params.toString()}`,
-      client.key
-    );
-    if (identityResult.ok && Array.isArray(identityResult.data)) {
-      for (const row of identityResult.data) {
-        if (!row?.id || row.id === id || seen.has(row.id)) continue;
-        seen.add(row.id);
-        combined.push(duplicateSummary(publicInventoryRow(row), vin));
-      }
-    }
-  }
-  return combined;
+  return { ok: true, listing: publicInventoryRow(savedListing), updated: Boolean(existingId) };
 }
 
 async function saveVehicleListing(client, { endpoint, method, payload }) {
@@ -494,71 +435,6 @@ async function fetchSupabaseJson(url, key) {
   const data = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: data };
   return { ok: true, data };
-}
-
-function attachDuplicateSellers(inventory) {
-  if (!Array.isArray(inventory) || inventory.length < 2) {
-    return inventory.map((item) => ({ ...item, duplicateSellers: [] }));
-  }
-  return inventory.map((item) => ({
-    ...item,
-    duplicateSellers: findDuplicateListingsInList(item, inventory)
-  }));
-}
-
-export function findDuplicateListingsInList(target, allListings) {
-  if (!target || !Array.isArray(allListings)) return [];
-  const targetVin = cleanVin(target.vin || "");
-  return allListings
-    .filter((item) => item && item.id && item.id !== target.id)
-    .filter((item) => isDuplicateMatch(target, item, targetVin))
-    .map((item) => duplicateSummary(item, targetVin));
-}
-
-function isDuplicateMatch(target, other, targetVin) {
-  if (targetVin) {
-    const otherVin = cleanVin(other.vin || "");
-    if (otherVin && otherVin === targetVin) return true;
-  }
-  return identityMatches(target, other);
-}
-
-function identityMatches(a, b) {
-  const yearA = String(a.year || "").trim();
-  const yearB = String(b.year || "").trim();
-  if (!yearA || yearA !== yearB) return false;
-  const fields = ["make", "model", "series", "style"];
-  return fields.every((field) => sameIdentityText(a[field], b[field]));
-}
-
-function sameIdentityText(a, b) {
-  return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
-}
-
-function duplicateSummary(item, targetVin) {
-  const otherVin = cleanVin(item.vin || "");
-  const matchedBy = otherVin && targetVin && otherVin === targetVin ? "vin" : "identity";
-  return {
-    id: item.id || "",
-    sourceLeadId: item.sourceLeadId || "",
-    status: item.status || "",
-    title: item.title || "",
-    vin: item.vin || "",
-    year: item.year || "",
-    make: item.make || "",
-    model: item.model || "",
-    series: item.series || "",
-    style: item.style || "",
-    price: Number(item.price || 0),
-    region: item.region || "",
-    color: item.color || "",
-    kilometers: Number(item.kilometers || 0),
-    matchedBy
-  };
-}
-
-function cleanVin(value) {
-  return String(value || "").trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, "");
 }
 
 function isPublicOptionEnabled(options, key) {

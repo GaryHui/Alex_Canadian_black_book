@@ -2699,96 +2699,6 @@ select {
   background: #fff;
   border: 1px solid #ddd;
   border-radius: 6px;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.inventory-card-admin.has-duplicate-warning {
-  border-color: #d49b3a;
-  box-shadow: inset 4px 0 0 #d49b3a;
-}
-
-.inventory-card-admin.highlight-inventory {
-  box-shadow: 0 0 0 3px #ffd591;
-  border-color: #d49b3a;
-}
-
-.inventory-duplicate-warning {
-  display: grid;
-  gap: 8px;
-  padding: 12px 14px;
-  background: #fff7e6;
-  border: 1px solid #f1c97a;
-  border-radius: 6px;
-  color: #6b4400;
-}
-
-.inventory-duplicate-warning header {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.inventory-duplicate-warning header strong {
-  font-size: 14px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.inventory-duplicate-warning header span {
-  font-size: 13px;
-  color: #83590c;
-}
-
-.inventory-duplicate-warning ul {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.inventory-duplicate-warning li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
-  background: #fff;
-  border: 1px solid #f1c97a;
-  border-radius: 4px;
-}
-
-.inventory-duplicate-warning li > div {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.inventory-duplicate-warning li strong {
-  font-size: 13px;
-  color: #1a1a1a;
-}
-
-.inventory-duplicate-warning li span,
-.inventory-duplicate-warning li small {
-  font-size: 12px;
-  color: #6b4400;
-}
-
-.inventory-duplicate-warning .link-button {
-  flex: 0 0 auto;
-  background: none;
-  border: 0;
-  padding: 4px 8px;
-  color: #83590c;
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.inventory-duplicate-warning .link-button:hover {
-  color: #4a3000;
 }
 
 .inventory-card-head {
@@ -3126,35 +3036,6 @@ select {
 .activity-item p {
   margin-top: 6px;
   white-space: pre-wrap;
-}
-
-.dealer-note-photo-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  margin-top: 10px;
-}
-
-.dealer-note-photo {
-  color: inherit;
-  display: grid;
-  gap: 6px;
-  text-decoration: none;
-}
-
-.dealer-note-photo img {
-  aspect-ratio: 4 / 3;
-  border: 1px solid #d8e2ef;
-  border-radius: 8px;
-  display: block;
-  object-fit: cover;
-  width: 100%;
-}
-
-.dealer-note-photo span {
-  color: #516174;
-  font-size: 12px;
-  font-weight: 700;
 }
 
 .activity-done {

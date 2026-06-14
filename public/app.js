@@ -25,7 +25,6 @@ const historyStatus = document.querySelector("#history-status");
 const historyList = document.querySelector("#history-list");
 const reloadHistoryButton = document.querySelector("#reload-history");
 const dealerWorkbench = document.querySelector("#dealer-workbench");
-const dealerValuationTool = document.querySelector("#dealer-valuation-tool");
 const dealerLeadsStatus = document.querySelector("#dealer-leads-status");
 const dealerLeadsList = document.querySelector("#dealer-leads-list");
 const reloadDealerLeadsButton = document.querySelector("#reload-dealer-leads");
@@ -943,29 +942,27 @@ async function setSession(session) {
   const emailField = form.elements.email;
   dealerAdminAllowed = false;
   stopDealerAutoRefresh();
-  if (dealerWorkbench) dealerWorkbench.hidden = true;
-  if (dealerValuationTool) dealerValuationTool.hidden = true;
-  historyPanel.hidden = true;
 
   if (session?.user) {
     const email = session.user.email || "";
+    if (dealerWorkbench) dealerWorkbench.hidden = false;
     authTitle.textContent = `Signed in as ${email}`;
     logoutButton.hidden = false;
     emailField.value = email;
     const dealer = await checkDealerAccess();
     if (!dealer.ok) {
+      authTitle.textContent = "Dealer access denied";
+      authSubtitle.textContent = dealer.error || `This Google account is not allowed: ${email}`;
       disableDealerTools(true);
       quotaPanel.hidden = true;
       historyPanel.hidden = true;
       if (dealerLeadSummary) dealerLeadSummary.innerHTML = "";
       if (dealerLeadsList) dealerLeadsList.innerHTML = "";
       if (dealerLeadsStatus) dealerLeadsStatus.textContent = dealer.error || "Dealer access denied.";
-      window.location.replace("/");
+      statusEl.textContent = "Ask the site owner to add this email in Admin > Dealer portal access.";
       return;
     }
     dealerAdminAllowed = true;
-    if (dealerWorkbench) dealerWorkbench.hidden = false;
-    if (dealerValuationTool) dealerValuationTool.hidden = false;
     authSubtitle.textContent = "Dealer access confirmed. Dealer tools are available.";
     disableDealerTools(false);
     await loadDealerDirectory();
@@ -1887,60 +1884,17 @@ function renderDealerActivity(data, options = {}) {
     `;
   });
 
-  const notes = (data.notes || []).map((note) => {
-    const noteText = String(note.note || "");
-    return `
-      <article class="activity-item ${latestKey === `note:${note.id}` ? "activity-highlight" : ""}">
-        <div>
-          <strong>${escapeHtml(note.note_type || "note")} by ${escapeHtml(note.author_email || "-")}</strong>
-          <span>${escapeHtml(formatDateTime(note.created_at))}</span>
-          <p>${formatActivityNote(noteText)}</p>
-          ${renderActivityPhotoGallery(noteText)}
-        </div>
-      </article>
-    `;
-  });
+  const notes = (data.notes || []).map((note) => `
+    <article class="activity-item ${latestKey === `note:${note.id}` ? "activity-highlight" : ""}">
+      <div>
+        <strong>${escapeHtml(note.note_type || "note")} by ${escapeHtml(note.author_email || "-")}</strong>
+        <span>${escapeHtml(formatDateTime(note.created_at))}</span>
+        <p>${escapeHtml(note.note || "")}</p>
+      </div>
+    </article>
+  `);
 
   return [...tasks, ...notes].join("") || "<p>No activity yet.</p>";
-}
-
-function formatActivityNote(note) {
-  return escapeHtml(String(note || "")).replace(/\r?\n/g, "<br />");
-}
-
-function renderActivityPhotoGallery(note) {
-  const photos = extractPhotoLinksFromNote(note);
-  if (!photos.length) return "";
-  return `
-    <div class="dealer-note-photo-grid">
-      ${photos.map((photo) => `
-        <a class="dealer-note-photo" href="${escapeHtml(photo.url)}" target="_blank" rel="noreferrer">
-          <img src="${escapeHtml(photoDisplayUrl(photo.url))}" alt="${escapeHtml(photo.label || "Vehicle photo")}" loading="lazy" />
-          <span>${escapeHtml(photo.label || "Vehicle photo")}</span>
-        </a>
-      `).join("")}
-    </div>
-  `;
-}
-
-function extractPhotoLinksFromNote(note) {
-  const text = String(note || "");
-  if (!text.includes("Vehicle photo upload:")) return [];
-  return text
-    .split(/\r?\n/)
-    .map((line) => {
-      const match = line.match(/^([^:]+):\s*(https?:\/\/\S+)/);
-      return match ? { label: match[1].trim(), url: match[2].trim() } : null;
-    })
-    .filter(Boolean);
-}
-
-function photoDisplayUrl(url) {
-  const value = String(url || "");
-  const fileMatch = value.match(/\/d\/([^/]+)/);
-  const idMatch = value.match(/[?&]id=([^&]+)/);
-  const id = fileMatch?.[1] || idMatch?.[1] || "";
-  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1200` : value;
 }
 
 function latestDealerActivityKey(data) {
