@@ -1667,13 +1667,20 @@ function renderLead(lead, index = 0) {
       ${mergeBanner}
       ${duplicateBanner}
       ${ownerReviewBanner}
-      ${sharedMeta}
-      ${progressSteps}
       ${quickAssign}
+      <div class="lead-quick-strip" aria-label="Lead quick actions">
+        <button type="button" class="lead-quick-button" data-admin-open-workspace>Open</button>
+        <button type="button" class="lead-quick-button" data-admin-focus-followup>Follow-up</button>
+        <button type="button" class="lead-quick-button" data-admin-focus-note="call">Log call</button>
+        <button type="button" class="lead-quick-button" data-admin-focus-note="internal">Add note</button>
+        <button type="button" class="lead-quick-button" data-admin-focus-task>Add task</button>
+      </div>
       ${actionButtons ? `<div class="lead-action-row">${actionButtons}</div>` : ""}
       ${warehousePanel}
       <details class="lead-manage">
         <summary>Open lead workspace</summary>
+        ${sharedMeta}
+        ${progressSteps}
         ${vehicleContext.related_lead_count || vehicleContext.inventory_count ? `
           <section class="lead-detail-section lead-vehicle-ops-panel">
             <header>
@@ -2288,6 +2295,34 @@ leadsEl.addEventListener("click", async (event) => {
     return;
   }
 
+  const openWorkspaceButton = event.target.closest("[data-admin-open-workspace]");
+  if (openWorkspaceButton) {
+    await openAdminLeadWorkspace(openWorkspaceButton.closest(".lead-card"), { forceActivity: true });
+    return;
+  }
+
+  const focusFollowUpButton = event.target.closest("[data-admin-focus-followup]");
+  if (focusFollowUpButton) {
+    await openAdminLeadWorkspace(focusFollowUpButton.closest(".lead-card"), { forceActivity: true, focus: "followup" });
+    return;
+  }
+
+  const focusNoteButton = event.target.closest("[data-admin-focus-note]");
+  if (focusNoteButton) {
+    await openAdminLeadWorkspace(focusNoteButton.closest(".lead-card"), {
+      forceActivity: true,
+      focus: "note",
+      noteType: focusNoteButton.dataset.adminFocusNote || "internal"
+    });
+    return;
+  }
+
+  const focusTaskButton = event.target.closest("[data-admin-focus-task]");
+  if (focusTaskButton) {
+    await openAdminLeadWorkspace(focusTaskButton.closest(".lead-card"), { forceActivity: true, focus: "task" });
+    return;
+  }
+
   const viewInventoryButton = event.target.closest("[data-view-inventory]");
   if (viewInventoryButton) {
     openInventoryListing(viewInventoryButton.dataset.viewInventory || "");
@@ -2377,6 +2412,32 @@ async function markOwnerReviewed(button) {
   } catch (error) {
     statusEl.textContent = error.message || "Unable to mark reviewed.";
     button.disabled = false;
+  }
+}
+
+async function openAdminLeadWorkspace(card, options = {}) {
+  if (!card) return;
+  const details = card.querySelector(".lead-manage");
+  if (details && !details.open) details.open = true;
+  await loadLeadActivity(card, { force: Boolean(options.forceActivity) });
+
+  if (options.focus === "followup") {
+    const input = card.querySelector('.owner-review input[name="nextFollowUpAt"]');
+    input?.focus();
+    return;
+  }
+
+  if (options.focus === "task") {
+    const taskInput = card.querySelector('.lead-task-form input[name="title"]');
+    taskInput?.focus();
+    return;
+  }
+
+  if (options.focus === "note") {
+    const noteType = card.querySelector('.lead-note-form select[name="noteType"]');
+    const noteField = card.querySelector('.lead-note-form textarea[name="note"]');
+    if (noteType && options.noteType) noteType.value = options.noteType;
+    noteField?.focus();
   }
 }
 

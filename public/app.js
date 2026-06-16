@@ -213,6 +213,28 @@ dealerLeadsList?.addEventListener("click", async (event) => {
     return;
   }
 
+  const openWorkspaceButton = event.target.closest("[data-dealer-open-workspace]");
+  if (openWorkspaceButton) {
+    await openDealerWorkspace(openWorkspaceButton.closest(".dealer-lead-card"), { forceActivity: true });
+    return;
+  }
+
+  const focusNoteButton = event.target.closest("[data-dealer-focus-note]");
+  if (focusNoteButton) {
+    await openDealerWorkspace(focusNoteButton.closest(".dealer-lead-card"), {
+      forceActivity: true,
+      focus: "note",
+      noteType: focusNoteButton.dataset.dealerFocusNote || "internal"
+    });
+    return;
+  }
+
+  const focusTaskButton = event.target.closest("[data-dealer-focus-task]");
+  if (focusTaskButton) {
+    await openDealerWorkspace(focusTaskButton.closest(".dealer-lead-card"), { forceActivity: true, focus: "task" });
+    return;
+  }
+
   const statusButton = event.target.closest("[data-dealer-status]");
   if (statusButton) {
     await updateDealerLeadStatus(statusButton);
@@ -1397,14 +1419,21 @@ function renderDealerLeads(leads, role) {
         ${dealerVehicleSignalInline(lead)}
         ${dealerVehicleContextInline(lead)}
         <p class="dealer-update-notice" ${pendingAlert ? "" : "hidden"}>Task or follow-up activity changed. Open this lead to review the latest update.</p>
-        ${sharedMeta}
-        ${progressSteps}
+        <div class="lead-quick-strip dealer-quick-strip" aria-label="Dealer quick actions">
+          <button type="button" class="lead-quick-button" data-dealer-open-workspace>Open</button>
+          <button type="button" class="lead-quick-button" data-dealer-focus-note="call">Log call</button>
+          <button type="button" class="lead-quick-button" data-dealer-focus-note="sms">Text</button>
+          <button type="button" class="lead-quick-button" data-dealer-follow-up="tomorrow">Tomorrow</button>
+          <button type="button" class="lead-quick-button" data-dealer-focus-task>Add task</button>
+        </div>
         ${actionButtons ? `<div class="dealer-lead-actions">${actionButtons}</div>` : ""}
         <div class="dealer-lead-actions dealer-follow-up-actions" aria-label="Set next follow-up">
           ${followUpButtons}
         </div>
         <details class="dealer-lead-details">
           <summary>Open lead details, tasks, and activity</summary>
+          ${sharedMeta}
+          ${progressSteps}
           ${vehicleContext.related_lead_count || vehicleContext.inventory_count ? `
             <section class="dealer-info-block">
               <h3>Vehicle operations</h3>
@@ -1851,6 +1880,26 @@ async function updateDealerLeadStatus(button) {
   } catch (error) {
     dealerLeadsStatus.textContent = error.message || "Unable to update lead status";
     button.disabled = false;
+  }
+}
+
+async function openDealerWorkspace(card, options = {}) {
+  if (!card) return;
+  const details = card.querySelector(".dealer-lead-details");
+  if (details && !details.open) details.open = true;
+  await loadDealerActivity(card, { force: Boolean(options.forceActivity) });
+
+  if (options.focus === "task") {
+    const taskInput = card.querySelector('.dealer-task-form input[name="title"]');
+    taskInput?.focus();
+    return;
+  }
+
+  if (options.focus === "note") {
+    const noteType = card.querySelector('.dealer-note-form select[name="noteType"]');
+    const noteField = card.querySelector('.dealer-note-form textarea[name="note"]');
+    if (noteType && options.noteType) noteType.value = options.noteType;
+    noteField?.focus();
   }
 }
 
