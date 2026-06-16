@@ -1893,7 +1893,7 @@ select {
   border-radius: 12px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 10px 24px rgba(15, 23, 42, .06);
   overflow: hidden;
-  padding: 12px;
+  padding: 10px 12px;
   position: relative;
   transition: opacity .18s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease;
 }
@@ -1993,7 +1993,9 @@ select {
 }
 
 .lead-card-urgent .lead-summary,
-.dealer-lead-card-urgent .dealer-lead-top {
+.dealer-lead-card-urgent .dealer-lead-top,
+.lead-card-urgent .lead-list-row,
+.dealer-lead-card-urgent .dealer-list-row {
   background: linear-gradient(180deg, rgba(255, 233, 236, .96) 0%, rgba(255, 245, 246, .9) 100%);
   border: 1px solid #fecdd3;
   border-radius: 10px;
@@ -2015,6 +2017,46 @@ select {
 
 .lead-summary-compact {
   margin-bottom: 10px;
+}
+
+.lead-list-row {
+  align-items: start;
+  column-gap: 12px;
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1.1fr 1fr .9fr 1fr;
+}
+
+.lead-list-col {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.lead-list-col > strong {
+  color: #16243a;
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.lead-list-col-actions {
+  justify-items: end;
+}
+
+.lead-list-subline {
+  color: #64748b;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lead-list-subline span {
+  background: rgba(255, 255, 255, .64);
+  border: 1px solid rgba(203, 213, 225, .8);
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 4px 7px;
 }
 
 .lead-summary > div:first-child {
@@ -2148,6 +2190,18 @@ select {
   gap: 12px;
 }
 
+.lead-list-header {
+  align-items: center;
+  color: #64748b;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1.3fr 1fr 1.1fr 1fr .9fr 1fr;
+  padding: 0 12px;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 900;
+}
+
 .lead-card-buyer {
   border-left: 6px solid var(--lead-buy);
 }
@@ -2202,7 +2256,8 @@ select {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 6px 0 10px;
+  justify-content: flex-end;
+  margin: 0;
 }
 
 .lead-quick-button {
@@ -2215,6 +2270,7 @@ select {
   font-weight: 800;
   min-height: 32px;
   padding: 0 12px;
+  white-space: nowrap;
 }
 
 .lead-quick-button:hover {
@@ -2232,7 +2288,7 @@ select {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 8px 0;
+  margin: 8px 0 0;
 }
 
 .quick-assign-row {
@@ -3203,7 +3259,8 @@ select {
   opacity: .82;
 }
 
-.lead-card-closed .lead-summary {
+.lead-card-closed .lead-summary,
+.lead-card-closed .lead-list-row {
   background: #f8fafc;
 }
 
@@ -4405,6 +4462,11 @@ select {
     display: grid;
   }
 
+  .lead-list-header,
+  .lead-list-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .lead-summary-metrics {
     justify-content: flex-start;
   }
@@ -4432,5 +4494,23 @@ select {
   .dealer-lead-group > header {
     align-items: stretch;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 760px) {
+  .lead-list-header {
+    display: none;
+  }
+
+  .lead-list-row {
+    grid-template-columns: 1fr;
+  }
+
+  .lead-list-col-actions {
+    justify-items: start;
+  }
+
+  .lead-quick-strip {
+    justify-content: flex-start;
   }
 }

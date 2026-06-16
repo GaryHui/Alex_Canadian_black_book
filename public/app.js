@@ -1380,52 +1380,67 @@ function renderDealerLeads(leads, role) {
             ? "Buyer opportunity"
             : "Seller appraisal";
     const customerSummary = input.phone || customerEmail;
+    const progressSummary = leadStatusLabel(status, buyerLead);
 
     return `
       <article class="history-card dealer-lead-card dealer-lead-${leadKind} dealer-lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${String(lead.priority || "").toLowerCase() === "urgent" ? "dealer-lead-card-urgent" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "dealer-lead-updated" : ""}" data-lead-id="${escapeHtml(lead.id || "")}" data-update-token="${escapeHtml(updateToken)}">
-        <div class="dealer-lead-top">
-          <div>
+        <section class="lead-list-row dealer-list-row">
+          <div class="lead-list-col lead-list-col-main">
             <div class="dealer-lead-title">
               <b class="dealer-type-pill dealer-type-${leadKind}">${escapeHtml(leadTypeLabel)}</b>
               <strong>${escapeHtml(title)}</strong>
             </div>
-            <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
+            <div class="lead-list-subline">
+              <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
+              <span>${escapeHtml(lead.priority || "normal")}</span>
+              <span>${escapeHtml(statusLabel)}</span>
+            </div>
           </div>
-          <b class="dealer-status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
-        </div>
-        ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-dealer-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
-        <section class="lead-command-bar dealer-command-bar">
-          <div class="lead-command-cell">
-            <span>Next step</span>
-            <strong>${escapeHtml(nextStepSummary)}</strong>
-            <small>${escapeHtml(lead.assigned_to ? `Owner ${lead.assigned_to}` : "Assigned lead")}</small>
-          </div>
-          <div class="lead-command-cell">
-            <span>Customer</span>
+          <div class="lead-list-col">
             <strong>${escapeHtml(customerSummary)}</strong>
-            <small>${escapeHtml(customerEmail)}</small>
+            <div class="lead-list-subline">
+              <span>${escapeHtml(customerEmail)}</span>
+              <span>${escapeHtml(lead.assigned_to || "Assigned lead")}</span>
+            </div>
           </div>
-          <div class="lead-command-cell">
-            <span>Vehicle</span>
+          <div class="lead-list-col">
             <strong>${escapeHtml(vehicleSummary)}</strong>
-            <small>${escapeHtml(vehicleContext.cluster_label || `VIN ${valuation.vin || input.vin || "-"}`)}</small>
+            <div class="lead-list-subline">
+              <span>${escapeHtml(vehicleContext.cluster_label || `VIN ${valuation.vin || input.vin || "-"}`)}</span>
+              <span>${escapeHtml(buyerLead ? (purchase.intent || input.purchaseIntent || "Buyer") : (wholesaleAvg ? `W ${formatNumber(wholesaleAvg)}` : "Seller"))}</span>
+              <span>${escapeHtml(!buyerLead && retailAvg ? `R ${formatNumber(retailAvg)}` : buyerLead && (purchase.monthlyPayment || retailAvg) ? `Budget ${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)}/mo` : formatNumber(retailAvg)}` : "-")}</span>
+            </div>
           </div>
-          <div class="lead-command-cell">
-            <span>Pipeline</span>
-            <strong>${escapeHtml(leadStatusLabel(status, buyerLead))}</strong>
-            <small>${escapeHtml(lastActivity ? `Last activity ${formatDateTime(lastActivity)}` : "No recent activity")}</small>
+          <div class="lead-list-col">
+            <strong>${escapeHtml(nextStepSummary)}</strong>
+            <div class="lead-list-subline">
+              <span>${escapeHtml(overdue ? "Overdue" : followUp ? "Scheduled" : "Unscheduled")}</span>
+              <span>${escapeHtml(lead.assigned_to || "Assigned")}</span>
+            </div>
+          </div>
+          <div class="lead-list-col">
+            <strong>${escapeHtml(progressSummary)}</strong>
+            <div class="lead-list-subline">
+              <span>${escapeHtml(lastActivity ? `Last activity ${formatDateTime(lastActivity)}` : "No recent activity")}</span>
+            </div>
+          </div>
+          <div class="lead-list-col lead-list-col-actions">
+            <div class="lead-quick-strip dealer-quick-strip" aria-label="Dealer quick actions">
+              <button type="button" class="lead-quick-button" data-dealer-open-workspace>Open</button>
+              <button type="button" class="lead-quick-button" data-dealer-focus-note="call">Log call</button>
+              <button type="button" class="lead-quick-button" data-dealer-focus-note="sms">Text</button>
+              <button type="button" class="lead-quick-button" data-dealer-focus-task>Add task</button>
+            </div>
+            <div class="lead-summary-metrics">
+              <b class="priority-pill priority-${escapeHtml(lead.priority || "normal")}">${escapeHtml(lead.priority || "normal")}</b>
+              <b class="dealer-status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
+            </div>
           </div>
         </section>
+        ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-dealer-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
         ${dealerVehicleSignalInline(lead)}
         ${dealerVehicleContextInline(lead)}
         <p class="dealer-update-notice" ${pendingAlert ? "" : "hidden"}>Task or follow-up activity changed. Open this lead to review the latest update.</p>
-        <div class="lead-quick-strip dealer-quick-strip" aria-label="Dealer quick actions">
-          <button type="button" class="lead-quick-button" data-dealer-open-workspace>Open</button>
-          <button type="button" class="lead-quick-button" data-dealer-focus-note="call">Log call</button>
-          <button type="button" class="lead-quick-button" data-dealer-focus-note="sms">Text</button>
-          <button type="button" class="lead-quick-button" data-dealer-follow-up="tomorrow">Tomorrow</button>
-          <button type="button" class="lead-quick-button" data-dealer-focus-task>Add task</button>
-        </div>
         ${actionButtons ? `<div class="dealer-lead-actions">${actionButtons}</div>` : ""}
         <div class="dealer-lead-actions dealer-follow-up-actions" aria-label="Set next follow-up">
           ${followUpButtons}
@@ -1710,6 +1725,14 @@ function renderDealerLeadGroups(leads, cardRenderer) {
         </div>
         <b>${group.leads.length}</b>
       </header>
+      <div class="lead-list-header dealer-lead-list-header" aria-hidden="true">
+        <span>Lead</span>
+        <span>Customer</span>
+        <span>Vehicle</span>
+        <span>Next step</span>
+        <span>Pipeline</span>
+        <span>Quick actions</span>
+      </div>
       <div class="dealer-lead-group-list">
         ${group.leads.map((lead, index) => cardRenderer(lead, index)).join("")}
       </div>

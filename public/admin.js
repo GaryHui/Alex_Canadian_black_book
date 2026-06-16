@@ -1318,6 +1318,14 @@ function renderLeadGroups(leads) {
         </div>
         <b>${group.leads.length}</b>
       </header>
+      <div class="lead-list-header" aria-hidden="true">
+        <span>Lead</span>
+        <span>Customer</span>
+        <span>Vehicle</span>
+        <span>Next step</span>
+        <span>Pipeline</span>
+        <span>Quick actions</span>
+      </div>
       <div class="lead-group-list">
         ${group.leads.map((lead, index) => renderLead(lead, index)).join("")}
       </div>
@@ -1609,6 +1617,7 @@ function renderLead(lead, index = 0) {
           ? "Buyer journey in CRM"
           : "Seller valuation in CRM";
   const responseSummary = lastActivity ? `Last activity ${formatDateTime(lastActivity)}` : "No recent activity logged";
+  const progressSummary = leadStatusLabel(status, buyer);
   const sharedMeta = renderSharedLeadMeta({
     customerEmail,
     phone: input.phone || "-",
@@ -1621,60 +1630,66 @@ function renderLead(lead, index = 0) {
   });
   return `
     <article class="lead-card lead-card-${leadType} lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${priority === "urgent" ? "lead-card-urgent" : ""} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "lead-card-updated" : ""} ${mergeState.kind ? "lead-card-vehicle-child" : ""}" data-id="${escapeHtml(lead.id || "")}">
-      <header class="lead-summary lead-summary-compact">
-        <div>
+      <section class="lead-list-row">
+        <div class="lead-list-col lead-list-col-main">
           <div class="lead-title-row">
             <b class="lead-type-pill lead-type-${leadType}">${escapeHtml(leadTypeLabel)}</b>
             <strong>${escapeHtml(title)}</strong>
           </div>
-          <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
+          <div class="lead-list-subline">
+            <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
+            <span>${escapeHtml(priority)}</span>
+            <span>${escapeHtml(statusLabel)}</span>
+          </div>
         </div>
-        <div class="lead-summary-metrics">
-          <span>${escapeHtml(customerEmail)}</span>
-          <span>VIN ${escapeHtml(vin)}</span>
-          <span>Owner ${escapeHtml(assignedTo || "Unassigned")}</span>
-          ${buyer ? `<span>Intent ${escapeHtml(purchase.intent || input.purchaseIntent || "-")}</span>` : `<span>Wholesale ${wholesale ? formatNumber(wholesale) : "-"}</span>`}
-          ${buyer ? `<span>Budget ${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)}/mo` : retail ? formatNumber(retail) : "-"}</span>` : `<span>Retail ${retail ? formatNumber(retail) : "-"}</span>`}
-          <b class="priority-pill priority-${escapeHtml(priority)}">${escapeHtml(priority)}</b>
-          <b class="status-pill ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
-        </div>
-      </header>
-      ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${ownerReview.unread ? "Owner review required" : "New update on this lead"}</button>` : ""}
-      <section class="lead-command-bar">
-        <div class="lead-command-cell">
-          <span>Next step</span>
-          <strong>${escapeHtml(queueSummary)}</strong>
-          <small>${escapeHtml(assignedTo ? `Owner ${assignedTo}` : "Assign owner to start workflow")}</small>
-        </div>
-        <div class="lead-command-cell">
-          <span>Customer lane</span>
+        <div class="lead-list-col">
           <strong>${escapeHtml(customerEmail)}</strong>
-          <small>${escapeHtml(input.phone || "No phone on file")}</small>
+          <div class="lead-list-subline">
+            <span>${escapeHtml(input.phone || "No phone")}</span>
+            <span>${escapeHtml(assignedTo || "Unassigned")}</span>
+          </div>
         </div>
-        <div class="lead-command-cell">
-          <span>Vehicle lane</span>
-          <strong>${escapeHtml(vehicleSummary)}</strong>
-          <small>${escapeHtml(vehicleContext.cluster_label || `VIN ${vin}`)}</small>
+        <div class="lead-list-col">
+          <strong>${escapeHtml(vehicleContext.cluster_label || title)}</strong>
+          <div class="lead-list-subline">
+            <span>VIN ${escapeHtml(vin)}</span>
+            <span>${escapeHtml(buyer ? (purchase.intent || input.purchaseIntent || "Buyer") : (wholesale ? `W ${formatNumber(wholesale)}` : "Seller"))}</span>
+            <span>${escapeHtml(!buyer && retail ? `R ${formatNumber(retail)}` : buyer && (purchase.monthlyPayment || retail) ? `Budget ${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)}/mo` : formatNumber(retail)}` : "-")}</span>
+          </div>
         </div>
-        <div class="lead-command-cell">
-          <span>Recent touch</span>
-          <strong>${escapeHtml(responseSummary)}</strong>
-          <small>${escapeHtml(priority === "urgent" ? "Urgent manager attention" : "Track next owner move")}</small>
+        <div class="lead-list-col">
+          <strong>${escapeHtml(queueSummary)}</strong>
+          <div class="lead-list-subline">
+            <span>${escapeHtml(assignedTo ? `Owner ${assignedTo}` : "Assign owner")}</span>
+            <span>${escapeHtml(overdue ? "Overdue" : followUp ? "Scheduled" : "Unscheduled")}</span>
+          </div>
+        </div>
+        <div class="lead-list-col">
+          <strong>${escapeHtml(progressSummary)}</strong>
+          <div class="lead-list-subline">
+            <span>${escapeHtml(responseSummary)}</span>
+          </div>
+        </div>
+        <div class="lead-list-col lead-list-col-actions">
+          <div class="lead-quick-strip" aria-label="Lead quick actions">
+            <button type="button" class="lead-quick-button" data-admin-open-workspace>Open</button>
+            <button type="button" class="lead-quick-button" data-admin-focus-followup>Follow-up</button>
+            <button type="button" class="lead-quick-button" data-admin-focus-note="call">Log call</button>
+            <button type="button" class="lead-quick-button" data-admin-focus-task>Add task</button>
+          </div>
+          <div class="lead-summary-metrics">
+            <b class="priority-pill priority-${escapeHtml(priority)}">${escapeHtml(priority)}</b>
+            <b class="status-pill ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
+          </div>
         </div>
       </section>
+      ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${ownerReview.unread ? "Owner review required" : "New update on this lead"}</button>` : ""}
       ${signalBanner}
       ${contextBanner}
       ${mergeBanner}
       ${duplicateBanner}
       ${ownerReviewBanner}
       ${quickAssign}
-      <div class="lead-quick-strip" aria-label="Lead quick actions">
-        <button type="button" class="lead-quick-button" data-admin-open-workspace>Open</button>
-        <button type="button" class="lead-quick-button" data-admin-focus-followup>Follow-up</button>
-        <button type="button" class="lead-quick-button" data-admin-focus-note="call">Log call</button>
-        <button type="button" class="lead-quick-button" data-admin-focus-note="internal">Add note</button>
-        <button type="button" class="lead-quick-button" data-admin-focus-task>Add task</button>
-      </div>
       ${actionButtons ? `<div class="lead-action-row">${actionButtons}</div>` : ""}
       ${warehousePanel}
       <details class="lead-manage">
