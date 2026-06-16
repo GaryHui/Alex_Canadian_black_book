@@ -395,7 +395,10 @@ async function markDuplicateReview(body, user) {
   return reviewDuplicateSellerLead({
     url,
     key
-  }, leadId, body.decision, user?.email);
+  }, leadId, body.decision, user?.email, {
+    targetLeadId: body.targetLeadId,
+    listingId: body.listingId
+  });
 }
 
 async function createOwnerReviewNote({ url, key, leadId, authorEmail, reason }) {

@@ -835,6 +835,24 @@ function vehicleContextInline(lead) {
       <span>Vehicle cluster</span>
       <strong>${escapeHtml(context.cluster_label || "Same vehicle activity")}</strong>
       <small>${escapeHtml(pills.join(" | ") || "Related vehicle activity found.")}</small>
+      ${context.primary_lead_id ? `<small>Primary CRM lead ${escapeHtml(context.primary_lead_title || context.primary_lead_id)}${context.primary_listing_id ? ` | warehouse ${escapeHtml(context.primary_listing_id)}` : ""}</small>` : ""}
+    </section>
+  `;
+}
+
+function mergeStateInline(lead) {
+  const state = lead?.merge_state;
+  if (!state?.kind) return "";
+  if (state.kind === "merged") {
+    return `
+      <section class="owner-review-read duplicate-vehicle-reviewed">
+        <span>Merged into primary CRM lead ${escapeHtml(state.primary_lead_id || "-")} ${state.at ? escapeHtml(formatDateTime(state.at)) : ""}</span>
+      </section>
+    `;
+  }
+  return `
+    <section class="owner-review-read duplicate-vehicle-reviewed">
+      <span>Linked to warehouse listing ${escapeHtml(state.listing_id || "-")} under CRM lead ${escapeHtml(state.primary_lead_id || "-")} ${state.at ? escapeHtml(formatDateTime(state.at)) : ""}</span>
     </section>
   `;
 }
@@ -850,17 +868,26 @@ function duplicateWarningInline(lead) {
     `;
   }
   const count = Number(duplicate.count || 0);
+  const currentId = String(lead?.id || "").trim();
+  const mergeTargetId = String(lead?.vehicle_context?.primary_lead_id || "").trim();
+  const safeMergeTargetId = mergeTargetId && mergeTargetId !== currentId ? mergeTargetId : "";
+  const listingId = String(lead?.vehicle_context?.primary_listing_id || "").trim();
+  const actionHint = safeMergeTargetId || listingId
+    ? `${safeMergeTargetId ? `Primary CRM ${safeMergeTargetId}` : ""}${safeMergeTargetId && listingId ? " | " : ""}${listingId ? `Warehouse ${listingId}` : ""}`
+    : "Open Vehicle clusters to review the related records.";
   return `
     <section class="owner-review-required duplicate-vehicle-warning">
       <div>
         <span>Duplicate vehicle warning</span>
         <strong>${escapeHtml(duplicate.message)}</strong>
         <small>${escapeHtml(count ? `${count} related CRM / Warehouse record${count === 1 ? "" : "s"} detected.` : "Related records detected.")}</small>
+        <small>${escapeHtml(actionHint)}</small>
       </div>
       <div class="duplicate-review-actions">
         <button type="button" data-duplicate-review="keep_separate">Keep separate</button>
-        <button type="button" data-duplicate-review="merge_existing">Merge later</button>
-        <button type="button" data-duplicate-review="link_inventory">Link warehouse</button>
+        <button type="button" data-duplicate-review="merge_existing" data-target-lead-id="${escapeHtml(safeMergeTargetId)}" ${safeMergeTargetId ? "" : "disabled"}>Merge into primary</button>
+        <button type="button" data-duplicate-review="link_inventory" data-target-lead-id="${escapeHtml(safeMergeTargetId)}" data-listing-id="${escapeHtml(listingId)}" ${listingId ? "" : "disabled"}>Link warehouse</button>
+        <a class="duplicate-review-link" href="/admin-vehicles.html" target="_blank" rel="noreferrer">Open vehicle clusters</a>
       </div>
     </section>
   `;
@@ -896,9 +923,10 @@ async function openAdminLeadFromAlert(id) {
     setAdminLeadFilter("all");
     renderLeadWorkbench(adminLeadsCache);
   }
-  const card = leadsEl.querySelector(`.lead-card[data-id="${cssEscape(id)}"]`);
+  const visibleId = resolveVisibleAdminLeadId(id);
+  const card = leadsEl.querySelector(`.lead-card[data-id="${cssEscape(visibleId)}"]`);
   if (!card) return;
-  setActiveAdminLead(id);
+  setActiveAdminLead(visibleId);
   const lead = adminLeadsCache.find((item) => String(item.id || "") === id);
   if (!lead?.owner_review?.unread) {
     markAdminLeadTokenRead(id);
@@ -918,14 +946,18 @@ async function openAdminLeadFromAlert(id) {
 function renderLeadWorkbench(leads) {
   const filtered = filterAdminLeads(leads);
   const sorted = sortAdminLeads(filtered);
+  const collapsed = collapseVisibleAdminLeads(sorted);
   const buyerCount = leads.filter(isBuyerLead).length;
   const sellerCount = leads.length - buyerCount;
   const activeCount = leads.filter((lead) => !isClosedLead(lead)).length;
   const closedCount = leads.length - activeCount;
   const searchLabel = adminLeadSearch.trim() ? ` Search: "${adminLeadSearch.trim()}".` : "";
   const sortLabel = adminLeadSort === "oldest" ? "Oldest first" : "Newest first";
-  statusEl.textContent = `${sorted.length} shown. ${activeCount} active / ${closedCount} closed. ${buyerCount} BUY / ${sellerCount} SELL. Sort: ${sortLabel}, with urgent, overdue, and new pinned first.${searchLabel}`;
-  leadsEl.innerHTML = renderLeadGroups(sorted);
+  const duplicateLabel = collapsed.hiddenSellerDuplicates > 0
+    ? ` ${collapsed.hiddenSellerDuplicates} duplicate SELL lead${collapsed.hiddenSellerDuplicates === 1 ? "" : "s"} collapsed into Vehicle clusters.`
+    : "";
+  statusEl.textContent = `${collapsed.visible.length} shown. ${activeCount} active / ${closedCount} closed. ${buyerCount} BUY / ${sellerCount} SELL. Sort: ${sortLabel}, with urgent, overdue, and new pinned first.${duplicateLabel}${searchLabel}`;
+  leadsEl.innerHTML = renderLeadGroups(collapsed.visible);
   syncActiveAdminLeadCard();
 }
 
@@ -1300,12 +1332,86 @@ function isClosedLead(lead) {
   return ["won", "lost", "closed", "deleted", "in_inventory"].includes(String(lead?.status || "").toLowerCase());
 }
 
+function resolveVisibleAdminLeadId(id) {
+  const lead = adminLeadsCache.find((item) => String(item.id || "") === String(id || ""));
+  return String(lead?.vehicle_context?.primary_lead_id || lead?.merge_state?.primary_lead_id || id || "").trim();
+}
+
+function collapseVisibleAdminLeads(leads) {
+  const visibleBuyerLeads = [];
+  const visibleUngroupedSellerLeads = [];
+  const sellerGroups = new Map();
+  let hiddenSellerDuplicates = 0;
+
+  for (const lead of leads) {
+    if (isBuyerLead(lead)) {
+      visibleBuyerLeads.push(lead);
+      continue;
+    }
+    const key = adminVehicleClusterKey(lead);
+    if (!key) {
+      visibleUngroupedSellerLeads.push(lead);
+      continue;
+    }
+    const group = sellerGroups.get(key) || [];
+    group.push(lead);
+    sellerGroups.set(key, group);
+  }
+
+  const visibleSellerLeads = [];
+  for (const group of sellerGroups.values()) {
+    const visibleLead = pickVisibleSellerLead(group);
+    if (!visibleLead) continue;
+    visibleSellerLeads.push(visibleLead);
+    hiddenSellerDuplicates += Math.max(group.length - 1, 0);
+  }
+
+  return {
+    visible: [...visibleBuyerLeads, ...visibleUngroupedSellerLeads, ...visibleSellerLeads].sort(compareAdminLeadOrder),
+    hiddenSellerDuplicates
+  };
+}
+
+function pickVisibleSellerLead(group) {
+  const primaryId = String(group.find((lead) => String(lead?.vehicle_context?.primary_lead_id || "").trim())?.vehicle_context?.primary_lead_id || "").trim();
+  return [...group].sort((a, b) => {
+    const primaryDiff = Number(String(b?.id || "") === primaryId) - Number(String(a?.id || "") === primaryId);
+    if (primaryDiff) return primaryDiff;
+    const childDiff = Number(Boolean(a?.merge_state?.kind)) - Number(Boolean(b?.merge_state?.kind));
+    if (childDiff) return childDiff;
+    return compareAdminLeadOrder(a, b);
+  })[0] || null;
+}
+
+function adminVehicleClusterKey(lead) {
+  const primaryId = String(lead?.vehicle_context?.primary_lead_id || "").trim();
+  if (primaryId) return `primary:${primaryId}`;
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  const vin = String(input.vin || valuation.vin || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (vin) return `vin:${vin}`;
+  const uvc = String(input.uvc || valuation.uvc || "").trim().toLowerCase();
+  if (uvc) return `uvc:${uvc}`;
+  const spec = [
+    input.year || valuation.year,
+    input.make || valuation.make,
+    input.model || valuation.model,
+    input.series || valuation.series,
+    input.style || valuation.style
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean)
+    .join("|");
+  return spec ? `spec:${spec}` : "";
+}
+
 function searchableLeadText(lead) {
   const input = lead?.input || {};
   const valuation = lead?.valuation || {};
   const ownerReview = lead?.owner_review || {};
   const duplicate = lead?.duplicate_warning || {};
   const vehicleContext = lead?.vehicle_context || {};
+  const mergeState = lead?.merge_state || {};
   return [
     lead?.id,
     lead?.status,
@@ -1334,8 +1440,14 @@ function searchableLeadText(lead) {
     valuation.source,
     duplicate.message,
     duplicate.decision,
+    mergeState.kind,
+    mergeState.primary_lead_id,
+    mergeState.listing_id,
     vehicleContext.cluster_label,
-    vehicleContext.primary_inventory_status
+    vehicleContext.primary_inventory_status,
+    vehicleContext.primary_lead_id,
+    vehicleContext.primary_lead_title,
+    vehicleContext.primary_listing_id
   ].filter(Boolean).join(" ").toLowerCase();
 }
 
@@ -1362,6 +1474,7 @@ function renderLead(lead, index = 0) {
   const priority = lead.priority || "normal";
   const ownerReview = lead.owner_review || {};
   const vehicleContext = lead.vehicle_context || {};
+  const mergeState = lead.merge_state || {};
   const purchase = input.buyerPlan || valuation.buyerPlan || {};
   const followUp = lead.next_follow_up_at || "";
   const lastActivity = lead.last_activity_at || "";
@@ -1435,6 +1548,7 @@ function renderLead(lead, index = 0) {
       </section>` : "";
   const signalBanner = vehicleSignalInline(lead);
   const contextBanner = vehicleContextInline(lead);
+  const mergeBanner = mergeStateInline(lead);
   const duplicateBanner = duplicateWarningInline(lead);
   const sharedMeta = renderSharedLeadMeta({
     customerEmail,
@@ -1447,7 +1561,7 @@ function renderLead(lead, index = 0) {
     leadTypeLabel
   });
   return `
-    <article class="lead-card lead-card-${leadType} lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${priority === "urgent" ? "lead-card-urgent" : ""} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "lead-card-updated" : ""}" data-id="${escapeHtml(lead.id || "")}">
+    <article class="lead-card lead-card-${leadType} lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${priority === "urgent" ? "lead-card-urgent" : ""} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "lead-card-updated" : ""} ${mergeState.kind ? "lead-card-vehicle-child" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <header class="lead-summary">
         <div>
           <div class="lead-title-row">
@@ -1469,6 +1583,7 @@ function renderLead(lead, index = 0) {
       ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${ownerReview.unread ? "Owner review required" : "New update on this lead"}</button>` : ""}
       ${signalBanner}
       ${contextBanner}
+      ${mergeBanner}
       ${duplicateBanner}
       ${ownerReviewBanner}
       ${sharedMeta}
@@ -1491,6 +1606,7 @@ function renderLead(lead, index = 0) {
               <span>Warehouse status</span><b>${escapeHtml(vehicleContext.primary_inventory_status ? String(vehicleContext.primary_inventory_status).replaceAll("_", " ") : "Not in warehouse")}</b>
               <span>Offer activity</span><b>${escapeHtml(vehicleContext.has_active_offer ? "Active" : "None")}</b>
               <span>Vehicle availability</span><b>${escapeHtml(vehicleContext.sold_elsewhere ? "Sold" : vehicleContext.off_market ? "Off market" : "Available / unknown")}</b>
+              <span>Primary CRM lead</span><b>${escapeHtml(vehicleContext.primary_lead_title || vehicleContext.primary_lead_id || "-")}</b>
             </dl>
           </section>` : ""}
         <section class="lead-detail-section lead-detail-summary">
@@ -2300,6 +2416,8 @@ leadsEl.addEventListener("click", async (event) => {
   const card = reviewButton.closest(".lead-card");
   const leadId = card?.dataset?.id || "";
   const decision = reviewButton.dataset.duplicateReview || "keep_separate";
+  const targetLeadId = reviewButton.dataset.targetLeadId || "";
+  const listingId = reviewButton.dataset.listingId || "";
   if (!leadId) return;
   reviewButton.disabled = true;
   statusEl.textContent = "Saving duplicate vehicle review...";
@@ -2310,7 +2428,9 @@ leadsEl.addEventListener("click", async (event) => {
       body: JSON.stringify({
         action: "duplicate_review",
         id: leadId,
-        decision
+        decision,
+        targetLeadId,
+        listingId
       })
     });
     const data = await response.json();

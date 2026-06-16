@@ -2336,6 +2336,18 @@ select {
   background: #fff7ed;
 }
 
+.duplicate-review-link {
+  align-self: center;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.duplicate-review-link:hover {
+  text-decoration: underline;
+}
+
 .admin-duplicate-panel header span {
   color: #9a3412;
 }
@@ -2382,6 +2394,165 @@ select {
 
 .owner-review-read span {
   color: #166534;
+}
+
+.lead-card-vehicle-child {
+  border-style: dashed;
+}
+
+.vehicle-clusters-list {
+  display: grid;
+  gap: 16px;
+}
+
+.vehicle-cluster-card {
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-left: 6px solid #7c3aed;
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, .05);
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.vehicle-cluster-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.vehicle-cluster-head > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.vehicle-cluster-head span,
+.vehicle-cluster-panel header span {
+  color: #516174;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.vehicle-cluster-head strong {
+  color: #16243a;
+  font-size: 20px;
+}
+
+.vehicle-cluster-head small {
+  color: #64748b;
+}
+
+.vehicle-cluster-badges {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.vehicle-cluster-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.vehicle-cluster-panel {
+  background: #f8fafc;
+  border: 1px solid #d8e2ef;
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.vehicle-cluster-panel header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.vehicle-cluster-panel header a {
+  color: #0b4f9c;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.vehicle-cluster-panel header a:hover {
+  text-decoration: underline;
+}
+
+.vehicle-cluster-items {
+  display: grid;
+  gap: 8px;
+}
+
+.vehicle-cluster-item {
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.vehicle-cluster-item-primary {
+  border-color: #c4b5fd;
+  box-shadow: inset 0 0 0 1px rgba(124, 58, 237, .12);
+}
+
+.vehicle-cluster-item strong {
+  color: #17233a;
+}
+
+.vehicle-cluster-item small {
+  color: #64748b;
+}
+
+.vehicle-cluster-item p {
+  color: #7a4a20;
+  margin: 0;
+}
+
+.vehicle-cluster-pending {
+  border-left: 4px solid #f59e0b;
+}
+
+.vehicle-cluster-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.vehicle-cluster-actions button {
+  background: #fff;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  color: #9a3412;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.vehicle-cluster-actions button:hover {
+  background: #fff7ed;
+}
+
+.vehicle-cluster-actions button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.vehicle-cluster-empty {
+  color: #64748b;
+  margin: 0;
 }
 
 .lead-card-flash {

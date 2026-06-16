@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vehicle clusters</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="admin-shell">
+      <header class="admin-head">
+        <div>
+          <p class="eyebrow">Internal</p>
+          <h1>Vehicle clusters</h1>
+        </div>
+        <div class="admin-actions">
+          <span id="vehicle-admin-auth-status">Checking admin sign-in...</span>
+          <button id="vehicle-admin-login" type="button" hidden>Sign in with Google</button>
+          <div class="turnstile-wrap" id="vehicle-admin-turnstile-wrap" hidden>
+            <div id="vehicle-admin-turnstile"></div>
+            <small id="vehicle-admin-turnstile-status"></small>
+          </div>
+          <button id="vehicle-admin-logout" type="button" hidden>Sign out</button>
+          <a href="/admin.html">Back to admin workbench</a>
+          <a href="/dealer.html" target="_blank" rel="noreferrer">Dealer portal</a>
+          <a href="/">Back to demo</a>
+        </div>
+      </header>
+
+      <section id="vehicle-admin-content" hidden>
+        <div class="admin-workbench-layout">
+          <aside class="admin-sidebar" aria-label="Vehicle workspace">
+            <nav class="admin-module-nav" aria-label="Vehicle modules">
+              <a href="#vehicle-clusters-board">Duplicate vehicles</a>
+              <a href="/admin.html">CRM leads</a>
+              <a href="/admin.html#inventory-warehouse">Inventory</a>
+            </nav>
+          </aside>
+
+          <div class="admin-workspace-main">
+            <section id="vehicle-clusters-board" class="admin-section admin-section-leads vehicle-clusters-board">
+              <div class="admin-section-head">
+                <div>
+                  <p class="section-kicker">Owner desk</p>
+                  <h2>Duplicate vehicles / vehicle clusters</h2>
+                  <p>Review duplicate SELL leads by vehicle, merge them into a primary CRM record, or bind them to the correct warehouse listing.</p>
+                </div>
+                <button id="reload-vehicle-clusters" type="button">Reload clusters</button>
+              </div>
+              <section id="vehicle-clusters-overview" class="admin-overview" aria-label="Vehicle cluster overview"></section>
+              <p id="vehicle-clusters-status" class="status">Loading vehicle clusters...</p>
+              <div id="vehicle-clusters-list" class="vehicle-clusters-list"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/turnstile.js"></script>
+    <script src="/admin-vehicles.js"></script>
+  </body>
+</html>
