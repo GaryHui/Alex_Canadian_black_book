@@ -994,6 +994,7 @@ function filterAdminLeads(leads) {
   if (adminLeadFilter === "closed") filtered = leads.filter(isClosedLead);
   if (adminLeadFilter === "call-now") filtered = leads.filter(isAdminCallNowLead);
   if (adminLeadFilter === "waiting-reply") filtered = leads.filter(isAdminWaitingReplyLead);
+  if (adminLeadFilter === "aging-critical") filtered = leads.filter(isAdminAgingCriticalLead);
   if (adminLeadFilter === "owner-unread") filtered = leads.filter((lead) => Boolean(lead.owner_review?.unread));
   if (adminLeadFilter === "duplicate-review") filtered = leads.filter((lead) => !isClosedLead(lead) && Boolean(lead.duplicate_warning?.message) && !lead.duplicate_warning?.reviewed);
   if (adminLeadFilter === "buyer") filtered = leads.filter((lead) => !isClosedLead(lead) && isBuyerLead(lead));
@@ -1077,6 +1078,32 @@ function isAdminCallNowLead(lead) {
     || String(lead?.status || "").toLowerCase() === "new";
 }
 
+function adminLeadAgeDays(lead) {
+  return Number(lead?.activity_summary?.age_days || 0);
+}
+
+function adminLeadAgeLabel(lead) {
+  return String(lead?.activity_summary?.age_label || "").trim() || "Fresh";
+}
+
+function isAdminAgingCriticalLead(lead) {
+  return !isClosedLead(lead) && String(lead?.activity_summary?.age_bucket || "") === "critical";
+}
+
+function adminOutboundLabel(lead) {
+  const summary = lead?.activity_summary || {};
+  if (summary.last_outbound_at && summary.last_outbound_label) {
+    return `${summary.last_outbound_label} ${formatDateTime(summary.last_outbound_at)}`;
+  }
+  return "";
+}
+
+function adminInboundLabel(lead) {
+  const summary = lead?.activity_summary || {};
+  if (summary.last_inbound_at) return `Customer inquiry ${formatDateTime(summary.last_inbound_at)}`;
+  return "Customer inquiry not logged";
+}
+
 function adminLastTouchLabel(lead) {
   if (lead?.last_activity_at) return `Last touch ${formatDateTime(lead.last_activity_at)}`;
   if (lead?.created_at) return `Created ${formatDateTime(lead.created_at)}`;
@@ -1102,7 +1129,8 @@ function adminNextBestAction(lead) {
 
 function renderAdminCommunicationStrip(lead) {
   const chips = [];
-  chips.push(isAdminStaleLead(lead) ? "No response 48h+" : adminLastTouchLabel(lead));
+  chips.push(isAdminStaleLead(lead) ? "No response 48h+" : (adminOutboundLabel(lead) || adminLastTouchLabel(lead)));
+  chips.push(adminInboundLabel(lead));
   chips.push(lead?.next_follow_up_at ? `Next follow-up ${formatDateTime(lead.next_follow_up_at)}` : "No follow-up scheduled");
   if (lead?.vehicle_signal?.message) chips.push(lead.vehicle_signal.message);
   else if (lead?.vehicle_context?.has_active_offer) chips.push("Vehicle has active offer");
@@ -1110,10 +1138,11 @@ function renderAdminCommunicationStrip(lead) {
   else if (isAdminAppointmentLead(lead)) chips.push("Appointment on the board");
   else if (isAdminWaitingReplyLead(lead)) chips.push("Waiting for customer reply");
   else if (lead?.owner_review?.unread) chips.push("Owner review unread");
+  else chips.push(adminLeadAgeLabel(lead));
   return `
     <section class="lead-communication-strip">
       <div class="lead-communication-chips">
-        ${chips.slice(0, 3).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+        ${chips.slice(0, 4).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
       </div>
       <strong>${escapeHtml(adminNextBestAction(lead))}</strong>
     </section>
@@ -1144,6 +1173,7 @@ function renderAdminOverview(leads) {
   const callNowCount = activeLeads.filter(isAdminCallNowLead).length;
   const staleCount = activeLeads.filter(isAdminStaleLead).length;
   const waitingReplyCount = activeLeads.filter(isAdminWaitingReplyLead).length;
+  const agingCriticalCount = activeLeads.filter(isAdminAgingCriticalLead).length;
   const assignmentCount = activeLeads.filter((lead) => !String(lead.assigned_to || "").trim()).length;
   const duplicateReviewCount = activeLeads.filter((lead) => Boolean(lead.duplicate_warning?.message) && !lead.duplicate_warning?.reviewed).length;
   const handoffCount = activeLeads.filter(isAdminReadyForWarehouse).length;
@@ -1157,6 +1187,7 @@ function renderAdminOverview(leads) {
     ${renderAdminOverviewCard("needs-follow-up", "overview-follow", "Due today", dueTodayCount, "Call, text, or close next step")}
     ${renderAdminOverviewCard("stale", "overview-unassigned", "No response", staleCount, "No touch in the last 48h")}
     ${renderAdminOverviewCard("waiting-reply", "overview-owner", "Waiting reply", waitingReplyCount, "Customer owes the next answer")}
+    ${renderAdminOverviewCard("aging-critical", "overview-urgent", "Aging 7d+", agingCriticalCount, "Older leads that need manager attention")}
     ${renderAdminOverviewCard("unassigned", "overview-unassigned", "Needs assignment", assignmentCount, "New leads waiting for owner")}
     ${renderAdminOverviewCard("duplicate-review", "overview-owner", "Duplicate vehicles", duplicateReviewCount, "SELL conflicts waiting for review")}
     ${renderAdminOverviewCard("seller", "overview-seller", "Ready for warehouse", handoffCount, "SELL leads ready to hand off")}
@@ -1182,6 +1213,10 @@ function renderAdminToday(leads) {
   const waitingReplyItems = leads
     .filter((lead) => isAdminWaitingReplyLead(lead))
     .sort(compareAdminLeadOrder)
+    .slice(0, 4);
+  const agingCriticalItems = leads
+    .filter((lead) => isAdminAgingCriticalLead(lead))
+    .sort((a, b) => adminLeadAgeDays(b) - adminLeadAgeDays(a) || compareAdminLeadOrder(a, b))
     .slice(0, 4);
   const staleItems = leads
     .filter((lead) => isAdminStaleLead(lead))
@@ -1259,7 +1294,7 @@ function renderAdminToday(leads) {
       <section class="admin-duplicate-panel admin-watch-panel">
         <header>
           <span>Manager watchlist</span>
-          <b>${duplicateItems.length + staleItems.length + ownerUnreadItems.length + appointmentItems.length + waitingReplyItems.length}</b>
+          <b>${duplicateItems.length + staleItems.length + ownerUnreadItems.length + appointmentItems.length + waitingReplyItems.length + agingCriticalItems.length}</b>
         </header>
         <div class="admin-watch-grid">
           <button type="button" class="admin-watch-tile" data-admin-set-filter="duplicate-review">
@@ -1287,6 +1322,11 @@ function renderAdminToday(leads) {
             <b>${waitingReplyItems.length}</b>
             <small>Customer owes the next answer</small>
           </button>
+          <button type="button" class="admin-watch-tile" data-admin-set-filter="aging-critical">
+            <span>Aging 7d+</span>
+            <b>${agingCriticalItems.length}</b>
+            <small>Older leads drifting too long</small>
+          </button>
         </div>
         <div class="admin-today-actions">
           <button type="button" data-admin-set-filter="duplicate-review">
@@ -1301,7 +1341,11 @@ function renderAdminToday(leads) {
             <b>${waitingReplyItems.length}</b>
             <span>Open waiting reply queue</span>
           </button>
-          ${(duplicateItems.length || staleItems.length || appointmentItems.length || waitingReplyItems.length) ? `<div class="admin-due-list">${duplicateItems.map(renderAdminDuplicateButton).join("")}${staleItems.map((lead) => renderAdminDueButton(lead, "No response")).join("")}${appointmentItems.map((lead) => renderAdminDueButton(lead, "Appointment")).join("")}${waitingReplyItems.map((lead) => renderAdminDueButton(lead, "Waiting"))}</div>` : `
+          <button type="button" data-admin-set-filter="aging-critical">
+            <b>${agingCriticalItems.length}</b>
+            <span>Open aging queue</span>
+          </button>
+          ${(duplicateItems.length || staleItems.length || appointmentItems.length || waitingReplyItems.length || agingCriticalItems.length) ? `<div class="admin-due-list">${duplicateItems.map(renderAdminDuplicateButton).join("")}${staleItems.map((lead) => renderAdminDueButton(lead, "No response")).join("")}${appointmentItems.map((lead) => renderAdminDueButton(lead, "Appointment")).join("")}${waitingReplyItems.map((lead) => renderAdminDueButton(lead, "Waiting")).join("")}${agingCriticalItems.map((lead) => renderAdminDueButton(lead, adminLeadAgeLabel(lead))).join("")}</div>` : `
             <div class="admin-today-empty">
               <b>No manager watch items waiting.</b>
               <span>Duplicate VINs, unread reviews, and stale leads will show here.</span>
@@ -1395,6 +1439,7 @@ function buildAdminAttentionItems(leads) {
   leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim()).forEach((lead) => add(lead, "Needs assignment", "assign"));
   leads.filter((lead) => isAdminAppointmentLead(lead)).forEach((lead) => add(lead, "Appointment", "assign"));
   leads.filter((lead) => isAdminWaitingReplyLead(lead)).forEach((lead) => add(lead, "Waiting reply", "assign"));
+  leads.filter((lead) => isAdminAgingCriticalLead(lead)).forEach((lead) => add(lead, adminLeadAgeLabel(lead), "update"));
   leads.filter((lead) => !isClosedLead(lead) && String(lead.status || "").toLowerCase() === "new").forEach((lead) => add(lead, "New lead", "update"));
   leads.filter((lead) => isAdminStaleLead(lead)).forEach((lead) => add(lead, "No response", "update"));
   return items.slice(0, 8);

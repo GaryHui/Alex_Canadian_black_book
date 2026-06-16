@@ -60,6 +60,7 @@ export async function attachLeadSignals(leads, client) {
   const duplicateMap = buildDuplicateWarningMap(leads, snapshot);
   const vehicleContextMap = buildVehicleContextMap(leads, snapshot);
   const signalMap = latestSignalByLead(snapshot.notes);
+  const activitySummaryMap = buildLeadActivitySummaryMap(leads, snapshot);
 
   return leads.map((lead) => {
     const id = String(lead.id || "").trim();
@@ -68,6 +69,7 @@ export async function attachLeadSignals(leads, client) {
       vehicle_signal: signalMap.get(id) || null,
       duplicate_warning: duplicateMap.get(id) || null,
       vehicle_context: vehicleContextMap.get(id) || null,
+      activity_summary: activitySummaryMap.get(id) || null,
       merge_state: snapshot.relationMap.get(id) || null
     };
   });
@@ -219,13 +221,17 @@ async function loadVehicleSnapshot(client) {
     fetchVehicleListings(client)
   ]);
   const noteIds = allLeads.map((lead) => String(lead.id || "").trim()).filter(Boolean);
-  const notes = await fetchLeadSignalNotes(noteIds, client);
+  const [notes, emails] = await Promise.all([
+    fetchLeadSignalNotes(noteIds, client),
+    fetchLeadEmails(noteIds, client)
+  ]);
   const relationMap = latestVehicleRelationByLead(notes);
   return {
     allLeads,
     leadsById: new Map(allLeads.map((lead) => [String(lead.id || "").trim(), lead])),
     inventoryRows,
     notes,
+    emails,
     relationMap,
     duplicateReviewMap: latestDuplicateReviewByLead(notes)
   };
@@ -236,6 +242,18 @@ async function fetchLeadSignalNotes(ids, client) {
   if (!client?.url || !client?.key || !validIds.length) return [];
   const encoded = validIds.map(encodeURIComponent).join(",");
   const response = await fetch(`${client.url}/rest/v1/lead_notes?select=lead_id,created_at,author_email,note,note_type&lead_id=in.(${encoded})&order=created_at.desc&limit=1000`, {
+    headers: authHeaders(client.key)
+  });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) return [];
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function fetchLeadEmails(ids, client) {
+  const validIds = (Array.isArray(ids) ? ids : []).map((id) => String(id || "").trim()).filter(Boolean);
+  if (!client?.url || !client?.key || !validIds.length) return [];
+  const encoded = validIds.map(encodeURIComponent).join(",");
+  const response = await fetch(`${client.url}/rest/v1/lead_emails?select=lead_id,created_at,sent_to,sent_by,subject,status&lead_id=in.(${encoded})&order=created_at.desc&limit=1000`, {
     headers: authHeaders(client.key)
   });
   const rows = await response.json().catch(() => []);
@@ -340,6 +358,84 @@ function latestSignalByLead(notes) {
     });
   }
   return map;
+}
+
+function buildLeadActivitySummaryMap(leads, snapshot) {
+  const summaries = new Map();
+  const notesByLead = groupByLeadId(snapshot?.notes || []);
+  const emailsByLead = groupByLeadId(snapshot?.emails || []);
+  const now = Date.now();
+  for (const lead of Array.isArray(leads) ? leads : []) {
+    const id = String(lead?.id || "").trim();
+    if (!id) continue;
+    const createdAt = String(lead?.created_at || "").trim();
+    const createdMs = new Date(createdAt || 0).getTime();
+    const ageDays = createdMs > 0 ? Math.max(0, Math.floor((now - createdMs) / (24 * 60 * 60 * 1000))) : 0;
+    const outboundTouch = latestOutboundTouch(notesByLead.get(id) || [], emailsByLead.get(id) || []);
+    const inboundLabel = isBuyerLead(lead) ? "Buyer inquiry" : "Seller inquiry";
+    summaries.set(id, {
+      last_inbound_at: createdAt,
+      last_inbound_label: createdAt ? `${inboundLabel} ${createdAt}` : inboundLabel,
+      last_outbound_at: outboundTouch?.at || "",
+      last_outbound_label: outboundTouch?.label || "",
+      last_outbound_channel: outboundTouch?.channel || "",
+      age_days: ageDays,
+      age_bucket: leadAgeBucket(ageDays),
+      age_label: leadAgeLabel(ageDays)
+    });
+  }
+  return summaries;
+}
+
+function groupByLeadId(rows) {
+  const map = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const leadId = String(row?.lead_id || "").trim();
+    if (!leadId) continue;
+    const current = map.get(leadId) || [];
+    current.push(row);
+    map.set(leadId, current);
+  }
+  return map;
+}
+
+function latestOutboundTouch(notes, emails) {
+  const emailTouches = (Array.isArray(emails) ? emails : []).map((email) => ({
+    at: email.created_at || "",
+    label: "Last outbound email",
+    channel: "email"
+  }));
+  const noteTouches = (Array.isArray(notes) ? notes : [])
+    .filter((note) => ["call", "sms", "email"].includes(String(note?.note_type || "").trim().toLowerCase()))
+    .map((note) => {
+      const type = String(note?.note_type || "").trim().toLowerCase();
+      const label = type === "call"
+        ? "Last outbound call"
+        : type === "sms"
+          ? "Last outbound text"
+          : "Last outbound email";
+      return {
+        at: note.created_at || "",
+        label,
+        channel: type
+      };
+    });
+  return [...emailTouches, ...noteTouches]
+    .map((item) => ({ ...item, time: new Date(item.at || 0).getTime() }))
+    .filter((item) => item.at && !Number.isNaN(item.time))
+    .sort((a, b) => b.time - a.time)[0] || null;
+}
+
+function leadAgeBucket(days) {
+  if (days >= 7) return "critical";
+  if (days >= 3) return "at_risk";
+  return "fresh";
+}
+
+function leadAgeLabel(days) {
+  if (days >= 7) return `Aging ${days}d`;
+  if (days >= 3) return `Open ${days}d`;
+  return days > 0 ? `Fresh ${days}d` : "Fresh today";
 }
 
 function latestDuplicateReviewByLead(notes) {
