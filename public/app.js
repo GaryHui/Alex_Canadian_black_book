@@ -1996,6 +1996,19 @@ function isDealerCallNowLead(lead) {
     || String(lead?.status || "").toLowerCase() === "new";
 }
 
+function isDealerDealDeskLead(lead) {
+  const status = String(lead?.status || "").toLowerCase();
+  if (isBuyerLead(lead)) return status === "won";
+  return ["in_inventory", "won"].includes(status);
+}
+
+function dealerDealDeskLabel(lead) {
+  const status = String(lead?.status || "").toLowerCase();
+  if (isBuyerLead(lead)) return "Delivery handoff";
+  if (status === "in_inventory") return "Warehouse intake";
+  return "Purchase closed";
+}
+
 function dealerLeadAgeDays(lead) {
   return Number(lead?.activity_summary?.age_days || 0);
 }
@@ -2032,6 +2045,9 @@ function dealerNextBestAction(lead) {
   const buyer = isBuyerLead(lead);
   const status = String(lead?.status || "new").toLowerCase();
   if (lead?.vehicle_signal?.message) return "Review the vehicle alert before the next customer update";
+  if (buyer && status === "won") return "Prep delivery, finance docs, and final handoff";
+  if (!buyer && status === "in_inventory") return "Confirm intake photos, price, and warehouse handoff";
+  if (!buyer && status === "won") return "Confirm purchase paperwork and stock handoff";
   if (isDealerNoResponseLead(lead)) return "Reach out now and log a fresh touch";
   if (isDealerLeadOverdue(lead?.next_follow_up_at || "", status)) return "Call now and reset the next follow-up";
   if (isDealerAppointmentLead(lead)) return buyer ? "Confirm the buyer appointment and prep the handoff" : "Confirm the inspection appointment and prep the appraisal";
@@ -2052,6 +2068,7 @@ function renderDealerCommunicationStrip(lead) {
   else if (lead?.vehicle_context?.sold_elsewhere) chips.push("Vehicle already sold");
   else if (isDealerAppointmentLead(lead)) chips.push("Appointment on the board");
   else if (isDealerWaitingReply(lead)) chips.push("Waiting for customer reply");
+  else if (isDealerDealDeskLead(lead)) chips.push(dealerDealDeskLabel(lead));
   else chips.push(dealerLeadAgeLabel(lead));
   return `
     <section class="lead-communication-strip">
@@ -2083,6 +2100,7 @@ function renderDealerLeadSummary(leads) {
   const waitingReplies = activeLeads.filter(isDealerWaitingReply).length;
   const appointments = activeLeads.filter(isDealerAppointmentLead).length;
   const agingCritical = activeLeads.filter(isDealerAgingCriticalLead).length;
+  const dealDesk = leads.filter(isDealerDealDeskLead).length;
   const closed = leads.length - activeLeads.length;
   dealerLeadSummary.innerHTML = `
     ${renderDealerSummaryCard("active", "dealer-summary-total", "My queue", activeLeads.length, "All assigned active work")}
@@ -2091,6 +2109,7 @@ function renderDealerLeadSummary(leads) {
     ${renderDealerSummaryCard("no-response", "dealer-summary-waiting", "No response", noResponse, "No touch logged in the last 48h")}
     ${renderDealerSummaryCard("appointments", "dealer-summary-appointment", "Appointments", appointments, "Booked buyer or seller meetings")}
     ${renderDealerSummaryCard("waiting-reply", "dealer-summary-alert", "Waiting reply", waitingReplies, "Waiting on customer response")}
+    ${renderDealerSummaryCard("deal-desk", "dealer-summary-closed", "Deal desk", dealDesk, "Won buyers and intake handoffs")}
     ${renderDealerSummaryCard("aging-critical", "dealer-summary-priority", "Aging 7d+", agingCritical, "Older leads drifting too long")}
     ${renderDealerSummaryCard("vehicle-alerts", "dealer-summary-alert", "Vehicle alerts", vehicleAlerts, "Same-vehicle inventory changes")}
     ${renderDealerSummaryCard("closed", "dealer-summary-closed", "Closed", closed, "Done or moved to inventory")}
@@ -2113,6 +2132,9 @@ function renderDealerTodayWork(leads) {
   const appointmentLeads = activeLeads
     .filter((lead) => isDealerAppointmentLead(lead))
     .slice(0, 5);
+  const dealDeskLeads = leads
+    .filter((lead) => isDealerDealDeskLead(lead))
+    .slice(0, 5);
   const agingLeads = activeLeads
     .filter((lead) => isDealerAgingCriticalLead(lead))
     .sort((a, b) => dealerLeadAgeDays(b) - dealerLeadAgeDays(a))
@@ -2129,6 +2151,7 @@ function renderDealerTodayWork(leads) {
     ...dueLeads,
     ...noResponseLeads,
     ...appointmentLeads,
+    ...dealDeskLeads,
     ...agingLeads,
     ...waitingReplyLeads,
     ...vehicleAlertLeads
@@ -2139,12 +2162,13 @@ function renderDealerTodayWork(leads) {
         <span>Today</span>
         <strong>${totalAttention} task${totalAttention === 1 ? "" : "s"} to work first</strong>
       </div>
-      <button type="button" data-dealer-filter-shortcut="${callNowLeads.length ? "call-now" : dueLeads.length ? "due" : noResponseLeads.length ? "no-response" : agingLeads.length ? "aging-critical" : appointmentLeads.length ? "appointments" : "active"}">${callNowLeads.length ? "Open call now" : dueLeads.length ? "Open due" : noResponseLeads.length ? "Open no response" : agingLeads.length ? "Open aging" : appointmentLeads.length ? "Open appointments" : "View active"}</button>
+      <button type="button" data-dealer-filter-shortcut="${callNowLeads.length ? "call-now" : dueLeads.length ? "due" : noResponseLeads.length ? "no-response" : dealDeskLeads.length ? "deal-desk" : agingLeads.length ? "aging-critical" : appointmentLeads.length ? "appointments" : "active"}">${callNowLeads.length ? "Open call now" : dueLeads.length ? "Open due" : noResponseLeads.length ? "Open no response" : dealDeskLeads.length ? "Open deal desk" : agingLeads.length ? "Open aging" : appointmentLeads.length ? "Open appointments" : "View active"}</button>
     </header>
     <div class="dealer-today-sections">
       ${renderDealerTodaySection("Call now", "New, urgent, or high-priority leads to contact first", callNowLeads, "call-now")}
       ${renderDealerTodaySection("Due today", "Overdue or due follow-ups that should be touched today", dueLeads, "due")}
       ${renderDealerTodaySection("No response", "Leads with no touch in the last 48 hours", noResponseLeads, "no-response")}
+      ${renderDealerTodaySection("Deal desk", "Won buyers and intake handoffs that need after-sale follow-through", dealDeskLeads, "deal-desk")}
       ${renderDealerTodaySection("Aging 7d+", "Older leads still open and needing a clear next step", agingLeads, "aging-critical")}
       ${renderDealerTodaySection("Appointments", "Booked meetings or inspections that need confirmation", appointmentLeads, "appointments")}
       ${renderDealerTodaySection("Waiting reply", "Customers waiting for a callback, text, or answer", waitingReplyLeads, "waiting-reply")}
@@ -2203,6 +2227,7 @@ function filterDealerLeads(leads) {
   if (dealerLeadFilter === "call-now") return leads.filter(isDealerCallNowLead);
   if (dealerLeadFilter === "no-response") return leads.filter(isDealerNoResponseLead);
   if (dealerLeadFilter === "appointments") return leads.filter(isDealerAppointmentLead);
+  if (dealerLeadFilter === "deal-desk") return leads.filter(isDealerDealDeskLead);
   if (dealerLeadFilter === "aging-critical") return leads.filter(isDealerAgingCriticalLead);
   if (dealerLeadFilter === "priority") return leads.filter((lead) => !isDealerClosedLead(lead) && ["high", "urgent"].includes(String(lead.priority || "").toLowerCase()));
   if (dealerLeadFilter === "buyer") return leads.filter((lead) => !isDealerClosedLead(lead) && isBuyerLead(lead));

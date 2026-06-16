@@ -994,6 +994,7 @@ function filterAdminLeads(leads) {
   if (adminLeadFilter === "closed") filtered = leads.filter(isClosedLead);
   if (adminLeadFilter === "call-now") filtered = leads.filter(isAdminCallNowLead);
   if (adminLeadFilter === "waiting-reply") filtered = leads.filter(isAdminWaitingReplyLead);
+  if (adminLeadFilter === "deal-desk") filtered = leads.filter(isAdminDealDeskLead);
   if (adminLeadFilter === "aging-critical") filtered = leads.filter(isAdminAgingCriticalLead);
   if (adminLeadFilter === "owner-unread") filtered = leads.filter((lead) => Boolean(lead.owner_review?.unread));
   if (adminLeadFilter === "duplicate-review") filtered = leads.filter((lead) => !isClosedLead(lead) && Boolean(lead.duplicate_warning?.message) && !lead.duplicate_warning?.reviewed);
@@ -1078,6 +1079,19 @@ function isAdminCallNowLead(lead) {
     || String(lead?.status || "").toLowerCase() === "new";
 }
 
+function isAdminDealDeskLead(lead) {
+  const status = String(lead?.status || "").toLowerCase();
+  if (isBuyerLead(lead)) return status === "won";
+  return ["in_inventory", "won"].includes(status);
+}
+
+function adminDealDeskLabel(lead) {
+  const status = String(lead?.status || "").toLowerCase();
+  if (isBuyerLead(lead)) return "Delivery handoff";
+  if (status === "in_inventory") return "Warehouse intake";
+  return "Purchase closed";
+}
+
 function adminLeadAgeDays(lead) {
   return Number(lead?.activity_summary?.age_days || 0);
 }
@@ -1115,6 +1129,9 @@ function adminNextBestAction(lead) {
   const status = String(lead?.status || "new").toLowerCase();
   if (lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed) return "Review duplicate vehicle before warehouse work";
   if (lead?.owner_review?.unread) return "Read dealer update and confirm next manager step";
+  if (buyer && status === "won") return "Start delivery checklist, docs, and final customer handoff";
+  if (!buyer && status === "in_inventory") return "Confirm warehouse intake, pricing, and publish plan";
+  if (!buyer && status === "won") return "Confirm purchase paperwork and stock transfer";
   if (!String(lead?.assigned_to || "").trim()) return "Assign an owner and start first contact";
   if (isOverdue(lead?.next_follow_up_at || "", status)) return "Call now and reset follow-up SLA";
   if (isAdminWaitingReplyLead(lead)) return "Follow up on the pending reply before this goes cold";
@@ -1137,6 +1154,7 @@ function renderAdminCommunicationStrip(lead) {
   else if (lead?.vehicle_context?.sold_elsewhere) chips.push("Vehicle already sold");
   else if (isAdminAppointmentLead(lead)) chips.push("Appointment on the board");
   else if (isAdminWaitingReplyLead(lead)) chips.push("Waiting for customer reply");
+  else if (isAdminDealDeskLead(lead)) chips.push(adminDealDeskLabel(lead));
   else if (lead?.owner_review?.unread) chips.push("Owner review unread");
   else chips.push(adminLeadAgeLabel(lead));
   return `
@@ -1174,6 +1192,7 @@ function renderAdminOverview(leads) {
   const staleCount = activeLeads.filter(isAdminStaleLead).length;
   const waitingReplyCount = activeLeads.filter(isAdminWaitingReplyLead).length;
   const agingCriticalCount = activeLeads.filter(isAdminAgingCriticalLead).length;
+  const dealDeskCount = leads.filter(isAdminDealDeskLead).length;
   const assignmentCount = activeLeads.filter((lead) => !String(lead.assigned_to || "").trim()).length;
   const duplicateReviewCount = activeLeads.filter((lead) => Boolean(lead.duplicate_warning?.message) && !lead.duplicate_warning?.reviewed).length;
   const handoffCount = activeLeads.filter(isAdminReadyForWarehouse).length;
@@ -1187,6 +1206,7 @@ function renderAdminOverview(leads) {
     ${renderAdminOverviewCard("needs-follow-up", "overview-follow", "Due today", dueTodayCount, "Call, text, or close next step")}
     ${renderAdminOverviewCard("stale", "overview-unassigned", "No response", staleCount, "No touch in the last 48h")}
     ${renderAdminOverviewCard("waiting-reply", "overview-owner", "Waiting reply", waitingReplyCount, "Customer owes the next answer")}
+    ${renderAdminOverviewCard("deal-desk", "overview-closed", "Deal desk", dealDeskCount, "Won buyers and intake handoffs")}
     ${renderAdminOverviewCard("aging-critical", "overview-urgent", "Aging 7d+", agingCriticalCount, "Older leads that need manager attention")}
     ${renderAdminOverviewCard("unassigned", "overview-unassigned", "Needs assignment", assignmentCount, "New leads waiting for owner")}
     ${renderAdminOverviewCard("duplicate-review", "overview-owner", "Duplicate vehicles", duplicateReviewCount, "SELL conflicts waiting for review")}
@@ -1214,6 +1234,10 @@ function renderAdminToday(leads) {
     .filter((lead) => isAdminWaitingReplyLead(lead))
     .sort(compareAdminLeadOrder)
     .slice(0, 4);
+  const dealDeskItems = leads
+    .filter((lead) => isAdminDealDeskLead(lead))
+    .sort(compareAdminLeadOrder)
+    .slice(0, 5);
   const agingCriticalItems = leads
     .filter((lead) => isAdminAgingCriticalLead(lead))
     .sort((a, b) => adminLeadAgeDays(b) - adminLeadAgeDays(a) || compareAdminLeadOrder(a, b))
@@ -1287,6 +1311,40 @@ function renderAdminToday(leads) {
             <div class="admin-today-empty">
               <b>No due leads right now.</b>
               <span>Next follow-up dates will show here for the owner desk.</span>
+            </div>
+          `}
+        </div>
+      </section>
+      <section class="admin-duplicate-panel admin-watch-panel">
+        <header>
+          <span>Deal desk</span>
+          <b>${dealDeskItems.length + soldCount}</b>
+        </header>
+        <div class="admin-watch-grid">
+          <button type="button" class="admin-watch-tile" data-admin-set-filter="deal-desk">
+            <span>Won and handoff</span>
+            <b>${dealDeskItems.length}</b>
+            <small>Buyer delivery and seller intake work</small>
+          </button>
+          <button type="button" class="admin-watch-tile" data-open-inventory-filter="sold">
+            <span>Sold inventory</span>
+            <b>${soldCount}</b>
+            <small>Closed stock to archive or review</small>
+          </button>
+        </div>
+        <div class="admin-today-actions">
+          <button type="button" data-admin-set-filter="deal-desk">
+            <b>${dealDeskItems.length}</b>
+            <span>Open deal desk queue</span>
+          </button>
+          <button type="button" data-open-inventory-filter="sold">
+            <b>${soldCount}</b>
+            <span>Open sold inventory</span>
+          </button>
+          ${dealDeskItems.length ? `<div class="admin-due-list">${dealDeskItems.map((lead) => renderAdminDueButton(lead, adminDealDeskLabel(lead))).join("")}</div>` : `
+            <div class="admin-today-empty">
+              <b>No delivery or intake handoffs waiting.</b>
+              <span>Won buyers and seller warehouse intake leads will show here.</span>
             </div>
           `}
         </div>
@@ -1439,6 +1497,7 @@ function buildAdminAttentionItems(leads) {
   leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim()).forEach((lead) => add(lead, "Needs assignment", "assign"));
   leads.filter((lead) => isAdminAppointmentLead(lead)).forEach((lead) => add(lead, "Appointment", "assign"));
   leads.filter((lead) => isAdminWaitingReplyLead(lead)).forEach((lead) => add(lead, "Waiting reply", "assign"));
+  leads.filter((lead) => isAdminDealDeskLead(lead)).forEach((lead) => add(lead, adminDealDeskLabel(lead), "assign"));
   leads.filter((lead) => isAdminAgingCriticalLead(lead)).forEach((lead) => add(lead, adminLeadAgeLabel(lead), "update"));
   leads.filter((lead) => !isClosedLead(lead) && String(lead.status || "").toLowerCase() === "new").forEach((lead) => add(lead, "New lead", "update"));
   leads.filter((lead) => isAdminStaleLead(lead)).forEach((lead) => add(lead, "No response", "update"));

@@ -3323,6 +3323,14 @@ body.admin-drawer-open .admin-shell {
   color: #0f766e;
 }
 
+.dealer-today-section-deal-desk {
+  border-left: 5px solid #475569;
+}
+
+.dealer-today-section-deal-desk header span {
+  color: #334155;
+}
+
 .dealer-today-section {
   background: #fff;
   border: 1px solid #d8e2ef;
