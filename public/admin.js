@@ -671,6 +671,20 @@ function collectAdminLeadAlerts(leads) {
           title: leadAlertTitle(lead),
           message: lead.owner_review.reason || "Owner review required"
         });
+      } else if (lead.duplicate_warning?.message) {
+        adminLeadAlertMap.set(id, {
+          id,
+          type: "owner",
+          title: leadAlertTitle(lead),
+          message: lead.duplicate_warning.message
+        });
+      } else if (lead.vehicle_signal?.message) {
+        adminLeadAlertMap.set(id, {
+          id,
+          type: lead.vehicle_signal.tone === "danger" ? "owner" : "updated",
+          title: leadAlertTitle(lead),
+          message: lead.vehicle_signal.message
+        });
       } else if (readTokens[id] && readTokens[id] !== token) {
         adminLeadAlertMap.set(id, {
           id,
@@ -702,6 +716,20 @@ function collectAdminLeadAlerts(leads) {
         type: "owner",
         title: leadAlertTitle(lead),
         message: lead.owner_review.reason || "Owner review required"
+      });
+    } else if (lead.duplicate_warning?.message) {
+      adminLeadAlertMap.set(id, {
+        id,
+        type: "owner",
+        title: leadAlertTitle(lead),
+        message: lead.duplicate_warning.message
+      });
+    } else if (lead.vehicle_signal?.message) {
+      adminLeadAlertMap.set(id, {
+        id,
+        type: lead.vehicle_signal.tone === "danger" ? "owner" : "updated",
+        title: leadAlertTitle(lead),
+        message: lead.vehicle_signal.message
       });
     } else if (readTokens[id] && readTokens[id] !== token) {
       adminLeadAlertMap.set(id, {
@@ -772,6 +800,8 @@ function leadUpdateToken(lead = {}) {
     lead.next_follow_up_at || "",
     JSON.stringify(lead.owner_adjustment || {}),
     JSON.stringify(lead.owner_review || {}),
+    JSON.stringify(lead.vehicle_signal || {}),
+    JSON.stringify(lead.duplicate_warning || {}),
     lead.notes || ""
   ].join("|");
 }
@@ -781,6 +811,28 @@ function leadAlertTitle(lead = {}) {
   const valuation = lead.valuation || {};
   const buyer = isBuyerLead(lead);
   return cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), buyer) || "Vehicle lead";
+}
+
+function vehicleSignalInline(lead) {
+  const signal = lead?.vehicle_signal;
+  if (!signal || !signal.message) return "";
+  const tone = ["danger", "warning", "info"].includes(String(signal.tone || "").toLowerCase()) ? String(signal.tone).toLowerCase() : "warning";
+  return `<p class="lead-vehicle-signal lead-vehicle-signal-${escapeHtml(tone)}">${escapeHtml(signal.message)}</p>`;
+}
+
+function duplicateWarningInline(lead) {
+  const duplicate = lead?.duplicate_warning;
+  if (!duplicate?.message) return "";
+  const count = Number(duplicate.count || 0);
+  return `
+    <section class="owner-review-required duplicate-vehicle-warning">
+      <div>
+        <span>Duplicate vehicle warning</span>
+        <strong>${escapeHtml(duplicate.message)}</strong>
+        <small>${escapeHtml(count ? `${count} related CRM / Warehouse record${count === 1 ? "" : "s"} detected.` : "Related records detected.")}</small>
+      </div>
+    </section>
+  `;
 }
 
 function renderAdminLeadAlerts() {
@@ -1298,6 +1350,8 @@ function renderLead(lead, index = 0) {
       <section class="owner-review-read">
         <span>Owner reviewed ${escapeHtml(formatDateTime(ownerReview.read_at))}${ownerReview.read_by ? ` by ${escapeHtml(ownerReview.read_by)}` : ""}</span>
       </section>` : "";
+  const signalBanner = vehicleSignalInline(lead);
+  const duplicateBanner = duplicateWarningInline(lead);
   const sharedMeta = renderSharedLeadMeta({
     customerEmail,
     phone: input.phone || "-",
@@ -1329,6 +1383,8 @@ function renderLead(lead, index = 0) {
         </div>
       </header>
       ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${ownerReview.unread ? "Owner review required" : "New update on this lead"}</button>` : ""}
+      ${signalBanner}
+      ${duplicateBanner}
       ${ownerReviewBanner}
       ${sharedMeta}
       ${progressSteps}

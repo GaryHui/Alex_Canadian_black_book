@@ -1144,7 +1144,14 @@ function collectDealerLeadAlerts(leads) {
     const id = String(lead.id || "");
     if (!id) continue;
     const token = dealerLeadUpdateToken(lead);
-    if (readTokens[id] && readTokens[id] !== token) {
+    if (lead.vehicle_signal?.message) {
+      dealerLeadAlertMap.set(id, {
+        id,
+        type: lead.vehicle_signal.tone === "danger" ? "owner" : "updated",
+        title: dealerLeadAlertTitle(lead),
+        message: lead.vehicle_signal.message
+      });
+    } else if (readTokens[id] && readTokens[id] !== token) {
       dealerLeadAlertMap.set(id, {
         id,
         type: "updated",
@@ -1157,6 +1164,13 @@ function collectDealerLeadAlerts(leads) {
     }
   }
   if (changed) saveDealerLeadReadTokens(readTokens);
+}
+
+function dealerVehicleSignalInline(lead) {
+  const signal = lead?.vehicle_signal;
+  if (!signal?.message) return "";
+  const tone = ["danger", "warning", "info"].includes(String(signal.tone || "").toLowerCase()) ? String(signal.tone).toLowerCase() : "warning";
+  return `<p class="lead-vehicle-signal lead-vehicle-signal-${escapeHtml(tone)}">${escapeHtml(signal.message)}</p>`;
 }
 
 function rememberDealerLeadTokens(leads) {
@@ -1321,6 +1335,7 @@ function renderDealerLeads(leads, role) {
           <b class="dealer-status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
         </div>
         ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-dealer-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
+        ${dealerVehicleSignalInline(lead)}
         <p class="dealer-update-notice" ${pendingAlert ? "" : "hidden"}>Task or follow-up activity changed. Open this lead to review the latest update.</p>
         ${sharedMeta}
         ${progressSteps}
@@ -1893,6 +1908,7 @@ function dealerLeadUpdateToken(lead = {}) {
     lead.priority || "",
     lead.next_follow_up_at || "",
     JSON.stringify(lead.owner_adjustment || {}),
+    JSON.stringify(lead.vehicle_signal || {}),
     lead.notes || ""
   ].join("|");
 }

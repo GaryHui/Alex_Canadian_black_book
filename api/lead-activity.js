@@ -1,4 +1,5 @@
 import { requireDealer } from "./_auth.js";
+import { isBuyerLead, notifySameVehicleBuyerLeads } from "./_lead-signals.js";
 
 export default async function handler(req, res) {
   const dealer = await requireDealer(req);
@@ -103,6 +104,8 @@ async function createNote(body, user, role) {
   const leadId = String(body.leadId || "").trim();
   const note = String(body.note || "").trim();
   if (!note) return { ok: false, status: 400, error: "Note is required" };
+  const lead = await fetchLeadRow(client, leadId);
+  if (!lead) return { ok: false, status: 404, error: "Lead not found" };
 
   const payload = {
     lead_id: leadId,
@@ -122,6 +125,13 @@ async function createNote(body, user, role) {
     );
   }
   await touchLead(client, leadId);
+  if (payload.note_type === "offer" && isBuyerLead(lead)) {
+    await notifySameVehicleBuyerLeads(client, lead, {
+      excludeLeadId: leadId,
+      code: "shared_offer",
+      message: `Another buyer lead just received an offer on ${leadTitle(lead)}. Review this inquiry before quoting again.`
+    });
+  }
   return { ok: true, note: result.data?.[0] || null };
 }
 
@@ -208,6 +218,8 @@ async function updateLeadStatus(body, user, role) {
   const status = normalizeLeadStatus(body.status);
   if (!leadId) return { ok: false, status: 400, error: "Lead id is required" };
   if (!status) return { ok: false, status: 400, error: "Unsupported lead status" };
+  const lead = await fetchLeadRow(client, leadId);
+  if (!lead) return { ok: false, status: 404, error: "Lead not found" };
 
   const now = new Date().toISOString();
   const response = await fetch(`${client.url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
@@ -235,6 +247,13 @@ async function updateLeadStatus(body, user, role) {
   if (role !== "admin") {
     const reason = ownerReviewReason(status);
     if (reason) await createOwnerReview(client, leadId, user, reason);
+  }
+  if (isBuyerLead(lead) && status === "won") {
+    await notifySameVehicleBuyerLeads(client, lead, {
+      excludeLeadId: leadId,
+      code: "vehicle_sold",
+      message: `This vehicle was committed to another buyer lead: ${leadTitle(lead)}. Review or close the other related inquiries.`
+    });
   }
 
   return { ok: true, lead: data?.[0] || null };
@@ -293,6 +312,22 @@ async function createOwnerReview(client, leadId, user, reason) {
     note_type: "owner_review",
     note: reason
   }).catch(() => null);
+}
+
+async function fetchLeadRow(client, leadId) {
+  const response = await fetch(`${client.url}/rest/v1/valuation_leads?select=*&id=eq.${encodeURIComponent(leadId)}&limit=1`, {
+    headers: authHeaders(client.key)
+  });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) return null;
+  return rows?.[0] || null;
+}
+
+function leadTitle(lead) {
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  const raw = String(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" ") || "Vehicle").trim();
+  return isBuyerLead(lead) ? raw.replace(/^Buyer inquiry\s*-\s*/i, "") : raw;
 }
 
 function ownerReviewReason(status) {

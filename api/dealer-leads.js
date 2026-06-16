@@ -1,4 +1,5 @@
 import { requireDealer, serviceClient, serviceHeaders } from "./_auth.js";
+import { attachLeadSignals } from "./_lead-signals.js";
 
 export default async function handler(req, res) {
   const dealer = await requireDealer(req);
@@ -64,7 +65,7 @@ async function listDealerLeads(dealer) {
     storage: "supabase",
     role: dealer.role,
     email,
-    leads
+    leads: await attachLeadSignals(leads, client)
   };
 }
 

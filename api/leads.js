@@ -1,4 +1,5 @@
 import { requireAdmin } from "./_admin.js";
+import { attachLeadSignals, isBuyerLead, notifyDuplicateSellerLead } from "./_lead-signals.js";
 
 export const config = {
   api: {
@@ -48,6 +49,12 @@ export default async function handler(req, res) {
         authorEmail: "system",
         reason: "New lead received."
       });
+      if (!isBuyerLead(savedLead)) {
+        await notifyDuplicateSellerLead({
+          url: process.env.SUPABASE_URL,
+          key: process.env.SUPABASE_SERVICE_ROLE_KEY
+        }, savedLead);
+      }
     }
     const webhook = await submitLeadToWebhook(savedLead, uploadFiles);
     if (saved.ok && savedLead.id) {
@@ -304,7 +311,8 @@ async function listFromSupabase() {
 
   const leads = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: leads, leads: [] };
-  return { ok: true, storage: "supabase", leads: await attachOwnerReviewState(leads, { url, key }) };
+  const withReview = await attachOwnerReviewState(leads, { url, key });
+  return { ok: true, storage: "supabase", leads: await attachLeadSignals(withReview, { url, key }) };
 }
 
 async function attachOwnerReviewState(leads, client) {

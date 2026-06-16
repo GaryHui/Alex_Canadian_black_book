@@ -2234,6 +2234,32 @@ select {
   margin: 4px 0 8px;
 }
 
+.lead-vehicle-signal {
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+}
+
+.lead-vehicle-signal-warning {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+}
+
+.lead-vehicle-signal-danger {
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+}
+
+.lead-vehicle-signal-info {
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  color: #1d4ed8;
+}
+
 .lead-card-updated {
   border-color: var(--lead-update);
   box-shadow: 0 0 0 2px rgba(245, 158, 11, .2), 0 12px 24px rgba(245, 158, 11, .12);
@@ -2255,6 +2281,10 @@ select {
 .owner-review-required div {
   display: grid;
   gap: 4px;
+}
+
+.duplicate-vehicle-warning {
+  margin-top: 6px;
 }
 
 .owner-review-required span,

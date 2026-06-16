@@ -1,4 +1,5 @@
 import { serviceClient, serviceHeaders } from "./_auth.js";
+import { notifySameVehicleBuyerLeads } from "./_lead-signals.js";
 
 export function normalizeListingStatus(value) {
   const status = String(value || "draft").trim().toLowerCase();
@@ -37,6 +38,8 @@ export async function updateInventoryListing(body, user) {
   if (!client.ok) return client;
   const id = String(body.id || "").trim();
   if (!id) return { ok: false, status: 400, error: "Listing id is required" };
+  const currentListing = await fetchListingById(client, id);
+  if (!currentListing) return { ok: false, status: 404, error: "Inventory listing not found" };
 
   const status = normalizeListingStatus(body.status);
   const patch = {
@@ -60,6 +63,10 @@ export async function updateInventoryListing(body, user) {
   if (Array.isArray(body.selectedPhotoUrls)) {
     await syncSelectedListingPhotos(client, id, String(body.sourceLeadId || "").trim(), body.selectedPhotoUrls);
   }
+  await notifyBuyerLeadsForInventoryChange(client, currentListing, {
+    nextStatus: status,
+    actorEmail: String(user?.email || "").trim().toLowerCase()
+  });
   return { ok: true, listing: publicInventoryRow(saveResult.data?.[0] || { ...saveResult.payload, id }) };
 }
 
@@ -96,6 +103,11 @@ export async function deleteInventoryListing(id, user) {
       `Inventory listing removed by ${user?.email || "admin"}. Lead restored to ${restoredStatus}. Staff can update the lead details, then an admin can publish it again.`
     );
   }
+  await notifySameVehicleBuyerLeads(client, listing, {
+    code: "vehicle_unlisted",
+    message: `This vehicle was removed from the Buy page: ${listing.title || "Vehicle"}. Review related buyer leads before continuing.`,
+    authorEmail: String(user?.email || "").trim().toLowerCase()
+  });
 
   return { ok: true, deleted: Array.isArray(data) ? data.length : 1, listing: publicInventoryRow(listing) };
 }
@@ -398,6 +410,37 @@ async function restoreLeadFromInventory(client, leadId) {
     })
   }).catch(() => null);
   return status;
+}
+
+async function fetchListingById(client, listingId) {
+  const result = await fetchSupabaseJson(
+    `${client.url}/rest/v1/vehicle_listings?select=*&id=eq.${encodeURIComponent(listingId)}&limit=1`,
+    client.key
+  );
+  if (!result.ok) return null;
+  return result.data?.[0] || null;
+}
+
+async function notifyBuyerLeadsForInventoryChange(client, currentListing, options = {}) {
+  const previousStatus = normalizeListingStatus(currentListing?.status);
+  const nextStatus = normalizeListingStatus(options.nextStatus);
+  const actorEmail = String(options.actorEmail || "system").trim().toLowerCase() || "system";
+  if (previousStatus === nextStatus) return;
+  if (nextStatus === "sold") {
+    await notifySameVehicleBuyerLeads(client, currentListing, {
+      code: "vehicle_sold",
+      message: `This vehicle was marked sold: ${currentListing.title || "Vehicle"}. Review or close the other related buyer leads.`,
+      authorEmail: actorEmail
+    });
+    return;
+  }
+  if (previousStatus === "published" && ["draft", "review", "archived"].includes(nextStatus)) {
+    await notifySameVehicleBuyerLeads(client, currentListing, {
+      code: "vehicle_unlisted",
+      message: `This vehicle was removed from the Buy page: ${currentListing.title || "Vehicle"}. Review related buyer leads before continuing.`,
+      authorEmail: actorEmail
+    });
+  }
 }
 
 async function previousLeadStatusBeforeInventory(client, leadId) {
