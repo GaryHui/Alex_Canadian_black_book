@@ -16,6 +16,8 @@ const adminTodayListEl = document.querySelector("#admin-today-list");
 const adminLeadFilterButtons = [...document.querySelectorAll("[data-admin-lead-filter]")];
 const adminLeadSearchInput = document.querySelector("#admin-lead-search");
 const adminLeadSortSelect = document.querySelector("#admin-lead-sort");
+const adminLeadDrawer = document.querySelector("#admin-lead-drawer");
+const adminLeadDrawerContent = document.querySelector("#admin-lead-drawer-content");
 const dealerStaffForm = document.querySelector("#dealer-staff-form");
 const reloadDealersButton = document.querySelector("#reload-dealers");
 const reloadUsersButton = document.querySelector("#reload-users");
@@ -50,6 +52,8 @@ let adminLeadSnapshotReady = false;
 let dealerStaffEmails = [];
 let activeAdminLeadId = "";
 let adminAttentionExpanded = false;
+let activeAdminDrawerLeadId = "";
+let adminDrawerActivityLoaded = false;
 
 reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", () => Promise.all([
@@ -194,6 +198,7 @@ async function setAdminSession(session) {
 
   if (!session?.user) {
     stopAdminAutoRefresh();
+    closeAdminDrawer();
     adminAuthStatus.textContent = "Admin Google sign-in required.";
     statusEl.textContent = "";
     usersStatusEl.textContent = "";
@@ -959,6 +964,14 @@ function renderLeadWorkbench(leads) {
   statusEl.textContent = `${collapsed.visible.length} shown. ${activeCount} active / ${closedCount} closed. ${buyerCount} BUY / ${sellerCount} SELL. Sort: ${sortLabel}, with urgent, overdue, and new pinned first.${duplicateLabel}${searchLabel}`;
   leadsEl.innerHTML = renderLeadGroups(collapsed.visible);
   syncActiveAdminLeadCard();
+  if (activeAdminDrawerLeadId) {
+    if (adminLeadsCache.some((lead) => String(lead.id || "") === activeAdminDrawerLeadId)) {
+      renderAdminDrawer(activeAdminDrawerLeadId);
+      loadAdminDrawerActivity({ force: true }).catch(() => null);
+    } else {
+      closeAdminDrawer();
+    }
+  }
 }
 
 function setAdminLeadFilter(filter) {
@@ -1833,6 +1846,163 @@ function renderSharedLeadMeta({
   `;
 }
 
+function renderAdminDrawer(leadId) {
+  if (!adminLeadDrawer || !adminLeadDrawerContent) return;
+  const id = String(leadId || "").trim();
+  const lead = adminLeadsCache.find((item) => String(item.id || "") === id);
+  if (!lead) {
+    adminLeadDrawer.hidden = true;
+    adminLeadDrawer.classList.remove("open");
+    adminLeadDrawerContent.innerHTML = "";
+    document.body.classList.remove("admin-drawer-open");
+    activeAdminDrawerLeadId = "";
+    adminDrawerActivityLoaded = false;
+    return;
+  }
+
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+  const buyer = isBuyerLead(lead);
+  const title = cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), buyer) || "Vehicle lead";
+  const customerEmail = input.email || lead.auth_user?.email || lead.auth_email || "-";
+  const vin = input.vin || valuation.vin || "-";
+  const status = lead.status || "new";
+  const priority = lead.priority || "normal";
+  const assignedTo = lead.assigned_to || "";
+  const followUp = lead.next_follow_up_at || "";
+  const lastActivity = lead.last_activity_at || "";
+  const overdue = isOverdue(followUp, status);
+  const ownerReview = lead.owner_review || {};
+  const vehicleContext = lead.vehicle_context || {};
+  const activityStatusButtons = leadStatusActions(buyer, status)
+    .map((action) => `<button type="button" data-drawer-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
+    .join("");
+
+  adminLeadDrawer.hidden = false;
+  adminLeadDrawer.classList.add("open");
+  document.body.classList.add("admin-drawer-open");
+  activeAdminDrawerLeadId = id;
+  adminLeadDrawerContent.innerHTML = `
+    <section class="admin-drawer-shell" data-drawer-lead-id="${escapeHtml(id)}">
+      <header class="admin-drawer-head">
+        <div>
+          <span>Lead workspace</span>
+          <strong>${escapeHtml(title)}</strong>
+          <small>${escapeHtml(customerEmail)} | VIN ${escapeHtml(vin)}</small>
+        </div>
+        <div class="admin-drawer-head-actions">
+          <button type="button" data-drawer-open-card>Open full</button>
+          <button type="button" data-drawer-close>Close</button>
+        </div>
+      </header>
+      <section class="admin-drawer-summary">
+        <div class="admin-drawer-stat">
+          <span>Pipeline</span>
+          <strong>${escapeHtml(leadStatusLabel(status, buyer))}</strong>
+          <small>${escapeHtml(overdue ? "Overdue follow-up" : followUp ? formatDateTime(followUp) : "No follow-up scheduled")}</small>
+        </div>
+        <div class="admin-drawer-stat">
+          <span>Owner</span>
+          <strong>${escapeHtml(assignedTo || "Unassigned")}</strong>
+          <small>${escapeHtml(priority)} priority</small>
+        </div>
+        <div class="admin-drawer-stat">
+          <span>Vehicle</span>
+          <strong>${escapeHtml(vehicleContext.cluster_label || title)}</strong>
+          <small>${escapeHtml(vehicleContext.primary_inventory_status ? `Warehouse ${String(vehicleContext.primary_inventory_status).replaceAll("_", " ")}` : "CRM only")}</small>
+        </div>
+      </section>
+      ${ownerReview.unread ? `
+        <section class="owner-review-required admin-drawer-owner-review">
+          <div>
+            <span>Owner review required</span>
+            <strong>${escapeHtml(ownerReview.reason || "Important staff update needs review.")}</strong>
+            <small>${escapeHtml(ownerReview.at ? formatDateTime(ownerReview.at) : "Unread update")}</small>
+          </div>
+          <button type="button" data-owner-read="${escapeHtml(id)}">Mark reviewed</button>
+        </section>
+      ` : ""}
+      ${vehicleSignalInline(lead)}
+      ${vehicleContextInline(lead)}
+      ${duplicateWarningInline(lead)}
+      <section class="admin-drawer-section">
+        <header>
+          <h3>Pipeline actions</h3>
+          <span>Fast status updates from the manager desk</span>
+        </header>
+        <div class="lead-action-row admin-drawer-actions">
+          ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
+        </div>
+      </section>
+      <section class="admin-drawer-section">
+        <header>
+          <h3>Communication hub</h3>
+          <span>Call, text, email, notes, and tasks in one lane</span>
+        </header>
+        <div class="admin-drawer-comm-shortcuts">
+          <button type="button" data-drawer-note-type="call">Call</button>
+          <button type="button" data-drawer-note-type="sms">Text</button>
+          <button type="button" data-drawer-note-type="email">Email</button>
+          <button type="button" data-drawer-note-type="internal">Note</button>
+        </div>
+        <form class="lead-note-form admin-drawer-note-form">
+          <select name="noteType">
+            <option value="internal">Internal note</option>
+            <option value="call">Call</option>
+            <option value="email">Email</option>
+            <option value="sms">SMS</option>
+            <option value="inspection">Inspection</option>
+            <option value="offer">Offer</option>
+          </select>
+          <textarea name="note" placeholder="Record the latest call, text, email, or manager instruction..."></textarea>
+          <button type="submit">Save note</button>
+        </form>
+        <form class="lead-task-form admin-drawer-task-form">
+          <input name="title" placeholder="Next task, e.g. call customer back" />
+          <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+          <input name="dueAt" type="datetime-local" />
+          <button type="submit">Add task</button>
+        </form>
+      </section>
+      <section class="admin-drawer-section">
+        <header>
+          <h3>Activity timeline</h3>
+          <button type="button" data-drawer-load-activity>Refresh</button>
+        </header>
+        <div class="lead-activity-list admin-drawer-activity-list">Activity not loaded yet.</div>
+      </section>
+    </section>
+  `;
+}
+
+function closeAdminDrawer() {
+  if (!adminLeadDrawer || !adminLeadDrawerContent) return;
+  adminLeadDrawer.classList.remove("open");
+  adminLeadDrawer.hidden = true;
+  adminLeadDrawerContent.innerHTML = "";
+  document.body.classList.remove("admin-drawer-open");
+  activeAdminDrawerLeadId = "";
+  adminDrawerActivityLoaded = false;
+}
+
+async function loadAdminDrawerActivity(options = {}) {
+  if (!adminLeadDrawerContent || !activeAdminDrawerLeadId) return;
+  const list = adminLeadDrawerContent.querySelector(".admin-drawer-activity-list");
+  if (!list) return;
+  if (adminDrawerActivityLoaded && !options.force) return;
+  list.textContent = "Loading activity...";
+  const response = await fetch(`/api/lead-activity?leadId=${encodeURIComponent(activeAdminDrawerLeadId)}`, {
+    headers: authHeaders()
+  });
+  const data = await response.json();
+  if (!data.ok) {
+    list.textContent = data.error || "Unable to load activity.";
+    return;
+  }
+  adminDrawerActivityLoaded = true;
+  list.innerHTML = renderActivity(data, { highlightLatest: Boolean(options.highlightLatest) });
+}
+
 function setActiveAdminLead(id) {
   activeAdminLeadId = String(id || "").trim();
   syncActiveAdminLeadCard();
@@ -2292,6 +2462,11 @@ leadsEl.addEventListener("submit", async (event) => {
 leadsEl.addEventListener("click", async (event) => {
   const clickedCard = event.target.closest(".lead-card");
   if (clickedCard?.dataset?.id) setActiveAdminLead(clickedCard.dataset.id);
+  const row = event.target.closest(".lead-list-row");
+  if (row && !event.target.closest("button, a, input, select, textarea, summary")) {
+    await openAdminLeadWorkspace(row.closest(".lead-card"), { forceActivity: false });
+    return;
+  }
   const alertButton = event.target.closest("[data-admin-open-alert]");
   if (alertButton) {
     await openAdminLeadFromAlert(alertButton.dataset.adminOpenAlert || "");
@@ -2404,6 +2579,167 @@ leadsEl.addEventListener("click", async (event) => {
   if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
 });
 
+adminLeadDrawer?.addEventListener("click", async (event) => {
+  const closeButton = event.target.closest("[data-drawer-close]");
+  if (closeButton) {
+    closeAdminDrawer();
+    return;
+  }
+
+  const openCardButton = event.target.closest("[data-drawer-open-card]");
+  if (openCardButton) {
+    await openFullLeadFromDrawer();
+    return;
+  }
+
+  const refreshButton = event.target.closest("[data-drawer-load-activity]");
+  if (refreshButton) {
+    adminDrawerActivityLoaded = false;
+    await loadAdminDrawerActivity({ force: true, highlightLatest: true });
+    return;
+  }
+
+  const noteTypeButton = event.target.closest("[data-drawer-note-type]");
+  if (noteTypeButton) {
+    const type = noteTypeButton.dataset.drawerNoteType || "internal";
+    const select = adminLeadDrawerContent?.querySelector('.admin-drawer-note-form select[name="noteType"]');
+    const field = adminLeadDrawerContent?.querySelector('.admin-drawer-note-form textarea[name="note"]');
+    if (select) select.value = type;
+    field?.focus();
+    return;
+  }
+
+  const ownerReadButton = event.target.closest("[data-owner-read]");
+  if (ownerReadButton) {
+    await markOwnerReviewed(ownerReadButton);
+    return;
+  }
+
+  const reviewButton = event.target.closest("[data-duplicate-review]");
+  if (reviewButton && activeAdminDrawerLeadId) {
+    reviewButton.disabled = true;
+    statusEl.textContent = "Saving duplicate vehicle review...";
+    try {
+      const response = await fetch("/api/leads", {
+        method: "PATCH",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "duplicate_review",
+          id: activeAdminDrawerLeadId,
+          decision: reviewButton.dataset.duplicateReview || "keep_separate",
+          targetLeadId: reviewButton.dataset.targetLeadId || "",
+          listingId: reviewButton.dataset.listingId || ""
+        })
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(formatApiError(data, "Unable to save duplicate review."));
+      statusEl.textContent = "Duplicate vehicle review saved.";
+      await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+    } catch (error) {
+      statusEl.textContent = error.message || "Unable to save duplicate review.";
+      reviewButton.disabled = false;
+    }
+    return;
+  }
+
+  const completeButton = event.target.closest("[data-complete-task]");
+  if (completeButton && activeAdminDrawerLeadId) {
+    const response = await fetch("/api/lead-activity", {
+      method: "PATCH",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId: activeAdminDrawerLeadId,
+        taskId: completeButton.dataset.completeTask,
+        completed: completeButton.dataset.completed !== "true"
+      })
+    });
+    const data = await response.json();
+    statusEl.textContent = data.ok ? "Task updated." : (data.error || "Unable to update task.");
+    if (data.ok) {
+      adminDrawerActivityLoaded = false;
+      await Promise.all([
+        loadAdminDrawerActivity({ force: true, highlightLatest: true }),
+        loadLeads({ suppressAlerts: true, forceOpenActivity: true })
+      ]);
+    }
+    return;
+  }
+
+  const statusButton = event.target.closest("[data-drawer-status]");
+  if (statusButton && activeAdminDrawerLeadId) {
+    const response = await fetch("/api/lead-activity", {
+      method: "PATCH",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId: activeAdminDrawerLeadId,
+        action: "status",
+        status: statusButton.dataset.drawerStatus,
+        note: `Admin updated status to ${String(statusButton.dataset.drawerStatus || "").replaceAll("_", " ")}.`
+      })
+    });
+    const data = await response.json();
+    statusEl.textContent = data.ok ? "Lead status updated." : (data.error || "Unable to update lead status.");
+    if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && activeAdminDrawerLeadId) closeAdminDrawer();
+});
+
+adminLeadDrawer?.addEventListener("submit", async (event) => {
+  const noteForm = event.target.closest(".admin-drawer-note-form");
+  if (noteForm && activeAdminDrawerLeadId) {
+    event.preventDefault();
+    const payload = {
+      leadId: activeAdminDrawerLeadId,
+      type: "note",
+      ...Object.fromEntries(new FormData(noteForm).entries())
+    };
+    const response = await fetch("/api/lead-activity", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    statusEl.textContent = data.ok ? "Note saved." : (data.error || "Unable to save note.");
+    if (data.ok) {
+      noteForm.reset();
+      adminDrawerActivityLoaded = false;
+      await Promise.all([
+        loadAdminDrawerActivity({ force: true, highlightLatest: true }),
+        loadLeads({ suppressAlerts: true, forceOpenActivity: true })
+      ]);
+    }
+    return;
+  }
+
+  const taskForm = event.target.closest(".admin-drawer-task-form");
+  if (taskForm && activeAdminDrawerLeadId) {
+    event.preventDefault();
+    const payload = {
+      leadId: activeAdminDrawerLeadId,
+      type: "task",
+      ...Object.fromEntries(new FormData(taskForm).entries())
+    };
+    const response = await fetch("/api/lead-activity", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    statusEl.textContent = data.ok ? "Task saved." : (data.error || "Unable to save task.");
+    if (data.ok) {
+      taskForm.reset();
+      adminDrawerActivityLoaded = false;
+      await Promise.all([
+        loadAdminDrawerActivity({ force: true, highlightLatest: true }),
+        loadLeads({ suppressAlerts: true, forceOpenActivity: true })
+      ]);
+    }
+  }
+});
+
 async function markOwnerReviewed(button) {
   const card = button.closest(".lead-card");
   const leadId = button.dataset.ownerRead || card?.dataset?.id || "";
@@ -2432,6 +2768,11 @@ async function markOwnerReviewed(button) {
 
 async function openAdminLeadWorkspace(card, options = {}) {
   if (!card) return;
+  if (card.dataset.id) {
+    renderAdminDrawer(card.dataset.id);
+    adminDrawerActivityLoaded = false;
+    await loadAdminDrawerActivity({ force: true, highlightLatest: true });
+  }
   const details = card.querySelector(".lead-manage");
   if (details && !details.open) details.open = true;
   await loadLeadActivity(card, { force: Boolean(options.forceActivity) });
@@ -2454,6 +2795,15 @@ async function openAdminLeadWorkspace(card, options = {}) {
     if (noteType && options.noteType) noteType.value = options.noteType;
     noteField?.focus();
   }
+}
+
+async function openFullLeadFromDrawer() {
+  if (!activeAdminDrawerLeadId) return;
+  const target = leadsEl.querySelector(`.lead-card[data-id="${CSS.escape(activeAdminDrawerLeadId)}"]`);
+  if (!target) return;
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+  setActiveAdminLead(activeAdminDrawerLeadId);
+  await openAdminLeadWorkspace(target, { forceActivity: true });
 }
 
 async function quickAssignLead(button) {
