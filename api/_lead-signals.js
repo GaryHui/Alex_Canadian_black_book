@@ -584,8 +584,20 @@ function resolveTargetListing(listingId, listings) {
 }
 
 function pickPrimarySellerLead(currentLead, matchingSellerLeads, inventoryRows, relationMap) {
-  const candidates = [...(Array.isArray(matchingSellerLeads) ? matchingSellerLeads : [])]
-    .filter((item) => !isVehicleChildLead(item, relationMap));
+  const currentId = String(currentLead?.id || "").trim();
+  const candidates = [...new Map([
+    currentLead,
+    ...(Array.isArray(matchingSellerLeads) ? matchingSellerLeads : [])
+  ]
+    .filter(Boolean)
+    .map((item) => [String(item?.id || "").trim(), item]))
+    .values()]
+    .filter((item) => {
+      const id = String(item?.id || "").trim();
+      if (!id) return false;
+      if (id === currentId) return true;
+      return !isVehicleChildLead(item, relationMap);
+    });
   const inventoryLeadIds = new Set((Array.isArray(inventoryRows) ? inventoryRows : [])
     .map((row) => String(row?.source_lead_id || "").trim())
     .filter(Boolean));
