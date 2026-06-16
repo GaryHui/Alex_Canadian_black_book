@@ -1781,17 +1781,24 @@ select {
 
 .lead-card {
   background: #fff;
-  border: 1px solid #d8e2ef;
-  border-radius: 8px;
+  border: 1px solid #d7e0ec;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 10px 24px rgba(15, 23, 42, .06);
   overflow: hidden;
   padding: 12px;
   position: relative;
   transition: opacity .18s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease;
 }
 
+.lead-card:hover,
+.dealer-lead-card:hover {
+  border-color: #b7c7dc;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 14px 28px rgba(15, 23, 42, .09);
+}
+
 .lead-card-current,
 .dealer-lead-card-current {
-  background: linear-gradient(180deg, #dbeafe 0%, #eff6ff 100%);
+  background: linear-gradient(180deg, #eaf3ff 0%, #f7fbff 100%);
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, .24), 0 18px 42px rgba(37, 99, 235, .18);
   position: relative;
@@ -1809,7 +1816,8 @@ select {
   padding: 5px 8px;
   position: absolute;
   right: 12px;
-  top: -11px;
+  top: 12px;
+  z-index: 3;
 }
 
 .lead-card-current .lead-manage,
@@ -1825,32 +1833,32 @@ select {
 
 .lead-card-buyer.lead-card-alt-even,
 .dealer-lead-buyer.dealer-lead-card-alt-even {
-  background: linear-gradient(180deg, #eef6ff 0%, #f8fbff 100%);
+  background: linear-gradient(180deg, #edf5ff 0%, #f8fbff 100%);
 }
 
 .lead-card-buyer.lead-card-alt-odd,
 .dealer-lead-buyer.dealer-lead-card-alt-odd {
-  background: linear-gradient(180deg, #eefcf4 0%, #f7fffb 100%);
+  background: linear-gradient(180deg, #e6f1ff 0%, #f4f9ff 100%);
 }
 
 .lead-card-seller.lead-card-alt-even,
 .dealer-lead-seller.dealer-lead-card-alt-even {
-  background: linear-gradient(180deg, #fff5ea 0%, #fffaf5 100%);
+  background: linear-gradient(180deg, #f5efff 0%, #fcf9ff 100%);
 }
 
 .lead-card-seller.lead-card-alt-odd,
 .dealer-lead-seller.dealer-lead-card-alt-odd {
-  background: linear-gradient(180deg, #fff0f6 0%, #fff8fb 100%);
+  background: linear-gradient(180deg, #efe6ff 0%, #f8f4ff 100%);
 }
 
 .lead-card-buyer.lead-card-current,
 .dealer-lead-buyer.dealer-lead-card-current {
-  background: linear-gradient(180deg, #dcedff 0%, #ecfff5 100%);
+  background: linear-gradient(180deg, #dcecff 0%, #eef6ff 100%);
 }
 
 .lead-card-seller.lead-card-current,
 .dealer-lead-seller.dealer-lead-card-current {
-  background: linear-gradient(180deg, #ffe8d8 0%, #fff0f6 100%);
+  background: linear-gradient(180deg, #e9deff 0%, #f5edff 100%);
 }
 
 .lead-card-urgent,
@@ -1882,8 +1890,8 @@ select {
 }
 
 .lead-overdue {
-  border-color: #d90429;
-  box-shadow: inset 4px 0 0 #d90429;
+  border-color: #ef4444;
+  box-shadow: inset 4px 0 0 #ef4444;
 }
 
 .lead-summary {
@@ -1993,13 +2001,13 @@ select {
 }
 
 .lead-group-buyer .lead-group-head {
-  background: #eaf5ff;
-  border: 1px solid #b9d7f4;
+  background: linear-gradient(180deg, #edf5ff 0%, #f7fbff 100%);
+  border: 1px solid #c4dafb;
 }
 
 .lead-group-seller .lead-group-head {
-  background: #fff3f0;
-  border: 1px solid #f1c2b8;
+  background: linear-gradient(180deg, #f4ecff 0%, #fbf8ff 100%);
+  border: 1px solid #d6c4fb;
 }
 
 .lead-group-list {
@@ -2012,7 +2020,7 @@ select {
 }
 
 .lead-card-seller {
-  border-left: 6px solid var(--red);
+  border-left: 6px solid #7c3aed;
 }
 
 .lead-title-row {
@@ -2221,7 +2229,7 @@ select {
 
 .lead-card-updated {
   border-color: #f59e0b;
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, .18);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, .2), 0 12px 24px rgba(245, 158, 11, .12);
 }
 
 .owner-review-required {
@@ -2537,15 +2545,15 @@ select {
 }
 
 .lead-type-buyer {
-  background: linear-gradient(180deg, #dff3ff 0%, #e8fff1 100%);
-  border: 1px solid #8ed0d7;
-  color: #0a5c68;
+  background: linear-gradient(180deg, #dbeeff 0%, #edf6ff 100%);
+  border: 1px solid #9fc5f8;
+  color: #0b4f9c;
 }
 
 .lead-type-seller {
-  background: linear-gradient(180deg, #fff1de 0%, #ffe8f0 100%);
-  border: 1px solid #f1b7a4;
-  color: #9a4a16;
+  background: linear-gradient(180deg, #efe2ff 0%, #f7f0ff 100%);
+  border: 1px solid #c4a7ff;
+  color: #6d28d9;
 }
 
 .admin-workspace-main .lead-type-pill {
@@ -2554,15 +2562,15 @@ select {
 }
 
 .admin-workspace-main .lead-type-buyer {
-  background: linear-gradient(180deg, #d8efff 0%, #dcfff0 100%);
-  border: 1px solid #7bc5d3;
-  color: #07586a;
+  background: linear-gradient(180deg, #dbeeff 0%, #edf6ff 100%);
+  border: 1px solid #9fc5f8;
+  color: #0b4f9c;
 }
 
 .admin-workspace-main .lead-type-seller {
-  background: linear-gradient(180deg, #ffedd9 0%, #ffe1ec 100%);
-  border: 1px solid #eeae96;
-  color: #98460f;
+  background: linear-gradient(180deg, #efe2ff 0%, #f7f0ff 100%);
+  border: 1px solid #c4a7ff;
+  color: #6d28d9;
 }
 
 .admin-workspace-main .lead-card-urgent .lead-summary {
@@ -3387,10 +3395,11 @@ select {
 
 .dealer-lead-card {
   background: #fff;
-  border: 1px solid #d8e2ef;
-  border-radius: 8px;
+  border: 1px solid #d7e0ec;
+  border-radius: 12px;
   display: grid;
   gap: 10px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 10px 24px rgba(15, 23, 42, .06);
   overflow: hidden;
   padding: 12px;
   position: relative;
@@ -3440,8 +3449,8 @@ select {
 }
 
 .dealer-lead-group-seller > header {
-  background: #fff3f0;
-  border: 1px solid #f1c2b8;
+  background: linear-gradient(180deg, #f4ecff 0%, #fbf8ff 100%);
+  border: 1px solid #d6c4fb;
 }
 
 .dealer-lead-group-list {
@@ -3454,7 +3463,7 @@ select {
 }
 
 .dealer-lead-seller {
-  border-left: 6px solid var(--red);
+  border-left: 6px solid #7c3aed;
 }
 
 .dealer-lead-title {
@@ -3474,20 +3483,20 @@ select {
 }
 
 .dealer-type-buyer {
-  background: linear-gradient(180deg, #dff3ff 0%, #e8fff1 100%);
-  border: 1px solid #8ed0d7;
-  color: #0a5c68;
+  background: linear-gradient(180deg, #dbeeff 0%, #edf6ff 100%);
+  border: 1px solid #9fc5f8;
+  color: #0b4f9c;
 }
 
 .dealer-type-seller {
-  background: linear-gradient(180deg, #fff1de 0%, #ffe8f0 100%);
-  border: 1px solid #f1b7a4;
-  color: #9a4a16;
+  background: linear-gradient(180deg, #efe2ff 0%, #f7f0ff 100%);
+  border: 1px solid #c4a7ff;
+  color: #6d28d9;
 }
 
 .dealer-lead-updated {
   border-color: #f59e0b;
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.16);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, .2), 0 12px 24px rgba(245, 158, 11, .12);
 }
 
 .dealer-update-notice {
