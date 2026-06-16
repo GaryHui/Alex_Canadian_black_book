@@ -2407,6 +2407,29 @@ select {
   color: #9a4a16;
 }
 
+.admin-workspace-main .lead-type-pill {
+  box-shadow: 0 4px 10px rgba(15, 23, 42, .06);
+  font-weight: 900;
+}
+
+.admin-workspace-main .lead-type-buyer {
+  background: linear-gradient(180deg, #d8efff 0%, #dcfff0 100%);
+  border: 1px solid #7bc5d3;
+  color: #07586a;
+}
+
+.admin-workspace-main .lead-type-seller {
+  background: linear-gradient(180deg, #ffedd9 0%, #ffe1ec 100%);
+  border: 1px solid #eeae96;
+  color: #98460f;
+}
+
+.admin-workspace-main .lead-card-urgent .lead-summary {
+  background: linear-gradient(180deg, #ffe2e7 0%, #fff0f3 100%);
+  border: 1px solid #fda4af;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .75);
+}
+
 .lead-grid {
   display: grid;
   gap: 8px 14px;
