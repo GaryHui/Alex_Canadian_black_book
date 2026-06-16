@@ -999,6 +999,7 @@ function filterAdminLeads(leads) {
   if (adminLeadFilter === "unassigned") filtered = leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim());
   if (adminLeadFilter === "urgent") filtered = leads.filter((lead) => !isClosedLead(lead) && String(lead.priority || "").toLowerCase() === "urgent");
   if (adminLeadFilter === "stale") filtered = leads.filter((lead) => isAdminStaleLead(lead));
+  if (adminLeadFilter === "appointments") filtered = leads.filter((lead) => isAdminAppointmentLead(lead));
   if (adminLeadFilter === "needs-follow-up") {
     filtered = leads.filter((lead) => !isClosedLead(lead) && isFollowUpDue(lead.next_follow_up_at, lead.status || "new"));
   }
@@ -1057,6 +1058,50 @@ function isAdminStaleLead(lead) {
   return touchedAt < Date.now() - (48 * 60 * 60 * 1000);
 }
 
+function isAdminAppointmentLead(lead) {
+  if (isClosedLead(lead)) return false;
+  return ["appointment_booked", "inspection_booked"].includes(String(lead?.status || "").toLowerCase());
+}
+
+function adminLastTouchLabel(lead) {
+  if (lead?.last_activity_at) return `Last touch ${formatDateTime(lead.last_activity_at)}`;
+  if (lead?.created_at) return `Created ${formatDateTime(lead.created_at)}`;
+  return "No touch logged";
+}
+
+function adminNextBestAction(lead) {
+  const buyer = isBuyerLead(lead);
+  const status = String(lead?.status || "new").toLowerCase();
+  if (lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed) return "Review duplicate vehicle before warehouse work";
+  if (lead?.owner_review?.unread) return "Read dealer update and confirm next manager step";
+  if (!String(lead?.assigned_to || "").trim()) return "Assign an owner and start first contact";
+  if (isOverdue(lead?.next_follow_up_at || "", status)) return "Call now and reset follow-up SLA";
+  if (status === "new") return buyer ? "Call buyer and confirm vehicle interest" : "Call seller and confirm appraisal details";
+  if (buyer && status === "contacted") return "Book appointment or send quote follow-up";
+  if (!buyer && status === "contacted") return "Book inspection or confirm appraisal visit";
+  if (!buyer && isAdminReadyForWarehouse(lead)) return "Move this seller vehicle to warehouse";
+  if (!lead?.next_follow_up_at) return "Schedule the next follow-up before leaving the lead";
+  return buyer ? "Work the buyer plan and move toward appointment" : "Work the seller plan and move toward inspection or handoff";
+}
+
+function renderAdminCommunicationStrip(lead) {
+  const chips = [];
+  chips.push(isAdminStaleLead(lead) ? "No response 48h+" : adminLastTouchLabel(lead));
+  chips.push(lead?.next_follow_up_at ? `Next follow-up ${formatDateTime(lead.next_follow_up_at)}` : "No follow-up scheduled");
+  if (lead?.vehicle_signal?.message) chips.push(lead.vehicle_signal.message);
+  else if (lead?.vehicle_context?.has_active_offer) chips.push("Vehicle has active offer");
+  else if (lead?.vehicle_context?.sold_elsewhere) chips.push("Vehicle already sold");
+  else if (lead?.owner_review?.unread) chips.push("Owner review unread");
+  return `
+    <section class="lead-communication-strip">
+      <div class="lead-communication-chips">
+        ${chips.slice(0, 3).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+      </div>
+      <strong>${escapeHtml(adminNextBestAction(lead))}</strong>
+    </section>
+  `;
+}
+
 function isAdminReadyForWarehouse(lead) {
   if (isBuyerLead(lead) || isClosedLead(lead)) return false;
   if (inventoryCache.some((item) => item.sourceLeadId && item.sourceLeadId === lead?.id)) return false;
@@ -1083,6 +1128,7 @@ function renderAdminOverview(leads) {
   const duplicateReviewCount = activeLeads.filter((lead) => Boolean(lead.duplicate_warning?.message) && !lead.duplicate_warning?.reviewed).length;
   const handoffCount = activeLeads.filter(isAdminReadyForWarehouse).length;
   const ownerUnreadCount = activeLeads.filter((lead) => Boolean(lead.owner_review?.unread)).length;
+  const appointmentCount = activeLeads.filter(isAdminAppointmentLead).length;
   const closedCount = leads.length - activeLeads.length;
   const urgentCount = activeLeads.filter((lead) => String(lead.priority || "").toLowerCase() === "urgent").length;
   adminOverviewEl.innerHTML = `
@@ -1093,6 +1139,7 @@ function renderAdminOverview(leads) {
     ${renderAdminOverviewCard("duplicate-review", "overview-owner", "Duplicate vehicles", duplicateReviewCount, "SELL conflicts waiting for review")}
     ${renderAdminOverviewCard("seller", "overview-seller", "Ready for warehouse", handoffCount, "SELL leads ready to hand off")}
     ${renderAdminOverviewCard("owner-unread", "overview-owner", "Owner unread", ownerUnreadCount, "Important dealer updates")}
+    ${renderAdminOverviewCard("appointments", "overview-follow", "Appointments", appointmentCount, "Booked meetings and inspections")}
     ${renderAdminOverviewCard("urgent", "overview-urgent", "Urgent", urgentCount, "Hot deals or escalation")}
     ${renderAdminOverviewCard("closed", "overview-closed", "Closed", closedCount, "Won, lost, or archived")}
     ${renderAdminOverviewCard("active", "overview-buyer", "New leads", newCount, "Fresh opportunities to route")}
@@ -1106,6 +1153,10 @@ function renderAdminToday(leads) {
   const attentionLimit = 4;
   const visibleAttention = adminAttentionExpanded ? attention : attention.slice(0, attentionLimit);
   const hiddenAttentionCount = Math.max(attention.length - visibleAttention.length, 0);
+  const appointmentItems = leads
+    .filter((lead) => isAdminAppointmentLead(lead))
+    .sort(compareAdminLeadOrder)
+    .slice(0, 4);
   const staleItems = leads
     .filter((lead) => isAdminStaleLead(lead))
     .sort(compareAdminLeadOrder)
@@ -1182,7 +1233,7 @@ function renderAdminToday(leads) {
       <section class="admin-duplicate-panel admin-watch-panel">
         <header>
           <span>Manager watchlist</span>
-          <b>${duplicateItems.length + staleItems.length + ownerUnreadItems.length}</b>
+          <b>${duplicateItems.length + staleItems.length + ownerUnreadItems.length + appointmentItems.length}</b>
         </header>
         <div class="admin-watch-grid">
           <button type="button" class="admin-watch-tile" data-admin-set-filter="duplicate-review">
@@ -1200,13 +1251,22 @@ function renderAdminToday(leads) {
             <b>${staleItems.length}</b>
             <small>Leads with no recent touch</small>
           </button>
+          <button type="button" class="admin-watch-tile" data-admin-set-filter="appointments">
+            <span>Appointments</span>
+            <b>${appointmentItems.length}</b>
+            <small>Booked buyer or seller meetings</small>
+          </button>
         </div>
         <div class="admin-today-actions">
           <button type="button" data-admin-set-filter="duplicate-review">
             <b>${duplicateItems.length}</b>
             <span>Open duplicate vehicle queue</span>
           </button>
-          ${(duplicateItems.length || staleItems.length) ? `<div class="admin-due-list">${duplicateItems.map(renderAdminDuplicateButton).join("")}${staleItems.map((lead) => renderAdminDueButton(lead, "No response")).join("")}</div>` : `
+          <button type="button" data-admin-set-filter="appointments">
+            <b>${appointmentItems.length}</b>
+            <span>Open appointment queue</span>
+          </button>
+          ${(duplicateItems.length || staleItems.length || appointmentItems.length) ? `<div class="admin-due-list">${duplicateItems.map(renderAdminDuplicateButton).join("")}${staleItems.map((lead) => renderAdminDueButton(lead, "No response")).join("")}${appointmentItems.map((lead) => renderAdminDueButton(lead, "Appointment")).join("")}</div>` : `
             <div class="admin-today-empty">
               <b>No manager watch items waiting.</b>
               <span>Duplicate VINs, unread reviews, and stale leads will show here.</span>
@@ -1290,14 +1350,16 @@ function buildAdminAttentionItems(leads) {
       reason,
       tone,
       title: `${buyer ? "BUY" : "SELL"} - ${title}`,
-      meta: `${owner} | ${leadStatusLabel(lead.status || "new", buyer)} | ${next}`
+      meta: `${owner} | ${leadStatusLabel(lead.status || "new", buyer)} | ${adminNextBestAction(lead) || next}`
     });
   };
 
   leads.filter((lead) => !isClosedLead(lead) && String(lead.priority || "").toLowerCase() === "urgent").forEach((lead) => add(lead, "Urgent", "urgent"));
   leads.filter((lead) => !isClosedLead(lead) && isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).forEach((lead) => add(lead, "Follow-up due", "due"));
   leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim()).forEach((lead) => add(lead, "Needs assignment", "assign"));
+  leads.filter((lead) => isAdminAppointmentLead(lead)).forEach((lead) => add(lead, "Appointment", "assign"));
   leads.filter((lead) => !isClosedLead(lead) && String(lead.status || "").toLowerCase() === "new").forEach((lead) => add(lead, "New lead", "update"));
+  leads.filter((lead) => isAdminStaleLead(lead)).forEach((lead) => add(lead, "No response", "update"));
   return items.slice(0, 8);
 }
 
@@ -1696,6 +1758,7 @@ function renderLead(lead, index = 0) {
           </div>
         </div>
       </section>
+      ${renderAdminCommunicationStrip(lead)}
       ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${ownerReview.unread ? "Owner review required" : "New update on this lead"}</button>` : ""}
       ${signalBanner}
       ${contextBanner}
@@ -1912,6 +1975,7 @@ function renderAdminDrawer(leadId) {
           <small>${escapeHtml(vehicleContext.primary_inventory_status ? `Warehouse ${String(vehicleContext.primary_inventory_status).replaceAll("_", " ")}` : "CRM only")}</small>
         </div>
       </section>
+      ${renderAdminCommunicationStrip(lead)}
       ${ownerReview.unread ? `
         <section class="owner-review-required admin-drawer-owner-review">
           <div>

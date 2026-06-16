@@ -1769,7 +1769,7 @@ body.admin-drawer-open .admin-shell {
 .admin-watch-grid {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .admin-watch-tile {
@@ -2798,6 +2798,48 @@ body.admin-drawer-open .admin-shell {
   color: #64748b;
 }
 
+.lead-communication-strip {
+  align-items: center;
+  background: rgba(255, 255, 255, .82);
+  border: 1px solid #d8e2ef;
+  border-radius: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  justify-content: space-between;
+  margin: 6px 0 8px;
+  padding: 10px 12px;
+}
+
+.lead-communication-chips {
+  display: flex;
+  flex: 1 1 340px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lead-communication-chips span {
+  background: #f8fbff;
+  border: 1px solid #d8e2ef;
+  border-radius: 999px;
+  color: #516174;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  padding: 5px 8px;
+}
+
+.lead-communication-strip strong {
+  background: linear-gradient(180deg, #eef6ff 0%, #f8fbff 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #0b4f9c;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+  padding: 7px 10px;
+}
+
 .lead-card-updated {
   border-color: var(--lead-update);
   box-shadow: 0 0 0 2px rgba(245, 158, 11, .2), 0 12px 24px rgba(245, 158, 11, .12);
@@ -3248,7 +3290,7 @@ body.admin-drawer-open .admin-shell {
 .dealer-today-sections {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 .dealer-today-section-call-now {
@@ -3263,6 +3305,22 @@ body.admin-drawer-open .admin-shell {
 
 .dealer-today-section-waiting-reply {
   border-left: 5px solid #2563eb;
+}
+
+.dealer-today-section-no-response {
+  border-left: 5px solid #7c3aed;
+}
+
+.dealer-today-section-no-response header span {
+  color: #6d28d9;
+}
+
+.dealer-today-section-appointments {
+  border-left: 5px solid #0f766e;
+}
+
+.dealer-today-section-appointments header span {
+  color: #0f766e;
 }
 
 .dealer-today-section {
@@ -4814,5 +4872,10 @@ body.admin-drawer-open .admin-shell {
 
   .lead-quick-strip {
     justify-content: flex-start;
+  }
+
+  .lead-communication-strip {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
