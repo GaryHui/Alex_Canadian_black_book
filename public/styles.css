@@ -1279,9 +1279,9 @@ select {
 }
 
 .admin-section-leads {
-  background: linear-gradient(180deg, #fff8f8 0%, #ffffff 100%);
-  border-color: #f3d5d8;
-  border-left-color: #ef4444;
+  background: linear-gradient(180deg, #eef6ff 0%, #ffffff 100%);
+  border-color: #cfe0f6;
+  border-left-color: #0f6fc6;
 }
 
 .admin-section-inventory {
@@ -3510,11 +3510,13 @@ select {
 .admin-leads .lead-card-buyer,
 .dealer-leads-list .dealer-lead-buyer {
   border-left-color: var(--lead-buy) !important;
+  background: linear-gradient(180deg, #eef6ff 0%, #f8fbff 100%) !important;
 }
 
 .admin-leads .lead-card-seller,
 .dealer-leads-list .dealer-lead-seller {
   border-left-color: var(--lead-sell) !important;
+  background: linear-gradient(180deg, #f2ebff 0%, #fbf8ff 100%) !important;
 }
 
 .admin-leads .lead-card-updated,
@@ -3534,16 +3536,21 @@ select {
 
 .admin-leads .lead-type-buyer,
 .dealer-leads-list .dealer-type-buyer {
+  background: #e8f2ff !important;
+  border-color: #9fc5f8 !important;
   color: #0b4f9c !important;
 }
 
 .admin-leads .lead-type-seller,
 .dealer-leads-list .dealer-type-seller {
+  background: #f1e8ff !important;
+  border-color: #c4a7ff !important;
   color: #6d28d9 !important;
 }
 
 .lead-group-buyer .lead-group-head,
 .dealer-lead-group-buyer > header {
+  background: linear-gradient(180deg, #eef6ff 0%, #f8fbff 100%) !important;
   border-color: #c4dafb !important;
 }
 
