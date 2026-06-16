@@ -137,7 +137,11 @@ export async function notifyDuplicateSellerLead(client, lead) {
   const duplicate = await evaluateDuplicateSellerLead(client, lead);
   if (!duplicate) return { ok: true, count: 0 };
   await createOwnerReviewNote(client, String(lead.id || ""), duplicate.message, "system");
-  await createVehicleSignalNotes(client, [String(lead.id || "")], {
+  const relatedLeadIds = (duplicate.items || [])
+    .filter((item) => item.kind === "lead")
+    .map((item) => String(item.id || "").trim())
+    .filter(Boolean);
+  await createVehicleSignalNotes(client, [String(lead.id || ""), ...relatedLeadIds], {
     code: "duplicate_vehicle",
     message: duplicate.message
   });
@@ -378,7 +382,6 @@ function buildLeadActivitySummaryMap(leads, snapshot) {
   const summaries = new Map();
   const notesByLead = groupByLeadId(snapshot?.notes || []);
   const emailsByLead = groupByLeadId(snapshot?.emails || []);
-  const tasksByLead = groupByLeadId(snapshot?.tasks || []);
   const now = Date.now();
   for (const lead of Array.isArray(leads) ? leads : []) {
     const id = String(lead?.id || "").trim();
@@ -397,7 +400,7 @@ function buildLeadActivitySummaryMap(leads, snapshot) {
       age_days: ageDays,
       age_bucket: leadAgeBucket(ageDays),
       age_label: leadAgeLabel(ageDays),
-      deal_checklist: buildDealChecklistSummary(lead, tasksByLead.get(id) || [])
+      deal_desk: buildDealDeskSummary(lead, notesByLead.get(id) || [])
     });
   }
   return summaries;
@@ -454,7 +457,7 @@ function leadAgeLabel(days) {
   return days > 0 ? `Fresh ${days}d` : "Fresh today";
 }
 
-function buildDealChecklistSummary(lead, tasks) {
+function buildDealDeskSummary(lead, notes) {
   const template = dealChecklistTemplateItems(lead);
   if (!template.length) {
     return {
@@ -462,19 +465,29 @@ function buildDealChecklistSummary(lead, tasks) {
       completed: 0,
       pending: 0,
       progress_label: "",
-      items: []
+      items: [],
+      delivery_at: "",
+      key_handoff_status: "pending",
+      key_handoff_label: "Key handoff pending"
     };
   }
-  const matched = template.map((title) => {
-    const task = (Array.isArray(tasks) ? tasks : []).find((item) => checklistTaskKey(item?.title) === checklistTaskKey(title));
+  const state = latestDealDeskState(notes);
+  const matched = template.map((item) => {
+    const current = state.checks.get(item.key) || null;
     return {
-      title,
-      completed: Boolean(task?.completed_at),
-      assigned_to: String(task?.assigned_to || "").trim(),
-      due_at: task?.due_at || "",
-      created_at: task?.created_at || ""
+      key: item.key,
+      label: item.label,
+      completed: Boolean(current?.completed),
+      completed_at: current?.at || ""
     };
   });
+  if (state.delivery_at) {
+    const deliveryItem = matched.find((item) => item.key === "delivery_booked");
+    if (deliveryItem) {
+      deliveryItem.completed = true;
+      deliveryItem.completed_at = state.delivery_at;
+    }
+  }
   const completed = matched.filter((item) => item.completed).length;
   const total = matched.length;
   return {
@@ -482,7 +495,10 @@ function buildDealChecklistSummary(lead, tasks) {
     completed,
     pending: total - completed,
     progress_label: total ? `Checklist ${completed}/${total}` : "",
-    items: matched
+    items: matched,
+    delivery_at: state.delivery_at,
+    key_handoff_status: state.key_handoff_status,
+    key_handoff_label: keyHandoffLabel(state.key_handoff_status)
   };
 }
 
@@ -490,25 +506,62 @@ function dealChecklistTemplateItems(lead) {
   const status = String(lead?.status || "").trim().toLowerCase();
   if (isBuyerLead(lead) && status === "won") {
     return [
-      "Deal desk: docs ready",
-      "Deal desk: keys ready",
-      "Deal desk: delivery booked",
-      "Deal desk: vehicle picked up"
+      { key: "docs_ready", label: "Docs ready" },
+      { key: "keys_ready", label: "Keys ready" },
+      { key: "delivery_booked", label: "Delivery booked" },
+      { key: "vehicle_picked_up", label: "Vehicle picked up" }
     ];
   }
   if (!isBuyerLead(lead) && ["in_inventory", "won"].includes(status)) {
     return [
-      "Deal desk: intake photos complete",
-      "Deal desk: keys collected",
-      "Deal desk: pricing approved",
-      "Deal desk: publish review complete"
+      { key: "intake_photos_complete", label: "Intake photos complete" },
+      { key: "keys_collected", label: "Keys collected" },
+      { key: "pricing_approved", label: "Pricing approved" },
+      { key: "publish_review_complete", label: "Publish review complete" }
     ];
   }
   return [];
 }
 
-function checklistTaskKey(title) {
-  return String(title || "").trim().toLowerCase();
+function latestDealDeskState(notes) {
+  const checks = new Map();
+  let deliveryAt = "";
+  let keyHandoffStatus = "pending";
+  for (const note of Array.isArray(notes) ? notes : []) {
+    const parsed = parseDealDeskNote(note?.note);
+    if (!parsed) continue;
+    if (parsed.kind === "check" && parsed.key && !checks.has(parsed.key)) {
+      checks.set(parsed.key, {
+        completed: parsed.state === "done",
+        at: note?.created_at || ""
+      });
+    }
+    if (parsed.kind === "delivery" && parsed.value && !deliveryAt) deliveryAt = parsed.value;
+    if (parsed.kind === "key_handoff" && parsed.value && keyHandoffStatus === "pending") keyHandoffStatus = parsed.value;
+  }
+  return {
+    checks,
+    delivery_at: deliveryAt,
+    key_handoff_status: keyHandoffStatus
+  };
+}
+
+function parseDealDeskNote(note) {
+  const text = String(note || "").trim();
+  let match = text.match(/^\[Deal desk:check:([a-z_]+):(done|open)\]/i);
+  if (match) return { kind: "check", key: String(match[1] || "").trim().toLowerCase(), state: String(match[2] || "").trim().toLowerCase() };
+  match = text.match(/^\[Deal desk:delivery_at:([^\]]+)\]/i);
+  if (match) return { kind: "delivery", value: String(match[1] || "").trim() };
+  match = text.match(/^\[Deal desk:key_handoff:(pending|ready|complete)\]/i);
+  if (match) return { kind: "key_handoff", value: String(match[1] || "").trim().toLowerCase() };
+  return null;
+}
+
+function keyHandoffLabel(status) {
+  const value = String(status || "pending").trim().toLowerCase();
+  if (value === "ready") return "Keys ready for handoff";
+  if (value === "complete") return "Keys handed off";
+  return "Key handoff pending";
 }
 
 function latestDuplicateReviewByLead(notes) {

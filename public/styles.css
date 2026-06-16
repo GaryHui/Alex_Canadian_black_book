@@ -2880,6 +2880,49 @@ body.admin-drawer-open .admin-shell {
   gap: 8px;
 }
 
+.deal-checklist-field {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.deal-checklist-field span,
+.deal-checklist-meta {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.deal-checklist-field input {
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  color: #0f172a;
+  padding: 8px 10px;
+}
+
+.deal-checklist-key-handoff {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.deal-checklist-key-handoff button {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 8px 12px;
+}
+
+.deal-checklist-key-handoff button.active {
+  background: #e2e8f0;
+  border-color: #64748b;
+  color: #0f172a;
+}
+
 .lead-card-updated {
   border-color: var(--lead-update);
   box-shadow: 0 0 0 2px rgba(245, 158, 11, .2), 0 12px 24px rgba(245, 158, 11, .12);

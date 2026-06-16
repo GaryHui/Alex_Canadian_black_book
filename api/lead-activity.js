@@ -94,6 +94,7 @@ async function createActivity(body, user, role) {
 
   if (type === "task") return createTask(body, user);
   if (type === "email") return recordEmail(body, user);
+  if (type === "deal_desk") return recordDealDeskActivity(body, user);
   return createNote(body, user, role);
 }
 
@@ -179,6 +180,31 @@ async function recordEmail(body, user) {
   if (!result.ok) return result;
   await touchLead(client, leadId);
   return { ok: true, email: result.data?.[0] || null };
+}
+
+async function recordDealDeskActivity(body, user) {
+  const client = supabaseClient();
+  if (!client.ok) return client;
+
+  const leadId = String(body.leadId || "").trim();
+  const kind = String(body.kind || "").trim().toLowerCase();
+  if (!leadId) return { ok: false, status: 400, error: "Lead id is required" };
+  if (!["check", "delivery", "key_handoff"].includes(kind)) {
+    return { ok: false, status: 400, error: "Unsupported deal desk update" };
+  }
+
+  const note = buildDealDeskNote(body);
+  if (!note) return { ok: false, status: 400, error: "Invalid deal desk payload" };
+
+  const result = await insertJson(`${client.url}/rest/v1/lead_notes`, client.key, {
+    lead_id: leadId,
+    author_email: String(user?.email || "").trim().toLowerCase(),
+    note_type: "internal",
+    note
+  });
+  if (!result.ok) return result;
+  await touchLead(client, leadId);
+  return { ok: true, note: result.data?.[0] || null };
 }
 
 async function updateTask(body, user) {
@@ -342,6 +368,66 @@ function ownerReviewReason(status) {
     lost: "Lead marked lost by staff."
   };
   return labels[value] || "";
+}
+
+function buildDealDeskNote(body) {
+  const kind = String(body.kind || "").trim().toLowerCase();
+  if (kind === "check") {
+    const itemKey = normalizeDealDeskKey(body.itemKey);
+    const completed = Boolean(body.completed);
+    if (!itemKey) return "";
+    return `[Deal desk:check:${itemKey}:${completed ? "done" : "open"}] ${dealDeskItemLabel(itemKey)} marked ${completed ? "complete" : "open"}.`;
+  }
+  if (kind === "delivery") {
+    const iso = dateOrNull(body.deliveryAt);
+    if (!iso) return "";
+    return `[Deal desk:delivery_at:${iso}] Delivery date set for ${iso}.`;
+  }
+  if (kind === "key_handoff") {
+    const status = normalizeKeyHandoffStatus(body.status);
+    if (!status) return "";
+    return `[Deal desk:key_handoff:${status}] ${dealDeskKeyHandoffMessage(status)}`;
+  }
+  return "";
+}
+
+function normalizeDealDeskKey(value) {
+  const key = String(value || "").trim().toLowerCase();
+  return [
+    "docs_ready",
+    "keys_ready",
+    "delivery_booked",
+    "vehicle_picked_up",
+    "intake_photos_complete",
+    "keys_collected",
+    "pricing_approved",
+    "publish_review_complete"
+  ].includes(key) ? key : "";
+}
+
+function dealDeskItemLabel(key) {
+  const labels = {
+    docs_ready: "Docs ready",
+    keys_ready: "Keys ready",
+    delivery_booked: "Delivery booked",
+    vehicle_picked_up: "Vehicle picked up",
+    intake_photos_complete: "Intake photos complete",
+    keys_collected: "Keys collected",
+    pricing_approved: "Pricing approved",
+    publish_review_complete: "Publish review complete"
+  };
+  return labels[key] || "Deal desk item";
+}
+
+function normalizeKeyHandoffStatus(value) {
+  const status = String(value || "").trim().toLowerCase();
+  return ["pending", "ready", "complete"].includes(status) ? status : "";
+}
+
+function dealDeskKeyHandoffMessage(status) {
+  if (status === "ready") return "Key handoff marked ready.";
+  if (status === "complete") return "Key handoff marked complete.";
+  return "Key handoff reset to pending.";
 }
 
 function supabaseClient() {

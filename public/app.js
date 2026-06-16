@@ -316,57 +316,72 @@ dealerLeadDrawer?.addEventListener("click", async (event) => {
     return;
   }
 
-  const checklistTaskButton = event.target.closest("[data-dealer-checklist-task]");
-  if (checklistTaskButton && activeDealerDrawerLeadId) {
-    const taskForm = dealerLeadDrawerContent?.querySelector(".dealer-drawer-task-form");
-    const titleField = taskForm?.querySelector('input[name="title"]');
-    if (titleField) titleField.value = checklistTaskButton.dataset.dealerChecklistTask || "";
-    titleField?.focus();
-    dealerLeadsStatus.textContent = "Checklist task loaded into the task form.";
-    return;
-  }
-
-  const checklistBundleButton = event.target.closest("[data-dealer-checklist-bundle]");
-  if (checklistBundleButton && activeDealerDrawerLeadId) {
-    const lead = dealerLeadsCache.find((item) => String(item.id || "") === activeDealerDrawerLeadId);
-    if (!lead) return;
-    const summary = dealerDealChecklistSummary(lead);
-    const existingTitles = new Set((summary.items || []).filter((item) => item.created_at || item.completed || item.assigned_to || item.due_at).map((item) => String(item.title || "").trim().toLowerCase()));
-    const missing = dealerDealChecklistTemplate(lead).filter((title) => !existingTitles.has(String(title || "").trim().toLowerCase()));
-    if (!missing.length) {
-      dealerLeadsStatus.textContent = "Checklist tasks are already loaded.";
-      return;
-    }
-    checklistBundleButton.disabled = true;
-    dealerLeadsStatus.textContent = "Loading deal desk checklist...";
+  const checklistToggleButton = event.target.closest("[data-dealer-dealdesk-check]");
+  if (checklistToggleButton && activeDealerDrawerLeadId) {
+    const itemKey = checklistToggleButton.dataset.dealerDealdeskCheck || "";
+    const completed = checklistToggleButton.dataset.completed !== "true";
+    checklistToggleButton.disabled = true;
+    dealerLeadsStatus.textContent = "Saving deal desk checklist...";
     try {
-      for (const title of missing) {
-        const response = await fetch("/api/lead-activity", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${authSession?.access_token || ""}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            leadId: activeDealerDrawerLeadId,
-            type: "task",
-            title,
-            assignedTo: lead.assigned_to || "",
-            dueAt: lead.next_follow_up_at || ""
-          })
-        });
-        const data = await response.json();
-        if (!data.ok) throw new Error(data.error || "Unable to load deal desk checklist");
-      }
+      const response = await fetch("/api/lead-activity", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          leadId: activeDealerDrawerLeadId,
+          type: "deal_desk",
+          kind: "check",
+          itemKey,
+          completed
+        })
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || "Unable to save deal desk checklist");
       dealerDrawerActivityLoaded = false;
-      dealerLeadsStatus.textContent = "Deal desk checklist loaded.";
+      dealerLeadsStatus.textContent = "Deal desk checklist updated.";
       await Promise.all([
         loadDealerDrawerActivity({ force: true, highlightLatest: true }),
         loadDealerLeads({ forceActivity: true, suppressAlerts: true })
       ]);
     } catch (error) {
-      checklistBundleButton.disabled = false;
-      dealerLeadsStatus.textContent = error.message || "Unable to load deal desk checklist";
+      checklistToggleButton.disabled = false;
+      dealerLeadsStatus.textContent = error.message || "Unable to save deal desk checklist";
+    }
+    return;
+  }
+
+  const keyHandoffButton = event.target.closest("[data-dealer-dealdesk-key]");
+  if (keyHandoffButton && activeDealerDrawerLeadId) {
+    const handoffStatus = keyHandoffButton.dataset.dealerDealdeskKey || "pending";
+    keyHandoffButton.disabled = true;
+    dealerLeadsStatus.textContent = "Saving key handoff...";
+    try {
+      const response = await fetch("/api/lead-activity", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          leadId: activeDealerDrawerLeadId,
+          type: "deal_desk",
+          kind: "key_handoff",
+          status: handoffStatus
+        })
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || "Unable to save key handoff");
+      dealerDrawerActivityLoaded = false;
+      dealerLeadsStatus.textContent = "Key handoff updated.";
+      await Promise.all([
+        loadDealerDrawerActivity({ force: true, highlightLatest: true }),
+        loadDealerLeads({ forceActivity: true, suppressAlerts: true })
+      ]);
+    } catch (error) {
+      keyHandoffButton.disabled = false;
+      dealerLeadsStatus.textContent = error.message || "Unable to save key handoff";
     }
     return;
   }
@@ -552,6 +567,37 @@ dealerLeadDrawer?.addEventListener("submit", async (event) => {
     } catch (error) {
       dealerLeadsStatus.textContent = error.message || "Unable to log email";
     }
+  }
+});
+
+dealerLeadDrawer?.addEventListener("change", async (event) => {
+  const deliveryField = event.target.closest("[data-dealer-dealdesk-delivery]");
+  if (!deliveryField || !activeDealerDrawerLeadId) return;
+  dealerLeadsStatus.textContent = "Saving delivery date...";
+  try {
+    const response = await fetch("/api/lead-activity", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${authSession?.access_token || ""}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        leadId: activeDealerDrawerLeadId,
+        type: "deal_desk",
+        kind: "delivery",
+        deliveryAt: deliveryField.value
+      })
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to save delivery date");
+    dealerDrawerActivityLoaded = false;
+    dealerLeadsStatus.textContent = "Delivery date updated.";
+    await Promise.all([
+      loadDealerDrawerActivity({ force: true, highlightLatest: true }),
+      loadDealerLeads({ forceActivity: true, suppressAlerts: true })
+    ]);
+  } catch (error) {
+    dealerLeadsStatus.textContent = error.message || "Unable to save delivery date";
   }
 });
 
@@ -2069,25 +2115,34 @@ function dealerDealChecklistTemplate(lead) {
   const status = String(lead?.status || "").toLowerCase();
   if (isBuyerLead(lead) && status === "won") {
     return [
-      "Deal desk: docs ready",
-      "Deal desk: keys ready",
-      "Deal desk: delivery booked",
-      "Deal desk: vehicle picked up"
+      { key: "docs_ready", label: "Docs ready" },
+      { key: "keys_ready", label: "Keys ready" },
+      { key: "delivery_booked", label: "Delivery booked" },
+      { key: "vehicle_picked_up", label: "Vehicle picked up" }
     ];
   }
   if (!isBuyerLead(lead) && ["in_inventory", "won"].includes(status)) {
     return [
-      "Deal desk: intake photos complete",
-      "Deal desk: keys collected",
-      "Deal desk: pricing approved",
-      "Deal desk: publish review complete"
+      { key: "intake_photos_complete", label: "Intake photos complete" },
+      { key: "keys_collected", label: "Keys collected" },
+      { key: "pricing_approved", label: "Pricing approved" },
+      { key: "publish_review_complete", label: "Publish review complete" }
     ];
   }
   return [];
 }
 
 function dealerDealChecklistSummary(lead) {
-  return lead?.activity_summary?.deal_checklist || { total: 0, completed: 0, pending: 0, progress_label: "", items: [] };
+  return lead?.activity_summary?.deal_desk || {
+    total: 0,
+    completed: 0,
+    pending: 0,
+    progress_label: "",
+    items: [],
+    delivery_at: "",
+    key_handoff_status: "pending",
+    key_handoff_label: "Key handoff pending"
+  };
 }
 
 function dealerDealChecklistProgressLabel(lead) {
@@ -2099,7 +2154,7 @@ function renderDealerDealChecklistSection(lead) {
   const summary = dealerDealChecklistSummary(lead);
   const items = Array.isArray(summary.items) && summary.items.length
     ? summary.items
-    : dealerDealChecklistTemplate(lead).map((title) => ({ title, completed: false, assigned_to: "", due_at: "" }));
+    : dealerDealChecklistTemplate(lead).map((item) => ({ ...item, completed: false, completed_at: "" }));
   const missingCount = items.filter((item) => !item.completed).length;
   return `
     <section class="dealer-drawer-section">
@@ -2109,14 +2164,23 @@ function renderDealerDealChecklistSection(lead) {
       </header>
       <div class="deal-checklist-grid">
         ${items.map((item) => `
-          <button type="button" class="deal-checklist-item ${item.completed ? "complete" : ""}" data-dealer-checklist-task="${escapeHtml(item.title)}" ${item.completed ? "disabled" : ""}>
-            <strong>${escapeHtml(item.title.replace(/^Deal desk:\s*/i, ""))}</strong>
-            <small>${escapeHtml(item.completed ? "Done" : item.due_at ? `Due ${formatDateTime(item.due_at)}` : "Create task")}</small>
+          <button type="button" class="deal-checklist-item ${item.completed ? "complete" : ""}" data-dealer-dealdesk-check="${escapeHtml(item.key || "")}" data-completed="${item.completed ? "true" : "false"}">
+            <strong>${escapeHtml(item.label || "")}</strong>
+            <small>${escapeHtml(item.completed ? `Done ${item.completed_at ? formatDateTime(item.completed_at) : ""}`.trim() : "Mark complete")}</small>
           </button>
         `).join("")}
       </div>
       <div class="deal-checklist-actions">
-        <button type="button" data-dealer-checklist-bundle="missing">${escapeHtml(missingCount > 0 ? `Load ${missingCount} missing tasks` : "Checklist loaded")}</button>
+        <label class="deal-checklist-field">
+          <span>Delivery date</span>
+          <input type="datetime-local" data-dealer-dealdesk-delivery value="${escapeHtml(dealerDateTimeValue(summary.delivery_at || ""))}">
+        </label>
+        <div class="deal-checklist-key-handoff">
+          ${["pending", "ready", "complete"].map((value) => `
+            <button type="button" class="${summary.key_handoff_status === value ? "active" : ""}" data-dealer-dealdesk-key="${escapeHtml(value)}">${escapeHtml(value === "pending" ? "Key pending" : value === "ready" ? "Key ready" : "Key handed off")}</button>
+          `).join("")}
+        </div>
+        <span class="deal-checklist-meta">${escapeHtml(summary.key_handoff_label || (missingCount > 0 ? `${missingCount} checklist items still open` : "Checklist loaded"))}</span>
       </div>
     </section>
   `;
@@ -2845,7 +2909,7 @@ function renderDealerActivity(data, options = {}) {
       <div>
         <strong>${escapeHtml(dealerActivityNoteLabel(note.note_type))} by ${escapeHtml(note.author_email || "-")}</strong>
         <span>${escapeHtml(formatDateTime(note.created_at))}</span>
-        <p>${escapeHtml(note.note || "")}</p>
+        <p>${escapeHtml(formatDealerActivityNoteText(note.note || ""))}</p>
       </div>
     </article>
   `);
@@ -2888,6 +2952,39 @@ function dealerActivityNoteLabel(type) {
     email: "email note"
   };
   return labels[value] || value || "note";
+}
+
+function formatDealerActivityNoteText(note) {
+  const text = String(note || "").trim();
+  let match = text.match(/^\[Deal desk:check:([a-z_]+):(done|open)\]/i);
+  if (match) return `${dealerDealDeskItemLabel(match[1])} marked ${String(match[2]).toLowerCase() === "done" ? "complete" : "open"}.`;
+  match = text.match(/^\[Deal desk:delivery_at:([^\]]+)\]/i);
+  if (match) return `Delivery date set for ${formatDateTime(match[1])}.`;
+  match = text.match(/^\[Deal desk:key_handoff:(pending|ready|complete)\]/i);
+  if (match) return match[1] === "complete" ? "Keys handed off." : match[1] === "ready" ? "Keys ready for handoff." : "Key handoff pending.";
+  return text;
+}
+
+function dealerDealDeskItemLabel(key) {
+  const labels = {
+    docs_ready: "Docs ready",
+    keys_ready: "Keys ready",
+    delivery_booked: "Delivery booked",
+    vehicle_picked_up: "Vehicle picked up",
+    intake_photos_complete: "Intake photos complete",
+    keys_collected: "Keys collected",
+    pricing_approved: "Pricing approved",
+    publish_review_complete: "Publish review complete"
+  };
+  return labels[String(key || "").trim().toLowerCase()] || "Deal desk item";
+}
+
+function dealerDateTimeValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (part) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function highlightDealerLeadChangeAreas(card) {

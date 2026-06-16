@@ -676,14 +676,14 @@ function collectAdminLeadAlerts(leads) {
           title: leadAlertTitle(lead),
           message: lead.owner_review.reason || "Owner review required"
         });
-      } else if (lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed) {
+      } else if (lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed && shouldShowAdminPassiveAlert(readTokens, id, token)) {
         adminLeadAlertMap.set(id, {
           id,
           type: "owner",
           title: leadAlertTitle(lead),
           message: lead.duplicate_warning.message
         });
-      } else if (lead.vehicle_signal?.message) {
+      } else if (lead.vehicle_signal?.message && shouldShowAdminPassiveAlert(readTokens, id, token)) {
         adminLeadAlertMap.set(id, {
           id,
           type: lead.vehicle_signal.tone === "danger" ? "owner" : "updated",
@@ -722,14 +722,14 @@ function collectAdminLeadAlerts(leads) {
         title: leadAlertTitle(lead),
         message: lead.owner_review.reason || "Owner review required"
       });
-    } else if (lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed) {
+    } else if (lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed && shouldShowAdminPassiveAlert(readTokens, id, token)) {
       adminLeadAlertMap.set(id, {
         id,
         type: "owner",
         title: leadAlertTitle(lead),
         message: lead.duplicate_warning.message
       });
-    } else if (lead.vehicle_signal?.message) {
+    } else if (lead.vehicle_signal?.message && shouldShowAdminPassiveAlert(readTokens, id, token)) {
       adminLeadAlertMap.set(id, {
         id,
         type: lead.vehicle_signal.tone === "danger" ? "owner" : "updated",
@@ -793,6 +793,10 @@ function markAdminLeadTokenRead(id) {
   const readTokens = loadAdminLeadReadTokens();
   readTokens[String(id)] = leadUpdateToken(lead);
   saveAdminLeadReadTokens(readTokens);
+}
+
+function shouldShowAdminPassiveAlert(readTokens, id, token) {
+  return !readTokens[id] || readTokens[id] !== token;
 }
 
 function leadUpdateToken(lead = {}) {
@@ -1096,25 +1100,34 @@ function adminDealChecklistTemplate(lead) {
   const status = String(lead?.status || "").toLowerCase();
   if (isBuyerLead(lead) && status === "won") {
     return [
-      "Deal desk: docs ready",
-      "Deal desk: keys ready",
-      "Deal desk: delivery booked",
-      "Deal desk: vehicle picked up"
+      { key: "docs_ready", label: "Docs ready" },
+      { key: "keys_ready", label: "Keys ready" },
+      { key: "delivery_booked", label: "Delivery booked" },
+      { key: "vehicle_picked_up", label: "Vehicle picked up" }
     ];
   }
   if (!isBuyerLead(lead) && ["in_inventory", "won"].includes(status)) {
     return [
-      "Deal desk: intake photos complete",
-      "Deal desk: keys collected",
-      "Deal desk: pricing approved",
-      "Deal desk: publish review complete"
+      { key: "intake_photos_complete", label: "Intake photos complete" },
+      { key: "keys_collected", label: "Keys collected" },
+      { key: "pricing_approved", label: "Pricing approved" },
+      { key: "publish_review_complete", label: "Publish review complete" }
     ];
   }
   return [];
 }
 
 function adminDealChecklistSummary(lead) {
-  return lead?.activity_summary?.deal_checklist || { total: 0, completed: 0, pending: 0, progress_label: "", items: [] };
+  return lead?.activity_summary?.deal_desk || {
+    total: 0,
+    completed: 0,
+    pending: 0,
+    progress_label: "",
+    items: [],
+    delivery_at: "",
+    key_handoff_status: "pending",
+    key_handoff_label: "Key handoff pending"
+  };
 }
 
 function adminDealChecklistProgressLabel(lead) {
@@ -1126,7 +1139,7 @@ function renderAdminDealChecklistSection(lead) {
   const summary = adminDealChecklistSummary(lead);
   const items = Array.isArray(summary.items) && summary.items.length
     ? summary.items
-    : adminDealChecklistTemplate(lead).map((title) => ({ title, completed: false, assigned_to: "", due_at: "" }));
+    : adminDealChecklistTemplate(lead).map((item) => ({ ...item, completed: false, completed_at: "" }));
   const missingCount = items.filter((item) => !item.completed).length;
   return `
     <section class="admin-drawer-section">
@@ -1136,14 +1149,23 @@ function renderAdminDealChecklistSection(lead) {
       </header>
       <div class="deal-checklist-grid">
         ${items.map((item) => `
-          <button type="button" class="deal-checklist-item ${item.completed ? "complete" : ""}" data-drawer-checklist-task="${escapeHtml(item.title)}" ${item.completed ? "disabled" : ""}>
-            <strong>${escapeHtml(item.title.replace(/^Deal desk:\s*/i, ""))}</strong>
-            <small>${escapeHtml(item.completed ? "Done" : item.due_at ? `Due ${formatDateTime(item.due_at)}` : "Create task")}</small>
+          <button type="button" class="deal-checklist-item ${item.completed ? "complete" : ""}" data-drawer-dealdesk-check="${escapeHtml(item.key || "")}" data-completed="${item.completed ? "true" : "false"}">
+            <strong>${escapeHtml(item.label || "")}</strong>
+            <small>${escapeHtml(item.completed ? `Done ${item.completed_at ? formatDateTime(item.completed_at) : ""}`.trim() : "Mark complete")}</small>
           </button>
         `).join("")}
       </div>
       <div class="deal-checklist-actions">
-        <button type="button" data-drawer-checklist-bundle="missing">${escapeHtml(missingCount > 0 ? `Load ${missingCount} missing tasks` : "Checklist loaded")}</button>
+        <label class="deal-checklist-field">
+          <span>Delivery date</span>
+          <input type="datetime-local" data-drawer-dealdesk-delivery value="${escapeHtml(datetimeLocalValue(summary.delivery_at || ""))}">
+        </label>
+        <div class="deal-checklist-key-handoff">
+          ${["pending", "ready", "complete"].map((value) => `
+            <button type="button" class="${summary.key_handoff_status === value ? "active" : ""}" data-drawer-dealdesk-key="${escapeHtml(value)}">${escapeHtml(value === "pending" ? "Key pending" : value === "ready" ? "Key ready" : "Key handed off")}</button>
+          `).join("")}
+        </div>
+        <span class="deal-checklist-meta">${escapeHtml(summary.key_handoff_label || (missingCount > 0 ? `${missingCount} checklist items still open` : "Checklist loaded"))}</span>
       </div>
     </section>
   `;
@@ -2889,54 +2911,66 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
     return;
   }
 
-  const checklistTaskButton = event.target.closest("[data-drawer-checklist-task]");
-  if (checklistTaskButton && activeAdminDrawerLeadId) {
-    const taskForm = adminLeadDrawerContent?.querySelector(".admin-drawer-task-form");
-    const titleField = taskForm?.querySelector('input[name="title"]');
-    if (titleField) titleField.value = checklistTaskButton.dataset.drawerChecklistTask || "";
-    titleField?.focus();
-    statusEl.textContent = "Checklist task loaded into the task form.";
-    return;
-  }
-
-  const checklistBundleButton = event.target.closest("[data-drawer-checklist-bundle]");
-  if (checklistBundleButton && activeAdminDrawerLeadId) {
-    const lead = adminLeadsCache.find((item) => String(item.id || "") === activeAdminDrawerLeadId);
-    if (!lead) return;
-    const summary = adminDealChecklistSummary(lead);
-    const existingTitles = new Set((summary.items || []).filter((item) => item.created_at || item.completed || item.assigned_to || item.due_at).map((item) => String(item.title || "").trim().toLowerCase()));
-    const missing = adminDealChecklistTemplate(lead).filter((title) => !existingTitles.has(String(title || "").trim().toLowerCase()));
-    if (!missing.length) {
-      statusEl.textContent = "Checklist tasks are already loaded.";
-      return;
-    }
-    checklistBundleButton.disabled = true;
-    statusEl.textContent = "Loading deal desk checklist...";
+  const checklistToggleButton = event.target.closest("[data-drawer-dealdesk-check]");
+  if (checklistToggleButton && activeAdminDrawerLeadId) {
+    const itemKey = checklistToggleButton.dataset.drawerDealdeskCheck || "";
+    const completed = checklistToggleButton.dataset.completed !== "true";
+    checklistToggleButton.disabled = true;
+    statusEl.textContent = "Saving deal desk checklist...";
     try {
-      for (const title of missing) {
-        const response = await fetch("/api/lead-activity", {
-          method: "POST",
-          headers: { ...authHeaders(), "Content-Type": "application/json" },
-          body: JSON.stringify({
-            leadId: activeAdminDrawerLeadId,
-            type: "task",
-            title,
-            assignedTo: lead.assigned_to || "",
-            dueAt: lead.next_follow_up_at || ""
-          })
-        });
-        const data = await response.json();
-        if (!data.ok) throw new Error(data.error || "Unable to load deal desk checklist.");
-      }
+      const response = await fetch("/api/lead-activity", {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: activeAdminDrawerLeadId,
+          type: "deal_desk",
+          kind: "check",
+          itemKey,
+          completed
+        })
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || "Unable to save deal desk checklist.");
       adminDrawerActivityLoaded = false;
-      statusEl.textContent = "Deal desk checklist loaded.";
+      statusEl.textContent = "Deal desk checklist updated.";
       await Promise.all([
         loadAdminDrawerActivity({ force: true, highlightLatest: true }),
         loadLeads({ suppressAlerts: true, forceOpenActivity: true })
       ]);
     } catch (error) {
-      checklistBundleButton.disabled = false;
-      statusEl.textContent = error.message || "Unable to load deal desk checklist.";
+      checklistToggleButton.disabled = false;
+      statusEl.textContent = error.message || "Unable to save deal desk checklist.";
+    }
+    return;
+  }
+
+  const keyHandoffButton = event.target.closest("[data-drawer-dealdesk-key]");
+  if (keyHandoffButton && activeAdminDrawerLeadId) {
+    const handoffStatus = keyHandoffButton.dataset.drawerDealdeskKey || "pending";
+    keyHandoffButton.disabled = true;
+    statusEl.textContent = "Saving key handoff...";
+    try {
+      const response = await fetch("/api/lead-activity", {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: activeAdminDrawerLeadId,
+          type: "deal_desk",
+          kind: "key_handoff",
+          status: handoffStatus
+        })
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || "Unable to save key handoff.");
+      adminDrawerActivityLoaded = false;
+      statusEl.textContent = "Key handoff updated.";
+      await Promise.all([
+        loadAdminDrawerActivity({ force: true, highlightLatest: true }),
+        loadLeads({ suppressAlerts: true, forceOpenActivity: true })
+      ]);
+    } catch (error) {
+      keyHandoffButton.disabled = false;
+      statusEl.textContent = error.message || "Unable to save key handoff.";
     }
     return;
   }
@@ -3097,6 +3131,34 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
         loadLeads({ suppressAlerts: true, forceOpenActivity: true })
       ]);
     }
+  }
+});
+
+adminLeadDrawer?.addEventListener("change", async (event) => {
+  const deliveryField = event.target.closest("[data-drawer-dealdesk-delivery]");
+  if (!deliveryField || !activeAdminDrawerLeadId) return;
+  statusEl.textContent = "Saving delivery date...";
+  try {
+    const response = await fetch("/api/lead-activity", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId: activeAdminDrawerLeadId,
+        type: "deal_desk",
+        kind: "delivery",
+        deliveryAt: deliveryField.value
+      })
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to save delivery date.");
+    adminDrawerActivityLoaded = false;
+    statusEl.textContent = "Delivery date updated.";
+    await Promise.all([
+      loadAdminDrawerActivity({ force: true, highlightLatest: true }),
+      loadLeads({ suppressAlerts: true, forceOpenActivity: true })
+    ]);
+  } catch (error) {
+    statusEl.textContent = error.message || "Unable to save delivery date.";
   }
 });
 
@@ -3489,7 +3551,7 @@ function renderActivity(data, options = {}) {
       <div>
         <strong>${escapeHtml(activityNoteLabel(note.note_type))} by ${escapeHtml(note.author_email || "-")}</strong>
         <span>${escapeHtml(formatDateTime(note.created_at))}</span>
-        <p>${linkifyNote(note.note || "")}</p>
+        <p>${linkifyNote(formatActivityNoteText(note.note || ""))}</p>
       </div>
     </article>
   `);
@@ -3532,6 +3594,31 @@ function activityNoteLabel(type) {
     email: "email note"
   };
   return labels[value] || value || "note";
+}
+
+function formatActivityNoteText(note) {
+  const text = String(note || "").trim();
+  let match = text.match(/^\[Deal desk:check:([a-z_]+):(done|open)\]/i);
+  if (match) return `${dealDeskItemLabel(match[1])} marked ${String(match[2]).toLowerCase() === "done" ? "complete" : "open"}.`;
+  match = text.match(/^\[Deal desk:delivery_at:([^\]]+)\]/i);
+  if (match) return `Delivery date set for ${formatDateTime(match[1])}.`;
+  match = text.match(/^\[Deal desk:key_handoff:(pending|ready|complete)\]/i);
+  if (match) return match[1] === "complete" ? "Keys handed off." : match[1] === "ready" ? "Keys ready for handoff." : "Key handoff pending.";
+  return text;
+}
+
+function dealDeskItemLabel(key) {
+  const labels = {
+    docs_ready: "Docs ready",
+    keys_ready: "Keys ready",
+    delivery_booked: "Delivery booked",
+    vehicle_picked_up: "Vehicle picked up",
+    intake_photos_complete: "Intake photos complete",
+    keys_collected: "Keys collected",
+    pricing_approved: "Pricing approved",
+    publish_review_complete: "Publish review complete"
+  };
+  return labels[String(key || "").trim().toLowerCase()] || "Deal desk item";
 }
 
 function highlightLeadChangeAreas(card) {
