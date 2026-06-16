@@ -316,6 +316,61 @@ dealerLeadDrawer?.addEventListener("click", async (event) => {
     return;
   }
 
+  const checklistTaskButton = event.target.closest("[data-dealer-checklist-task]");
+  if (checklistTaskButton && activeDealerDrawerLeadId) {
+    const taskForm = dealerLeadDrawerContent?.querySelector(".dealer-drawer-task-form");
+    const titleField = taskForm?.querySelector('input[name="title"]');
+    if (titleField) titleField.value = checklistTaskButton.dataset.dealerChecklistTask || "";
+    titleField?.focus();
+    dealerLeadsStatus.textContent = "Checklist task loaded into the task form.";
+    return;
+  }
+
+  const checklistBundleButton = event.target.closest("[data-dealer-checklist-bundle]");
+  if (checklistBundleButton && activeDealerDrawerLeadId) {
+    const lead = dealerLeadsCache.find((item) => String(item.id || "") === activeDealerDrawerLeadId);
+    if (!lead) return;
+    const summary = dealerDealChecklistSummary(lead);
+    const existingTitles = new Set((summary.items || []).filter((item) => item.created_at || item.completed || item.assigned_to || item.due_at).map((item) => String(item.title || "").trim().toLowerCase()));
+    const missing = dealerDealChecklistTemplate(lead).filter((title) => !existingTitles.has(String(title || "").trim().toLowerCase()));
+    if (!missing.length) {
+      dealerLeadsStatus.textContent = "Checklist tasks are already loaded.";
+      return;
+    }
+    checklistBundleButton.disabled = true;
+    dealerLeadsStatus.textContent = "Loading deal desk checklist...";
+    try {
+      for (const title of missing) {
+        const response = await fetch("/api/lead-activity", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${authSession?.access_token || ""}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            leadId: activeDealerDrawerLeadId,
+            type: "task",
+            title,
+            assignedTo: lead.assigned_to || "",
+            dueAt: lead.next_follow_up_at || ""
+          })
+        });
+        const data = await response.json();
+        if (!data.ok) throw new Error(data.error || "Unable to load deal desk checklist");
+      }
+      dealerDrawerActivityLoaded = false;
+      dealerLeadsStatus.textContent = "Deal desk checklist loaded.";
+      await Promise.all([
+        loadDealerDrawerActivity({ force: true, highlightLatest: true }),
+        loadDealerLeads({ forceActivity: true, suppressAlerts: true })
+      ]);
+    } catch (error) {
+      checklistBundleButton.disabled = false;
+      dealerLeadsStatus.textContent = error.message || "Unable to load deal desk checklist";
+    }
+    return;
+  }
+
   const completeButton = event.target.closest("[data-complete-dealer-task]");
   if (completeButton && activeDealerDrawerLeadId) {
     completeButton.disabled = true;
@@ -1860,6 +1915,7 @@ function renderDealerDrawer(leadId) {
           ${followUpButtons}
         </div>
       </section>
+      ${renderDealerDealChecklistSection(lead)}
       <section class="dealer-drawer-section">
         <header>
           <h3>Communication hub</h3>
@@ -2009,6 +2065,63 @@ function dealerDealDeskLabel(lead) {
   return "Purchase closed";
 }
 
+function dealerDealChecklistTemplate(lead) {
+  const status = String(lead?.status || "").toLowerCase();
+  if (isBuyerLead(lead) && status === "won") {
+    return [
+      "Deal desk: docs ready",
+      "Deal desk: keys ready",
+      "Deal desk: delivery booked",
+      "Deal desk: vehicle picked up"
+    ];
+  }
+  if (!isBuyerLead(lead) && ["in_inventory", "won"].includes(status)) {
+    return [
+      "Deal desk: intake photos complete",
+      "Deal desk: keys collected",
+      "Deal desk: pricing approved",
+      "Deal desk: publish review complete"
+    ];
+  }
+  return [];
+}
+
+function dealerDealChecklistSummary(lead) {
+  return lead?.activity_summary?.deal_checklist || { total: 0, completed: 0, pending: 0, progress_label: "", items: [] };
+}
+
+function dealerDealChecklistProgressLabel(lead) {
+  return String(dealerDealChecklistSummary(lead)?.progress_label || "").trim();
+}
+
+function renderDealerDealChecklistSection(lead) {
+  if (!isDealerDealDeskLead(lead)) return "";
+  const summary = dealerDealChecklistSummary(lead);
+  const items = Array.isArray(summary.items) && summary.items.length
+    ? summary.items
+    : dealerDealChecklistTemplate(lead).map((title) => ({ title, completed: false, assigned_to: "", due_at: "" }));
+  const missingCount = items.filter((item) => !item.completed).length;
+  return `
+    <section class="dealer-drawer-section">
+      <header>
+        <h3>Deal desk checklist</h3>
+        <span>${escapeHtml(summary.progress_label || "Checklist 0/0")}</span>
+      </header>
+      <div class="deal-checklist-grid">
+        ${items.map((item) => `
+          <button type="button" class="deal-checklist-item ${item.completed ? "complete" : ""}" data-dealer-checklist-task="${escapeHtml(item.title)}" ${item.completed ? "disabled" : ""}>
+            <strong>${escapeHtml(item.title.replace(/^Deal desk:\s*/i, ""))}</strong>
+            <small>${escapeHtml(item.completed ? "Done" : item.due_at ? `Due ${formatDateTime(item.due_at)}` : "Create task")}</small>
+          </button>
+        `).join("")}
+      </div>
+      <div class="deal-checklist-actions">
+        <button type="button" data-dealer-checklist-bundle="missing">${escapeHtml(missingCount > 0 ? `Load ${missingCount} missing tasks` : "Checklist loaded")}</button>
+      </div>
+    </section>
+  `;
+}
+
 function dealerLeadAgeDays(lead) {
   return Number(lead?.activity_summary?.age_days || 0);
 }
@@ -2045,6 +2158,7 @@ function dealerNextBestAction(lead) {
   const buyer = isBuyerLead(lead);
   const status = String(lead?.status || "new").toLowerCase();
   if (lead?.vehicle_signal?.message) return "Review the vehicle alert before the next customer update";
+  if (isDealerDealDeskLead(lead) && dealerDealChecklistSummary(lead).pending > 0) return `Finish ${dealerDealChecklistProgressLabel(lead)} before closing the handoff`;
   if (buyer && status === "won") return "Prep delivery, finance docs, and final handoff";
   if (!buyer && status === "in_inventory") return "Confirm intake photos, price, and warehouse handoff";
   if (!buyer && status === "won") return "Confirm purchase paperwork and stock handoff";
@@ -2068,6 +2182,7 @@ function renderDealerCommunicationStrip(lead) {
   else if (lead?.vehicle_context?.sold_elsewhere) chips.push("Vehicle already sold");
   else if (isDealerAppointmentLead(lead)) chips.push("Appointment on the board");
   else if (isDealerWaitingReply(lead)) chips.push("Waiting for customer reply");
+  else if (isDealerDealDeskLead(lead) && dealerDealChecklistProgressLabel(lead)) chips.push(dealerDealChecklistProgressLabel(lead));
   else if (isDealerDealDeskLead(lead)) chips.push(dealerDealDeskLabel(lead));
   else chips.push(dealerLeadAgeLabel(lead));
   return `

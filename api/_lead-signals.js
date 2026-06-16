@@ -221,9 +221,10 @@ async function loadVehicleSnapshot(client) {
     fetchVehicleListings(client)
   ]);
   const noteIds = allLeads.map((lead) => String(lead.id || "").trim()).filter(Boolean);
-  const [notes, emails] = await Promise.all([
+  const [notes, emails, tasks] = await Promise.all([
     fetchLeadSignalNotes(noteIds, client),
-    fetchLeadEmails(noteIds, client)
+    fetchLeadEmails(noteIds, client),
+    fetchLeadTasks(noteIds, client)
   ]);
   const relationMap = latestVehicleRelationByLead(notes);
   return {
@@ -232,6 +233,7 @@ async function loadVehicleSnapshot(client) {
     inventoryRows,
     notes,
     emails,
+    tasks,
     relationMap,
     duplicateReviewMap: latestDuplicateReviewByLead(notes)
   };
@@ -254,6 +256,18 @@ async function fetchLeadEmails(ids, client) {
   if (!client?.url || !client?.key || !validIds.length) return [];
   const encoded = validIds.map(encodeURIComponent).join(",");
   const response = await fetch(`${client.url}/rest/v1/lead_emails?select=lead_id,created_at,sent_to,sent_by,subject,status&lead_id=in.(${encoded})&order=created_at.desc&limit=1000`, {
+    headers: authHeaders(client.key)
+  });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) return [];
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function fetchLeadTasks(ids, client) {
+  const validIds = (Array.isArray(ids) ? ids : []).map((id) => String(id || "").trim()).filter(Boolean);
+  if (!client?.url || !client?.key || !validIds.length) return [];
+  const encoded = validIds.map(encodeURIComponent).join(",");
+  const response = await fetch(`${client.url}/rest/v1/lead_tasks?select=lead_id,title,completed_at,due_at,assigned_to,created_at&lead_id=in.(${encoded})&order=created_at.desc&limit=1000`, {
     headers: authHeaders(client.key)
   });
   const rows = await response.json().catch(() => []);
@@ -364,6 +378,7 @@ function buildLeadActivitySummaryMap(leads, snapshot) {
   const summaries = new Map();
   const notesByLead = groupByLeadId(snapshot?.notes || []);
   const emailsByLead = groupByLeadId(snapshot?.emails || []);
+  const tasksByLead = groupByLeadId(snapshot?.tasks || []);
   const now = Date.now();
   for (const lead of Array.isArray(leads) ? leads : []) {
     const id = String(lead?.id || "").trim();
@@ -381,7 +396,8 @@ function buildLeadActivitySummaryMap(leads, snapshot) {
       last_outbound_channel: outboundTouch?.channel || "",
       age_days: ageDays,
       age_bucket: leadAgeBucket(ageDays),
-      age_label: leadAgeLabel(ageDays)
+      age_label: leadAgeLabel(ageDays),
+      deal_checklist: buildDealChecklistSummary(lead, tasksByLead.get(id) || [])
     });
   }
   return summaries;
@@ -436,6 +452,63 @@ function leadAgeLabel(days) {
   if (days >= 7) return `Aging ${days}d`;
   if (days >= 3) return `Open ${days}d`;
   return days > 0 ? `Fresh ${days}d` : "Fresh today";
+}
+
+function buildDealChecklistSummary(lead, tasks) {
+  const template = dealChecklistTemplateItems(lead);
+  if (!template.length) {
+    return {
+      total: 0,
+      completed: 0,
+      pending: 0,
+      progress_label: "",
+      items: []
+    };
+  }
+  const matched = template.map((title) => {
+    const task = (Array.isArray(tasks) ? tasks : []).find((item) => checklistTaskKey(item?.title) === checklistTaskKey(title));
+    return {
+      title,
+      completed: Boolean(task?.completed_at),
+      assigned_to: String(task?.assigned_to || "").trim(),
+      due_at: task?.due_at || "",
+      created_at: task?.created_at || ""
+    };
+  });
+  const completed = matched.filter((item) => item.completed).length;
+  const total = matched.length;
+  return {
+    total,
+    completed,
+    pending: total - completed,
+    progress_label: total ? `Checklist ${completed}/${total}` : "",
+    items: matched
+  };
+}
+
+function dealChecklistTemplateItems(lead) {
+  const status = String(lead?.status || "").trim().toLowerCase();
+  if (isBuyerLead(lead) && status === "won") {
+    return [
+      "Deal desk: docs ready",
+      "Deal desk: keys ready",
+      "Deal desk: delivery booked",
+      "Deal desk: vehicle picked up"
+    ];
+  }
+  if (!isBuyerLead(lead) && ["in_inventory", "won"].includes(status)) {
+    return [
+      "Deal desk: intake photos complete",
+      "Deal desk: keys collected",
+      "Deal desk: pricing approved",
+      "Deal desk: publish review complete"
+    ];
+  }
+  return [];
+}
+
+function checklistTaskKey(title) {
+  return String(title || "").trim().toLowerCase();
 }
 
 function latestDuplicateReviewByLead(notes) {

@@ -1092,6 +1092,63 @@ function adminDealDeskLabel(lead) {
   return "Purchase closed";
 }
 
+function adminDealChecklistTemplate(lead) {
+  const status = String(lead?.status || "").toLowerCase();
+  if (isBuyerLead(lead) && status === "won") {
+    return [
+      "Deal desk: docs ready",
+      "Deal desk: keys ready",
+      "Deal desk: delivery booked",
+      "Deal desk: vehicle picked up"
+    ];
+  }
+  if (!isBuyerLead(lead) && ["in_inventory", "won"].includes(status)) {
+    return [
+      "Deal desk: intake photos complete",
+      "Deal desk: keys collected",
+      "Deal desk: pricing approved",
+      "Deal desk: publish review complete"
+    ];
+  }
+  return [];
+}
+
+function adminDealChecklistSummary(lead) {
+  return lead?.activity_summary?.deal_checklist || { total: 0, completed: 0, pending: 0, progress_label: "", items: [] };
+}
+
+function adminDealChecklistProgressLabel(lead) {
+  return String(adminDealChecklistSummary(lead)?.progress_label || "").trim();
+}
+
+function renderAdminDealChecklistSection(lead) {
+  if (!isAdminDealDeskLead(lead)) return "";
+  const summary = adminDealChecklistSummary(lead);
+  const items = Array.isArray(summary.items) && summary.items.length
+    ? summary.items
+    : adminDealChecklistTemplate(lead).map((title) => ({ title, completed: false, assigned_to: "", due_at: "" }));
+  const missingCount = items.filter((item) => !item.completed).length;
+  return `
+    <section class="admin-drawer-section">
+      <header>
+        <h3>Deal desk checklist</h3>
+        <span>${escapeHtml(summary.progress_label || "Checklist 0/0")}</span>
+      </header>
+      <div class="deal-checklist-grid">
+        ${items.map((item) => `
+          <button type="button" class="deal-checklist-item ${item.completed ? "complete" : ""}" data-drawer-checklist-task="${escapeHtml(item.title)}" ${item.completed ? "disabled" : ""}>
+            <strong>${escapeHtml(item.title.replace(/^Deal desk:\s*/i, ""))}</strong>
+            <small>${escapeHtml(item.completed ? "Done" : item.due_at ? `Due ${formatDateTime(item.due_at)}` : "Create task")}</small>
+          </button>
+        `).join("")}
+      </div>
+      <div class="deal-checklist-actions">
+        <button type="button" data-drawer-checklist-bundle="missing">${escapeHtml(missingCount > 0 ? `Load ${missingCount} missing tasks` : "Checklist loaded")}</button>
+      </div>
+    </section>
+  `;
+}
+
 function adminLeadAgeDays(lead) {
   return Number(lead?.activity_summary?.age_days || 0);
 }
@@ -1129,6 +1186,7 @@ function adminNextBestAction(lead) {
   const status = String(lead?.status || "new").toLowerCase();
   if (lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed) return "Review duplicate vehicle before warehouse work";
   if (lead?.owner_review?.unread) return "Read dealer update and confirm next manager step";
+  if (isAdminDealDeskLead(lead) && adminDealChecklistSummary(lead).pending > 0) return `Finish ${adminDealChecklistProgressLabel(lead)} before closing the handoff`;
   if (buyer && status === "won") return "Start delivery checklist, docs, and final customer handoff";
   if (!buyer && status === "in_inventory") return "Confirm warehouse intake, pricing, and publish plan";
   if (!buyer && status === "won") return "Confirm purchase paperwork and stock transfer";
@@ -1154,6 +1212,7 @@ function renderAdminCommunicationStrip(lead) {
   else if (lead?.vehicle_context?.sold_elsewhere) chips.push("Vehicle already sold");
   else if (isAdminAppointmentLead(lead)) chips.push("Appointment on the board");
   else if (isAdminWaitingReplyLead(lead)) chips.push("Waiting for customer reply");
+  else if (isAdminDealDeskLead(lead) && adminDealChecklistProgressLabel(lead)) chips.push(adminDealChecklistProgressLabel(lead));
   else if (isAdminDealDeskLead(lead)) chips.push(adminDealDeskLabel(lead));
   else if (lead?.owner_review?.unread) chips.push("Owner review unread");
   else chips.push(adminLeadAgeLabel(lead));
@@ -2139,6 +2198,7 @@ function renderAdminDrawer(leadId) {
           ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
         </div>
       </section>
+      ${renderAdminDealChecklistSection(lead)}
       <section class="admin-drawer-section">
         <header>
           <h3>Communication hub</h3>
@@ -2826,6 +2886,58 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
   if (focusEmailButton) {
     const field = adminLeadDrawerContent?.querySelector('.admin-drawer-email-form input[name="subject"]');
     field?.focus();
+    return;
+  }
+
+  const checklistTaskButton = event.target.closest("[data-drawer-checklist-task]");
+  if (checklistTaskButton && activeAdminDrawerLeadId) {
+    const taskForm = adminLeadDrawerContent?.querySelector(".admin-drawer-task-form");
+    const titleField = taskForm?.querySelector('input[name="title"]');
+    if (titleField) titleField.value = checklistTaskButton.dataset.drawerChecklistTask || "";
+    titleField?.focus();
+    statusEl.textContent = "Checklist task loaded into the task form.";
+    return;
+  }
+
+  const checklistBundleButton = event.target.closest("[data-drawer-checklist-bundle]");
+  if (checklistBundleButton && activeAdminDrawerLeadId) {
+    const lead = adminLeadsCache.find((item) => String(item.id || "") === activeAdminDrawerLeadId);
+    if (!lead) return;
+    const summary = adminDealChecklistSummary(lead);
+    const existingTitles = new Set((summary.items || []).filter((item) => item.created_at || item.completed || item.assigned_to || item.due_at).map((item) => String(item.title || "").trim().toLowerCase()));
+    const missing = adminDealChecklistTemplate(lead).filter((title) => !existingTitles.has(String(title || "").trim().toLowerCase()));
+    if (!missing.length) {
+      statusEl.textContent = "Checklist tasks are already loaded.";
+      return;
+    }
+    checklistBundleButton.disabled = true;
+    statusEl.textContent = "Loading deal desk checklist...";
+    try {
+      for (const title of missing) {
+        const response = await fetch("/api/lead-activity", {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leadId: activeAdminDrawerLeadId,
+            type: "task",
+            title,
+            assignedTo: lead.assigned_to || "",
+            dueAt: lead.next_follow_up_at || ""
+          })
+        });
+        const data = await response.json();
+        if (!data.ok) throw new Error(data.error || "Unable to load deal desk checklist.");
+      }
+      adminDrawerActivityLoaded = false;
+      statusEl.textContent = "Deal desk checklist loaded.";
+      await Promise.all([
+        loadAdminDrawerActivity({ force: true, highlightLatest: true }),
+        loadLeads({ suppressAlerts: true, forceOpenActivity: true })
+      ]);
+    } catch (error) {
+      checklistBundleButton.disabled = false;
+      statusEl.textContent = error.message || "Unable to load deal desk checklist.";
+    }
     return;
   }
 

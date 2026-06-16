@@ -2840,6 +2840,46 @@ body.admin-drawer-open .admin-shell {
   padding: 7px 10px;
 }
 
+.deal-checklist-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.deal-checklist-item {
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.deal-checklist-item strong {
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.deal-checklist-item small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.deal-checklist-item.complete {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.deal-checklist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .lead-card-updated {
   border-color: var(--lead-update);
   box-shadow: 0 0 0 2px rgba(245, 158, 11, .2), 0 12px 24px rgba(245, 158, 11, .12);
