@@ -32,6 +32,7 @@ const dealerLeadSummary = document.querySelector("#dealer-lead-summary");
 const dealerLeadAlertsEl = document.querySelector("#dealer-lead-alerts");
 const dealerTodayWorkEl = document.querySelector("#dealer-today-work");
 const dealerLeadFilterButtons = document.querySelectorAll("[data-dealer-filter]");
+const dealerLeadSortSelect = document.querySelector("#dealer-lead-sort");
 const saveValuationLeadButton = document.querySelector("#save-valuation-lead");
 const DEALER_REFRESH_MS = 30000;
 const DEALER_LEAD_READ_TOKENS_KEY = "autoswitch-dealer-lead-read-tokens";
@@ -90,6 +91,7 @@ let dealerDirectoryEmails = [];
 let dealerLeadsCache = [];
 let dealerLeadRole = "dealer";
 let dealerLeadFilter = "active";
+let dealerLeadSort = "newest";
 let dealerLeadAlertMap = new Map();
 let activeDealerLeadId = "";
 
@@ -107,6 +109,10 @@ dealerLeadFilterButtons.forEach((button) => {
     setDealerLeadFilter(button.dataset.dealerFilter || "all");
     renderDealerLeads(dealerLeadsCache, dealerLeadRole);
   });
+});
+dealerLeadSortSelect?.addEventListener("change", () => {
+  dealerLeadSort = dealerLeadSortSelect.value === "oldest" ? "oldest" : "newest";
+  renderDealerLeads(dealerLeadsCache, dealerLeadRole);
 });
 dealerLeadSummary?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-dealer-summary-filter]");
@@ -1214,7 +1220,8 @@ function renderDealerLeads(leads, role) {
 
   const activeCount = leads.filter((lead) => !isDealerClosedLead(lead)).length;
   const closedCount = leads.length - activeCount;
-  dealerLeadsStatus.textContent = `${visibleLeads.length} shown. ${activeCount} active / ${closedCount} closed assigned lead${leads.length === 1 ? "" : "s"}.`;
+  const sortLabel = dealerLeadSort === "oldest" ? "Oldest first" : "Newest first";
+  dealerLeadsStatus.textContent = `${visibleLeads.length} shown. ${activeCount} active / ${closedCount} closed assigned lead${leads.length === 1 ? "" : "s"}. Sort: ${sortLabel}, with overdue and urgent pinned first.`;
   dealerLeadsList.innerHTML = renderDealerLeadGroups(visibleLeads, (lead, index) => {
     const input = lead.input || {};
     const valuation = lead.valuation || {};
@@ -1517,14 +1524,27 @@ function filterDealerLeads(leads) {
 }
 
 function sortDealerLeads(leads) {
-  const priorityRank = { urgent: 0, high: 1, normal: 2, low: 3 };
   return [...leads].sort((a, b) => {
-    const priorityDiff = (priorityRank[String(a.priority || "normal").toLowerCase()] ?? 2) - (priorityRank[String(b.priority || "normal").toLowerCase()] ?? 2);
-    if (priorityDiff) return priorityDiff;
-    const aDue = new Date(a.next_follow_up_at || a.created_at || 0).getTime();
-    const bDue = new Date(b.next_follow_up_at || b.created_at || 0).getTime();
-    return (Number.isNaN(aDue) ? Infinity : aDue) - (Number.isNaN(bDue) ? Infinity : bDue);
+    const pinnedDiff = dealerLeadPinnedRank(a) - dealerLeadPinnedRank(b);
+    if (pinnedDiff) return pinnedDiff;
+    const timeDiff = leadCreatedTimestamp(b) - leadCreatedTimestamp(a);
+    if (timeDiff) return dealerLeadSort === "oldest" ? -timeDiff : timeDiff;
+    return String(b.id || "").localeCompare(String(a.id || ""));
   });
+}
+
+function dealerLeadPinnedRank(lead) {
+  if (isDealerClosedLead(lead)) return 2;
+  const status = lead.status || "new";
+  if (isDealerLeadOverdue(lead.next_follow_up_at || "", status)) return 0;
+  if (String(lead.priority || "").toLowerCase() === "urgent") return 1;
+  return 2;
+}
+
+function leadCreatedTimestamp(lead) {
+  const value = lead?.created_at || lead?.last_activity_at || lead?.next_follow_up_at || 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
 function renderDealerLeadGroups(leads, cardRenderer) {

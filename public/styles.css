@@ -64,6 +64,7 @@ select {
 }
 
 .dealer-sidebar {
+  align-self: start;
   position: sticky;
   top: 18px;
   z-index: 12;
@@ -901,6 +902,12 @@ select {
   margin-bottom: 12px;
 }
 
+.dealer-lead-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
 .dealer-lead-filters button {
   background: #fff;
   border: 1px solid #b9c7d8;
@@ -1113,6 +1120,7 @@ select {
 }
 
 .admin-sidebar {
+  align-self: start;
   position: sticky;
   top: 18px;
   z-index: 12;
@@ -1407,9 +1415,34 @@ select {
 }
 
 .admin-lead-toolbar {
+  align-items: end;
   display: grid;
   gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
   margin: 16px 0 8px;
+}
+
+.lead-sort-control {
+  display: grid;
+  gap: 6px;
+  justify-self: end;
+  min-width: 0;
+}
+
+.lead-sort-control span {
+  color: #516174;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.lead-sort-control select {
+  background: #fff;
+  border: 1px solid #c7d2e1;
+  border-radius: 8px;
+  color: #1f3652;
+  min-height: 40px;
+  padding: 0 12px;
 }
 
 .admin-lead-search {
@@ -3481,6 +3514,10 @@ select {
   gap: 18px;
 }
 
+.dealer-history-details:not([open]) {
+  gap: 0;
+}
+
 .dealer-history-details > summary {
   align-items: center;
   border: 1px solid #d8e2ef;
@@ -3504,6 +3541,10 @@ select {
 .dealer-history-details > summary small {
   color: #64748b;
   margin-top: 3px;
+}
+
+.dealer-history-details[open] {
+  padding-bottom: 4px;
 }
 
 .dealer-info-block summary {
@@ -3653,6 +3694,19 @@ select {
   .admin-head,
   .admin-section-head {
     flex-direction: column;
+  }
+
+  .admin-lead-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .dealer-lead-toolbar {
+    justify-content: flex-start;
+  }
+
+  .lead-sort-control {
+    justify-self: stretch;
+    width: 100%;
   }
 
   .admin-actions {

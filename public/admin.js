@@ -15,6 +15,7 @@ const adminLeadAlertsEl = document.querySelector("#admin-lead-alerts");
 const adminTodayListEl = document.querySelector("#admin-today-list");
 const adminLeadFilterButtons = [...document.querySelectorAll("[data-admin-lead-filter]")];
 const adminLeadSearchInput = document.querySelector("#admin-lead-search");
+const adminLeadSortSelect = document.querySelector("#admin-lead-sort");
 const dealerStaffForm = document.querySelector("#dealer-staff-form");
 const reloadDealersButton = document.querySelector("#reload-dealers");
 const reloadUsersButton = document.querySelector("#reload-users");
@@ -40,6 +41,7 @@ let adminRefreshTimer = null;
 let adminLeadsCache = [];
 let adminLeadFilter = "active";
 let adminLeadSearch = "";
+let adminLeadSort = "newest";
 let inventoryCache = [];
 let inventoryFilter = "active";
 let adminLeadTokenMap = new Map();
@@ -68,6 +70,10 @@ adminLeadFilterButtons.forEach((button) => {
 });
 adminLeadSearchInput?.addEventListener("input", () => {
   adminLeadSearch = adminLeadSearchInput.value || "";
+  renderLeadWorkbench(adminLeadsCache);
+});
+adminLeadSortSelect?.addEventListener("change", () => {
+  adminLeadSort = adminLeadSortSelect.value === "oldest" ? "oldest" : "newest";
   renderLeadWorkbench(adminLeadsCache);
 });
 adminLeadAlertsEl?.addEventListener("click", async (event) => {
@@ -820,13 +826,15 @@ async function openAdminLeadFromAlert(id) {
 
 function renderLeadWorkbench(leads) {
   const filtered = filterAdminLeads(leads);
+  const sorted = sortAdminLeads(filtered);
   const buyerCount = leads.filter(isBuyerLead).length;
   const sellerCount = leads.length - buyerCount;
   const activeCount = leads.filter((lead) => !isClosedLead(lead)).length;
   const closedCount = leads.length - activeCount;
   const searchLabel = adminLeadSearch.trim() ? ` Search: "${adminLeadSearch.trim()}".` : "";
-  statusEl.textContent = `${filtered.length} shown. ${activeCount} active / ${closedCount} closed. ${buyerCount} BUY / ${sellerCount} SELL.${searchLabel}`;
-  leadsEl.innerHTML = renderLeadGroups(filtered);
+  const sortLabel = adminLeadSort === "oldest" ? "Oldest first" : "Newest first";
+  statusEl.textContent = `${sorted.length} shown. ${activeCount} active / ${closedCount} closed. ${buyerCount} BUY / ${sellerCount} SELL. Sort: ${sortLabel}, with overdue and urgent pinned first.${searchLabel}`;
+  leadsEl.innerHTML = renderLeadGroups(sorted);
   syncActiveAdminLeadCard();
 }
 
@@ -863,6 +871,30 @@ function filterAdminLeads(leads) {
     const haystack = searchableLeadText(lead);
     return terms.every((term) => haystack.includes(term));
   });
+}
+
+function sortAdminLeads(leads) {
+  return [...leads].sort((a, b) => {
+    const pinnedDiff = adminLeadPinnedRank(a) - adminLeadPinnedRank(b);
+    if (pinnedDiff) return pinnedDiff;
+    const timeDiff = leadCreatedTimestamp(b) - leadCreatedTimestamp(a);
+    if (timeDiff) return adminLeadSort === "oldest" ? -timeDiff : timeDiff;
+    return String(b.id || "").localeCompare(String(a.id || ""));
+  });
+}
+
+function adminLeadPinnedRank(lead) {
+  if (isClosedLead(lead)) return 2;
+  const status = lead.status || "new";
+  if (isOverdue(lead.next_follow_up_at || "", status)) return 0;
+  if (String(lead.priority || "").toLowerCase() === "urgent") return 1;
+  return 2;
+}
+
+function leadCreatedTimestamp(lead) {
+  const value = lead?.created_at || lead?.last_activity_at || lead?.next_follow_up_at || 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
 function renderAdminOverview(leads) {

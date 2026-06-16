@@ -64,6 +64,15 @@
           <button type="button" data-dealer-filter="closed">Closed</button>
           <button type="button" data-dealer-filter="all">All</button>
         </div>
+        <div class="dealer-lead-toolbar">
+          <label class="lead-sort-control">
+            <span>Sort by time</span>
+            <select id="dealer-lead-sort">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          </label>
+        </div>
         <p id="dealer-leads-status" class="status">Loading assigned leads...</p>
         <div id="dealer-leads-list" class="history-list dealer-leads-list"></div>
         </section>
@@ -186,7 +195,7 @@
         </section>
 
         <section id="history-panel" class="history-panel dealer-history-panel" hidden>
-          <details class="dealer-history-details" open>
+          <details class="dealer-history-details">
             <summary>
               <span>
                 <b>Quote history</b>
