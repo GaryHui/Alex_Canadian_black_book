@@ -1341,6 +1341,23 @@ function renderDealerLeads(leads, role) {
     const followUpButtons = dealerFollowUpActions()
       .map((action) => `<button type="button" data-dealer-follow-up="${escapeHtml(action.key)}">${escapeHtml(action.label)}</button>`)
       .join("");
+    const nextStepSummary = overdue
+      ? "Follow-up overdue"
+      : followUp
+        ? `Next follow-up ${formatDateTime(followUp)}`
+        : String(status || "").toLowerCase() === "new"
+          ? "New lead waiting for first response"
+          : "No next follow-up scheduled";
+    const vehicleSummary = vehicleContext.primary_inventory_status
+      ? `Warehouse ${String(vehicleContext.primary_inventory_status).replaceAll("_", " ")}`
+      : vehicleContext.sold_elsewhere
+        ? "Vehicle already sold"
+        : vehicleContext.off_market
+          ? "Vehicle off market"
+          : buyerLead
+            ? "Buyer opportunity"
+            : "Seller appraisal";
+    const customerSummary = input.phone || customerEmail;
 
     return `
       <article class="history-card dealer-lead-card dealer-lead-${leadKind} dealer-lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${String(lead.priority || "").toLowerCase() === "urgent" ? "dealer-lead-card-urgent" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "dealer-lead-updated" : ""}" data-lead-id="${escapeHtml(lead.id || "")}" data-update-token="${escapeHtml(updateToken)}">
@@ -1355,6 +1372,28 @@ function renderDealerLeads(leads, role) {
           <b class="dealer-status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
         </div>
         ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-dealer-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
+        <section class="lead-command-bar dealer-command-bar">
+          <div class="lead-command-cell">
+            <span>Next step</span>
+            <strong>${escapeHtml(nextStepSummary)}</strong>
+            <small>${escapeHtml(lead.assigned_to ? `Owner ${lead.assigned_to}` : "Assigned lead")}</small>
+          </div>
+          <div class="lead-command-cell">
+            <span>Customer</span>
+            <strong>${escapeHtml(customerSummary)}</strong>
+            <small>${escapeHtml(customerEmail)}</small>
+          </div>
+          <div class="lead-command-cell">
+            <span>Vehicle</span>
+            <strong>${escapeHtml(vehicleSummary)}</strong>
+            <small>${escapeHtml(vehicleContext.cluster_label || `VIN ${valuation.vin || input.vin || "-"}`)}</small>
+          </div>
+          <div class="lead-command-cell">
+            <span>Pipeline</span>
+            <strong>${escapeHtml(leadStatusLabel(status, buyerLead))}</strong>
+            <small>${escapeHtml(lastActivity ? `Last activity ${formatDateTime(lastActivity)}` : "No recent activity")}</small>
+          </div>
+        </section>
         ${dealerVehicleSignalInline(lead)}
         ${dealerVehicleContextInline(lead)}
         <p class="dealer-update-notice" ${pendingAlert ? "" : "hidden"}>Task or follow-up activity changed. Open this lead to review the latest update.</p>
@@ -1463,60 +1502,80 @@ function setDealerLeadFilter(filter) {
   });
 }
 
-function renderDealerLeadSummary(leads) {
-  if (!dealerLeadSummary) return;
-  const activeLeads = leads.filter((lead) => !isDealerClosedLead(lead));
-  const buyer = activeLeads.filter(isBuyerLead).length;
-  const seller = activeLeads.length - buyer;
-  const due = activeLeads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new")).length;
-  const priority = activeLeads.filter((lead) => ["high", "urgent"].includes(String(lead.priority || "").toLowerCase())).length;
-  const vehicleAlerts = activeLeads.filter((lead) => lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market).length;
-  const closed = leads.length - activeLeads.length;
-  const updated = dealerLeadAlertMap.size;
-  dealerLeadSummary.innerHTML = [
-    ["Active", activeLeads.length, "Current assigned work", "active"],
-    ["High priority", priority, "High or urgent leads", "priority"],
-    ["BUY", buyer, "Buyer inquiries from inventory", "buyer"],
-    ["SELL", seller, "Seller valuation leads", "seller"],
-    ["Vehicle alerts", vehicleAlerts, "Same-vehicle conflicts or inventory updates", "all"],
-    ["Needs follow-up", due, "Overdue or due today", "due"],
-    ["Closed", closed, "Done or moved to inventory", "closed"],
-    ["Updated", updated, "Changed since last refresh", "all"]
-  ].map(([label, value, hint, filter]) => `
-    <button type="button" data-dealer-summary-filter="${escapeHtml(filter || "all")}">
+function isDealerWaitingReply(lead) {
+  if (isDealerClosedLead(lead)) return false;
+  return String(lead?.status || "").toLowerCase() === "waiting_for_customer";
+}
+
+function isDealerCallNowLead(lead) {
+  if (isDealerClosedLead(lead)) return false;
+  return ["high", "urgent"].includes(String(lead?.priority || "").toLowerCase())
+    || isDealerLeadDueNow(lead?.next_follow_up_at || "", lead?.status || "new")
+    || String(lead?.status || "").toLowerCase() === "new";
+}
+
+function renderDealerSummaryCard(filter, tone, label, value, hint) {
+  return `
+    <button type="button" class="dealer-summary-card ${escapeHtml(tone)}" data-dealer-summary-filter="${escapeHtml(filter)}">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(String(value))}</strong>
       <small>${escapeHtml(hint)}</small>
     </button>
-  `).join("");
+  `;
+}
+
+function renderDealerLeadSummary(leads) {
+  if (!dealerLeadSummary) return;
+  const activeLeads = leads.filter((lead) => !isDealerClosedLead(lead));
+  const due = activeLeads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new")).length;
+  const callNow = activeLeads.filter(isDealerCallNowLead).length;
+  const vehicleAlerts = activeLeads.filter((lead) => lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market).length;
+  const waitingReplies = activeLeads.filter(isDealerWaitingReply).length;
+  const appointments = activeLeads.filter((lead) => ["appointment_booked", "inspection_booked"].includes(String(lead.status || "").toLowerCase())).length;
+  const closed = leads.length - activeLeads.length;
+  const updated = dealerLeadAlertMap.size;
+  dealerLeadSummary.innerHTML = `
+    ${renderDealerSummaryCard("active", "dealer-summary-total", "My queue", activeLeads.length, "All assigned active work")}
+    ${renderDealerSummaryCard("call-now", "dealer-summary-priority", "Call now", callNow, "New, high priority, or hot leads")}
+    ${renderDealerSummaryCard("due", "dealer-summary-due", "Due today", due, "Follow-up due or overdue")}
+    ${renderDealerSummaryCard("vehicle-alerts", "dealer-summary-alert", "Vehicle alerts", vehicleAlerts, "Same-vehicle inventory changes")}
+    ${renderDealerSummaryCard("all", "dealer-summary-appointment", "Appointments", appointments, "Booked buyer or seller meetings")}
+    ${renderDealerSummaryCard("waiting-reply", "dealer-summary-waiting", "Waiting reply", waitingReplies, "Waiting on customer response")}
+    ${renderDealerSummaryCard("closed", "dealer-summary-closed", "Closed", closed, "Done or moved to inventory")}
+    ${renderDealerSummaryCard("all", "dealer-summary-updated", "Updated", updated, "Changed since last refresh")}
+  `;
 }
 
 function renderDealerTodayWork(leads) {
   if (!dealerTodayWorkEl) return;
   const activeLeads = leads.filter((lead) => !isDealerClosedLead(lead));
-  const priorityLeads = activeLeads
-    .filter((lead) => ["high", "urgent"].includes(String(lead.priority || "").toLowerCase()))
+  const callNowLeads = activeLeads
+    .filter((lead) => isDealerCallNowLead(lead))
     .slice(0, 5);
   const dueLeads = activeLeads
     .filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"))
+    .slice(0, 5);
+  const waitingReplyLeads = activeLeads
+    .filter((lead) => isDealerWaitingReply(lead))
     .slice(0, 5);
   const vehicleAlertLeads = activeLeads
     .filter((lead) => lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market)
     .slice(0, 5);
   dealerTodayWorkEl.hidden = false;
-  const totalAttention = priorityLeads.length + dueLeads.length + vehicleAlertLeads.length;
+  const totalAttention = callNowLeads.length + dueLeads.length + waitingReplyLeads.length + vehicleAlertLeads.length;
   dealerTodayWorkEl.innerHTML = totalAttention ? `
     <header>
       <div>
         <span>Today</span>
         <strong>${totalAttention} task${totalAttention === 1 ? "" : "s"} to work first</strong>
       </div>
-      <button type="button" data-dealer-filter-shortcut="${vehicleAlertLeads.length ? "all" : priorityLeads.length ? "priority" : dueLeads.length ? "due" : "active"}">${vehicleAlertLeads.length ? "View alerts" : priorityLeads.length ? "View priority" : dueLeads.length ? "View due" : "View active"}</button>
+      <button type="button" data-dealer-filter-shortcut="${callNowLeads.length ? "call-now" : dueLeads.length ? "due" : "active"}">${callNowLeads.length ? "Open call now" : dueLeads.length ? "Open due" : "View active"}</button>
     </header>
     <div class="dealer-today-sections">
-      ${renderDealerTodaySection("Vehicle alerts", "Offer, sold, or off-market updates on the same vehicle", vehicleAlertLeads, "all")}
-      ${renderDealerTodaySection("Priority", "Urgent or high leads from owner", priorityLeads, "priority")}
-      ${renderDealerTodaySection("Due", "Overdue or due today", dueLeads, "due")}
+      ${renderDealerTodaySection("Call now", "New, urgent, or high-priority leads to contact first", callNowLeads, "call-now")}
+      ${renderDealerTodaySection("Due today", "Overdue or due follow-ups that should be touched today", dueLeads, "due")}
+      ${renderDealerTodaySection("Waiting reply", "Customers waiting for a callback, text, or answer", waitingReplyLeads, "waiting-reply")}
+      ${renderDealerTodaySection("Vehicle alerts", "Offer, sold, or off-market updates on the same vehicle", vehicleAlertLeads, "vehicle-alerts")}
     </div>
   ` : `
     <header>
@@ -1568,9 +1627,12 @@ function renderDealerTodayLeadButton(lead) {
 function filterDealerLeads(leads) {
   if (dealerLeadFilter === "active") return leads.filter((lead) => !isDealerClosedLead(lead));
   if (dealerLeadFilter === "closed") return leads.filter(isDealerClosedLead);
+  if (dealerLeadFilter === "call-now") return leads.filter(isDealerCallNowLead);
   if (dealerLeadFilter === "priority") return leads.filter((lead) => !isDealerClosedLead(lead) && ["high", "urgent"].includes(String(lead.priority || "").toLowerCase()));
   if (dealerLeadFilter === "buyer") return leads.filter((lead) => !isDealerClosedLead(lead) && isBuyerLead(lead));
   if (dealerLeadFilter === "seller") return leads.filter((lead) => !isDealerClosedLead(lead) && !isBuyerLead(lead));
+  if (dealerLeadFilter === "waiting-reply") return leads.filter(isDealerWaitingReply);
+  if (dealerLeadFilter === "vehicle-alerts") return leads.filter((lead) => !isDealerClosedLead(lead) && (lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market));
   if (dealerLeadFilter === "due") {
     return leads.filter((lead) => !isDealerClosedLead(lead) && isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"));
   }
