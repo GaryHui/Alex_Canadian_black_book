@@ -9,11 +9,14 @@ const reloadButton = document.querySelector("#reload-vehicle-clusters");
 const statusEl = document.querySelector("#vehicle-clusters-status");
 const overviewEl = document.querySelector("#vehicle-clusters-overview");
 const listEl = document.querySelector("#vehicle-clusters-list");
+const focusParams = new URLSearchParams(window.location.search);
 
 let supabaseClient = null;
 let adminSession = null;
 let turnstileGate = null;
 let clustersCache = [];
+let focusedLeadId = focusParams.get("leadId") || "";
+let focusedClusterKey = focusParams.get("cluster") || "";
 
 loginButton?.addEventListener("click", signInAdmin);
 logoutButton?.addEventListener("click", signOutAdmin);
@@ -137,6 +140,7 @@ async function loadVehicleClusters() {
   renderOverview(clustersCache);
   renderClusters(clustersCache);
   statusEl.textContent = `${clustersCache.length} vehicle cluster(s) loaded. ${clustersCache.filter((item) => Number(item.needs_review_count || 0) > 0).length} still need review.`;
+  highlightFocusedCluster();
 }
 
 function renderOverview(clusters) {
@@ -174,7 +178,8 @@ function renderClusters(clusters) {
     listEl.innerHTML = `<p>No duplicate vehicle clusters found right now.</p>`;
     return;
   }
-  listEl.innerHTML = clusters.map(renderClusterCard).join("");
+  const ordered = [...clusters].sort((a, b) => Number(clusterMatchesFocus(b)) - Number(clusterMatchesFocus(a)));
+  listEl.innerHTML = ordered.map(renderClusterCard).join("");
 }
 
 function renderClusterCard(cluster) {
@@ -182,7 +187,7 @@ function renderClusterCard(cluster) {
   const primaryLead = (cluster.seller_leads || []).find((lead) => lead.id === cluster.primary_lead_id) || null;
   const primaryListing = (cluster.inventory || []).find((listing) => listing.id === cluster.primary_listing_id) || cluster.inventory?.[0] || null;
   return `
-    <article class="vehicle-cluster-card">
+    <article class="vehicle-cluster-card ${clusterMatchesFocus(cluster) ? "vehicle-cluster-card-focus" : ""}" data-cluster-key="${escapeHtml(cluster.key || "")}">
       <header class="vehicle-cluster-head">
         <div>
           <span>Vehicle cluster</span>
@@ -201,7 +206,7 @@ function renderClusterCard(cluster) {
         <section class="vehicle-cluster-panel">
           <header>
             <span>Primary CRM</span>
-            <a href="/admin.html" target="_blank" rel="noreferrer">Open CRM</a>
+            <a href="${escapeHtml(primaryLead ? adminLeadUrl(primaryLead.id) : "/admin.html")}" target="_blank" rel="noreferrer">Open CRM</a>
           </header>
           ${primaryLead ? renderClusterLeadSummary(primaryLead, true) : `<p class="vehicle-cluster-empty">No primary seller lead chosen yet.</p>`}
         </section>
@@ -297,6 +302,7 @@ function renderClusterLeadSummary(lead, isPrimary) {
         lead.priority || "normal",
         relationText
       ].filter(Boolean).join(" | "))}</small>
+      <a class="vehicle-cluster-item-link" href="${escapeHtml(adminLeadUrl(lead.id))}" target="_blank" rel="noreferrer">Open in CRM</a>
     </article>
   `;
 }
@@ -312,6 +318,29 @@ function renderClusterListingSummary(listing) {
       ].filter(Boolean).join(" | "))}</small>
     </article>
   `;
+}
+
+function clusterMatchesFocus(cluster) {
+  if (focusedClusterKey && String(cluster?.key || "") === focusedClusterKey) return true;
+  if (!focusedLeadId) return false;
+  return [...(cluster?.seller_leads || []), ...(cluster?.buyer_leads || [])].some((lead) => String(lead?.id || "") === focusedLeadId)
+    || (cluster?.inventory || []).some((listing) => String(listing?.source_lead_id || "") === focusedLeadId);
+}
+
+function highlightFocusedCluster() {
+  const target = listEl?.querySelector(".vehicle-cluster-card-focus");
+  if (!target) return;
+  window.requestAnimationFrame(() => {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  if (focusedLeadId || focusedClusterKey) {
+    statusEl.textContent = `${statusEl.textContent} Focused vehicle cluster opened from the admin workbench.`;
+  }
+}
+
+function adminLeadUrl(leadId) {
+  const id = String(leadId || "").trim();
+  return id ? `/admin.html?leadId=${encodeURIComponent(id)}` : "/admin.html";
 }
 
 async function saveVehicleReview(button) {

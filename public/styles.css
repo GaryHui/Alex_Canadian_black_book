@@ -3268,8 +3268,69 @@ body.admin-drawer-open .admin-shell {
   margin: 0;
 }
 
+.vehicle-cluster-item-link {
+  color: #0b4f9c;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.vehicle-cluster-item-link:hover {
+  text-decoration: underline;
+}
+
 .vehicle-cluster-pending {
   border-left: 4px solid #f59e0b;
+}
+
+.vehicle-cluster-card-focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .18), 0 18px 42px rgba(37, 99, 235, .12);
+}
+
+.lead-collapsed-cluster {
+  align-items: center;
+  background: #f5f3ff;
+  border: 1px solid #c4b5fd;
+  border-left: 5px solid #7c3aed;
+  border-radius: 10px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 8px 0;
+  padding: 10px 12px;
+}
+
+.lead-collapsed-cluster div {
+  display: grid;
+  gap: 4px;
+}
+
+.lead-collapsed-cluster span {
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.lead-collapsed-cluster strong {
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.lead-collapsed-cluster small {
+  color: #64748b;
+}
+
+.lead-collapsed-cluster button {
+  background: #fff;
+  border: 1px solid #a78bfa;
+  border-radius: 999px;
+  color: #6d28d9;
+  font-size: 12px;
+  font-weight: 900;
+  min-height: 34px;
+  padding: 0 12px;
 }
 
 .vehicle-cluster-actions {

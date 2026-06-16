@@ -55,6 +55,7 @@ let activeAdminLeadId = "";
 let adminAttentionExpanded = false;
 let activeAdminDrawerLeadId = "";
 let adminDrawerActivityLoaded = false;
+let pendingAdminDeepLinkLeadId = new URLSearchParams(window.location.search).get("leadId") || "";
 
 reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", () => Promise.all([
@@ -680,6 +681,11 @@ async function loadLeads(options = {}) {
     statusEl.textContent = "Lead storage is not configured on this deployment. Add Supabase env vars to persist leads.";
   }
   await restoreOpenLeads(openIds, { forceActivity: Boolean(options.forceOpenActivity) });
+  if (pendingAdminDeepLinkLeadId) {
+    const leadId = pendingAdminDeepLinkLeadId;
+    pendingAdminDeepLinkLeadId = "";
+    await openAdminLeadFromAlert(leadId);
+  }
 }
 
 function collectAdminLeadAlerts(leads) {
@@ -1908,6 +1914,42 @@ function pickVisibleSellerLead(group) {
   })[0] || null;
 }
 
+function adminClusterMembersForLead(lead) {
+  const id = String(lead?.id || "").trim();
+  if (!id || isBuyerLead(lead)) return [];
+  const key = adminVehicleClusterKey(lead);
+  if (!key) return [];
+  return adminLeadsCache
+    .filter((item) => !isBuyerLead(item) && adminVehicleClusterKey(item) === key)
+    .sort(compareAdminLeadOrder);
+}
+
+function adminCollapsedSellerMembers(lead) {
+  const id = String(lead?.id || "").trim();
+  return adminClusterMembersForLead(lead).filter((item) => String(item.id || "").trim() !== id);
+}
+
+function adminVehicleClusterUrl(lead) {
+  const leadId = String(lead?.id || "").trim();
+  return leadId ? `/admin-vehicles.html?leadId=${encodeURIComponent(leadId)}` : "/admin-vehicles.html";
+}
+
+function renderCollapsedSellerMembersInline(lead) {
+  if (isBuyerLead(lead)) return "";
+  const hiddenMembers = adminCollapsedSellerMembers(lead);
+  if (!hiddenMembers.length) return "";
+  return `
+    <section class="lead-collapsed-cluster">
+      <div>
+        <span>Collapsed SELL leads</span>
+        <strong>${escapeHtml(`${hiddenMembers.length} more seller lead${hiddenMembers.length === 1 ? "" : "s"} folded into this vehicle card`)}</strong>
+        <small>${escapeHtml(hiddenMembers.slice(0, 3).map((item) => item.input?.email || item.auth_email || item.id || "Seller lead").join(" | "))}${hiddenMembers.length > 3 ? ` +${hiddenMembers.length - 3} more` : ""}</small>
+      </div>
+      <button type="button" data-admin-open-url="${escapeHtml(adminVehicleClusterUrl(lead))}">Open vehicle cluster</button>
+    </section>
+  `;
+}
+
 function adminVehicleClusterKey(lead) {
   const primaryId = String(lead?.vehicle_context?.primary_lead_id || "").trim();
   if (primaryId) return `primary:${primaryId}`;
@@ -2073,6 +2115,7 @@ function renderLead(lead, index = 0) {
       </section>` : "";
   const signalBanner = vehicleSignalInline(lead);
   const contextBanner = vehicleContextInline(lead);
+  const collapsedMembersBanner = renderCollapsedSellerMembersInline(lead);
   const mergeBanner = mergeStateInline(lead);
   const duplicateBanner = duplicateWarningInline(lead);
   const queueSummary = overdue
@@ -2163,6 +2206,7 @@ function renderLead(lead, index = 0) {
       ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${ownerReview.unread ? "Owner review required" : "New update on this lead"}</button>` : ""}
       ${signalBanner}
       ${contextBanner}
+      ${collapsedMembersBanner}
       ${mergeBanner}
       ${duplicateBanner}
       ${ownerReviewBanner}
@@ -2188,6 +2232,7 @@ function renderLead(lead, index = 0) {
               <span>Vehicle availability</span><b>${escapeHtml(vehicleContext.sold_elsewhere ? "Sold" : vehicleContext.off_market ? "Off market" : "Available / unknown")}</b>
               <span>Primary CRM lead</span><b>${escapeHtml(vehicleContext.primary_lead_title || vehicleContext.primary_lead_id || "-")}</b>
             </dl>
+            ${collapsedMembersBanner}
           </section>` : ""}
         <section class="lead-detail-section lead-detail-summary">
           <header>
@@ -2944,6 +2989,12 @@ leadsEl.addEventListener("click", async (event) => {
   const alertButton = event.target.closest("[data-admin-open-alert]");
   if (alertButton) {
     await openAdminLeadFromAlert(alertButton.dataset.adminOpenAlert || "");
+    return;
+  }
+
+  const openUrlButton = event.target.closest("[data-admin-open-url]");
+  if (openUrlButton) {
+    window.location.href = openUrlButton.dataset.adminOpenUrl || "/admin-vehicles.html";
     return;
   }
 
