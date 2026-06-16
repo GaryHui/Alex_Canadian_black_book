@@ -992,6 +992,8 @@ function filterAdminLeads(leads) {
   let filtered = leads;
   if (adminLeadFilter === "active") filtered = leads.filter((lead) => !isClosedLead(lead));
   if (adminLeadFilter === "closed") filtered = leads.filter(isClosedLead);
+  if (adminLeadFilter === "call-now") filtered = leads.filter(isAdminCallNowLead);
+  if (adminLeadFilter === "waiting-reply") filtered = leads.filter(isAdminWaitingReplyLead);
   if (adminLeadFilter === "owner-unread") filtered = leads.filter((lead) => Boolean(lead.owner_review?.unread));
   if (adminLeadFilter === "duplicate-review") filtered = leads.filter((lead) => !isClosedLead(lead) && Boolean(lead.duplicate_warning?.message) && !lead.duplicate_warning?.reviewed);
   if (adminLeadFilter === "buyer") filtered = leads.filter((lead) => !isClosedLead(lead) && isBuyerLead(lead));
@@ -1063,6 +1065,18 @@ function isAdminAppointmentLead(lead) {
   return ["appointment_booked", "inspection_booked"].includes(String(lead?.status || "").toLowerCase());
 }
 
+function isAdminWaitingReplyLead(lead) {
+  if (isClosedLead(lead)) return false;
+  return String(lead?.status || "").toLowerCase() === "waiting_for_customer";
+}
+
+function isAdminCallNowLead(lead) {
+  if (isClosedLead(lead)) return false;
+  return ["high", "urgent"].includes(String(lead?.priority || "").toLowerCase())
+    || isFollowUpDue(lead?.next_follow_up_at || "", lead?.status || "new")
+    || String(lead?.status || "").toLowerCase() === "new";
+}
+
 function adminLastTouchLabel(lead) {
   if (lead?.last_activity_at) return `Last touch ${formatDateTime(lead.last_activity_at)}`;
   if (lead?.created_at) return `Created ${formatDateTime(lead.created_at)}`;
@@ -1076,6 +1090,8 @@ function adminNextBestAction(lead) {
   if (lead?.owner_review?.unread) return "Read dealer update and confirm next manager step";
   if (!String(lead?.assigned_to || "").trim()) return "Assign an owner and start first contact";
   if (isOverdue(lead?.next_follow_up_at || "", status)) return "Call now and reset follow-up SLA";
+  if (isAdminWaitingReplyLead(lead)) return "Follow up on the pending reply before this goes cold";
+  if (isAdminAppointmentLead(lead)) return buyer ? "Confirm the buyer appointment and prep the next step" : "Confirm the inspection appointment and prep the appraisal";
   if (status === "new") return buyer ? "Call buyer and confirm vehicle interest" : "Call seller and confirm appraisal details";
   if (buyer && status === "contacted") return "Book appointment or send quote follow-up";
   if (!buyer && status === "contacted") return "Book inspection or confirm appraisal visit";
@@ -1091,6 +1107,8 @@ function renderAdminCommunicationStrip(lead) {
   if (lead?.vehicle_signal?.message) chips.push(lead.vehicle_signal.message);
   else if (lead?.vehicle_context?.has_active_offer) chips.push("Vehicle has active offer");
   else if (lead?.vehicle_context?.sold_elsewhere) chips.push("Vehicle already sold");
+  else if (isAdminAppointmentLead(lead)) chips.push("Appointment on the board");
+  else if (isAdminWaitingReplyLead(lead)) chips.push("Waiting for customer reply");
   else if (lead?.owner_review?.unread) chips.push("Owner review unread");
   return `
     <section class="lead-communication-strip">
@@ -1123,7 +1141,9 @@ function renderAdminOverview(leads) {
   const activeLeads = leads.filter((lead) => !isClosedLead(lead));
   const newCount = activeLeads.filter((lead) => String(lead.status || "").toLowerCase() === "new").length;
   const dueTodayCount = activeLeads.filter((lead) => isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).length;
+  const callNowCount = activeLeads.filter(isAdminCallNowLead).length;
   const staleCount = activeLeads.filter(isAdminStaleLead).length;
+  const waitingReplyCount = activeLeads.filter(isAdminWaitingReplyLead).length;
   const assignmentCount = activeLeads.filter((lead) => !String(lead.assigned_to || "").trim()).length;
   const duplicateReviewCount = activeLeads.filter((lead) => Boolean(lead.duplicate_warning?.message) && !lead.duplicate_warning?.reviewed).length;
   const handoffCount = activeLeads.filter(isAdminReadyForWarehouse).length;
@@ -1133,8 +1153,10 @@ function renderAdminOverview(leads) {
   const urgentCount = activeLeads.filter((lead) => String(lead.priority || "").toLowerCase() === "urgent").length;
   adminOverviewEl.innerHTML = `
     ${renderAdminOverviewCard("active", "overview-total", "Manager queue", activeLeads.length, "All active CRM work")}
+    ${renderAdminOverviewCard("call-now", "overview-urgent", "Call now", callNowCount, "Hot leads needing immediate touch")}
     ${renderAdminOverviewCard("needs-follow-up", "overview-follow", "Due today", dueTodayCount, "Call, text, or close next step")}
     ${renderAdminOverviewCard("stale", "overview-unassigned", "No response", staleCount, "No touch in the last 48h")}
+    ${renderAdminOverviewCard("waiting-reply", "overview-owner", "Waiting reply", waitingReplyCount, "Customer owes the next answer")}
     ${renderAdminOverviewCard("unassigned", "overview-unassigned", "Needs assignment", assignmentCount, "New leads waiting for owner")}
     ${renderAdminOverviewCard("duplicate-review", "overview-owner", "Duplicate vehicles", duplicateReviewCount, "SELL conflicts waiting for review")}
     ${renderAdminOverviewCard("seller", "overview-seller", "Ready for warehouse", handoffCount, "SELL leads ready to hand off")}
@@ -1155,6 +1177,10 @@ function renderAdminToday(leads) {
   const hiddenAttentionCount = Math.max(attention.length - visibleAttention.length, 0);
   const appointmentItems = leads
     .filter((lead) => isAdminAppointmentLead(lead))
+    .sort(compareAdminLeadOrder)
+    .slice(0, 4);
+  const waitingReplyItems = leads
+    .filter((lead) => isAdminWaitingReplyLead(lead))
     .sort(compareAdminLeadOrder)
     .slice(0, 4);
   const staleItems = leads
@@ -1233,7 +1259,7 @@ function renderAdminToday(leads) {
       <section class="admin-duplicate-panel admin-watch-panel">
         <header>
           <span>Manager watchlist</span>
-          <b>${duplicateItems.length + staleItems.length + ownerUnreadItems.length + appointmentItems.length}</b>
+          <b>${duplicateItems.length + staleItems.length + ownerUnreadItems.length + appointmentItems.length + waitingReplyItems.length}</b>
         </header>
         <div class="admin-watch-grid">
           <button type="button" class="admin-watch-tile" data-admin-set-filter="duplicate-review">
@@ -1256,6 +1282,11 @@ function renderAdminToday(leads) {
             <b>${appointmentItems.length}</b>
             <small>Booked buyer or seller meetings</small>
           </button>
+          <button type="button" class="admin-watch-tile" data-admin-set-filter="waiting-reply">
+            <span>Waiting reply</span>
+            <b>${waitingReplyItems.length}</b>
+            <small>Customer owes the next answer</small>
+          </button>
         </div>
         <div class="admin-today-actions">
           <button type="button" data-admin-set-filter="duplicate-review">
@@ -1266,7 +1297,11 @@ function renderAdminToday(leads) {
             <b>${appointmentItems.length}</b>
             <span>Open appointment queue</span>
           </button>
-          ${(duplicateItems.length || staleItems.length || appointmentItems.length) ? `<div class="admin-due-list">${duplicateItems.map(renderAdminDuplicateButton).join("")}${staleItems.map((lead) => renderAdminDueButton(lead, "No response")).join("")}${appointmentItems.map((lead) => renderAdminDueButton(lead, "Appointment")).join("")}</div>` : `
+          <button type="button" data-admin-set-filter="waiting-reply">
+            <b>${waitingReplyItems.length}</b>
+            <span>Open waiting reply queue</span>
+          </button>
+          ${(duplicateItems.length || staleItems.length || appointmentItems.length || waitingReplyItems.length) ? `<div class="admin-due-list">${duplicateItems.map(renderAdminDuplicateButton).join("")}${staleItems.map((lead) => renderAdminDueButton(lead, "No response")).join("")}${appointmentItems.map((lead) => renderAdminDueButton(lead, "Appointment")).join("")}${waitingReplyItems.map((lead) => renderAdminDueButton(lead, "Waiting"))}</div>` : `
             <div class="admin-today-empty">
               <b>No manager watch items waiting.</b>
               <span>Duplicate VINs, unread reviews, and stale leads will show here.</span>
@@ -1355,9 +1390,11 @@ function buildAdminAttentionItems(leads) {
   };
 
   leads.filter((lead) => !isClosedLead(lead) && String(lead.priority || "").toLowerCase() === "urgent").forEach((lead) => add(lead, "Urgent", "urgent"));
+  leads.filter((lead) => isAdminCallNowLead(lead)).forEach((lead) => add(lead, "Call now", "urgent"));
   leads.filter((lead) => !isClosedLead(lead) && isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).forEach((lead) => add(lead, "Follow-up due", "due"));
   leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim()).forEach((lead) => add(lead, "Needs assignment", "assign"));
   leads.filter((lead) => isAdminAppointmentLead(lead)).forEach((lead) => add(lead, "Appointment", "assign"));
+  leads.filter((lead) => isAdminWaitingReplyLead(lead)).forEach((lead) => add(lead, "Waiting reply", "assign"));
   leads.filter((lead) => !isClosedLead(lead) && String(lead.status || "").toLowerCase() === "new").forEach((lead) => add(lead, "New lead", "update"));
   leads.filter((lead) => isAdminStaleLead(lead)).forEach((lead) => add(lead, "No response", "update"));
   return items.slice(0, 8);
@@ -2006,7 +2043,7 @@ function renderAdminDrawer(leadId) {
         <div class="admin-drawer-comm-shortcuts">
           <button type="button" data-drawer-note-type="call">Call</button>
           <button type="button" data-drawer-note-type="sms">Text</button>
-          <button type="button" data-drawer-note-type="email">Email</button>
+          <button type="button" data-drawer-focus-email>Email</button>
           <button type="button" data-drawer-note-type="internal">Note</button>
         </div>
         <form class="lead-note-form admin-drawer-note-form">
@@ -2026,6 +2063,12 @@ function renderAdminDrawer(leadId) {
           <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
           <input name="dueAt" type="datetime-local" />
           <button type="submit">Add task</button>
+        </form>
+        <form class="lead-email-form admin-drawer-email-form">
+          <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
+          <input name="subject" placeholder="Email subject" />
+          <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
+          <button type="submit">Log email</button>
         </form>
       </section>
       <section class="admin-drawer-section">
@@ -2121,6 +2164,7 @@ function leadStatusActions(buyer, status) {
     ? [
         ["assigned", "Assign"],
         ["contacted", "Contacted"],
+        ["waiting_for_customer", "Waiting"],
         ["appointment_booked", "Appointment"],
         ["finance_sent", "Finance sent"],
         ["won", "Won"],
@@ -2129,6 +2173,7 @@ function leadStatusActions(buyer, status) {
     : [
         ["assigned", "Assign"],
         ["contacted", "Contacted"],
+        ["waiting_for_customer", "Waiting"],
         ["inspection_booked", "Inspection"],
         ["offer_sent", "Offer sent"],
         ["in_inventory", "In inventory"],
@@ -2673,6 +2718,13 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
     return;
   }
 
+  const focusEmailButton = event.target.closest("[data-drawer-focus-email]");
+  if (focusEmailButton) {
+    const field = adminLeadDrawerContent?.querySelector('.admin-drawer-email-form input[name="subject"]');
+    field?.focus();
+    return;
+  }
+
   const ownerReadButton = event.target.closest("[data-owner-read]");
   if (ownerReadButton) {
     await markOwnerReviewed(ownerReadButton);
@@ -2795,6 +2847,34 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
     statusEl.textContent = data.ok ? "Task saved." : (data.error || "Unable to save task.");
     if (data.ok) {
       taskForm.reset();
+      adminDrawerActivityLoaded = false;
+      await Promise.all([
+        loadAdminDrawerActivity({ force: true, highlightLatest: true }),
+        loadLeads({ suppressAlerts: true, forceOpenActivity: true })
+      ]);
+    }
+    return;
+  }
+
+  const emailForm = event.target.closest(".admin-drawer-email-form");
+  if (emailForm && activeAdminDrawerLeadId) {
+    event.preventDefault();
+    const payload = {
+      leadId: activeAdminDrawerLeadId,
+      type: "email",
+      ...Object.fromEntries(new FormData(emailForm).entries())
+    };
+    const response = await fetch("/api/lead-activity", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    statusEl.textContent = data.ok ? "Email logged." : (data.error || "Unable to log email.");
+    if (data.ok) {
+      emailForm.reset();
+      const recipient = emailForm.querySelector('input[name="sentTo"]');
+      if (recipient) recipient.value = payload.sentTo || "";
       adminDrawerActivityLoaded = false;
       await Promise.all([
         loadAdminDrawerActivity({ force: true, highlightLatest: true }),
@@ -3230,7 +3310,10 @@ function activityNoteLabel(type) {
     correction: "correction request",
     internal: "internal note",
     inspection: "inspection note",
-    offer: "offer note"
+    offer: "offer note",
+    call: "call note",
+    sms: "sms note",
+    email: "email note"
   };
   return labels[value] || value || "note";
 }

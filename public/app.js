@@ -309,6 +309,13 @@ dealerLeadDrawer?.addEventListener("click", async (event) => {
     return;
   }
 
+  const focusEmailButton = event.target.closest("[data-drawer-focus-email]");
+  if (focusEmailButton) {
+    const field = dealerLeadDrawerContent?.querySelector('.dealer-drawer-email-form input[name="subject"]');
+    field?.focus();
+    return;
+  }
+
   const completeButton = event.target.closest("[data-complete-dealer-task]");
   if (completeButton && activeDealerDrawerLeadId) {
     completeButton.disabled = true;
@@ -454,6 +461,41 @@ dealerLeadDrawer?.addEventListener("submit", async (event) => {
       ]);
     } catch (error) {
       dealerLeadsStatus.textContent = error.message || "Unable to save follow-up";
+    }
+    return;
+  }
+
+  const emailForm = event.target.closest(".dealer-drawer-email-form");
+  if (emailForm && activeDealerDrawerLeadId) {
+    event.preventDefault();
+    const payload = {
+      leadId: activeDealerDrawerLeadId,
+      type: "email",
+      ...Object.fromEntries(new FormData(emailForm).entries())
+    };
+    dealerLeadsStatus.textContent = "Logging email...";
+    try {
+      const response = await fetch("/api/lead-activity", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || "Unable to log email");
+      dealerLeadsStatus.textContent = "Email logged.";
+      emailForm.reset();
+      const recipient = emailForm.querySelector('input[name="sentTo"]');
+      if (recipient) recipient.value = payload.sentTo || "";
+      dealerDrawerActivityLoaded = false;
+      await Promise.all([
+        loadDealerDrawerActivity({ force: true, highlightLatest: true }),
+        loadDealerLeads({ forceActivity: true, suppressAlerts: true })
+      ]);
+    } catch (error) {
+      dealerLeadsStatus.textContent = error.message || "Unable to log email";
     }
   }
 });
@@ -1826,7 +1868,7 @@ function renderDealerDrawer(leadId) {
         <div class="dealer-drawer-comm-shortcuts">
           <button type="button" data-drawer-note-type="call">Call</button>
           <button type="button" data-drawer-note-type="sms">Text</button>
-          <button type="button" data-drawer-note-type="email">Email</button>
+          <button type="button" data-drawer-focus-email>Email</button>
           <button type="button" data-drawer-note-type="internal">Note</button>
         </div>
         <form class="dealer-note-form dealer-drawer-note-form">
@@ -1848,6 +1890,12 @@ function renderDealerDrawer(leadId) {
           <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
           <input name="dueAt" type="datetime-local" />
           <button type="submit">Add task</button>
+        </form>
+        <form class="lead-email-form dealer-email-form dealer-drawer-email-form">
+          <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
+          <input name="subject" placeholder="Email subject" />
+          <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
+          <button type="submit">Log email</button>
         </form>
       </section>
       <section class="dealer-drawer-section">
@@ -2212,6 +2260,7 @@ function dealerStatusActions(buyerLead, status) {
   const actions = buyerLead
     ? [
         ["contacted", "Mark contacted"],
+        ["waiting_for_customer", "Waiting"],
         ["appointment_booked", "Book appointment"],
         ["finance_sent", "Finance sent"],
         ["won", "Won"],
@@ -2219,6 +2268,7 @@ function dealerStatusActions(buyerLead, status) {
       ]
     : [
         ["contacted", "Mark contacted"],
+        ["waiting_for_customer", "Waiting"],
         ["inspection_booked", "Inspection booked"],
         ["offer_sent", "Offer sent"],
         ["in_inventory", "Moved to inventory"],
@@ -2616,25 +2666,51 @@ function renderDealerActivity(data, options = {}) {
   const notes = (data.notes || []).map((note) => `
     <article class="activity-item ${latestKey === `note:${note.id}` ? "activity-highlight" : ""}">
       <div>
-        <strong>${escapeHtml(note.note_type || "note")} by ${escapeHtml(note.author_email || "-")}</strong>
+        <strong>${escapeHtml(dealerActivityNoteLabel(note.note_type))} by ${escapeHtml(note.author_email || "-")}</strong>
         <span>${escapeHtml(formatDateTime(note.created_at))}</span>
         <p>${escapeHtml(note.note || "")}</p>
       </div>
     </article>
   `);
 
-  return [...tasks, ...notes].join("") || "<p>No activity yet.</p>";
+  const emails = (data.emails || []).map((email) => `
+    <article class="activity-item ${latestKey === `email:${email.id}` ? "activity-highlight" : ""}">
+      <div>
+        <strong>Email to ${escapeHtml(email.sent_to || "-")}</strong>
+        <span>${escapeHtml(email.subject || "")} - ${escapeHtml(formatDateTime(email.created_at))}</span>
+        <p>${escapeHtml(email.body || "")}</p>
+      </div>
+    </article>
+  `);
+
+  return [...tasks, ...notes, ...emails].join("") || "<p>No activity yet.</p>";
 }
 
 function latestDealerActivityKey(data) {
   const items = [
     ...(data.tasks || []).map((item) => ({ key: `task:${item.id}`, at: item.completed_at || item.created_at || item.due_at })),
-    ...(data.notes || []).map((item) => ({ key: `note:${item.id}`, at: item.created_at }))
+    ...(data.notes || []).map((item) => ({ key: `note:${item.id}`, at: item.created_at })),
+    ...(data.emails || []).map((item) => ({ key: `email:${item.id}`, at: item.created_at }))
   ];
   return items
     .map((item) => ({ ...item, time: new Date(item.at || 0).getTime() }))
     .filter((item) => item.key && !Number.isNaN(item.time))
     .sort((a, b) => b.time - a.time)[0]?.key || "";
+}
+
+function dealerActivityNoteLabel(type) {
+  const value = String(type || "note").trim().toLowerCase();
+  const labels = {
+    owner_review: "owner review request",
+    correction: "correction request",
+    internal: "internal note",
+    inspection: "inspection note",
+    offer: "offer note",
+    call: "call note",
+    sms: "sms note",
+    email: "email note"
+  };
+  return labels[value] || value || "note";
 }
 
 function highlightDealerLeadChangeAreas(card) {
