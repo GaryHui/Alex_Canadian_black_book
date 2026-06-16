@@ -1394,8 +1394,10 @@ function setActiveDealerLead(id) {
 
 function syncActiveDealerLeadCard() {
   const cards = [...dealerLeadsList.querySelectorAll(".dealer-lead-card")];
+  const hasMatch = Boolean(activeDealerLeadId) && cards.some((card) => card.dataset.leadId === activeDealerLeadId);
+  dealerLeadsList.classList.toggle("lead-focus-mode", hasMatch);
   cards.forEach((card) => {
-    card.classList.toggle("dealer-lead-card-current", Boolean(activeDealerLeadId) && card.dataset.leadId === activeDealerLeadId);
+    card.classList.toggle("dealer-lead-card-current", hasMatch && card.dataset.leadId === activeDealerLeadId);
   });
 }
 

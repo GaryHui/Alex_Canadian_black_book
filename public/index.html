@@ -67,10 +67,7 @@
         <p id="dealer-leads-status" class="status">Loading assigned leads...</p>
         <div id="dealer-leads-list" class="history-list dealer-leads-list"></div>
         </section>
-        </div>
-      </section>
-
-      <section id="dealer-valuation-tool" class="search-panel dealer-valuation-panel">
+        <section id="dealer-valuation-tool" class="search-panel dealer-valuation-panel">
         <details class="dealer-valuation-details">
           <summary>
             <span>
@@ -186,18 +183,28 @@
           <div id="inline-choice-list" class="choice-list inline-choice-list" hidden></div>
           <p class="admin-link"><a href="/admin.html" target="_blank" rel="noreferrer">View captured leads</a></p>
         </details>
-      </section>
+        </section>
 
-      <section id="history-panel" class="history-panel" hidden>
-        <div class="history-head">
-          <div>
-            <p class="eyebrow">My valuations</p>
-            <h2>Quote history</h2>
-          </div>
-          <button id="reload-history" type="button">Reload</button>
+        <section id="history-panel" class="history-panel dealer-history-panel" hidden>
+          <details class="dealer-history-details" open>
+            <summary>
+              <span>
+                <b>Quote history</b>
+                <small>Open when staff needs to review saved dealer valuations.</small>
+              </span>
+            </summary>
+            <div class="history-head">
+              <div>
+                <p class="eyebrow">My valuations</p>
+                <h2>Quote history</h2>
+              </div>
+              <button id="reload-history" type="button">Reload</button>
+            </div>
+            <p id="history-status" class="status">Loading quote history...</p>
+            <div id="history-list" class="history-list"></div>
+          </details>
+        </section>
         </div>
-        <p id="history-status" class="status">Loading quote history...</p>
-        <div id="history-list" class="history-list"></div>
       </section>
 
       <div id="search-modal" class="search-modal" hidden>

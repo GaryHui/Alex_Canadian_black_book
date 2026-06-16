@@ -867,9 +867,10 @@ function filterAdminLeads(leads) {
 
 function renderAdminOverview(leads) {
   if (!adminOverviewEl) return;
-  const buyerCount = leads.filter(isBuyerLead).length;
-  const sellerCount = leads.length - buyerCount;
-  const activeCount = leads.filter((lead) => !isClosedLead(lead)).length;
+  const activeLeads = leads.filter((lead) => !isClosedLead(lead));
+  const activeCount = activeLeads.length;
+  const activeBuyerCount = activeLeads.filter(isBuyerLead).length;
+  const activeSellerCount = activeLeads.length - activeBuyerCount;
   const closedCount = leads.length - activeCount;
   const ownerUnreadCount = leads.filter((lead) => Boolean(lead.owner_review?.unread)).length;
   const unassignedCount = leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim()).length;
@@ -879,7 +880,17 @@ function renderAdminOverview(leads) {
     <button class="admin-overview-card overview-total" type="button" data-admin-set-filter="active">
       <span>Active leads</span>
       <strong>${activeCount}</strong>
-      <small>${buyerCount} BUY / ${sellerCount} SELL</small>
+      <small>Owner queue</small>
+    </button>
+    <button class="admin-overview-card overview-buyer" type="button" data-admin-set-filter="buyer">
+      <span>BUY active</span>
+      <strong>${activeBuyerCount}</strong>
+      <small>Buyer inquiries</small>
+    </button>
+    <button class="admin-overview-card overview-seller" type="button" data-admin-set-filter="seller">
+      <span>SELL active</span>
+      <strong>${activeSellerCount}</strong>
+      <small>Seller valuations</small>
     </button>
     <button class="admin-overview-card overview-owner" type="button" data-admin-set-filter="owner-unread">
       <span>Owner unread</span>
@@ -1393,8 +1404,10 @@ function setActiveAdminLead(id) {
 
 function syncActiveAdminLeadCard() {
   const cards = [...leadsEl.querySelectorAll(".lead-card")];
+  const hasMatch = Boolean(activeAdminLeadId) && cards.some((card) => card.dataset.id === activeAdminLeadId);
+  leadsEl.classList.toggle("lead-focus-mode", hasMatch);
   cards.forEach((card) => {
-    card.classList.toggle("lead-card-current", Boolean(activeAdminLeadId) && card.dataset.id === activeAdminLeadId);
+    card.classList.toggle("lead-card-current", hasMatch && card.dataset.id === activeAdminLeadId);
   });
 }
 
