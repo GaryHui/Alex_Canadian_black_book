@@ -49,6 +49,7 @@ let adminLeadAlertMap = new Map();
 let adminLeadSnapshotReady = false;
 let dealerStaffEmails = [];
 let activeAdminLeadId = "";
+let adminAttentionExpanded = false;
 
 reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", () => Promise.all([
@@ -89,6 +90,13 @@ adminOverviewEl?.addEventListener("click", (event) => {
   document.querySelector("#crm-leads")?.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 adminTodayListEl?.addEventListener("click", async (event) => {
+  const toggleButton = event.target.closest("[data-admin-toggle-attention]");
+  if (toggleButton) {
+    adminAttentionExpanded = toggleButton.dataset.adminToggleAttention === "show";
+    renderAdminToday(adminLeadsCache);
+    return;
+  }
+
   const leadButton = event.target.closest("[data-admin-open-lead]");
   if (leadButton) {
     await openAdminLeadFromAlert(leadButton.dataset.adminOpenLead || "");
@@ -833,7 +841,7 @@ function renderLeadWorkbench(leads) {
   const closedCount = leads.length - activeCount;
   const searchLabel = adminLeadSearch.trim() ? ` Search: "${adminLeadSearch.trim()}".` : "";
   const sortLabel = adminLeadSort === "oldest" ? "Oldest first" : "Newest first";
-  statusEl.textContent = `${sorted.length} shown. ${activeCount} active / ${closedCount} closed. ${buyerCount} BUY / ${sellerCount} SELL. Sort: ${sortLabel}, with overdue and urgent pinned first.${searchLabel}`;
+  statusEl.textContent = `${sorted.length} shown. ${activeCount} active / ${closedCount} closed. ${buyerCount} BUY / ${sellerCount} SELL. Sort: ${sortLabel}, with urgent, overdue, and new pinned first.${searchLabel}`;
   leadsEl.innerHTML = renderLeadGroups(sorted);
   syncActiveAdminLeadCard();
 }
@@ -884,11 +892,12 @@ function sortAdminLeads(leads) {
 }
 
 function adminLeadPinnedRank(lead) {
-  if (isClosedLead(lead)) return 2;
+  if (isClosedLead(lead)) return 4;
   const status = lead.status || "new";
-  if (isOverdue(lead.next_follow_up_at || "", status)) return 0;
-  if (String(lead.priority || "").toLowerCase() === "urgent") return 1;
-  return 2;
+  if (String(lead.priority || "").toLowerCase() === "urgent") return 0;
+  if (isOverdue(lead.next_follow_up_at || "", status)) return 1;
+  if (String(status).toLowerCase() === "new") return 2;
+  return 3;
 }
 
 function leadCreatedTimestamp(lead) {
@@ -956,6 +965,9 @@ function renderAdminOverview(leads) {
 function renderAdminToday(leads) {
   if (!adminTodayListEl) return;
   const attention = buildAdminAttentionItems(leads);
+  const attentionLimit = 4;
+  const visibleAttention = adminAttentionExpanded ? attention : attention.slice(0, attentionLimit);
+  const hiddenAttentionCount = Math.max(attention.length - visibleAttention.length, 0);
   const dueItems = leads
     .filter((lead) => !isClosedLead(lead) && isFollowUpDue(lead.next_follow_up_at, lead.status || "new"))
     .sort((a, b) => new Date(a.next_follow_up_at || a.created_at || 0).getTime() - new Date(b.next_follow_up_at || b.created_at || 0).getTime())
@@ -963,7 +975,7 @@ function renderAdminToday(leads) {
   const draftCount = inventoryCache.filter((item) => ["draft", "review"].includes(String(item.status || "").toLowerCase())).length;
   const soldCount = inventoryCache.filter((item) => String(item.status || "").toLowerCase() === "sold").length;
   const attentionMarkup = attention.length
-    ? attention.map((item) => `
+    ? visibleAttention.map((item) => `
         <button type="button" class="admin-today-item admin-today-${escapeHtml(item.tone)}" data-admin-open-lead="${escapeHtml(item.id)}">
           <span>${escapeHtml(item.reason)}</span>
           <b>${escapeHtml(item.title)}</b>
@@ -974,15 +986,25 @@ function renderAdminToday(leads) {
         <b>No urgent lead work right now.</b>
         <span>Use CRM leads for the full pipeline or Inventory for warehouse work.</span>
       </div>`;
+  const attentionFooter = hiddenAttentionCount > 0 ? `
+      <button type="button" class="admin-today-more" data-admin-toggle-attention="show">
+        Show ${hiddenAttentionCount} more item${hiddenAttentionCount === 1 ? "" : "s"}
+      </button>
+    ` : adminAttentionExpanded && attention.length > attentionLimit ? `
+      <button type="button" class="admin-today-more" data-admin-toggle-attention="hide">
+        Show less
+      </button>
+    ` : "";
 
   adminTodayListEl.innerHTML = `
     <div class="admin-today-grid">
-      <section>
+      <section class="admin-attention-panel">
         <header>
           <span>Lead attention queue</span>
           <b>${attention.length}</b>
         </header>
         <div class="admin-today-items">${attentionMarkup}</div>
+        ${attentionFooter}
       </section>
       <section class="admin-due-panel">
         <header>
@@ -994,7 +1016,7 @@ function renderAdminToday(leads) {
             <b>${dueItems.length}</b>
             <span>Open all due follow-ups</span>
           </button>
-          ${dueItems.length ? dueItems.map(renderAdminDueButton).join("") : `
+          ${dueItems.length ? `<div class="admin-due-list">${dueItems.map(renderAdminDueButton).join("")}</div>` : `
             <div class="admin-today-empty">
               <b>No due leads right now.</b>
               <span>Next follow-up dates will show here for the owner desk.</span>
@@ -1029,9 +1051,12 @@ function renderAdminDueButton(lead) {
   const title = cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), buyer) || "Vehicle lead";
   const followUp = lead.next_follow_up_at ? formatDateTime(lead.next_follow_up_at) : "No next follow-up";
   return `
-    <button type="button" class="admin-today-item admin-today-due" data-admin-open-lead="${escapeHtml(lead.id || "")}">
-      <b>${escapeHtml(`${buyer ? "BUY" : "SELL"} - ${title}`)}</b>
-      <span>${escapeHtml(followUp)}</span>
+    <button type="button" class="admin-due-item" data-admin-open-lead="${escapeHtml(lead.id || "")}">
+      <span class="admin-due-type">${escapeHtml(buyer ? "BUY" : "SELL")}</span>
+      <div>
+        <b>${escapeHtml(title)}</b>
+        <small>${escapeHtml(followUp)}</small>
+      </div>
     </button>
   `;
 }
@@ -1058,9 +1083,9 @@ function buildAdminAttentionItems(leads) {
     });
   };
 
+  leads.filter((lead) => !isClosedLead(lead) && String(lead.priority || "").toLowerCase() === "urgent").forEach((lead) => add(lead, "Urgent", "urgent"));
   leads.filter((lead) => !isClosedLead(lead) && isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).forEach((lead) => add(lead, "Follow-up due", "due"));
   leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim()).forEach((lead) => add(lead, "Needs assignment", "assign"));
-  leads.filter((lead) => !isClosedLead(lead) && String(lead.priority || "").toLowerCase() === "urgent").forEach((lead) => add(lead, "Urgent", "urgent"));
   return items.slice(0, 8);
 }
 

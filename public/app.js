@@ -1221,7 +1221,7 @@ function renderDealerLeads(leads, role) {
   const activeCount = leads.filter((lead) => !isDealerClosedLead(lead)).length;
   const closedCount = leads.length - activeCount;
   const sortLabel = dealerLeadSort === "oldest" ? "Oldest first" : "Newest first";
-  dealerLeadsStatus.textContent = `${visibleLeads.length} shown. ${activeCount} active / ${closedCount} closed assigned lead${leads.length === 1 ? "" : "s"}. Sort: ${sortLabel}, with overdue and urgent pinned first.`;
+  dealerLeadsStatus.textContent = `${visibleLeads.length} shown. ${activeCount} active / ${closedCount} closed assigned lead${leads.length === 1 ? "" : "s"}. Sort: ${sortLabel}, with urgent, overdue, and new pinned first.`;
   dealerLeadsList.innerHTML = renderDealerLeadGroups(visibleLeads, (lead, index) => {
     const input = lead.input || {};
     const valuation = lead.valuation || {};
@@ -1534,11 +1534,12 @@ function sortDealerLeads(leads) {
 }
 
 function dealerLeadPinnedRank(lead) {
-  if (isDealerClosedLead(lead)) return 2;
+  if (isDealerClosedLead(lead)) return 4;
   const status = lead.status || "new";
-  if (isDealerLeadOverdue(lead.next_follow_up_at || "", status)) return 0;
-  if (String(lead.priority || "").toLowerCase() === "urgent") return 1;
-  return 2;
+  if (String(lead.priority || "").toLowerCase() === "urgent") return 0;
+  if (isDealerLeadOverdue(lead.next_follow_up_at || "", status)) return 1;
+  if (String(status).toLowerCase() === "new") return 2;
+  return 3;
 }
 
 function leadCreatedTimestamp(lead) {

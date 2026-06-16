@@ -5,6 +5,8 @@
   --line: #d8d8d8;
   --soft: #f3eeee;
   --sage: #a9bfb9;
+  --workbench-head-top: 10px;
+  --workbench-sidebar-top: 108px;
 }
 
 * {
@@ -66,7 +68,7 @@ select {
 .dealer-sidebar {
   align-self: start;
   position: sticky;
-  top: 18px;
+  top: var(--workbench-sidebar-top);
   z-index: 12;
 }
 
@@ -140,14 +142,40 @@ select {
   margin-top: 3px;
 }
 
-.dealer-page-links {
+.dealer-head {
+  align-items: center;
+  background: rgba(255, 255, 255, .96);
+  backdrop-filter: blur(10px);
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
   display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  margin: 24px 24px 0;
+  gap: 16px;
+  justify-content: space-between;
+  margin: 16px 24px 0;
+  padding: 16px 18px;
+  position: sticky;
+  top: var(--workbench-head-top);
+  z-index: 28;
 }
 
-.dealer-page-links a {
+.dealer-head h1 {
+  margin: 0;
+}
+
+.dealer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.dealer-actions span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.dealer-actions a {
   border: 1px solid #c7d2e1;
   border-radius: 6px;
   color: #0f3b78;
@@ -156,7 +184,7 @@ select {
   text-decoration: none;
 }
 
-.dealer-page-links a:hover {
+.dealer-actions a:hover {
   background: #eef6ff;
 }
 
@@ -1078,7 +1106,8 @@ select {
 
 .admin-head {
   align-items: center;
-  background: #fff;
+  background: rgba(255, 255, 255, .96);
+  backdrop-filter: blur(10px);
   border: 1px solid #d8e2ef;
   border-radius: 8px;
   display: flex;
@@ -1086,6 +1115,9 @@ select {
   justify-content: space-between;
   margin-bottom: 18px;
   padding: 16px 18px;
+  position: sticky;
+  top: var(--workbench-head-top);
+  z-index: 28;
 }
 
 .admin-actions {
@@ -1122,7 +1154,7 @@ select {
 .admin-sidebar {
   align-self: start;
   position: sticky;
-  top: 18px;
+  top: var(--workbench-sidebar-top);
   z-index: 12;
 }
 
@@ -1322,6 +1354,10 @@ select {
   gap: 8px;
 }
 
+.admin-attention-panel .admin-today-items {
+  align-content: start;
+}
+
 .admin-today-item,
 .admin-today-actions button {
   background: #fff;
@@ -1384,8 +1420,68 @@ select {
   border-color: #fcd34d !important;
 }
 
-.admin-due-actions .admin-today-item {
-  border-left-color: #f59e0b;
+.admin-due-actions {
+  align-content: start;
+}
+
+.admin-due-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-due-item {
+  align-items: center;
+  background: linear-gradient(180deg, #fffdf7 0%, #fff8eb 100%);
+  border: 1px solid #f4d28c;
+  border-radius: 10px;
+  color: #1f2937;
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 56px minmax(0, 1fr);
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.admin-due-item:hover {
+  border-color: #f59e0b;
+  box-shadow: 0 8px 20px rgba(217, 119, 6, .12);
+}
+
+.admin-due-type {
+  align-self: center;
+  background: #fff;
+  border: 1px solid #f6c35d;
+  border-radius: 999px;
+  color: #9a5b00;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 5px 8px;
+  text-align: center;
+}
+
+.admin-due-item b {
+  color: #17233a;
+  display: block;
+  font-size: 14px;
+  margin-bottom: 3px;
+}
+
+.admin-due-item small {
+  color: #7c5a13;
+  display: block;
+  font-size: 12px;
+}
+
+.admin-today-more {
+  background: #fff;
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  color: #1f3652;
+  cursor: pointer;
+  font-weight: 800;
+  min-height: 40px;
+  width: 100%;
 }
 
 .admin-today-actions button {
@@ -3671,7 +3767,7 @@ select {
 
   .admin-sidebar,
   .dealer-sidebar {
-    top: 0;
+    top: 84px;
   }
 
   .admin-module-nav,
@@ -3692,6 +3788,7 @@ select {
   }
 
   .admin-head,
+  .dealer-head,
   .admin-section-head {
     flex-direction: column;
   }
@@ -3710,6 +3807,15 @@ select {
   }
 
   .admin-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .dealer-head {
+    margin: 12px 16px 0;
+  }
+
+  .dealer-actions {
     justify-content: flex-start;
     width: 100%;
   }
