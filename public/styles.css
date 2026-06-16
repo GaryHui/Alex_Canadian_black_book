@@ -1266,7 +1266,7 @@ select {
 .admin-today-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: minmax(0, 1.7fr) minmax(280px, .9fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(260px, .85fr) minmax(260px, .9fr);
 }
 
 .admin-today-grid section {
@@ -1361,6 +1361,15 @@ select {
 .admin-today-actions {
   display: grid;
   gap: 8px;
+}
+
+.admin-due-panel {
+  background: #fffaf0 !important;
+  border-color: #fcd34d !important;
+}
+
+.admin-due-actions .admin-today-item {
+  border-left-color: #f59e0b;
 }
 
 .admin-today-actions button {
@@ -1626,6 +1635,46 @@ select {
   border: 1px solid #d8e2ef;
   border-radius: 8px;
   padding: 12px;
+}
+
+.lead-card-alt-even,
+.dealer-lead-card-alt-even {
+  background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
+  margin-right: 8px;
+}
+
+.lead-card-alt-odd,
+.dealer-lead-card-alt-odd {
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  margin-left: 8px;
+}
+
+.lead-card-current,
+.dealer-lead-card-current {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .18), 0 16px 36px rgba(37, 99, 235, .12);
+  position: relative;
+}
+
+.lead-card-current::before,
+.dealer-lead-card-current::before {
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+  border-radius: 999px;
+  color: #fff;
+  content: "CURRENT";
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  padding: 5px 8px;
+  position: absolute;
+  right: 12px;
+  top: -11px;
+}
+
+.lead-card-current .lead-manage,
+.dealer-lead-card-current .dealer-lead-details {
+  border-color: #93c5fd;
+  box-shadow: inset 0 0 0 1px rgba(147, 197, 253, .45);
 }
 
 .lead-overdue {
@@ -2103,6 +2152,37 @@ select {
 
 .lead-progress li.closed span {
   background: #e11d48;
+}
+
+.lead-shared-meta {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 8px 0 10px;
+}
+
+.lead-shared-meta div {
+  background: rgba(248, 250, 252, .92);
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 9px 10px;
+}
+
+.lead-shared-meta dt {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.lead-shared-meta dd {
+  color: #16243a;
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .dealer-follow-up-actions {
@@ -3456,6 +3536,7 @@ select {
   .lead-summary,
   .owner-review,
   .lead-workspace-grid,
+  .lead-shared-meta,
   .lead-photo-manager,
   .inventory-publish-form,
   .inventory-photo-upload,
@@ -3486,6 +3567,14 @@ select {
 
   .dealer-lead-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lead-card-alt-even,
+  .lead-card-alt-odd,
+  .dealer-lead-card-alt-even,
+  .dealer-lead-card-alt-odd {
+    margin-left: 0;
+    margin-right: 0;
   }
 
   .inventory-photo-picker label {

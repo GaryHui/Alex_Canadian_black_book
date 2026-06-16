@@ -46,6 +46,7 @@ let adminLeadTokenMap = new Map();
 let adminLeadAlertMap = new Map();
 let adminLeadSnapshotReady = false;
 let dealerStaffEmails = [];
+let activeAdminLeadId = "";
 
 reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", () => Promise.all([
@@ -800,6 +801,7 @@ async function openAdminLeadFromAlert(id) {
   }
   const card = leadsEl.querySelector(`.lead-card[data-id="${cssEscape(id)}"]`);
   if (!card) return;
+  setActiveAdminLead(id);
   const lead = adminLeadsCache.find((item) => String(item.id || "") === id);
   if (!lead?.owner_review?.unread) {
     markAdminLeadTokenRead(id);
@@ -825,6 +827,7 @@ function renderLeadWorkbench(leads) {
   const searchLabel = adminLeadSearch.trim() ? ` Search: "${adminLeadSearch.trim()}".` : "";
   statusEl.textContent = `${filtered.length} shown. ${activeCount} active / ${closedCount} closed. ${buyerCount} BUY / ${sellerCount} SELL.${searchLabel}`;
   leadsEl.innerHTML = renderLeadGroups(filtered);
+  syncActiveAdminLeadCard();
 }
 
 function setAdminLeadFilter(filter) {
@@ -910,6 +913,10 @@ function renderAdminOverview(leads) {
 function renderAdminToday(leads) {
   if (!adminTodayListEl) return;
   const attention = buildAdminAttentionItems(leads);
+  const dueItems = leads
+    .filter((lead) => !isClosedLead(lead) && isFollowUpDue(lead.next_follow_up_at, lead.status || "new"))
+    .sort((a, b) => new Date(a.next_follow_up_at || a.created_at || 0).getTime() - new Date(b.next_follow_up_at || b.created_at || 0).getTime())
+    .slice(0, 6);
   const draftCount = inventoryCache.filter((item) => ["draft", "review"].includes(String(item.status || "").toLowerCase())).length;
   const soldCount = inventoryCache.filter((item) => String(item.status || "").toLowerCase() === "sold").length;
   const attentionMarkup = attention.length
@@ -934,6 +941,24 @@ function renderAdminToday(leads) {
         </header>
         <div class="admin-today-items">${attentionMarkup}</div>
       </section>
+      <section class="admin-due-panel">
+        <header>
+          <span>DUE</span>
+          <b>${dueItems.length}</b>
+        </header>
+        <div class="admin-today-actions admin-due-actions">
+          <button type="button" data-admin-set-filter="needs-follow-up">
+            <b>${dueItems.length}</b>
+            <span>Open all due follow-ups</span>
+          </button>
+          ${dueItems.length ? dueItems.map(renderAdminDueButton).join("") : `
+            <div class="admin-today-empty">
+              <b>No due leads right now.</b>
+              <span>Next follow-up dates will show here for the owner desk.</span>
+            </div>
+          `}
+        </div>
+      </section>
       <section>
         <header>
           <span>Warehouse decisions</span>
@@ -951,6 +976,20 @@ function renderAdminToday(leads) {
         </div>
       </section>
     </div>
+  `;
+}
+
+function renderAdminDueButton(lead) {
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+  const buyer = isBuyerLead(lead);
+  const title = cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), buyer) || "Vehicle lead";
+  const followUp = lead.next_follow_up_at ? formatDateTime(lead.next_follow_up_at) : "No next follow-up";
+  return `
+    <button type="button" class="admin-today-item admin-today-due" data-admin-open-lead="${escapeHtml(lead.id || "")}">
+      <b>${escapeHtml(`${buyer ? "BUY" : "SELL"} - ${title}`)}</b>
+      <span>${escapeHtml(followUp)}</span>
+    </button>
   `;
 }
 
@@ -1006,7 +1045,7 @@ function renderLeadGroups(leads) {
         <b>${group.leads.length}</b>
       </header>
       <div class="lead-group-list">
-        ${group.leads.map(renderLead).join("")}
+        ${group.leads.map((lead, index) => renderLead(lead, index)).join("")}
       </div>
     </section>
   `).join("");
@@ -1099,7 +1138,7 @@ function cleanLeadTitle(title, buyer) {
   return buyer ? value.replace(/^Buyer inquiry\s*-\s*/i, "") : value;
 }
 
-function renderLead(lead) {
+function renderLead(lead, index = 0) {
   const input = lead.input || {};
   const authUser = lead.auth_user || {};
   const valuation = lead.valuation || {};
@@ -1118,6 +1157,7 @@ function renderLead(lead) {
   const ownerReview = lead.owner_review || {};
   const purchase = input.buyerPlan || valuation.buyerPlan || {};
   const followUp = lead.next_follow_up_at || "";
+  const lastActivity = lead.last_activity_at || "";
   const overdue = isOverdue(followUp, status);
   const statusClass = overdue ? "status-overdue" : `status-${cssToken(status)}`;
   const statusLabel = overdue ? "Overdue" : leadStatusLabel(status, buyer);
@@ -1186,8 +1226,18 @@ function renderLead(lead) {
       <section class="owner-review-read">
         <span>Owner reviewed ${escapeHtml(formatDateTime(ownerReview.read_at))}${ownerReview.read_by ? ` by ${escapeHtml(ownerReview.read_by)}` : ""}</span>
       </section>` : "";
+  const sharedMeta = renderSharedLeadMeta({
+    customerEmail,
+    phone: input.phone || "-",
+    vin,
+    assignedTo,
+    priority,
+    followUp,
+    lastActivity,
+    leadTypeLabel
+  });
   return `
-    <article class="lead-card lead-card-${leadType} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "lead-card-updated" : ""}" data-id="${escapeHtml(lead.id || "")}">
+    <article class="lead-card lead-card-${leadType} lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "lead-card-updated" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <header class="lead-summary">
         <div>
           <div class="lead-title-row">
@@ -1208,6 +1258,7 @@ function renderLead(lead) {
       </header>
       ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${ownerReview.unread ? "Owner review required" : "New update on this lead"}</button>` : ""}
       ${ownerReviewBanner}
+      ${sharedMeta}
       ${progressSteps}
       ${quickAssign}
       ${actionButtons ? `<div class="lead-action-row">${actionButtons}</div>` : ""}
@@ -1309,6 +1360,42 @@ function renderLead(lead) {
       </details>
     </article>
   `;
+}
+
+function renderSharedLeadMeta({
+  customerEmail,
+  phone,
+  vin,
+  assignedTo,
+  priority,
+  followUp,
+  lastActivity,
+  leadTypeLabel
+}) {
+  return `
+    <dl class="lead-shared-meta">
+      <div><dt>Customer</dt><dd>${escapeHtml(customerEmail || "-")}</dd></div>
+      <div><dt>Phone</dt><dd>${escapeHtml(phone || "-")}</dd></div>
+      <div><dt>VIN</dt><dd>${escapeHtml(vin || "-")}</dd></div>
+      <div><dt>Lead type</dt><dd>${escapeHtml(leadTypeLabel || "-")}</dd></div>
+      <div><dt>Owner</dt><dd>${escapeHtml(assignedTo || "Unassigned")}</dd></div>
+      <div><dt>Priority</dt><dd>${escapeHtml(priority || "normal")}</dd></div>
+      <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "Not set")}</dd></div>
+      <div><dt>Last activity</dt><dd>${escapeHtml(lastActivity ? formatDateTime(lastActivity) : "No recent activity")}</dd></div>
+    </dl>
+  `;
+}
+
+function setActiveAdminLead(id) {
+  activeAdminLeadId = String(id || "").trim();
+  syncActiveAdminLeadCard();
+}
+
+function syncActiveAdminLeadCard() {
+  const cards = [...leadsEl.querySelectorAll(".lead-card")];
+  cards.forEach((card) => {
+    card.classList.toggle("lead-card-current", Boolean(activeAdminLeadId) && card.dataset.id === activeAdminLeadId);
+  });
 }
 
 function leadStatusOptions(buyer) {
@@ -1754,6 +1841,8 @@ leadsEl.addEventListener("submit", async (event) => {
 });
 
 leadsEl.addEventListener("click", async (event) => {
+  const clickedCard = event.target.closest(".lead-card");
+  if (clickedCard?.dataset?.id) setActiveAdminLead(clickedCard.dataset.id);
   const alertButton = event.target.closest("[data-admin-open-alert]");
   if (alertButton) {
     await openAdminLeadFromAlert(alertButton.dataset.adminOpenAlert || "");
@@ -1959,6 +2048,7 @@ leadsEl.addEventListener("toggle", async (event) => {
 
   const card = details.closest(".lead-card");
   if (!card) return;
+  if (card.dataset.id) setActiveAdminLead(card.dataset.id);
   if (card.dataset.id && adminLeadAlertMap.has(card.dataset.id)) {
     const lead = adminLeadsCache.find((item) => String(item.id || "") === String(card.dataset.id));
     if (!lead?.owner_review?.unread) markAdminLeadTokenRead(card.dataset.id);
@@ -1969,6 +2059,11 @@ leadsEl.addEventListener("toggle", async (event) => {
   if (card.dataset.activityLoaded === "true") return;
   await loadLeadActivity(card, { force: true });
 }, true);
+
+leadsEl.addEventListener("focusin", (event) => {
+  const card = event.target.closest(".lead-card");
+  if (card?.dataset?.id) setActiveAdminLead(card.dataset.id);
+});
 
 async function deleteSingleLead(button) {
   const id = button.dataset.deleteLead || "";
