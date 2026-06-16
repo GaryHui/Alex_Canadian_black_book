@@ -1274,6 +1274,18 @@ select {
   border-left-color: #f59e0b;
 }
 
+.admin-section-leads {
+  background: linear-gradient(180deg, #fff8f8 0%, #ffffff 100%);
+  border-color: #f3d5d8;
+  border-left-color: #ef4444;
+}
+
+.admin-section-inventory {
+  background: linear-gradient(180deg, #f3fbfa 0%, #ffffff 100%);
+  border-color: #cbe7e4;
+  border-left-color: #0f766e;
+}
+
 .admin-section-head {
   align-items: center;
   display: flex;

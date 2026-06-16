@@ -882,13 +882,15 @@ function filterAdminLeads(leads) {
 }
 
 function sortAdminLeads(leads) {
-  return [...leads].sort((a, b) => {
-    const pinnedDiff = adminLeadPinnedRank(a) - adminLeadPinnedRank(b);
-    if (pinnedDiff) return pinnedDiff;
-    const timeDiff = leadCreatedTimestamp(b) - leadCreatedTimestamp(a);
-    if (timeDiff) return adminLeadSort === "oldest" ? -timeDiff : timeDiff;
-    return String(b.id || "").localeCompare(String(a.id || ""));
-  });
+  return [...leads].sort(compareAdminLeadOrder);
+}
+
+function compareAdminLeadOrder(a, b) {
+  const pinnedDiff = adminLeadPinnedRank(a) - adminLeadPinnedRank(b);
+  if (pinnedDiff) return pinnedDiff;
+  const timeDiff = leadCreatedTimestamp(b) - leadCreatedTimestamp(a);
+  if (timeDiff) return adminLeadSort === "oldest" ? -timeDiff : timeDiff;
+  return String(b.id || "").localeCompare(String(a.id || ""));
 }
 
 function adminLeadPinnedRank(lead) {
@@ -1102,7 +1104,9 @@ function renderLeadGroups(leads) {
   const groups = [
     { title: "BUY - Buyer leads", caption: "People asking about vehicles on the Buy page.", leads: buyerLeads, kind: "buyer" },
     { title: "SELL - Seller leads", caption: "People submitting vehicles for valuation or sale.", leads: sellerLeads, kind: "seller" }
-  ].filter((group) => group.leads.length);
+  ]
+    .filter((group) => group.leads.length)
+    .sort((a, b) => compareAdminLeadOrder(a.leads[0], b.leads[0]));
   return groups.map((group) => `
     <section class="lead-group lead-group-${group.kind}">
       <header class="lead-group-head">
