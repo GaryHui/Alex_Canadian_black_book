@@ -280,6 +280,10 @@ dealerLeadsList?.addEventListener("focusin", (event) => {
 });
 
 dealerLeadDrawer?.addEventListener("click", async (event) => {
+  if (event.target === dealerLeadDrawer || event.target.classList.contains("dealer-lead-drawer-panel")) {
+    closeDealerDrawer();
+    return;
+  }
   const closeButton = event.target.closest("[data-dealer-drawer-close]");
   if (closeButton) {
     closeDealerDrawer();
@@ -1952,7 +1956,7 @@ function renderDealerDrawer(leadId) {
       <section class="dealer-drawer-section">
         <header>
           <h3>Quick follow-up</h3>
-          <span>Move the lead forward without opening the full card</span>
+          <span>Move the lead forward without opening the full CRM card</span>
         </header>
         <div class="dealer-lead-actions dealer-drawer-actions">
           ${actionButtons}
@@ -1964,8 +1968,8 @@ function renderDealerDrawer(leadId) {
       ${renderDealerDealChecklistSection(lead)}
       <section class="dealer-drawer-section">
         <header>
-          <h3>Communication hub</h3>
-          <span>Call, text, email, note, and task from one place</span>
+          <h3>Log touch</h3>
+          <span>Record the latest customer touch, then review recent activity below</span>
         </header>
         <div class="dealer-drawer-comm-shortcuts">
           <button type="button" data-drawer-note-type="call">Call</button>
@@ -1986,23 +1990,26 @@ function renderDealerDrawer(leadId) {
           <textarea name="note" placeholder="Record the latest customer touch, inspection result, correction, or quote update..."></textarea>
           <button type="submit">Save note</button>
         </form>
-        <form class="dealer-task-form dealer-drawer-task-form">
-          <input name="title" placeholder="Next task" />
-          <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to dealer email" />
-          <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
-          <input name="dueAt" type="datetime-local" />
-          <button type="submit">Add task</button>
-        </form>
-        <form class="lead-email-form dealer-email-form dealer-drawer-email-form">
-          <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
-          <input name="subject" placeholder="Email subject" />
-          <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
-          <button type="submit">Log email</button>
-        </form>
+        <details class="drawer-secondary-forms">
+          <summary>Task and email tools</summary>
+          <form class="dealer-task-form dealer-drawer-task-form">
+            <input name="title" placeholder="Next task" />
+            <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to dealer email" />
+            <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
+            <input name="dueAt" type="datetime-local" />
+            <button type="submit">Add task</button>
+          </form>
+          <form class="lead-email-form dealer-email-form dealer-drawer-email-form">
+            <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
+            <input name="subject" placeholder="Email subject" />
+            <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
+            <button type="submit">Log email</button>
+          </form>
+        </details>
       </section>
       <section class="dealer-drawer-section">
         <header>
-          <h3>Activity timeline</h3>
+          <h3>Recent activity</h3>
           <button type="button" data-drawer-load-dealer-activity>Refresh</button>
         </header>
         <div class="dealer-activity-list dealer-drawer-activity-list">Activity not loaded yet.</div>
@@ -2036,7 +2043,7 @@ async function loadDealerDrawerActivity(options = {}) {
     const data = await response.json();
     if (!data.ok) throw new Error(data.error || "Unable to load activity");
     dealerDrawerActivityLoaded = true;
-    list.innerHTML = renderDealerActivity(data, { highlightLatest: Boolean(options.highlightLatest) });
+    list.innerHTML = renderDealerActivity(data, { highlightLatest: Boolean(options.highlightLatest), limit: 8 });
   } catch (error) {
     list.textContent = error.message || "Unable to load activity";
   }
@@ -2673,6 +2680,7 @@ async function openFullDealerLeadFromDrawer() {
   if (!activeDealerDrawerLeadId) return;
   const target = dealerLeadsList.querySelector(`.dealer-lead-card[data-lead-id="${cssEscape(activeDealerDrawerLeadId)}"]`);
   if (!target) return;
+  closeDealerDrawer();
   target.scrollIntoView({ behavior: "smooth", block: "center" });
   setActiveDealerLead(activeDealerDrawerLeadId);
   const details = target.querySelector(".dealer-lead-details");
@@ -2888,43 +2896,57 @@ async function loadDealerActivity(card, options = {}) {
 
 function renderDealerActivity(data, options = {}) {
   const latestKey = options.highlightLatest ? latestDealerActivityKey(data) : "";
-  const tasks = (data.tasks || []).map((task) => {
-    const dueText = task.due_at ? ` - Due ${escapeHtml(formatDateTime(task.due_at))}` : " - No due date";
-    const action = task.completed_at
-      ? `<span class="task-complete-note">Completed ${escapeHtml(formatDateTime(task.completed_at))}</span>`
-      : `<button type="button" data-complete-dealer-task="${escapeHtml(task.id || "")}">Mark complete</button>`;
-    return `
-      <article class="activity-item ${task.completed_at ? "activity-done" : ""} ${latestKey === `task:${task.id}` ? "activity-highlight" : ""}">
-        <div>
-          <strong>${escapeHtml(task.title || "Task")}</strong>
-          <span>Assigned to ${escapeHtml(task.assigned_to || "unassigned")}${dueText}</span>
-        </div>
-        ${action}
-      </article>
-    `;
-  });
-
-  const notes = (data.notes || []).map((note) => `
-    <article class="activity-item ${latestKey === `note:${note.id}` ? "activity-highlight" : ""}">
-      <div>
-        <strong>${escapeHtml(dealerActivityNoteLabel(note.note_type))} by ${escapeHtml(note.author_email || "-")}</strong>
-        <span>${escapeHtml(formatDateTime(note.created_at))}</span>
-        <p>${escapeHtml(formatDealerActivityNoteText(note.note || ""))}</p>
-      </div>
-    </article>
-  `);
-
-  const emails = (data.emails || []).map((email) => `
-    <article class="activity-item ${latestKey === `email:${email.id}` ? "activity-highlight" : ""}">
-      <div>
-        <strong>Email to ${escapeHtml(email.sent_to || "-")}</strong>
-        <span>${escapeHtml(email.subject || "")} - ${escapeHtml(formatDateTime(email.created_at))}</span>
-        <p>${escapeHtml(email.body || "")}</p>
-      </div>
-    </article>
-  `);
-
-  return [...tasks, ...notes, ...emails].join("") || "<p>No activity yet.</p>";
+  const items = [
+    ...(data.tasks || []).map((task) => {
+      const dueText = task.due_at ? ` - Due ${escapeHtml(formatDateTime(task.due_at))}` : " - No due date";
+      const action = task.completed_at
+        ? `<span class="task-complete-note">Completed ${escapeHtml(formatDateTime(task.completed_at))}</span>`
+        : `<button type="button" data-complete-dealer-task="${escapeHtml(task.id || "")}">Mark complete</button>`;
+      return {
+        key: `task:${task.id}`,
+        time: new Date(task.completed_at || task.created_at || task.due_at || 0).getTime(),
+        render: `
+          <article class="activity-item ${task.completed_at ? "activity-done" : ""} ${latestKey === `task:${task.id}` ? "activity-highlight" : ""}">
+            <div>
+              <strong>${escapeHtml(task.title || "Task")}</strong>
+              <span>Assigned to ${escapeHtml(task.assigned_to || "unassigned")}${dueText}</span>
+            </div>
+            ${action}
+          </article>
+        `
+      };
+    }),
+    ...(data.notes || []).map((note) => ({
+      key: `note:${note.id}`,
+      time: new Date(note.created_at || 0).getTime(),
+      render: `
+        <article class="activity-item ${latestKey === `note:${note.id}` ? "activity-highlight" : ""}">
+          <div>
+            <strong>${escapeHtml(dealerActivityNoteLabel(note.note_type))} by ${escapeHtml(note.author_email || "-")}</strong>
+            <span>${escapeHtml(formatDateTime(note.created_at))}</span>
+            <p>${escapeHtml(formatDealerActivityNoteText(note.note || ""))}</p>
+          </div>
+        </article>
+      `
+    })),
+    ...(data.emails || []).map((email) => ({
+      key: `email:${email.id}`,
+      time: new Date(email.created_at || 0).getTime(),
+      render: `
+        <article class="activity-item ${latestKey === `email:${email.id}` ? "activity-highlight" : ""}">
+          <div>
+            <strong>Email to ${escapeHtml(email.sent_to || "-")}</strong>
+            <span>${escapeHtml(email.subject || "")} - ${escapeHtml(formatDateTime(email.created_at))}</span>
+            <p>${escapeHtml(email.body || "")}</p>
+          </div>
+        </article>
+      `
+    }))
+  ]
+    .filter((item) => !Number.isNaN(item.time))
+    .sort((a, b) => b.time - a.time);
+  const limited = Number(options.limit || 0) > 0 ? items.slice(0, Number(options.limit)) : items;
+  return limited.map((item) => item.render).join("") || "<p>No activity yet.</p>";
 }
 
 function latestDealerActivityKey(data) {

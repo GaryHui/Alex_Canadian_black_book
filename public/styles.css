@@ -113,21 +113,26 @@ body.dealer-drawer-open .dealer-app-shell {
 
 .dealer-lead-drawer {
   bottom: 0;
+  left: 0;
   position: fixed;
   right: 0;
   top: 0;
-  width: 420px;
+  width: auto;
   z-index: 34;
 }
 
 .dealer-lead-drawer-panel {
-  background: rgba(15, 23, 42, .12);
+  align-items: stretch;
+  background: rgba(15, 23, 42, .18);
+  display: flex;
   height: 100%;
-  padding: 18px 18px 18px 0;
+  justify-content: flex-end;
+  padding: 18px;
 }
 
 .dealer-lead-drawer-content {
   height: 100%;
+  width: min(420px, calc(100vw - 24px));
 }
 
 .dealer-drawer-shell {
@@ -1339,21 +1344,26 @@ body.admin-drawer-open .admin-shell {
 
 .admin-lead-drawer {
   bottom: 0;
+  left: 0;
   position: fixed;
   right: 0;
   top: 0;
-  width: 420px;
+  width: auto;
   z-index: 34;
 }
 
 .admin-lead-drawer-panel {
-  background: rgba(15, 23, 42, .12);
+  align-items: stretch;
+  background: rgba(15, 23, 42, .18);
+  display: flex;
   height: 100%;
-  padding: 18px 18px 18px 0;
+  justify-content: flex-end;
+  padding: 18px;
 }
 
 .admin-lead-drawer-content {
   height: 100%;
+  width: min(420px, calc(100vw - 24px));
 }
 
 .admin-drawer-shell {
@@ -1449,6 +1459,30 @@ body.admin-drawer-open .admin-shell {
 .admin-drawer-stat small,
 .admin-drawer-empty {
   color: #64748b;
+}
+
+.drawer-secondary-forms {
+  background: #f8fafc;
+  border: 1px solid #d8e2ef;
+  border-radius: 10px;
+  margin-top: 10px;
+  padding: 10px;
+}
+
+.drawer-secondary-forms summary {
+  color: #334155;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  list-style: none;
+}
+
+.drawer-secondary-forms summary::-webkit-details-marker {
+  display: none;
+}
+
+.drawer-secondary-forms[open] summary {
+  margin-bottom: 10px;
 }
 
 .admin-drawer-owner-review {

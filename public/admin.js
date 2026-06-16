@@ -2438,7 +2438,7 @@ function renderAdminDrawer(leadId) {
       <section class="admin-drawer-section">
         <header>
           <h3>Pipeline actions</h3>
-          <span>Fast status updates from the manager desk</span>
+          <span>Move the lead without opening the full CRM card</span>
         </header>
         <div class="lead-action-row admin-drawer-actions">
           ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
@@ -2447,8 +2447,8 @@ function renderAdminDrawer(leadId) {
       ${renderAdminDealChecklistSection(lead)}
       <section class="admin-drawer-section">
         <header>
-          <h3>Communication hub</h3>
-          <span>Call, text, email, notes, and tasks in one lane</span>
+          <h3>Log touch</h3>
+          <span>Record the latest customer contact, then review recent activity below</span>
         </header>
         <div class="admin-drawer-comm-shortcuts">
           <button type="button" data-drawer-note-type="call">Call</button>
@@ -2468,22 +2468,25 @@ function renderAdminDrawer(leadId) {
           <textarea name="note" placeholder="Record the latest call, text, email, or manager instruction..."></textarea>
           <button type="submit">Save note</button>
         </form>
-        <form class="lead-task-form admin-drawer-task-form">
-          <input name="title" placeholder="Next task, e.g. call customer back" />
-          <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
-          <input name="dueAt" type="datetime-local" />
-          <button type="submit">Add task</button>
-        </form>
-        <form class="lead-email-form admin-drawer-email-form">
-          <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
-          <input name="subject" placeholder="Email subject" />
-          <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
-          <button type="submit">Log email</button>
-        </form>
+        <details class="drawer-secondary-forms">
+          <summary>Task and email tools</summary>
+          <form class="lead-task-form admin-drawer-task-form">
+            <input name="title" placeholder="Next task, e.g. call customer back" />
+            <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+            <input name="dueAt" type="datetime-local" />
+            <button type="submit">Add task</button>
+          </form>
+          <form class="lead-email-form admin-drawer-email-form">
+            <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
+            <input name="subject" placeholder="Email subject" />
+            <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
+            <button type="submit">Log email</button>
+          </form>
+        </details>
       </section>
       <section class="admin-drawer-section">
         <header>
-          <h3>Activity timeline</h3>
+          <h3>Recent activity</h3>
           <button type="button" data-drawer-load-activity>Refresh</button>
         </header>
         <div class="lead-activity-list admin-drawer-activity-list">Activity not loaded yet.</div>
@@ -2517,7 +2520,7 @@ async function loadAdminDrawerActivity(options = {}) {
     return;
   }
   adminDrawerActivityLoaded = true;
-  list.innerHTML = renderActivity(data, { highlightLatest: Boolean(options.highlightLatest) });
+  list.innerHTML = renderActivity(data, { highlightLatest: Boolean(options.highlightLatest), limit: 8 });
 }
 
 function setActiveAdminLead(id) {
@@ -3105,6 +3108,10 @@ leadsEl.addEventListener("click", async (event) => {
 });
 
 adminLeadDrawer?.addEventListener("click", async (event) => {
+  if (event.target === adminLeadDrawer || event.target.classList.contains("admin-lead-drawer-panel")) {
+    closeAdminDrawer();
+    return;
+  }
   const closeButton = event.target.closest("[data-drawer-close]");
   if (closeButton) {
     closeAdminDrawer();
@@ -3453,6 +3460,7 @@ async function openFullLeadFromDrawer() {
   if (!activeAdminDrawerLeadId) return;
   const target = leadsEl.querySelector(`.lead-card[data-id="${CSS.escape(activeAdminDrawerLeadId)}"]`);
   if (!target) return;
+  closeAdminDrawer();
   target.scrollIntoView({ behavior: "smooth", block: "center" });
   setActiveAdminLead(activeAdminDrawerLeadId);
   await openAdminLeadWorkspace(target, { forceActivity: true });
@@ -3762,39 +3770,54 @@ async function loadLeadActivity(card, options = {}) {
 
 function renderActivity(data, options = {}) {
   const latestKey = options.highlightLatest ? latestActivityKey(data) : "";
-  const tasks = (data.tasks || []).map((task) => `
-    <article class="activity-item ${task.completed_at ? "activity-done" : ""} ${latestKey === `task:${task.id}` ? "activity-highlight" : ""}">
-      <div>
-        <strong>${escapeHtml(task.title || "Task")}</strong>
-        <span>Task for ${escapeHtml(task.assigned_to || "unassigned")} ${task.due_at ? `due ${escapeHtml(formatDateTime(task.due_at))}` : ""}</span>
-      </div>
-      <button type="button" data-complete-task="${escapeHtml(task.id)}" data-completed="${task.completed_at ? "true" : "false"}">
-        ${task.completed_at ? "Reopen" : "Complete"}
-      </button>
-    </article>
-  `);
-
-  const notes = (data.notes || []).filter((note) => note.note_type !== "owner_read").map((note) => `
-    <article class="activity-item ${latestKey === `note:${note.id}` ? "activity-highlight" : ""}">
-      <div>
-        <strong>${escapeHtml(activityNoteLabel(note.note_type))} by ${escapeHtml(note.author_email || "-")}</strong>
-        <span>${escapeHtml(formatDateTime(note.created_at))}</span>
-        <p>${linkifyNote(formatActivityNoteText(note.note || ""))}</p>
-      </div>
-    </article>
-  `);
-
-  const emails = (data.emails || []).map((email) => `
-    <article class="activity-item ${latestKey === `email:${email.id}` ? "activity-highlight" : ""}">
-      <div>
-        <strong>Email to ${escapeHtml(email.sent_to || "-")}</strong>
-        <span>${escapeHtml(email.subject || "")} - ${escapeHtml(formatDateTime(email.created_at))}</span>
-      </div>
-    </article>
-  `);
-
-  const content = [...tasks, ...notes, ...emails].join("");
-  return content || "<p>No activity yet.</p>";
+  const items = [
+    ...(data.tasks || []).map((task) => ({
+      key: `task:${task.id}`,
+      time: new Date(task.completed_at || task.created_at || task.due_at || 0).getTime(),
+      render: `
+        <article class="activity-item ${task.completed_at ? "activity-done" : ""} ${latestKey === `task:${task.id}` ? "activity-highlight" : ""}">
+          <div>
+            <strong>${escapeHtml(task.title || "Task")}</strong>
+            <span>Task for ${escapeHtml(task.assigned_to || "unassigned")} ${task.due_at ? `due ${escapeHtml(formatDateTime(task.due_at))}` : ""}</span>
+          </div>
+          <button type="button" data-complete-task="${escapeHtml(task.id)}" data-completed="${task.completed_at ? "true" : "false"}">
+            ${task.completed_at ? "Reopen" : "Complete"}
+          </button>
+        </article>
+      `
+    })),
+    ...(data.notes || [])
+      .filter((note) => note.note_type !== "owner_read")
+      .map((note) => ({
+        key: `note:${note.id}`,
+        time: new Date(note.created_at || 0).getTime(),
+        render: `
+          <article class="activity-item ${latestKey === `note:${note.id}` ? "activity-highlight" : ""}">
+            <div>
+              <strong>${escapeHtml(activityNoteLabel(note.note_type))} by ${escapeHtml(note.author_email || "-")}</strong>
+              <span>${escapeHtml(formatDateTime(note.created_at))}</span>
+              <p>${linkifyNote(formatActivityNoteText(note.note || ""))}</p>
+            </div>
+          </article>
+        `
+      })),
+    ...(data.emails || []).map((email) => ({
+      key: `email:${email.id}`,
+      time: new Date(email.created_at || 0).getTime(),
+      render: `
+        <article class="activity-item ${latestKey === `email:${email.id}` ? "activity-highlight" : ""}">
+          <div>
+            <strong>Email to ${escapeHtml(email.sent_to || "-")}</strong>
+            <span>${escapeHtml(email.subject || "")} - ${escapeHtml(formatDateTime(email.created_at))}</span>
+          </div>
+        </article>
+      `
+    }))
+  ]
+    .filter((item) => !Number.isNaN(item.time))
+    .sort((a, b) => b.time - a.time);
+  const limited = Number(options.limit || 0) > 0 ? items.slice(0, Number(options.limit)) : items;
+  return limited.map((item) => item.render).join("") || "<p>No activity yet.</p>";
 }
 
 function latestActivityKey(data) {
