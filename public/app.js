@@ -33,6 +33,8 @@ const dealerLeadAlertsEl = document.querySelector("#dealer-lead-alerts");
 const dealerTodayWorkEl = document.querySelector("#dealer-today-work");
 const dealerLeadFilterButtons = document.querySelectorAll("[data-dealer-filter]");
 const dealerLeadSortSelect = document.querySelector("#dealer-lead-sort");
+const dealerLeadDrawer = document.querySelector("#dealer-lead-drawer");
+const dealerLeadDrawerContent = document.querySelector("#dealer-lead-drawer-content");
 const saveValuationLeadButton = document.querySelector("#save-valuation-lead");
 const DEALER_REFRESH_MS = 30000;
 const DEALER_LEAD_READ_TOKENS_KEY = "autoswitch-dealer-lead-read-tokens";
@@ -94,6 +96,8 @@ let dealerLeadFilter = "active";
 let dealerLeadSort = "newest";
 let dealerLeadAlertMap = new Map();
 let activeDealerLeadId = "";
+let activeDealerDrawerLeadId = "";
+let dealerDrawerActivityLoaded = false;
 
 initializeDatalists();
 initializeAuth();
@@ -171,6 +175,10 @@ dealerLeadsList?.addEventListener("submit", async (event) => {
     dealerLeadsStatus.textContent = isTask ? "Task saved." : "Note saved.";
     (isTask ? taskForm : noteForm).reset();
     await loadDealerActivity(card, { force: true });
+    if (leadId && activeDealerDrawerLeadId === leadId) {
+      dealerDrawerActivityLoaded = false;
+      await loadDealerDrawerActivity({ force: true, highlightLatest: true });
+    }
   } catch (error) {
     dealerLeadsStatus.textContent = error.message || "Unable to save follow-up";
   }
@@ -179,6 +187,11 @@ dealerLeadsList?.addEventListener("submit", async (event) => {
 dealerLeadsList?.addEventListener("click", async (event) => {
   const clickedCard = event.target.closest(".dealer-lead-card");
   if (clickedCard?.dataset?.leadId) setActiveDealerLead(clickedCard.dataset.leadId);
+  const row = event.target.closest(".dealer-list-row");
+  if (row && !event.target.closest("button, a, input, select, textarea, summary")) {
+    await openDealerWorkspace(row.closest(".dealer-lead-card"), { forceActivity: false });
+    return;
+  }
   const completeButton = event.target.closest("[data-complete-dealer-task]");
   if (completeButton) {
     const card = completeButton.closest(".dealer-lead-card");
@@ -200,6 +213,10 @@ dealerLeadsList?.addEventListener("click", async (event) => {
       if (!data.ok) throw new Error(data.error || "Unable to complete task");
       dealerLeadsStatus.textContent = "Task completed. Admin can review it.";
       await loadDealerActivity(card, { force: true });
+      if (leadId && activeDealerDrawerLeadId === leadId) {
+        dealerDrawerActivityLoaded = false;
+        await loadDealerDrawerActivity({ force: true, highlightLatest: true });
+      }
     } catch (error) {
       completeButton.disabled = false;
       dealerLeadsStatus.textContent = error.message || "Unable to complete task";
@@ -260,6 +277,189 @@ dealerLeadsList?.addEventListener("toggle", async (event) => {
 dealerLeadsList?.addEventListener("focusin", (event) => {
   const card = event.target.closest(".dealer-lead-card");
   if (card?.dataset?.leadId) setActiveDealerLead(card.dataset.leadId);
+});
+
+dealerLeadDrawer?.addEventListener("click", async (event) => {
+  const closeButton = event.target.closest("[data-dealer-drawer-close]");
+  if (closeButton) {
+    closeDealerDrawer();
+    return;
+  }
+
+  const openCardButton = event.target.closest("[data-dealer-drawer-open-card]");
+  if (openCardButton) {
+    await openFullDealerLeadFromDrawer();
+    return;
+  }
+
+  const refreshButton = event.target.closest("[data-drawer-load-dealer-activity]");
+  if (refreshButton) {
+    dealerDrawerActivityLoaded = false;
+    await loadDealerDrawerActivity({ force: true, highlightLatest: true });
+    return;
+  }
+
+  const noteTypeButton = event.target.closest("[data-drawer-note-type]");
+  if (noteTypeButton) {
+    const type = noteTypeButton.dataset.drawerNoteType || "internal";
+    const select = dealerLeadDrawerContent?.querySelector('.dealer-drawer-note-form select[name="noteType"]');
+    const field = dealerLeadDrawerContent?.querySelector('.dealer-drawer-note-form textarea[name="note"]');
+    if (select) select.value = type;
+    field?.focus();
+    return;
+  }
+
+  const completeButton = event.target.closest("[data-complete-dealer-task]");
+  if (completeButton && activeDealerDrawerLeadId) {
+    completeButton.disabled = true;
+    dealerLeadsStatus.textContent = "Marking task complete...";
+    try {
+      const response = await fetch("/api/lead-activity", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ leadId: activeDealerDrawerLeadId, taskId: completeButton.dataset.completeDealerTask || "", completed: true })
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || "Unable to complete task");
+      dealerLeadsStatus.textContent = "Task completed. Admin can review it.";
+      dealerDrawerActivityLoaded = false;
+      await Promise.all([
+        loadDealerDrawerActivity({ force: true, highlightLatest: true }),
+        loadDealerLeads({ forceActivity: true, suppressAlerts: true })
+      ]);
+    } catch (error) {
+      completeButton.disabled = false;
+      dealerLeadsStatus.textContent = error.message || "Unable to complete task";
+    }
+    return;
+  }
+
+  const statusButton = event.target.closest("[data-drawer-dealer-status]");
+  if (statusButton && activeDealerDrawerLeadId) {
+    statusButton.disabled = true;
+    dealerLeadsStatus.textContent = "Updating lead status...";
+    try {
+      const response = await fetch("/api/lead-activity", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          leadId: activeDealerDrawerLeadId,
+          action: "status",
+          status: statusButton.dataset.drawerDealerStatus || "",
+          note: `Dealer updated status to ${String(statusButton.dataset.drawerDealerStatus || "").replaceAll("_", " ")}.`
+        })
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || "Unable to update lead status");
+      dealerLeadsStatus.textContent = "Lead status updated.";
+      await loadDealerLeads({ forceActivity: true, suppressAlerts: true });
+    } catch (error) {
+      dealerLeadsStatus.textContent = error.message || "Unable to update lead status";
+      statusButton.disabled = false;
+    }
+    return;
+  }
+
+  const followUpButton = event.target.closest("[data-drawer-dealer-follow-up]");
+  if (followUpButton && activeDealerDrawerLeadId) {
+    followUpButton.disabled = true;
+    dealerLeadsStatus.textContent = "Scheduling follow-up...";
+    try {
+      const followUpAt = dealerFollowUpDate(followUpButton.dataset.drawerDealerFollowUp || "");
+      const response = await fetch("/api/leads", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ id: activeDealerDrawerLeadId, nextFollowUpAt: followUpAt })
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || "Unable to schedule follow-up");
+      dealerLeadsStatus.textContent = `Next follow-up scheduled for ${formatDateTime(followUpAt)}.`;
+      await loadDealerLeads({ forceActivity: true, suppressAlerts: true });
+    } catch (error) {
+      dealerLeadsStatus.textContent = error.message || "Unable to schedule follow-up";
+      followUpButton.disabled = false;
+    }
+  }
+});
+
+dealerLeadDrawer?.addEventListener("submit", async (event) => {
+  const noteForm = event.target.closest(".dealer-drawer-note-form");
+  if (noteForm && activeDealerDrawerLeadId) {
+    event.preventDefault();
+    const payload = {
+      leadId: activeDealerDrawerLeadId,
+      type: "note",
+      ...Object.fromEntries(new FormData(noteForm).entries())
+    };
+    dealerLeadsStatus.textContent = "Saving note...";
+    try {
+      const response = await fetch("/api/lead-activity", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || "Unable to save follow-up");
+      dealerLeadsStatus.textContent = "Note saved.";
+      noteForm.reset();
+      dealerDrawerActivityLoaded = false;
+      await Promise.all([
+        loadDealerDrawerActivity({ force: true, highlightLatest: true }),
+        loadDealerLeads({ forceActivity: true, suppressAlerts: true })
+      ]);
+    } catch (error) {
+      dealerLeadsStatus.textContent = error.message || "Unable to save follow-up";
+    }
+    return;
+  }
+
+  const taskForm = event.target.closest(".dealer-drawer-task-form");
+  if (taskForm && activeDealerDrawerLeadId) {
+    event.preventDefault();
+    const payload = {
+      leadId: activeDealerDrawerLeadId,
+      type: "task",
+      ...Object.fromEntries(new FormData(taskForm).entries())
+    };
+    dealerLeadsStatus.textContent = "Saving task...";
+    try {
+      const response = await fetch("/api/lead-activity", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || "Unable to save follow-up");
+      dealerLeadsStatus.textContent = "Task saved.";
+      taskForm.reset();
+      dealerDrawerActivityLoaded = false;
+      await Promise.all([
+        loadDealerDrawerActivity({ force: true, highlightLatest: true }),
+        loadDealerLeads({ forceActivity: true, suppressAlerts: true })
+      ]);
+    } catch (error) {
+      dealerLeadsStatus.textContent = error.message || "Unable to save follow-up";
+    }
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && activeDealerDrawerLeadId) closeDealerDrawer();
 });
 
 logoutButton.addEventListener("click", async () => {
@@ -1008,6 +1208,7 @@ async function setSession(session) {
     loadDealerLeads({ forceActivity: true, suppressAlerts: true });
     startDealerAutoRefresh();
   } else {
+    closeDealerDrawer();
     if (supabaseClient) {
       window.location.replace("/login.html?next=/dealer.html");
       return;
@@ -1499,6 +1700,14 @@ function renderDealerLeads(leads, role) {
     `;
   });
   syncActiveDealerLeadCard();
+  if (activeDealerDrawerLeadId) {
+    if (dealerLeadsCache.some((lead) => String(lead.id || "") === activeDealerDrawerLeadId)) {
+      renderDealerDrawer(activeDealerDrawerLeadId);
+      loadDealerDrawerActivity({ force: true }).catch(() => null);
+    } else {
+      closeDealerDrawer();
+    }
+  }
 }
 
 function renderDealerSharedLeadMeta({
@@ -1523,6 +1732,162 @@ function renderDealerSharedLeadMeta({
       <div><dt>Last activity</dt><dd>${escapeHtml(lastActivity ? formatDateTime(lastActivity) : "No recent activity")}</dd></div>
     </dl>
   `;
+}
+
+function renderDealerDrawer(leadId) {
+  if (!dealerLeadDrawer || !dealerLeadDrawerContent) return;
+  const id = String(leadId || "").trim();
+  const lead = dealerLeadsCache.find((item) => String(item.id || "") === id);
+  if (!lead) {
+    closeDealerDrawer();
+    return;
+  }
+
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+  const purchase = input.purchase || {};
+  const buyerLead = isBuyerLead(lead);
+  const status = lead.status || "new";
+  const priority = lead.priority || "normal";
+  const followUp = lead.next_follow_up_at || "";
+  const lastActivity = lead.last_activity_at || "";
+  const overdue = isDealerLeadOverdue(followUp, status);
+  const title = cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || "Vehicle lead", buyerLead);
+  const customerEmail = input.email || lead.auth_user?.email || lead.auth_email || "-";
+  const customerPhone = input.phone || "No phone";
+  const vehicleContext = lead.vehicle_context || {};
+  const dealerEmailOptionsId = `dealer-drawer-email-options-${cssToken(lead.id || id)}`;
+  const dealerEmailOptions = dealerDirectoryEmails.map((email) => `<option value="${escapeHtml(email)}"></option>`).join("");
+  const actionButtons = dealerStatusActions(buyerLead, status)
+    .map((action) => `<button type="button" data-drawer-dealer-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
+    .join("");
+  const followUpButtons = dealerFollowUpActions()
+    .map((action) => `<button type="button" data-drawer-dealer-follow-up="${escapeHtml(action.key)}">${escapeHtml(action.label)}</button>`)
+    .join("");
+  const planSummary = buyerLead
+    ? `${purchase.intent || input.purchaseIntent || "Buyer opportunity"} | ${purchase.buyingTimeline || input.buyingTimeline || "Timeline open"}`
+    : `${valuation.wholesale?.avg ? `Wholesale ${formatNumber(valuation.wholesale.avg)}` : "Seller appraisal"} | ${input.ownershipType || input.ownership || "Ownership unknown"}`;
+
+  dealerLeadDrawer.hidden = false;
+  dealerLeadDrawer.classList.add("open");
+  document.body.classList.add("dealer-drawer-open");
+  activeDealerDrawerLeadId = id;
+  dealerLeadDrawerContent.innerHTML = `
+    <section class="dealer-drawer-shell" data-drawer-lead-id="${escapeHtml(id)}">
+      <header class="dealer-drawer-head">
+        <div>
+          <span>Dealer workspace</span>
+          <strong>${escapeHtml(title)}</strong>
+          <small>${escapeHtml(customerEmail)} | ${escapeHtml(customerPhone)}</small>
+        </div>
+        <div class="dealer-drawer-head-actions">
+          <button type="button" data-dealer-drawer-open-card>Open full</button>
+          <button type="button" data-dealer-drawer-close>Close</button>
+        </div>
+      </header>
+      <section class="dealer-drawer-summary">
+        <div class="dealer-drawer-stat">
+          <span>Pipeline</span>
+          <strong>${escapeHtml(leadStatusLabel(status, buyerLead))}</strong>
+          <small>${escapeHtml(overdue ? "Overdue follow-up" : followUp ? formatDateTime(followUp) : "No follow-up scheduled")}</small>
+        </div>
+        <div class="dealer-drawer-stat">
+          <span>Priority</span>
+          <strong>${escapeHtml(priority)}</strong>
+          <small>${escapeHtml(lastActivity ? `Last touch ${formatDateTime(lastActivity)}` : "No recent activity")}</small>
+        </div>
+        <div class="dealer-drawer-stat">
+          <span>Vehicle</span>
+          <strong>${escapeHtml(vehicleContext.cluster_label || title)}</strong>
+          <small>${escapeHtml(vehicleContext.primary_inventory_status ? `Warehouse ${String(vehicleContext.primary_inventory_status).replaceAll("_", " ")}` : planSummary)}</small>
+        </div>
+      </section>
+      ${dealerVehicleSignalInline(lead)}
+      ${dealerVehicleContextInline(lead)}
+      <section class="dealer-drawer-section">
+        <header>
+          <h3>Quick follow-up</h3>
+          <span>Move the lead forward without opening the full card</span>
+        </header>
+        <div class="dealer-lead-actions dealer-drawer-actions">
+          ${actionButtons}
+        </div>
+        <div class="dealer-lead-actions dealer-follow-up-actions dealer-drawer-followups">
+          ${followUpButtons}
+        </div>
+      </section>
+      <section class="dealer-drawer-section">
+        <header>
+          <h3>Communication hub</h3>
+          <span>Call, text, email, note, and task from one place</span>
+        </header>
+        <div class="dealer-drawer-comm-shortcuts">
+          <button type="button" data-drawer-note-type="call">Call</button>
+          <button type="button" data-drawer-note-type="sms">Text</button>
+          <button type="button" data-drawer-note-type="email">Email</button>
+          <button type="button" data-drawer-note-type="internal">Note</button>
+        </div>
+        <form class="dealer-note-form dealer-drawer-note-form">
+          <select name="noteType">
+            <option value="call">Call</option>
+            <option value="email">Email</option>
+            <option value="sms">SMS</option>
+            <option value="inspection">Inspection</option>
+            <option value="correction">Correction request</option>
+            <option value="offer">Offer</option>
+            <option value="internal">Internal note</option>
+          </select>
+          <textarea name="note" placeholder="Record the latest customer touch, inspection result, correction, or quote update..."></textarea>
+          <button type="submit">Save note</button>
+        </form>
+        <form class="dealer-task-form dealer-drawer-task-form">
+          <input name="title" placeholder="Next task" />
+          <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to dealer email" />
+          <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
+          <input name="dueAt" type="datetime-local" />
+          <button type="submit">Add task</button>
+        </form>
+      </section>
+      <section class="dealer-drawer-section">
+        <header>
+          <h3>Activity timeline</h3>
+          <button type="button" data-drawer-load-dealer-activity>Refresh</button>
+        </header>
+        <div class="dealer-activity-list dealer-drawer-activity-list">Activity not loaded yet.</div>
+      </section>
+    </section>
+  `;
+}
+
+function closeDealerDrawer() {
+  if (!dealerLeadDrawer || !dealerLeadDrawerContent) return;
+  dealerLeadDrawer.classList.remove("open");
+  dealerLeadDrawer.hidden = true;
+  dealerLeadDrawerContent.innerHTML = "";
+  document.body.classList.remove("dealer-drawer-open");
+  activeDealerDrawerLeadId = "";
+  dealerDrawerActivityLoaded = false;
+}
+
+async function loadDealerDrawerActivity(options = {}) {
+  if (!dealerLeadDrawerContent || !activeDealerDrawerLeadId) return;
+  const list = dealerLeadDrawerContent.querySelector(".dealer-drawer-activity-list");
+  if (!list) return;
+  if (dealerDrawerActivityLoaded && !options.force) return;
+  list.textContent = "Loading activity...";
+  try {
+    const response = await fetch(`/api/lead-activity?leadId=${encodeURIComponent(activeDealerDrawerLeadId)}`, {
+      headers: {
+        Authorization: `Bearer ${authSession?.access_token || ""}`
+      }
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to load activity");
+    dealerDrawerActivityLoaded = true;
+    list.innerHTML = renderDealerActivity(data, { highlightLatest: Boolean(options.highlightLatest) });
+  } catch (error) {
+    list.textContent = error.message || "Unable to load activity";
+  }
 }
 
 function setActiveDealerLead(id) {
@@ -1908,6 +2273,11 @@ async function updateDealerLeadStatus(button) {
 
 async function openDealerWorkspace(card, options = {}) {
   if (!card) return;
+  if (card.dataset.leadId) {
+    renderDealerDrawer(card.dataset.leadId);
+    dealerDrawerActivityLoaded = false;
+    await loadDealerDrawerActivity({ force: true, highlightLatest: true });
+  }
   const details = card.querySelector(".dealer-lead-details");
   if (details && !details.open) details.open = true;
   await loadDealerActivity(card, { force: Boolean(options.forceActivity) });
@@ -1924,6 +2294,17 @@ async function openDealerWorkspace(card, options = {}) {
     if (noteType && options.noteType) noteType.value = options.noteType;
     noteField?.focus();
   }
+}
+
+async function openFullDealerLeadFromDrawer() {
+  if (!activeDealerDrawerLeadId) return;
+  const target = dealerLeadsList.querySelector(`.dealer-lead-card[data-lead-id="${cssEscape(activeDealerDrawerLeadId)}"]`);
+  if (!target) return;
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+  setActiveDealerLead(activeDealerDrawerLeadId);
+  const details = target.querySelector(".dealer-lead-details");
+  if (details) details.open = true;
+  await openDealerWorkspace(target, { forceActivity: true });
 }
 
 function startDealerAutoRefresh() {
@@ -2066,10 +2447,15 @@ async function openDealerLead(id, options = {}) {
   card.classList.add("lead-card-flash");
   window.setTimeout(() => card.classList.remove("lead-card-flash"), 1600);
   card.scrollIntoView({ behavior: "smooth", block: "center" });
+  renderDealerDrawer(id);
+  dealerDrawerActivityLoaded = false;
   const details = card.querySelector(".dealer-lead-details");
   if (details) details.open = true;
   if (options.fromAlert) highlightDealerLeadChangeAreas(card);
-  await loadDealerActivity(card, { force: true, highlightLatest: Boolean(options.fromAlert) });
+  await Promise.all([
+    loadDealerActivity(card, { force: true, highlightLatest: Boolean(options.fromAlert) }),
+    loadDealerDrawerActivity({ force: true, highlightLatest: Boolean(options.fromAlert) })
+  ]);
 }
 
 function dealerLeadUpdateToken(lead = {}) {
