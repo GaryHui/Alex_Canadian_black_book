@@ -1302,7 +1302,7 @@ function renderDealerLeads(leads, role) {
       .join("");
 
     return `
-      <article class="history-card dealer-lead-card dealer-lead-${leadKind} dealer-lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "dealer-lead-updated" : ""}" data-lead-id="${escapeHtml(lead.id || "")}" data-update-token="${escapeHtml(updateToken)}">
+      <article class="history-card dealer-lead-card dealer-lead-${leadKind} dealer-lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${String(lead.priority || "").toLowerCase() === "urgent" ? "dealer-lead-card-urgent" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "dealer-lead-updated" : ""}" data-lead-id="${escapeHtml(lead.id || "")}" data-update-token="${escapeHtml(updateToken)}">
         <div class="dealer-lead-top">
           <div>
             <div class="dealer-lead-title">

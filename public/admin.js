@@ -1248,7 +1248,7 @@ function renderLead(lead, index = 0) {
     leadTypeLabel
   });
   return `
-    <article class="lead-card lead-card-${leadType} lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "lead-card-updated" : ""}" data-id="${escapeHtml(lead.id || "")}">
+    <article class="lead-card lead-card-${leadType} lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${priority === "urgent" ? "lead-card-urgent" : ""} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "lead-card-updated" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <header class="lead-summary">
         <div>
           <div class="lead-title-row">

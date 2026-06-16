@@ -1642,18 +1642,10 @@ select {
   background: #fff;
   border: 1px solid #d8e2ef;
   border-radius: 8px;
+  overflow: hidden;
   padding: 12px;
+  position: relative;
   transition: opacity .18s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease;
-}
-
-.lead-card-alt-even,
-.dealer-lead-card-alt-even {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-}
-
-.lead-card-alt-odd,
-.dealer-lead-card-alt-odd {
-  background: linear-gradient(180deg, #eef5ff 0%, #f9fbff 100%);
 }
 
 .lead-card-current,
@@ -1688,6 +1680,64 @@ select {
 .lead-focus-mode .lead-card:not(.lead-card-current),
 .dealer-leads-list.lead-focus-mode .dealer-lead-card:not(.dealer-lead-card-current) {
   opacity: .72;
+}
+
+.lead-card-buyer.lead-card-alt-even,
+.dealer-lead-buyer.dealer-lead-card-alt-even {
+  background: linear-gradient(180deg, #eef6ff 0%, #f8fbff 100%);
+}
+
+.lead-card-buyer.lead-card-alt-odd,
+.dealer-lead-buyer.dealer-lead-card-alt-odd {
+  background: linear-gradient(180deg, #eefcf4 0%, #f7fffb 100%);
+}
+
+.lead-card-seller.lead-card-alt-even,
+.dealer-lead-seller.dealer-lead-card-alt-even {
+  background: linear-gradient(180deg, #fff5ea 0%, #fffaf5 100%);
+}
+
+.lead-card-seller.lead-card-alt-odd,
+.dealer-lead-seller.dealer-lead-card-alt-odd {
+  background: linear-gradient(180deg, #fff0f6 0%, #fff8fb 100%);
+}
+
+.lead-card-buyer.lead-card-current,
+.dealer-lead-buyer.dealer-lead-card-current {
+  background: linear-gradient(180deg, #dcedff 0%, #ecfff5 100%);
+}
+
+.lead-card-seller.lead-card-current,
+.dealer-lead-seller.dealer-lead-card-current {
+  background: linear-gradient(180deg, #ffe8d8 0%, #fff0f6 100%);
+}
+
+.lead-card-urgent,
+.dealer-lead-card-urgent {
+  border-top: 7px solid #c1121f;
+}
+
+.lead-card-urgent::after,
+.dealer-lead-card-urgent::after {
+  background: linear-gradient(90deg, #c1121f 0%, #ef4444 100%);
+  color: #fff;
+  content: "URGENT";
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  line-height: 1;
+  padding: 6px 10px;
+  position: absolute;
+  left: 14px;
+  top: 0;
+}
+
+.lead-card-urgent .lead-summary,
+.dealer-lead-card-urgent .dealer-lead-top {
+  background: linear-gradient(180deg, rgba(255, 233, 236, .96) 0%, rgba(255, 245, 246, .9) 100%);
+  border: 1px solid #fecdd3;
+  border-radius: 10px;
+  padding: 18px 10px 10px;
 }
 
 .lead-overdue {
@@ -2337,6 +2387,7 @@ select {
 }
 
 .lead-type-pill {
+  font-weight: 900;
   padding: 5px 8px;
   border-radius: 999px;
   font-size: 12px;
@@ -2345,15 +2396,15 @@ select {
 }
 
 .lead-type-buyer {
-  color: #07457d;
-  background: #d9efff;
-  border: 1px solid #9bc8ef;
+  background: linear-gradient(180deg, #dff3ff 0%, #e8fff1 100%);
+  border: 1px solid #8ed0d7;
+  color: #0a5c68;
 }
 
 .lead-type-seller {
-  color: #9b1c26;
-  background: #ffe8e3;
-  border: 1px solid #f2b2a8;
+  background: linear-gradient(180deg, #fff1de 0%, #ffe8f0 100%);
+  border: 1px solid #f1b7a4;
+  color: #9a4a16;
 }
 
 .lead-grid {
@@ -3176,7 +3227,10 @@ select {
   border-radius: 8px;
   display: grid;
   gap: 10px;
+  overflow: hidden;
   padding: 12px;
+  position: relative;
+  transition: opacity .18s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease;
 }
 
 .dealer-leads-list {
@@ -3252,18 +3306,19 @@ select {
   font-weight: 900;
   line-height: 1;
   padding: 5px 8px;
+  text-transform: uppercase;
 }
 
 .dealer-type-buyer {
-  background: #d9efff;
-  border: 1px solid #9bc8ef;
-  color: #07457d;
+  background: linear-gradient(180deg, #dff3ff 0%, #e8fff1 100%);
+  border: 1px solid #8ed0d7;
+  color: #0a5c68;
 }
 
 .dealer-type-seller {
-  background: #ffe8e3;
-  border: 1px solid #f2b2a8;
-  color: #9b1c26;
+  background: linear-gradient(180deg, #fff1de 0%, #ffe8f0 100%);
+  border: 1px solid #f1b7a4;
+  color: #9a4a16;
 }
 
 .dealer-lead-updated {
