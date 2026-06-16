@@ -1,5 +1,9 @@
 :root {
   --red: #ed1b2f;
+  --lead-buy: #0f6fc6;
+  --lead-sell: #7c3aed;
+  --lead-update: #f59e0b;
+  --lead-urgent: #dc2626;
   --ink: #2d2f33;
   --muted: #8f8f8f;
   --line: #d8d8d8;
@@ -1801,7 +1805,9 @@ select {
   background: linear-gradient(180deg, #eaf3ff 0%, #f7fbff 100%);
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, .24), 0 18px 42px rgba(37, 99, 235, .18);
+  isolation: isolate;
   position: relative;
+  z-index: 4;
 }
 
 .lead-card-current::before,
@@ -1813,11 +1819,12 @@ select {
   font-size: 10px;
   font-weight: 900;
   letter-spacing: .08em;
-  padding: 5px 8px;
+  padding: 6px 9px;
+  pointer-events: none;
   position: absolute;
-  right: 12px;
-  top: 12px;
-  z-index: 3;
+  right: 10px;
+  top: 10px;
+  z-index: 8;
 }
 
 .lead-card-current .lead-manage,
@@ -1890,8 +1897,8 @@ select {
 }
 
 .lead-overdue {
-  border-color: #ef4444;
-  box-shadow: inset 4px 0 0 #ef4444;
+  border-color: var(--lead-urgent);
+  box-shadow: inset 4px 0 0 var(--lead-urgent);
 }
 
 .lead-summary {
@@ -2016,11 +2023,11 @@ select {
 }
 
 .lead-card-buyer {
-  border-left: 6px solid #0f6fc6;
+  border-left: 6px solid var(--lead-buy);
 }
 
 .lead-card-seller {
-  border-left: 6px solid #7c3aed;
+  border-left: 6px solid var(--lead-sell);
 }
 
 .lead-title-row {
@@ -2228,7 +2235,7 @@ select {
 }
 
 .lead-card-updated {
-  border-color: #f59e0b;
+  border-color: var(--lead-update);
   box-shadow: 0 0 0 2px rgba(245, 158, 11, .2), 0 12px 24px rgba(245, 158, 11, .12);
 }
 
@@ -3459,11 +3466,11 @@ select {
 }
 
 .dealer-lead-buyer {
-  border-left: 6px solid #0f6fc6;
+  border-left: 6px solid var(--lead-buy);
 }
 
 .dealer-lead-seller {
-  border-left: 6px solid #7c3aed;
+  border-left: 6px solid var(--lead-sell);
 }
 
 .dealer-lead-title {
@@ -3495,8 +3502,54 @@ select {
 }
 
 .dealer-lead-updated {
-  border-color: #f59e0b;
+  border-color: var(--lead-update);
   box-shadow: 0 0 0 2px rgba(245, 158, 11, .2), 0 12px 24px rgba(245, 158, 11, .12);
+}
+
+/* Enforce the unified lead color system across admin and dealer views */
+.admin-leads .lead-card-buyer,
+.dealer-leads-list .dealer-lead-buyer {
+  border-left-color: var(--lead-buy) !important;
+}
+
+.admin-leads .lead-card-seller,
+.dealer-leads-list .dealer-lead-seller {
+  border-left-color: var(--lead-sell) !important;
+}
+
+.admin-leads .lead-card-updated,
+.dealer-leads-list .dealer-lead-updated {
+  border-color: var(--lead-update) !important;
+}
+
+.admin-leads .lead-card-urgent,
+.dealer-leads-list .dealer-lead-card-urgent {
+  border-top-color: var(--lead-urgent) !important;
+}
+
+.admin-leads .lead-overdue,
+.dealer-leads-list .lead-overdue {
+  border-color: var(--lead-urgent) !important;
+}
+
+.admin-leads .lead-type-buyer,
+.dealer-leads-list .dealer-type-buyer {
+  color: #0b4f9c !important;
+}
+
+.admin-leads .lead-type-seller,
+.dealer-leads-list .dealer-type-seller {
+  color: #6d28d9 !important;
+}
+
+.lead-group-buyer .lead-group-head,
+.dealer-lead-group-buyer > header {
+  border-color: #c4dafb !important;
+}
+
+.lead-group-seller .lead-group-head,
+.dealer-lead-group-seller > header {
+  border-color: #d6c4fb !important;
 }
 
 .dealer-update-notice {
