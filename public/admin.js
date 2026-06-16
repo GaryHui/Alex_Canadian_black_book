@@ -10,6 +10,7 @@ const inventorySummaryEl = document.querySelector("#inventory-summary");
 const inventoryFilterButtons = [...document.querySelectorAll("[data-inventory-filter]")];
 const inquiriesStatusEl = document.querySelector("#inquiries-status");
 const inquiriesEl = document.querySelector("#admin-inquiries");
+const adminControlBoardEl = document.querySelector("#admin-control-board");
 const adminOverviewEl = document.querySelector("#admin-overview");
 const adminLeadAlertsEl = document.querySelector("#admin-lead-alerts");
 const adminTodayListEl = document.querySelector("#admin-today-list");
@@ -92,6 +93,26 @@ adminOverviewEl?.addEventListener("click", (event) => {
   setAdminLeadFilter(filterButton.dataset.adminSetFilter || "all");
   renderLeadWorkbench(adminLeadsCache);
   document.querySelector("#crm-leads")?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+adminControlBoardEl?.addEventListener("click", (event) => {
+  const filterButton = event.target.closest("[data-admin-set-filter]");
+  if (filterButton) {
+    setAdminLeadFilter(filterButton.dataset.adminSetFilter || "all");
+    renderLeadWorkbench(adminLeadsCache);
+    document.querySelector("#crm-leads")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  const inventoryButton = event.target.closest("[data-open-inventory-filter]");
+  if (inventoryButton) {
+    setInventoryFilter(inventoryButton.dataset.openInventoryFilter || "active");
+    renderInventoryWarehouse(inventoryCache);
+    document.querySelector("#inventory-warehouse")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  const urlButton = event.target.closest("[data-admin-open-url]");
+  if (urlButton) {
+    window.location.href = urlButton.dataset.adminOpenUrl || "/admin-vehicles.html";
+  }
 });
 adminTodayListEl?.addEventListener("click", async (event) => {
   const toggleButton = event.target.closest("[data-admin-toggle-attention]");
@@ -317,7 +338,7 @@ async function loadInventory() {
 function renderInventoryWarehouse(inventory) {
   const filtered = filterInventory(inventory);
   renderInventorySummary(inventory);
-  if (adminLeadsCache.length) renderAdminToday(adminLeadsCache);
+  if (adminLeadsCache.length) renderAdminOverview(adminLeadsCache);
   inventoryStatusEl.textContent = `${filtered.length} shown of ${inventory.length} inventory listing(s).`;
   inventoryEl.innerHTML = renderInventoryGroups(filtered) || "<p>No inventory listings in this view. Add a SELL lead as a draft inventory item first.</p>";
 }
@@ -755,6 +776,58 @@ function collectAdminLeadAlerts(leads) {
   adminLeadTokenMap = nextMap;
 }
 
+function adminAlertVisibleId(id) {
+  return resolveVisibleAdminLeadId(id) || String(id || "").trim();
+}
+
+function buildAdminVisibleAlertGroups() {
+  const groups = new Map();
+  for (const alert of adminLeadAlertMap.values()) {
+    const visibleId = adminAlertVisibleId(alert.id);
+    if (!visibleId) continue;
+    const current = groups.get(visibleId) || {
+      id: visibleId,
+      type: "updated",
+      title: alert.title || "Vehicle lead",
+      message: alert.message || "",
+      count: 0,
+      memberIds: []
+    };
+    current.count += 1;
+    current.memberIds.push(String(alert.id || "").trim());
+    if (alert.type === "owner") current.type = "owner";
+    if (!current.message) current.message = alert.message || "";
+    groups.set(visibleId, current);
+  }
+  return [...groups.values()].map((group) => ({
+    ...group,
+    message: group.count > 1 ? `${group.count} updates in this vehicle cluster` : group.message
+  }));
+}
+
+function hasAdminVisibleAlert(leadId) {
+  const visibleId = adminAlertVisibleId(leadId);
+  if (!visibleId) return false;
+  for (const alert of adminLeadAlertMap.values()) {
+    if (adminAlertVisibleId(alert.id) === visibleId) return true;
+  }
+  return false;
+}
+
+function clearAdminVisibleAlertGroup(id) {
+  const visibleId = adminAlertVisibleId(id);
+  if (!visibleId) return;
+  const relatedIds = adminLeadsCache
+    .filter((lead) => adminAlertVisibleId(lead.id) === visibleId)
+    .map((lead) => String(lead.id || "").trim())
+    .filter(Boolean);
+  for (const leadId of relatedIds) {
+    const lead = adminLeadsCache.find((item) => String(item.id || "") === leadId);
+    if (!lead?.owner_review?.unread) markAdminLeadTokenRead(leadId);
+    adminLeadAlertMap.delete(leadId);
+  }
+}
+
 function rememberAdminLeadTokens(leads) {
   adminLeadTokenMap = new Map(leads
     .map((lead) => [String(lead.id || ""), leadUpdateToken(lead)])
@@ -904,7 +977,7 @@ function duplicateWarningInline(lead) {
 
 function renderAdminLeadAlerts() {
   if (!adminLeadAlertsEl) return;
-  const alerts = [...adminLeadAlertMap.values()];
+  const alerts = buildAdminVisibleAlertGroups();
   adminLeadAlertsEl.hidden = alerts.length === 0;
   adminLeadAlertsEl.innerHTML = alerts.length ? `
     <div>
@@ -936,11 +1009,8 @@ async function openAdminLeadFromAlert(id) {
   const card = leadsEl.querySelector(`.lead-card[data-id="${cssEscape(visibleId)}"]`);
   if (!card) return;
   setActiveAdminLead(visibleId);
-  const lead = adminLeadsCache.find((item) => String(item.id || "") === id);
-  if (!lead?.owner_review?.unread) {
-    markAdminLeadTokenRead(id);
-    adminLeadAlertMap.delete(id);
-  }
+  clearAdminVisibleAlertGroup(id);
+  const lead = adminLeadsCache.find((item) => String(item.id || "") === visibleId) || adminLeadsCache.find((item) => String(item.id || "") === id);
   renderAdminLeadAlerts();
   if (!lead?.owner_review?.unread) card.classList.remove("lead-card-updated");
   card.classList.add("lead-card-flash");
@@ -1264,6 +1334,113 @@ function renderAdminOverviewCard(filter, tone, label, value, hint) {
   `;
 }
 
+function renderAdminControlCard(config = {}) {
+  return `
+    <section class="admin-control-card ${escapeHtml(config.tone || "")}">
+      <header>
+        <div>
+          <span>${escapeHtml(config.kicker || "")}</span>
+          <h3>${escapeHtml(config.title || "")}</h3>
+        </div>
+        <b>${escapeHtml(String(config.total || 0))}</b>
+      </header>
+      <p>${escapeHtml(config.caption || "")}</p>
+      <div class="admin-control-chips">
+        ${(config.chips || []).filter(Boolean).map((chip) => `<span>${escapeHtml(chip)}</span>`).join("")}
+      </div>
+      <div class="admin-control-actions">
+        ${(config.actions || []).map((action) => `
+          <button
+            type="button"
+            ${action.filter ? `data-admin-set-filter="${escapeHtml(action.filter)}"` : ""}
+            ${action.inventoryFilter ? `data-open-inventory-filter="${escapeHtml(action.inventoryFilter)}"` : ""}
+            ${action.url ? `data-admin-open-url="${escapeHtml(action.url)}"` : ""}
+          >${escapeHtml(action.label || "")}</button>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderAdminControlBoard(leads) {
+  if (!adminControlBoardEl) return;
+  const activeLeads = leads.filter((lead) => !isClosedLead(lead));
+  const crmQueueCount = activeLeads.length;
+  const callNowCount = activeLeads.filter(isAdminCallNowLead).length;
+  const ownerUnreadCount = activeLeads.filter((lead) => Boolean(lead.owner_review?.unread)).length;
+  const duplicateReviewCount = activeLeads.filter((lead) => Boolean(lead.duplicate_warning?.message) && !lead.duplicate_warning?.reviewed).length;
+  const dealDeskCount = leads.filter(isAdminDealDeskLead).length;
+  const dealDeskPendingCount = leads.filter((lead) => isAdminDealDeskLead(lead) && adminDealChecklistSummary(lead).pending > 0).length;
+  const deliveryBookedCount = leads.filter((lead) => isAdminDealDeskLead(lead) && Boolean(adminDealChecklistSummary(lead).delivery_at)).length;
+  const keyReadyCount = leads.filter((lead) => isAdminDealDeskLead(lead) && ["ready", "complete"].includes(String(adminDealChecklistSummary(lead).key_handoff_status || "").toLowerCase())).length;
+  const inventoryActiveCount = inventoryCache.filter((item) => !["sold", "archived"].includes(String(item.status || "").toLowerCase())).length;
+  const inventoryDraftCount = inventoryCache.filter((item) => ["draft", "review"].includes(String(item.status || "").toLowerCase())).length;
+  const inventoryPublishedCount = inventoryCache.filter((item) => String(item.status || "").toLowerCase() === "published").length;
+  const inventorySoldCount = inventoryCache.filter((item) => String(item.status || "").toLowerCase() === "sold").length;
+  const clusterCount = new Set(
+    leads
+      .filter((lead) => (lead?.vehicle_context?.related_lead_count || 0) > 0 || (lead?.vehicle_context?.inventory_count || 0) > 0 || lead?.duplicate_warning?.message || lead?.vehicle_signal?.message)
+      .map(adminVehicleClusterKey)
+      .filter(Boolean)
+  ).size;
+  const clusterAlertCount = leads.filter((lead) => lead?.vehicle_signal?.message || (lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed)).length;
+
+  adminControlBoardEl.innerHTML = `
+    ${renderAdminControlCard({
+      tone: "control-crm",
+      kicker: "CRM",
+      title: "Manager queue",
+      total: crmQueueCount,
+      caption: "Work live BUY and SELL opportunities, unread updates, and follow-ups from one lane.",
+      chips: [`Call now ${callNowCount}`, `Owner unread ${ownerUnreadCount}`, `Duplicate review ${duplicateReviewCount}`],
+      actions: [
+        { label: "Open active CRM", filter: "active" },
+        { label: "Open call now", filter: "call-now" },
+        { label: "Open owner unread", filter: "owner-unread" }
+      ]
+    })}
+    ${renderAdminControlCard({
+      tone: "control-inventory",
+      kicker: "Inventory",
+      title: "Warehouse board",
+      total: inventoryActiveCount,
+      caption: "Move seller vehicles through draft, publish, sold, and archive without losing CRM context.",
+      chips: [`Draft / review ${inventoryDraftCount}`, `Published ${inventoryPublishedCount}`, `Sold ${inventorySoldCount}`],
+      actions: [
+        { label: "Open active stock", inventoryFilter: "active" },
+        { label: "Open draft / review", inventoryFilter: "draft" },
+        { label: "Open sold stock", inventoryFilter: "sold" }
+      ]
+    })}
+    ${renderAdminControlCard({
+      tone: "control-dealdesk",
+      kicker: "Deal Desk",
+      title: "Handoff and delivery",
+      total: dealDeskCount,
+      caption: "Track won buyers, warehouse intake, checklist progress, delivery booking, and key handoff.",
+      chips: [`Checklist open ${dealDeskPendingCount}`, `Delivery booked ${deliveryBookedCount}`, `Keys ready ${keyReadyCount}`],
+      actions: [
+        { label: "Open deal desk", filter: "deal-desk" },
+        { label: "Open sold inventory", inventoryFilter: "sold" },
+        { label: "Open ready for warehouse", filter: "seller" }
+      ]
+    })}
+    ${renderAdminControlCard({
+      tone: "control-clusters",
+      kicker: "Vehicle Clusters",
+      title: "Duplicate and shared vehicle watch",
+      total: clusterCount,
+      caption: "Review duplicate seller vehicles, same-vehicle buyer activity, and cross-lane vehicle signals.",
+      chips: [`Vehicle alerts ${clusterAlertCount}`, `Needs duplicate review ${duplicateReviewCount}`, `Shared vehicle map ${clusterCount}`],
+      actions: [
+        { label: "Open duplicate review", filter: "duplicate-review" },
+        { label: "Open owner watchlist", filter: "owner-unread" },
+        { label: "Open vehicle clusters", url: "/admin-vehicles.html" }
+      ]
+    })}
+  `;
+}
+
 function renderAdminOverview(leads) {
   if (!adminOverviewEl) return;
   const activeLeads = leads.filter((lead) => !isClosedLead(lead));
@@ -1298,6 +1475,7 @@ function renderAdminOverview(leads) {
     ${renderAdminOverviewCard("closed", "overview-closed", "Closed", closedCount, "Won, lost, or archived")}
     ${renderAdminOverviewCard("active", "overview-buyer", "New leads", newCount, "Fresh opportunities to route")}
   `;
+  renderAdminControlBoard(leads);
   renderAdminToday(leads);
 }
 
@@ -1828,7 +2006,7 @@ function renderLead(lead, index = 0) {
   const overdue = isOverdue(followUp, status);
   const statusClass = overdue ? "status-overdue" : `status-${cssToken(status)}`;
   const statusLabel = overdue ? "Overdue" : leadStatusLabel(status, buyer);
-  const pendingAlert = Boolean(ownerReview.unread) || adminLeadAlertMap.has(String(lead.id || ""));
+  const pendingAlert = Boolean(ownerReview.unread) || hasAdminVisibleAlert(String(lead.id || ""));
   const progressSteps = renderLeadProgress(buyer, status);
   const inventoryListing = inventoryCache.find((item) => item.sourceLeadId && item.sourceLeadId === lead.id);
   const actionButtons = leadStatusActions(buyer, status)
@@ -1969,6 +2147,7 @@ function renderLead(lead, index = 0) {
         </div>
         <div class="lead-list-col lead-list-col-actions">
           <div class="lead-quick-strip" aria-label="Lead quick actions">
+            <span class="lead-current-badge" aria-hidden="true">CURRENT</span>
             <button type="button" class="lead-quick-button" data-admin-open-workspace>Open</button>
             <button type="button" class="lead-quick-button" data-admin-focus-followup>Follow-up</button>
             <button type="button" class="lead-quick-button" data-admin-focus-note="call">Log call</button>
@@ -3328,10 +3507,8 @@ leadsEl.addEventListener("toggle", async (event) => {
   const card = details.closest(".lead-card");
   if (!card) return;
   if (card.dataset.id) setActiveAdminLead(card.dataset.id);
-  if (card.dataset.id && adminLeadAlertMap.has(card.dataset.id)) {
-    const lead = adminLeadsCache.find((item) => String(item.id || "") === String(card.dataset.id));
-    if (!lead?.owner_review?.unread) markAdminLeadTokenRead(card.dataset.id);
-    adminLeadAlertMap.delete(card.dataset.id);
+  if (card.dataset.id && hasAdminVisibleAlert(card.dataset.id)) {
+    clearAdminVisibleAlertGroup(card.dataset.id);
     renderAdminLeadAlerts();
     card.classList.remove("lead-card-updated");
   }

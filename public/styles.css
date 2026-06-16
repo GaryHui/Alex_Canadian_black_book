@@ -1475,6 +1475,114 @@ body.admin-drawer-open .admin-shell {
   margin: 16px 0;
 }
 
+.admin-control-board {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin: 16px 0;
+}
+
+.admin-control-card {
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-left: 6px solid #64748b;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .05);
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.admin-control-card header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.admin-control-card header span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.admin-control-card h3 {
+  color: #16243a;
+  font-size: 18px;
+  margin: 4px 0 0;
+}
+
+.admin-control-card header b {
+  color: #0f172a;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.admin-control-card p {
+  color: #516174;
+  margin: 0;
+}
+
+.admin-control-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-control-chips span {
+  background: #eef4fb;
+  border: 1px solid #d8e2ef;
+  border-radius: 999px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 10px;
+}
+
+.admin-control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-control-actions button {
+  background: #fff;
+  border: 1px solid #b9c7d8;
+  border-radius: 999px;
+  color: #1f3652;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 9px 12px;
+}
+
+.admin-control-actions button:hover {
+  background: #eef6ff;
+  border-color: #0b4f9c;
+  color: #0b4f9c;
+}
+
+.admin-control-card.control-crm {
+  border-left-color: #0b4f9c;
+  background: linear-gradient(180deg, #eef6ff 0%, #ffffff 100%);
+}
+
+.admin-control-card.control-inventory {
+  border-left-color: #f59e0b;
+  background: linear-gradient(180deg, #fff8ed 0%, #ffffff 100%);
+}
+
+.admin-control-card.control-dealdesk {
+  border-left-color: #475569;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.admin-control-card.control-clusters {
+  border-left-color: #7c3aed;
+  background: linear-gradient(180deg, #f6f1ff 0%, #ffffff 100%);
+}
+
 .admin-overview-card {
   background: #fff;
   border: 1px solid #d8e2ef;
@@ -2180,21 +2288,22 @@ body.admin-drawer-open .admin-shell {
   z-index: 4;
 }
 
-.lead-card-current::before,
-.dealer-lead-card-current::before {
+.lead-current-badge {
   background: linear-gradient(90deg, #2563eb, #60a5fa);
   border-radius: 999px;
   color: #fff;
-  content: "CURRENT";
+  display: none;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: .08em;
+  line-height: 1;
   padding: 6px 9px;
-  pointer-events: none;
-  position: absolute;
-  right: 10px;
-  top: 10px;
-  z-index: 8;
+}
+
+.lead-card-current .lead-current-badge,
+.dealer-lead-card-current .lead-current-badge {
+  display: inline-flex;
+  align-items: center;
 }
 
 .lead-card-current .lead-manage,
@@ -2346,6 +2455,10 @@ body.admin-drawer-open .admin-shell {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.lead-quick-strip {
+  align-items: center;
 }
 
 .lead-summary-metrics span,
