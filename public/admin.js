@@ -671,7 +671,7 @@ function collectAdminLeadAlerts(leads) {
           title: leadAlertTitle(lead),
           message: lead.owner_review.reason || "Owner review required"
         });
-      } else if (lead.duplicate_warning?.message) {
+      } else if (lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed) {
         adminLeadAlertMap.set(id, {
           id,
           type: "owner",
@@ -717,7 +717,7 @@ function collectAdminLeadAlerts(leads) {
         title: leadAlertTitle(lead),
         message: lead.owner_review.reason || "Owner review required"
       });
-    } else if (lead.duplicate_warning?.message) {
+    } else if (lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed) {
       adminLeadAlertMap.set(id, {
         id,
         type: "owner",
@@ -820,9 +820,35 @@ function vehicleSignalInline(lead) {
   return `<p class="lead-vehicle-signal lead-vehicle-signal-${escapeHtml(tone)}">${escapeHtml(signal.message)}</p>`;
 }
 
+function vehicleContextInline(lead) {
+  const context = lead?.vehicle_context;
+  if (!context) return "";
+  const pills = [];
+  if (context.active_buyer_count > 0) pills.push(`${context.active_buyer_count} active buyer lead${context.active_buyer_count === 1 ? "" : "s"}`);
+  if (context.has_active_offer) pills.push("offer already active");
+  if (context.sold_elsewhere) pills.push("vehicle sold");
+  if (context.off_market) pills.push("off market");
+  if (context.primary_inventory_status) pills.push(`warehouse ${String(context.primary_inventory_status).replaceAll("_", " ")}`);
+  if (!pills.length && !context.related_lead_count) return "";
+  return `
+    <section class="lead-vehicle-context">
+      <span>Vehicle cluster</span>
+      <strong>${escapeHtml(context.cluster_label || "Same vehicle activity")}</strong>
+      <small>${escapeHtml(pills.join(" | ") || "Related vehicle activity found.")}</small>
+    </section>
+  `;
+}
+
 function duplicateWarningInline(lead) {
   const duplicate = lead?.duplicate_warning;
   if (!duplicate?.message) return "";
+  if (duplicate.reviewed) {
+    return `
+      <section class="owner-review-read duplicate-vehicle-reviewed">
+        <span>Duplicate seller review completed${duplicate.reviewed_at ? ` ${escapeHtml(formatDateTime(duplicate.reviewed_at))}` : ""}${duplicate.reviewed_by ? ` by ${escapeHtml(duplicate.reviewed_by)}` : ""}</span>
+      </section>
+    `;
+  }
   const count = Number(duplicate.count || 0);
   return `
     <section class="owner-review-required duplicate-vehicle-warning">
@@ -830,6 +856,11 @@ function duplicateWarningInline(lead) {
         <span>Duplicate vehicle warning</span>
         <strong>${escapeHtml(duplicate.message)}</strong>
         <small>${escapeHtml(count ? `${count} related CRM / Warehouse record${count === 1 ? "" : "s"} detected.` : "Related records detected.")}</small>
+      </div>
+      <div class="duplicate-review-actions">
+        <button type="button" data-duplicate-review="keep_separate">Keep separate</button>
+        <button type="button" data-duplicate-review="merge_existing">Merge later</button>
+        <button type="button" data-duplicate-review="link_inventory">Link warehouse</button>
       </div>
     </section>
   `;
@@ -917,6 +948,7 @@ function filterAdminLeads(leads) {
   if (adminLeadFilter === "active") filtered = leads.filter((lead) => !isClosedLead(lead));
   if (adminLeadFilter === "closed") filtered = leads.filter(isClosedLead);
   if (adminLeadFilter === "owner-unread") filtered = leads.filter((lead) => Boolean(lead.owner_review?.unread));
+  if (adminLeadFilter === "duplicate-review") filtered = leads.filter((lead) => !isClosedLead(lead) && Boolean(lead.duplicate_warning?.message) && !lead.duplicate_warning?.reviewed);
   if (adminLeadFilter === "buyer") filtered = leads.filter((lead) => !isClosedLead(lead) && isBuyerLead(lead));
   if (adminLeadFilter === "seller") filtered = leads.filter((lead) => !isClosedLead(lead) && !isBuyerLead(lead));
   if (adminLeadFilter === "unassigned") filtered = leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim());
@@ -968,6 +1000,7 @@ function renderAdminOverview(leads) {
   const activeSellerCount = activeLeads.length - activeBuyerCount;
   const closedCount = leads.length - activeCount;
   const ownerUnreadCount = leads.filter((lead) => Boolean(lead.owner_review?.unread)).length;
+  const duplicateReviewCount = leads.filter((lead) => !isClosedLead(lead) && Boolean(lead.duplicate_warning?.message) && !lead.duplicate_warning?.reviewed).length;
   const unassignedCount = leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim()).length;
   const followUpCount = leads.filter((lead) => !isClosedLead(lead) && isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).length;
   const urgentCount = leads.filter((lead) => !isClosedLead(lead) && String(lead.priority || "").toLowerCase() === "urgent").length;
@@ -991,6 +1024,11 @@ function renderAdminOverview(leads) {
       <span>Owner unread</span>
       <strong>${ownerUnreadCount}</strong>
       <small>Needs review</small>
+    </button>
+    <button class="admin-overview-card overview-owner" type="button" data-admin-set-filter="duplicate-review">
+      <span>Duplicate review</span>
+      <strong>${duplicateReviewCount}</strong>
+      <small>SELL vehicles to review</small>
     </button>
     <button class="admin-overview-card overview-follow" type="button" data-admin-set-filter="needs-follow-up">
       <span>Needs follow-up</span>
@@ -1026,6 +1064,10 @@ function renderAdminToday(leads) {
     .filter((lead) => !isClosedLead(lead) && isFollowUpDue(lead.next_follow_up_at, lead.status || "new"))
     .sort((a, b) => new Date(a.next_follow_up_at || a.created_at || 0).getTime() - new Date(b.next_follow_up_at || b.created_at || 0).getTime())
     .slice(0, 6);
+  const duplicateItems = leads
+    .filter((lead) => !isClosedLead(lead) && lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed)
+    .sort(compareAdminLeadOrder)
+    .slice(0, 4);
   const draftCount = inventoryCache.filter((item) => ["draft", "review"].includes(String(item.status || "").toLowerCase())).length;
   const soldCount = inventoryCache.filter((item) => String(item.status || "").toLowerCase() === "sold").length;
   const attentionMarkup = attention.length
@@ -1078,6 +1120,24 @@ function renderAdminToday(leads) {
           `}
         </div>
       </section>
+      <section class="admin-duplicate-panel">
+        <header>
+          <span>Duplicate seller review</span>
+          <b>${duplicateItems.length}</b>
+        </header>
+        <div class="admin-today-actions">
+          <button type="button" data-admin-set-filter="duplicate-review">
+            <b>${duplicateItems.length}</b>
+            <span>Open duplicate SELL queue</span>
+          </button>
+          ${duplicateItems.length ? `<div class="admin-due-list">${duplicateItems.map(renderAdminDuplicateButton).join("")}</div>` : `
+            <div class="admin-today-empty">
+              <b>No duplicate seller reviews waiting.</b>
+              <span>New duplicate VIN or vehicle matches will appear here.</span>
+            </div>
+          `}
+        </div>
+      </section>
       <section>
         <header>
           <span>Warehouse decisions</span>
@@ -1110,6 +1170,22 @@ function renderAdminDueButton(lead) {
       <div>
         <b>${escapeHtml(title)}</b>
         <small>${escapeHtml(followUp)}</small>
+      </div>
+    </button>
+  `;
+}
+
+function renderAdminDuplicateButton(lead) {
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+  const title = cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), isBuyerLead(lead)) || "Vehicle lead";
+  const duplicate = lead.duplicate_warning || {};
+  return `
+    <button type="button" class="admin-due-item admin-duplicate-item" data-admin-open-lead="${escapeHtml(lead.id || "")}">
+      <span class="admin-due-type">SELL</span>
+      <div>
+        <b>${escapeHtml(title)}</b>
+        <small>${escapeHtml(duplicate.message || "Duplicate vehicle review required")}</small>
       </div>
     </button>
   `;
@@ -1228,6 +1304,8 @@ function searchableLeadText(lead) {
   const input = lead?.input || {};
   const valuation = lead?.valuation || {};
   const ownerReview = lead?.owner_review || {};
+  const duplicate = lead?.duplicate_warning || {};
+  const vehicleContext = lead?.vehicle_context || {};
   return [
     lead?.id,
     lead?.status,
@@ -1253,7 +1331,11 @@ function searchableLeadText(lead) {
     input.preferredContact,
     input.ownershipType,
     valuation.title,
-    valuation.source
+    valuation.source,
+    duplicate.message,
+    duplicate.decision,
+    vehicleContext.cluster_label,
+    vehicleContext.primary_inventory_status
   ].filter(Boolean).join(" ").toLowerCase();
 }
 
@@ -1279,6 +1361,7 @@ function renderLead(lead, index = 0) {
   const assignedTo = lead.assigned_to || "";
   const priority = lead.priority || "normal";
   const ownerReview = lead.owner_review || {};
+  const vehicleContext = lead.vehicle_context || {};
   const purchase = input.buyerPlan || valuation.buyerPlan || {};
   const followUp = lead.next_follow_up_at || "";
   const lastActivity = lead.last_activity_at || "";
@@ -1351,6 +1434,7 @@ function renderLead(lead, index = 0) {
         <span>Owner reviewed ${escapeHtml(formatDateTime(ownerReview.read_at))}${ownerReview.read_by ? ` by ${escapeHtml(ownerReview.read_by)}` : ""}</span>
       </section>` : "";
   const signalBanner = vehicleSignalInline(lead);
+  const contextBanner = vehicleContextInline(lead);
   const duplicateBanner = duplicateWarningInline(lead);
   const sharedMeta = renderSharedLeadMeta({
     customerEmail,
@@ -1384,6 +1468,7 @@ function renderLead(lead, index = 0) {
       </header>
       ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${ownerReview.unread ? "Owner review required" : "New update on this lead"}</button>` : ""}
       ${signalBanner}
+      ${contextBanner}
       ${duplicateBanner}
       ${ownerReviewBanner}
       ${sharedMeta}
@@ -1393,6 +1478,21 @@ function renderLead(lead, index = 0) {
       ${warehousePanel}
       <details class="lead-manage">
         <summary>Open lead workspace</summary>
+        ${vehicleContext.related_lead_count || vehicleContext.inventory_count ? `
+          <section class="lead-detail-section lead-vehicle-ops-panel">
+            <header>
+              <h3>Vehicle operations</h3>
+              <span>Same-vehicle activity across CRM and Warehouse</span>
+            </header>
+            <dl class="lead-grid">
+              <span>Related leads</span><b>${escapeHtml(String(vehicleContext.related_lead_count || 0))}</b>
+              <span>Active buyer leads</span><b>${escapeHtml(String(vehicleContext.active_buyer_count || 0))}</b>
+              <span>Warehouse records</span><b>${escapeHtml(String(vehicleContext.inventory_count || 0))}</b>
+              <span>Warehouse status</span><b>${escapeHtml(vehicleContext.primary_inventory_status ? String(vehicleContext.primary_inventory_status).replaceAll("_", " ") : "Not in warehouse")}</b>
+              <span>Offer activity</span><b>${escapeHtml(vehicleContext.has_active_offer ? "Active" : "None")}</b>
+              <span>Vehicle availability</span><b>${escapeHtml(vehicleContext.sold_elsewhere ? "Sold" : vehicleContext.off_market ? "Off market" : "Available / unknown")}</b>
+            </dl>
+          </section>` : ""}
         <section class="lead-detail-section lead-detail-summary">
           <header>
             <h3>Customer and vehicle summary</h3>
@@ -2125,6 +2225,10 @@ async function quickAddDraftInventory(button) {
   const leadId = button.dataset.quickInventory || card?.dataset?.id || "";
   if (!leadId) return;
   const lead = adminLeadsCache.find((item) => String(item.id || "") === String(leadId));
+  if (lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed) {
+    statusEl.textContent = "Review duplicate seller vehicle first, then move it into Warehouse.";
+    return;
+  }
   const previousStatus = String(lead?.status || "assigned").trim().toLowerCase() || "assigned";
 
   button.disabled = true;
@@ -2189,6 +2293,35 @@ leadsEl.addEventListener("toggle", async (event) => {
   if (card.dataset.activityLoaded === "true") return;
   await loadLeadActivity(card, { force: true });
 }, true);
+
+leadsEl.addEventListener("click", async (event) => {
+  const reviewButton = event.target.closest("[data-duplicate-review]");
+  if (!reviewButton) return;
+  const card = reviewButton.closest(".lead-card");
+  const leadId = card?.dataset?.id || "";
+  const decision = reviewButton.dataset.duplicateReview || "keep_separate";
+  if (!leadId) return;
+  reviewButton.disabled = true;
+  statusEl.textContent = "Saving duplicate vehicle review...";
+  try {
+    const response = await fetch("/api/leads", {
+      method: "PATCH",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "duplicate_review",
+        id: leadId,
+        decision
+      })
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(formatApiError(data, "Unable to save duplicate review."));
+    statusEl.textContent = "Duplicate vehicle review saved.";
+    await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+  } catch (error) {
+    statusEl.textContent = error.message || "Unable to save duplicate review.";
+    reviewButton.disabled = false;
+  }
+});
 
 leadsEl.addEventListener("focusin", (event) => {
   const card = event.target.closest(".lead-card");

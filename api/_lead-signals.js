@@ -46,17 +46,20 @@ export async function attachLeadSignals(leads, client) {
   const ids = leads.map((lead) => String(lead.id || "").trim()).filter(Boolean);
   if (!ids.length) return leads;
 
-  const [signalNotes, inventoryRows] = await Promise.all([
-    fetchVehicleSignalNotes(ids, client),
-    fetchVehicleListings(client)
+  const [signalNotes, inventoryRows, allLeads] = await Promise.all([
+    fetchLeadSignalNotes(ids, client),
+    fetchVehicleListings(client),
+    fetchAllLeads(client)
   ]);
 
-  const duplicateMap = buildDuplicateWarningMap(leads, inventoryRows);
+  const duplicateMap = buildDuplicateWarningMap(leads, allLeads, inventoryRows, signalNotes);
+  const vehicleContextMap = buildVehicleContextMap(leads, allLeads, inventoryRows);
   const signalMap = latestSignalByLead(signalNotes);
   return leads.map((lead) => ({
     ...lead,
     vehicle_signal: signalMap.get(String(lead.id || "")) || null,
-    duplicate_warning: duplicateMap.get(String(lead.id || "")) || null
+    duplicate_warning: duplicateMap.get(String(lead.id || "")) || null,
+    vehicle_context: vehicleContextMap.get(String(lead.id || "")) || null
   }));
 }
 
@@ -84,21 +87,46 @@ export async function notifySameVehicleBuyerLeads(client, reference, options = {
 
 export async function notifyDuplicateSellerLead(client, lead) {
   if (!client?.url || !client?.key || !lead?.id || isBuyerLead(lead)) return { ok: true, count: 0 };
-  const leads = await fetchAllLeads(client);
-  const inventoryRows = await fetchVehicleListings(client);
-  const duplicates = duplicateMatchesForLead(lead, leads, inventoryRows).slice(0, 3);
-  if (!duplicates.length) return { ok: true, count: 0 };
-
-  const message = duplicates.some((item) => item.kind === "inventory")
-    ? "Possible duplicate seller vehicle. Matching CRM or Warehouse records already exist for this vehicle."
-    : "Possible duplicate seller vehicle. Another SELL lead already matches this vehicle.";
-
-  await createOwnerReviewNote(client, String(lead.id || ""), message, "system");
+  const duplicate = await evaluateDuplicateSellerLead(client, lead);
+  if (!duplicate) return { ok: true, count: 0 };
+  await createOwnerReviewNote(client, String(lead.id || ""), duplicate.message, "system");
   await createVehicleSignalNotes(client, [String(lead.id || "")], {
     code: "duplicate_vehicle",
-    message
+    message: duplicate.message
   });
-  return { ok: true, count: duplicates.length };
+  return { ok: true, count: duplicate.count || 0 };
+}
+
+export async function evaluateDuplicateSellerLead(client, lead) {
+  if (!client?.url || !client?.key || !lead?.id || isBuyerLead(lead)) return null;
+  const [allLeads, inventoryRows, notes] = await Promise.all([
+    fetchAllLeads(client),
+    fetchVehicleListings(client),
+    fetchLeadSignalNotes([String(lead.id || "")], client)
+  ]);
+  return duplicateWarningForLead(lead, allLeads, inventoryRows, notes);
+}
+
+export async function reviewDuplicateSellerLead(client, leadId, decision, authorEmail) {
+  const id = String(leadId || "").trim();
+  const choice = duplicateDecision(decision);
+  if (!client?.url || !client?.key || !id) return { ok: false, error: "Lead id is required" };
+  const author = String(authorEmail || "system").trim().toLowerCase() || "system";
+  const message = duplicateDecisionMessage(choice);
+  await insertLeadNote(client, {
+    lead_id: id,
+    author_email: author,
+    note_type: "internal",
+    note: `[Vehicle review:duplicate_reviewed:${choice}] ${message}`
+  });
+  await insertLeadNote(client, {
+    lead_id: id,
+    author_email: author,
+    note_type: "owner_read",
+    note: `Duplicate vehicle review completed: ${message}`
+  });
+  await touchLeadIds(client, [id]);
+  return { ok: true, decision: choice };
 }
 
 export async function createVehicleSignalNotes(client, leadIds, options = {}) {
@@ -118,14 +146,14 @@ export async function createVehicleSignalNotes(client, leadIds, options = {}) {
   await touchLeadIds(client, ids);
 }
 
-async function fetchVehicleSignalNotes(ids, client) {
+async function fetchLeadSignalNotes(ids, client) {
   const encoded = ids.map(encodeURIComponent).join(",");
   const response = await fetch(`${client.url}/rest/v1/lead_notes?select=lead_id,created_at,author_email,note,note_type&lead_id=in.(${encoded})&order=created_at.desc&limit=500`, {
     headers: authHeaders(client.key)
   });
   const rows = await response.json().catch(() => []);
   if (!response.ok) return [];
-  return (Array.isArray(rows) ? rows : []).filter((row) => isVehicleSignalNote(row?.note));
+  return Array.isArray(rows) ? rows : [];
 }
 
 async function fetchAllLeads(client) {
@@ -144,22 +172,32 @@ async function fetchVehicleListings(client) {
   return response.ok && Array.isArray(rows) ? rows : [];
 }
 
-function buildDuplicateWarningMap(leads, inventoryRows) {
+function buildDuplicateWarningMap(leads, allLeads, inventoryRows, notes) {
   const map = new Map();
   for (const lead of leads) {
-    const id = String(lead.id || "").trim();
-    if (!id || isBuyerLead(lead)) continue;
-    const matches = duplicateMatchesForLead(lead, leads, inventoryRows).slice(0, 3);
-    if (!matches.length) continue;
-    map.set(id, {
-      count: matches.length,
-      items: matches,
-      message: matches.some((item) => item.kind === "inventory")
-        ? "Possible duplicate seller vehicle already exists in CRM / Warehouse."
-        : "Possible duplicate seller vehicle already exists in CRM."
-    });
+    const warning = duplicateWarningForLead(lead, allLeads, inventoryRows, notes);
+    if (warning) map.set(String(lead.id || "").trim(), warning);
   }
   return map;
+}
+
+function duplicateWarningForLead(lead, leads, inventoryRows, notes) {
+  const id = String(lead?.id || "").trim();
+  if (!id || isBuyerLead(lead)) return null;
+  const matches = duplicateMatchesForLead(lead, leads, inventoryRows).slice(0, 4);
+  if (!matches.length) return null;
+  const review = latestDuplicateReviewByLead(notes).get(id) || null;
+  return {
+    count: matches.length,
+    items: matches,
+    reviewed: Boolean(review),
+    reviewed_at: review?.created_at || "",
+    reviewed_by: review?.author_email || "",
+    decision: review?.decision || "",
+    message: matches.some((item) => item.kind === "inventory")
+      ? "Possible duplicate seller vehicle already exists in CRM / Warehouse."
+      : "Possible duplicate seller vehicle already exists in CRM."
+  };
 }
 
 function duplicateMatchesForLead(lead, leads, inventoryRows) {
@@ -195,7 +233,7 @@ function duplicateMatchesForLead(lead, leads, inventoryRows) {
 
 function latestSignalByLead(notes) {
   const map = new Map();
-  for (const note of Array.isArray(notes) ? notes : []) {
+  for (const note of (Array.isArray(notes) ? notes : []).filter((row) => isVehicleSignalNote(row?.note))) {
     const leadId = String(note.lead_id || "").trim();
     if (!leadId || map.has(leadId)) continue;
     const parsed = parseVehicleSignalNote(note.note);
@@ -211,11 +249,37 @@ function latestSignalByLead(notes) {
   return map;
 }
 
+function latestDuplicateReviewByLead(notes) {
+  const map = new Map();
+  for (const note of Array.isArray(notes) ? notes : []) {
+    const leadId = String(note?.lead_id || "").trim();
+    const parsed = parseDuplicateReviewNote(note?.note);
+    if (!leadId || !parsed) continue;
+    if (map.has(leadId)) continue;
+    map.set(leadId, {
+      created_at: note.created_at || "",
+      author_email: note.author_email || "",
+      decision: parsed.decision,
+      message: parsed.message
+    });
+  }
+  return map;
+}
+
 function parseVehicleSignalNote(note) {
   const match = String(note || "").match(/^\[Vehicle signal:([a-z_]+)\]\s*(.+)$/i);
   if (!match) return null;
   return {
     code: signalCode(match[1]),
+    message: String(match[2] || "").trim()
+  };
+}
+
+function parseDuplicateReviewNote(note) {
+  const match = String(note || "").match(/^\[Vehicle review:duplicate_reviewed:([a-z_]+)\]\s*(.+)$/i);
+  if (!match) return null;
+  return {
+    decision: duplicateDecision(match[1]),
     message: String(match[2] || "").trim()
   };
 }
@@ -232,6 +296,44 @@ function signalTone(code) {
   if (["vehicle_sold", "duplicate_vehicle"].includes(code)) return "danger";
   if (["vehicle_unlisted", "shared_offer"].includes(code)) return "warning";
   return "info";
+}
+
+function buildVehicleContextMap(leads, allLeads, inventoryRows) {
+  const map = new Map();
+  for (const lead of Array.isArray(leads) ? leads : []) {
+    const id = String(lead?.id || "").trim();
+    if (!id) continue;
+    const keys = leadVehicleKeys(lead);
+    if (!keys.length) continue;
+    const relatedLeads = (Array.isArray(allLeads) ? allLeads : [])
+      .filter((item) => {
+        const itemId = String(item?.id || "").trim();
+        return itemId && itemId !== id && sharesVehicle(keys, leadVehicleKeys(item));
+      });
+    const relatedBuyerLeads = relatedLeads.filter(isBuyerLead);
+    const activeBuyerLeads = relatedBuyerLeads.filter((item) => !isClosedLeadStatus(item.status));
+    const sellerDuplicates = relatedLeads.filter((item) => !isBuyerLead(item));
+    const matchingInventory = (Array.isArray(inventoryRows) ? inventoryRows : [])
+      .filter((item) => sharesVehicle(keys, listingVehicleKeys(item)));
+    const activeOffer = activeBuyerLeads.some((item) => ["finance_sent", "appointment_booked", "offer_sent"].includes(String(item.status || "").toLowerCase()));
+    const soldState = activeBuyerLeads.some((item) => String(item.status || "").toLowerCase() === "won")
+      || matchingInventory.some((item) => String(item.status || "").toLowerCase() === "sold");
+    const offMarket = matchingInventory.length > 0 && matchingInventory.every((item) => ["archived", "draft", "review"].includes(String(item.status || "").toLowerCase()));
+    map.set(id, {
+      related_lead_count: relatedLeads.length,
+      related_buyer_count: relatedBuyerLeads.length,
+      active_buyer_count: activeBuyerLeads.length,
+      seller_duplicate_count: sellerDuplicates.length,
+      inventory_count: matchingInventory.length,
+      inventory_statuses: [...new Set(matchingInventory.map((item) => String(item.status || "").toLowerCase()).filter(Boolean))],
+      has_active_offer: activeOffer,
+      sold_elsewhere: soldState,
+      off_market: offMarket,
+      primary_inventory_status: matchingInventory[0]?.status || "",
+      cluster_label: vehicleClusterLabel(lead)
+    });
+  }
+  return map;
 }
 
 function vehicleKeysForRecord(record) {
@@ -257,6 +359,12 @@ function vehicleKeysFromFields(fields) {
   if (uvc) keys.push(`uvc:${uvc}`);
   if (year && make && model) keys.push(`spec:${[year, make, model, series, style].join("|")}`);
   return [...new Set(keys)];
+}
+
+function vehicleClusterLabel(lead) {
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  return String([input.year || valuation.year, input.make || valuation.make, input.model || valuation.model].filter(Boolean).join(" ") || leadDisplayTitle(lead)).trim();
 }
 
 function normalizeVehicleText(value) {
@@ -298,6 +406,17 @@ async function insertLeadNote(client, payload) {
     },
     body: JSON.stringify(payload)
   }).catch(() => null);
+}
+
+function duplicateDecision(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["keep_separate", "merge_existing", "link_inventory"].includes(normalized) ? normalized : "keep_separate";
+}
+
+function duplicateDecisionMessage(decision) {
+  if (decision === "merge_existing") return "Owner reviewed duplicate seller vehicle and will merge it into the existing CRM record.";
+  if (decision === "link_inventory") return "Owner reviewed duplicate seller vehicle and linked it to the existing warehouse record.";
+  return "Owner reviewed duplicate seller vehicle and chose to keep it as a separate lead.";
 }
 
 function authHeaders(key) {

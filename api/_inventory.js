@@ -1,5 +1,5 @@
 import { serviceClient, serviceHeaders } from "./_auth.js";
-import { notifySameVehicleBuyerLeads } from "./_lead-signals.js";
+import { evaluateDuplicateSellerLead, notifySameVehicleBuyerLeads } from "./_lead-signals.js";
 
 export function normalizeListingStatus(value) {
   const status = String(value || "draft").trim().toLowerCase();
@@ -40,6 +40,19 @@ export async function updateInventoryListing(body, user) {
   if (!id) return { ok: false, status: 400, error: "Listing id is required" };
   const currentListing = await fetchListingById(client, id);
   if (!currentListing) return { ok: false, status: 404, error: "Inventory listing not found" };
+  const nextStatus = normalizeListingStatus(body.status || currentListing.status);
+  if (nextStatus === "published" && currentListing.source_lead_id) {
+    const lead = await fetchLeadById(client, currentListing.source_lead_id);
+    const duplicateWarning = await evaluateDuplicateSellerLead(client, lead);
+    if (duplicateWarning && !duplicateWarning.reviewed) {
+      return {
+        ok: false,
+        status: 409,
+        error: "Duplicate seller vehicle must be reviewed by owner before publishing this Warehouse listing.",
+        duplicate_warning: duplicateWarning
+      };
+    }
+  }
 
   const status = normalizeListingStatus(body.status);
   const patch = {
@@ -125,6 +138,15 @@ export async function publishLeadToInventory(body, user) {
   if (!leadResult.ok) return leadResult;
   const lead = leadResult.data?.[0];
   if (!lead) return { ok: false, status: 404, error: "Lead not found" };
+  const duplicateWarning = await evaluateDuplicateSellerLead(client, lead);
+  if (duplicateWarning && !duplicateWarning.reviewed) {
+    return {
+      ok: false,
+      status: 409,
+      error: "Duplicate seller vehicle must be reviewed by owner before moving into Warehouse.",
+      duplicate_warning: duplicateWarning
+    };
+  }
 
   const existing = await fetchSupabaseJson(
     `${client.url}/rest/v1/vehicle_listings?select=id,status,updated_at,created_at&source_lead_id=eq.${encodeURIComponent(leadId)}&order=updated_at.desc.nullslast,created_at.desc&limit=1`,
@@ -415,6 +437,16 @@ async function restoreLeadFromInventory(client, leadId) {
 async function fetchListingById(client, listingId) {
   const result = await fetchSupabaseJson(
     `${client.url}/rest/v1/vehicle_listings?select=*&id=eq.${encodeURIComponent(listingId)}&limit=1`,
+    client.key
+  );
+  if (!result.ok) return null;
+  return result.data?.[0] || null;
+}
+
+async function fetchLeadById(client, leadId) {
+  if (!leadId) return null;
+  const result = await fetchSupabaseJson(
+    `${client.url}/rest/v1/valuation_leads?select=*&id=eq.${encodeURIComponent(leadId)}&limit=1`,
     client.key
   );
   if (!result.ok) return null;

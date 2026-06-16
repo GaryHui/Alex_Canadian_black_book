@@ -2260,6 +2260,32 @@ select {
   color: #1d4ed8;
 }
 
+.lead-vehicle-context {
+  background: #f8fafc;
+  border: 1px solid #d8e2ef;
+  border-left: 4px solid #64748b;
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+}
+
+.lead-vehicle-context span {
+  color: #516174;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.lead-vehicle-context strong {
+  color: #16243a;
+}
+
+.lead-vehicle-context small {
+  color: #64748b;
+}
+
 .lead-card-updated {
   border-color: var(--lead-update);
   box-shadow: 0 0 0 2px rgba(245, 158, 11, .2), 0 12px 24px rgba(245, 158, 11, .12);
@@ -2285,6 +2311,37 @@ select {
 
 .duplicate-vehicle-warning {
   margin-top: 6px;
+}
+
+.duplicate-vehicle-reviewed {
+  margin-top: 6px;
+}
+
+.duplicate-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.duplicate-review-actions button {
+  background: #fff;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  color: #9a3412;
+  font-weight: 700;
+  padding: 8px 12px;
+}
+
+.duplicate-review-actions button:hover {
+  background: #fff7ed;
+}
+
+.admin-duplicate-panel header span {
+  color: #9a3412;
+}
+
+.admin-duplicate-item {
+  border-left-color: #f59e0b;
 }
 
 .owner-review-required span,

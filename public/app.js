@@ -1173,6 +1173,25 @@ function dealerVehicleSignalInline(lead) {
   return `<p class="lead-vehicle-signal lead-vehicle-signal-${escapeHtml(tone)}">${escapeHtml(signal.message)}</p>`;
 }
 
+function dealerVehicleContextInline(lead) {
+  const context = lead?.vehicle_context;
+  if (!context) return "";
+  const pills = [];
+  if (context.active_buyer_count > 0) pills.push(`${context.active_buyer_count} active buyer lead${context.active_buyer_count === 1 ? "" : "s"}`);
+  if (context.has_active_offer) pills.push("offer active");
+  if (context.sold_elsewhere) pills.push("vehicle sold");
+  if (context.off_market) pills.push("off market");
+  if (context.primary_inventory_status) pills.push(`warehouse ${String(context.primary_inventory_status).replaceAll("_", " ")}`);
+  if (!pills.length && !context.related_lead_count) return "";
+  return `
+    <section class="lead-vehicle-context">
+      <span>Vehicle cluster</span>
+      <strong>${escapeHtml(context.cluster_label || "Same vehicle activity")}</strong>
+      <small>${escapeHtml(pills.join(" | ") || "Related vehicle activity found.")}</small>
+    </section>
+  `;
+}
+
 function rememberDealerLeadTokens(leads) {
   const readTokens = loadDealerLeadReadTokens();
   let changed = false;
@@ -1304,6 +1323,7 @@ function renderDealerLeads(leads, role) {
     ].filter(Boolean).filter(([, value]) => value !== "" && value !== null && value !== undefined);
 
     const updateToken = dealerLeadUpdateToken(lead);
+    const vehicleContext = lead.vehicle_context || {};
     const progressSteps = renderDealerLeadProgress(buyerLead, status);
     const sharedMeta = renderDealerSharedLeadMeta({
       customerEmail,
@@ -1336,6 +1356,7 @@ function renderDealerLeads(leads, role) {
         </div>
         ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-dealer-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
         ${dealerVehicleSignalInline(lead)}
+        ${dealerVehicleContextInline(lead)}
         <p class="dealer-update-notice" ${pendingAlert ? "" : "hidden"}>Task or follow-up activity changed. Open this lead to review the latest update.</p>
         ${sharedMeta}
         ${progressSteps}
@@ -1345,6 +1366,18 @@ function renderDealerLeads(leads, role) {
         </div>
         <details class="dealer-lead-details">
           <summary>Open lead details, tasks, and activity</summary>
+          ${vehicleContext.related_lead_count || vehicleContext.inventory_count ? `
+            <section class="dealer-info-block">
+              <h3>Vehicle operations</h3>
+              <dl class="history-meta dealer-detail-grid">
+                <div><dt>Related leads</dt><dd>${escapeHtml(String(vehicleContext.related_lead_count || 0))}</dd></div>
+                <div><dt>Active buyer leads</dt><dd>${escapeHtml(String(vehicleContext.active_buyer_count || 0))}</dd></div>
+                <div><dt>Warehouse records</dt><dd>${escapeHtml(String(vehicleContext.inventory_count || 0))}</dd></div>
+                <div><dt>Warehouse status</dt><dd>${escapeHtml(vehicleContext.primary_inventory_status ? String(vehicleContext.primary_inventory_status).replaceAll("_", " ") : "Not in warehouse")}</dd></div>
+                <div><dt>Offer activity</dt><dd>${escapeHtml(vehicleContext.has_active_offer ? "Active" : "None")}</dd></div>
+                <div><dt>Availability</dt><dd>${escapeHtml(vehicleContext.sold_elsewhere ? "Sold" : vehicleContext.off_market ? "Off market" : "Available / unknown")}</dd></div>
+              </dl>
+            </section>` : ""}
           <section class="dealer-info-block">
             <h3>Vehicle details</h3>
             <dl class="history-meta dealer-detail-grid">
@@ -1437,6 +1470,7 @@ function renderDealerLeadSummary(leads) {
   const seller = activeLeads.length - buyer;
   const due = activeLeads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new")).length;
   const priority = activeLeads.filter((lead) => ["high", "urgent"].includes(String(lead.priority || "").toLowerCase())).length;
+  const vehicleAlerts = activeLeads.filter((lead) => lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market).length;
   const closed = leads.length - activeLeads.length;
   const updated = dealerLeadAlertMap.size;
   dealerLeadSummary.innerHTML = [
@@ -1444,6 +1478,7 @@ function renderDealerLeadSummary(leads) {
     ["High priority", priority, "High or urgent leads", "priority"],
     ["BUY", buyer, "Buyer inquiries from inventory", "buyer"],
     ["SELL", seller, "Seller valuation leads", "seller"],
+    ["Vehicle alerts", vehicleAlerts, "Same-vehicle conflicts or inventory updates", "all"],
     ["Needs follow-up", due, "Overdue or due today", "due"],
     ["Closed", closed, "Done or moved to inventory", "closed"],
     ["Updated", updated, "Changed since last refresh", "all"]
@@ -1465,17 +1500,21 @@ function renderDealerTodayWork(leads) {
   const dueLeads = activeLeads
     .filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"))
     .slice(0, 5);
+  const vehicleAlertLeads = activeLeads
+    .filter((lead) => lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market)
+    .slice(0, 5);
   dealerTodayWorkEl.hidden = false;
-  const totalAttention = priorityLeads.length + dueLeads.length;
+  const totalAttention = priorityLeads.length + dueLeads.length + vehicleAlertLeads.length;
   dealerTodayWorkEl.innerHTML = totalAttention ? `
     <header>
       <div>
         <span>Today</span>
         <strong>${totalAttention} task${totalAttention === 1 ? "" : "s"} to work first</strong>
       </div>
-      <button type="button" data-dealer-filter-shortcut="${priorityLeads.length ? "priority" : dueLeads.length ? "due" : "active"}">${priorityLeads.length ? "View priority" : dueLeads.length ? "View due" : "View active"}</button>
+      <button type="button" data-dealer-filter-shortcut="${vehicleAlertLeads.length ? "all" : priorityLeads.length ? "priority" : dueLeads.length ? "due" : "active"}">${vehicleAlertLeads.length ? "View alerts" : priorityLeads.length ? "View priority" : dueLeads.length ? "View due" : "View active"}</button>
     </header>
     <div class="dealer-today-sections">
+      ${renderDealerTodaySection("Vehicle alerts", "Offer, sold, or off-market updates on the same vehicle", vehicleAlertLeads, "all")}
       ${renderDealerTodaySection("Priority", "Urgent or high leads from owner", priorityLeads, "priority")}
       ${renderDealerTodaySection("Due", "Overdue or due today", dueLeads, "due")}
     </div>

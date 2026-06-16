@@ -1,5 +1,5 @@
 import { requireAdmin } from "./_admin.js";
-import { attachLeadSignals, isBuyerLead, notifyDuplicateSellerLead } from "./_lead-signals.js";
+import { attachLeadSignals, isBuyerLead, notifyDuplicateSellerLead, reviewDuplicateSellerLead } from "./_lead-signals.js";
 
 export const config = {
   api: {
@@ -15,7 +15,9 @@ export default async function handler(req, res) {
     if (!admin.ok) return res.status(admin.status).json({ ok: false, error: admin.error });
     const result = req.body?.action === "owner_read"
       ? await markOwnerRead(req.body || {}, admin.user)
-      : await updateLead(req.body || {});
+      : req.body?.action === "duplicate_review"
+        ? await markDuplicateReview(req.body || {}, admin.user)
+        : await updateLead(req.body || {});
     return res.status(result.ok ? 200 : 400).json(result);
   }
 
@@ -382,6 +384,18 @@ async function markOwnerRead(body, user) {
   });
   if (!result.ok) return result;
   return { ok: true, read: result.data?.[0] || null };
+}
+
+async function markDuplicateReview(body, user) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const leadId = String(body.id || body.leadId || "").trim();
+  if (!leadId) return { ok: false, error: "Lead id is required" };
+  if (!url || !key) return { ok: false, error: "Supabase is not configured" };
+  return reviewDuplicateSellerLead({
+    url,
+    key
+  }, leadId, body.decision, user?.email);
 }
 
 async function createOwnerReviewNote({ url, key, leadId, authorEmail, reason }) {
