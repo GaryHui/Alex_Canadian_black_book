@@ -2322,6 +2322,14 @@ function renderAdminDrawer(leadId) {
   const adjustment = lead.owner_adjustment || {};
   const buyer = isBuyerLead(lead);
   const title = cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), buyer) || "Vehicle lead";
+  const vehicleYear = input.year || valuation.year || "";
+  const vehicleMake = input.make || valuation.make || "";
+  const vehicleModel = input.model || valuation.model || "";
+  const vehicleSeries = input.series || valuation.series || "";
+  const vehicleStyle = input.style || valuation.style || "";
+  const vehicleKilometers = input.kilometers || input.mileage || "";
+  const vehicleColor = input.color || "";
+  const vehicleRegion = input.region || valuation.region || "";
   const customerName = input.ownerName || input.name || "";
   const sourceLabel = leadSourceLabel(lead);
   const dealerCreated = sourceLabel === "Dealer appraisal";
@@ -2386,6 +2394,64 @@ function renderAdminDrawer(leadId) {
                 <input type="hidden" name="notes" value="${escapeHtml(lead.notes || "")}" />
                 ${sellerAdjustmentFields}
                 <button type="submit">Save pricing</button>
+              </form>
+            </section>`;
+  const vehicleDetailsSection = `
+            <section class="admin-drawer-section admin-drawer-vehicle-card">
+              <header>
+                <h3>Vehicle details</h3>
+                <span>Manager-editable vehicle record</span>
+              </header>
+              <form class="owner-review admin-drawer-owner-form admin-drawer-vehicle-form">
+                <input type="hidden" name="status" value="${escapeHtml(status)}" />
+                <input type="hidden" name="assignedTo" value="${escapeHtml(assignedTo)}" />
+                <input type="hidden" name="priority" value="${escapeHtml(priority)}" />
+                <input type="hidden" name="nextFollowUpAt" value="${escapeHtml(datetimeLocalValue(followUp))}" />
+                <input type="hidden" name="notes" value="${escapeHtml(lead.notes || "")}" />
+                <input type="hidden" name="ownerWholesale" value="${adjustment.wholesale ?? ""}" />
+                <input type="hidden" name="ownerRetail" value="${adjustment.retail ?? ""}" />
+                <input type="hidden" name="reason" value="${escapeHtml(adjustment.reason || "")}" />
+                <label class="admin-drawer-field-wide">
+                  <span>Vehicle title</span>
+                  <input name="vehicleTitle" value="${escapeHtml(title)}" placeholder="2019 Toyota Mirai Base 4D Sedan" />
+                </label>
+                <label>
+                  <span>VIN</span>
+                  <input name="vehicleVin" value="${escapeHtml(vin === "-" ? "" : vin)}" placeholder="VIN" />
+                </label>
+                <label>
+                  <span>Year</span>
+                  <input name="vehicleYear" value="${escapeHtml(vehicleYear)}" placeholder="2020" />
+                </label>
+                <label>
+                  <span>Make</span>
+                  <input name="vehicleMake" value="${escapeHtml(vehicleMake)}" placeholder="Toyota" />
+                </label>
+                <label>
+                  <span>Model</span>
+                  <input name="vehicleModel" value="${escapeHtml(vehicleModel)}" placeholder="Camry" />
+                </label>
+                <label>
+                  <span>Trim / series</span>
+                  <input name="vehicleSeries" value="${escapeHtml(vehicleSeries)}" placeholder="XSE Hybrid" />
+                </label>
+                <label>
+                  <span>Style</span>
+                  <input name="vehicleStyle" value="${escapeHtml(vehicleStyle)}" placeholder="4D Sedan" />
+                </label>
+                <label>
+                  <span>Kilometers</span>
+                  <input name="vehicleKilometers" type="number" min="0" value="${escapeHtml(vehicleKilometers)}" placeholder="50000" />
+                </label>
+                <label>
+                  <span>Color</span>
+                  <input name="vehicleColor" value="${escapeHtml(vehicleColor)}" placeholder="Black" />
+                </label>
+                <label>
+                  <span>Region</span>
+                  <input name="vehicleRegion" value="${escapeHtml(vehicleRegion)}" placeholder="BC" />
+                </label>
+                <button type="submit">Save vehicle</button>
               </form>
             </section>`;
   const activityStatusButtons = leadStatusActions(buyer, status)
@@ -2498,12 +2564,20 @@ function renderAdminDrawer(leadId) {
                 </label>
                 <button type="submit">Save next step</button>
               </form>
+              <div class="admin-drawer-followup-presets" aria-label="Follow-up presets">
+                <span>Quick follow-up</span>
+                <button type="button" data-followup-preset="today">Today 5 PM</button>
+                <button type="button" data-followup-preset="tomorrow">Tomorrow 10 AM</button>
+                <button type="button" data-followup-preset="3d">In 3 days</button>
+                <button type="button" data-followup-preset="7d">Next week</button>
+              </div>
               ${quickAssignButtons}
               ${renderLeadProgress(buyer, status)}
               <div class="lead-action-row admin-drawer-actions">
                 ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
               </div>
             </section>
+            ${vehicleDetailsSection}
             ${sellerPricingSection}
             ${renderAdminDealChecklistSection(lead)}
             <section class="admin-drawer-section admin-drawer-update-card">
@@ -2663,8 +2737,7 @@ async function quickAssignDrawerLead(button) {
     await markManagerReviewedByLeadId(activeAdminDrawerLeadId, { silent: true, reload: false });
   }
   statusEl.textContent = `Assigned to ${shortEmail(email)}.`;
-  await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
-  renderAdminDrawer(activeAdminDrawerLeadId);
+  await loadLeads({ suppressAlerts: true, forceOpenActivity: true, refreshActiveDrawer: true });
   adminDrawerActivityLoaded = false;
   await loadAdminDrawerActivity({ force: true, highlightLatest: true });
 }
@@ -3178,6 +3251,12 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
     return;
   }
 
+  const followUpPresetButton = event.target.closest("[data-followup-preset]");
+  if (followUpPresetButton) {
+    applyFollowUpPreset(followUpPresetButton.dataset.followupPreset || "");
+    return;
+  }
+
   const refreshButton = event.target.closest("[data-drawer-load-activity]");
   if (refreshButton) {
     adminDrawerActivityLoaded = false;
@@ -3364,6 +3443,8 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
       ? "Assignment saved."
       : ownerForm.classList.contains("admin-drawer-pricing-form")
         ? "Owner pricing saved."
+        : ownerForm.classList.contains("admin-drawer-vehicle-form")
+          ? "Vehicle details saved."
         : "Lead tools saved.";
     statusEl.textContent = data.ok ? savedMessage : (data.error || "Unable to save lead.");
     if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true, refreshActiveDrawer: true });
@@ -3494,6 +3575,28 @@ function syncAssignmentStatus(form) {
   if (String(assignedField.value || "").trim() && (!currentStatus || currentStatus === "new")) {
     statusField.value = "assigned";
   }
+}
+
+function applyFollowUpPreset(preset) {
+  const input = adminLeadDrawerContent?.querySelector('.admin-drawer-assign-form input[name="nextFollowUpAt"]');
+  if (!input) return;
+  const date = new Date();
+  if (preset === "today") {
+    date.setHours(17, 0, 0, 0);
+  } else if (preset === "tomorrow") {
+    date.setDate(date.getDate() + 1);
+    date.setHours(10, 0, 0, 0);
+  } else if (preset === "3d") {
+    date.setDate(date.getDate() + 3);
+    date.setHours(10, 0, 0, 0);
+  } else if (preset === "7d") {
+    date.setDate(date.getDate() + 7);
+    date.setHours(10, 0, 0, 0);
+  } else {
+    return;
+  }
+  input.value = datetimeLocalValue(date.toISOString());
+  input.focus();
 }
 
 async function maybeAdvanceStatusAfterCustomerTouch(noteType) {

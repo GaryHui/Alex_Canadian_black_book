@@ -541,6 +541,9 @@ async function updateLead(body) {
       updated_at: now
     }
   };
+  const vehiclePatch = buildVehiclePatch(body, previous || {});
+  if (vehiclePatch.input) patch.input = vehiclePatch.input;
+  if (vehiclePatch.valuation) patch.valuation = vehiclePatch.valuation;
 
   const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -618,8 +621,75 @@ function buildLeadUpdateTimeline(previous = {}, patch = {}) {
     changes.push(`approved retail ${previousAdjustment.retail ?? "not set"} -> ${patch.owner_adjustment?.retail ?? "not set"}`);
   }
 
+  const vehicleChanges = buildVehicleChangeSummary(previous, patch);
+  if (vehicleChanges) changes.push(vehicleChanges);
+
   if (!changes.length) return "";
   return `Lead updated: ${changes.join("; ")}.`;
+}
+
+function buildVehiclePatch(body = {}, previous = {}) {
+  const hasVehicleField = [
+    "vehicleTitle",
+    "vehicleVin",
+    "vehicleYear",
+    "vehicleMake",
+    "vehicleModel",
+    "vehicleSeries",
+    "vehicleStyle",
+    "vehicleKilometers",
+    "vehicleColor",
+    "vehicleRegion"
+  ].some((key) => Object.prototype.hasOwnProperty.call(body, key));
+  if (!hasVehicleField) return {};
+
+  const input = { ...(previous.input || {}) };
+  const valuation = { ...(previous.valuation || {}) };
+  const title = String(body.vehicleTitle || "").trim();
+  const vin = cleanVin(body.vehicleVin || input.vin || valuation.vin);
+  const year = String(body.vehicleYear || "").trim();
+  const make = String(body.vehicleMake || "").trim();
+  const model = String(body.vehicleModel || "").trim();
+  const series = String(body.vehicleSeries || "").trim();
+  const style = String(body.vehicleStyle || "").trim();
+  const kilometers = numberOrNull(body.vehicleKilometers);
+  const color = String(body.vehicleColor || "").trim();
+  const region = String(body.vehicleRegion || "").trim();
+
+  if (title) valuation.title = title;
+  input.vin = vin;
+  valuation.vin = vin;
+  input.year = year;
+  input.make = make;
+  input.model = model;
+  input.series = series;
+  input.style = style;
+  if (kilometers !== null) input.kilometers = kilometers;
+  input.color = color;
+  input.region = region;
+  valuation.region = region;
+
+  return { input, valuation };
+}
+
+function buildVehicleChangeSummary(previous = {}, patch = {}) {
+  if (!patch.input && !patch.valuation) return "";
+  const beforeInput = previous.input || {};
+  const afterInput = patch.input || beforeInput;
+  const beforeValuation = previous.valuation || {};
+  const afterValuation = patch.valuation || beforeValuation;
+  const changes = [];
+  if (String(beforeValuation.title || "") !== String(afterValuation.title || "")) changes.push("title");
+  if (String(beforeInput.vin || beforeValuation.vin || "") !== String(afterInput.vin || afterValuation.vin || "")) changes.push("VIN");
+  if (String(beforeInput.year || "") !== String(afterInput.year || "")) changes.push("year");
+  if (String(beforeInput.make || "") !== String(afterInput.make || "")) changes.push("make");
+  if (String(beforeInput.model || "") !== String(afterInput.model || "")) changes.push("model");
+  if (String(beforeInput.series || "") !== String(afterInput.series || "")) changes.push("series");
+  if (String(beforeInput.style || "") !== String(afterInput.style || "")) changes.push("style");
+  if (numberOrNull(beforeInput.kilometers) !== numberOrNull(afterInput.kilometers)) changes.push("kilometers");
+  if (String(beforeInput.color || "") !== String(afterInput.color || "")) changes.push("color");
+  if (String(beforeInput.region || beforeValuation.region || "") !== String(afterInput.region || afterValuation.region || "")) changes.push("region");
+  return changes.length ? `vehicle details updated (${changes.join(", ")})` : "";
 }
 
 function normalizeIsoForCompare(value) {

@@ -1686,6 +1686,7 @@ body.admin-drawer-open {
 }
 
 .admin-drawer-command-card,
+.admin-drawer-vehicle-card,
 .admin-drawer-pricing-card,
 .admin-drawer-update-card,
 .admin-drawer-task-card {
@@ -1715,8 +1716,54 @@ body.admin-drawer-open {
   grid-template-columns: repeat(3, minmax(140px, 1fr)) auto;
 }
 
+.admin-drawer-vehicle-form {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+}
+
+.admin-drawer-field-wide {
+  grid-column: span 2;
+}
+
+.admin-drawer-vehicle-form button {
+  min-height: 42px;
+}
+
 .admin-drawer-pricing-form button {
   min-height: 42px;
+}
+
+.admin-drawer-followup-presets {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-drawer-followup-presets span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.admin-drawer-followup-presets button {
+  background: #fff;
+  border: 1px solid #cdd8e6;
+  border-radius: 999px;
+  color: #1f3652;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.admin-drawer-followup-presets button:hover {
+  background: #eef6ff;
+  border-color: #0b4f9c;
 }
 
 .admin-drawer-quick-assign {
@@ -1764,6 +1811,10 @@ body.admin-drawer-open {
 
 .admin-drawer-assign-form {
   grid-template-columns: minmax(160px, 1.2fr) minmax(170px, 1fr) minmax(130px, .8fr) minmax(120px, .7fr) auto;
+}
+
+.admin-drawer-vehicle-form {
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
 }
 
 .admin-drawer-pricing-form {
@@ -5443,11 +5494,16 @@ body.admin-drawer-open {
   .lead-task-form,
   .lead-email-form,
   .admin-drawer-assign-form,
+  .admin-drawer-vehicle-form,
   .admin-drawer-pricing-form,
   .dealer-note-form,
   .dealer-task-form,
   .dealer-email-form {
     grid-template-columns: 1fr;
+  }
+
+  .admin-drawer-field-wide {
+    grid-column: 1 / -1;
   }
 
   .inventory-step-heading,
