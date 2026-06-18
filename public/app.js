@@ -1574,8 +1574,6 @@ function renderDealerLeads(leads, role) {
     const pendingAlert = dealerLeadAlertMap.has(String(lead.id || ""));
     const wholesaleAvg = historyMarketAverage(valuation, "wholesale");
     const retailAvg = historyMarketAverage(valuation, "retail");
-    const dealerWholesale = ownerAdjustment.wholesale ?? "";
-    const dealerRetail = ownerAdjustment.retail ?? "";
     const updateToken = dealerLeadUpdateToken(lead);
     const vehicleContext = lead.vehicle_context || {};
     const taskSummary = lead.task_summary || {};
