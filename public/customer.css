@@ -2743,6 +2743,11 @@ input::placeholder {
   min-width: 0;
 }
 
+.vehicle-detail-payment-slot {
+  min-height: 0;
+  overflow: auto;
+}
+
 .vehicle-detail-dialog .vehicle-detail-photo,
 .vehicle-detail-gallery .inventory-photo,
 .vehicle-detail-gallery .inventory-image {
@@ -2776,6 +2781,8 @@ input::placeholder {
 .vehicle-detail-payment-panel {
   margin: 0;
   padding: 24px;
+  max-height: 100%;
+  overflow: auto;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
