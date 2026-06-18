@@ -2105,8 +2105,9 @@ function renderLead(lead, index = 0) {
         <span>Owner reviewed ${escapeHtml(formatDateTime(ownerReview.read_at))}${ownerReview.read_by ? ` by ${escapeHtml(ownerReview.read_by)}` : ""}</span>
       </section>` : "";
   const signalBanner = vehicleSignalInline(lead);
-  const contextBanner = vehicleContextInline(lead);
-  const collapsedMembersBanner = renderCollapsedSellerMembersInline(lead);
+  const hasOpenDuplicateReview = Boolean(lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed);
+  const contextBanner = hasOpenDuplicateReview ? "" : vehicleContextInline(lead);
+  const collapsedMembersBanner = hasOpenDuplicateReview ? "" : renderCollapsedSellerMembersInline(lead);
   const mergeBanner = mergeStateInline(lead);
   const duplicateBanner = duplicateWarningInline(lead);
   const queueSummary = overdue
@@ -2275,6 +2276,19 @@ function renderAdminDrawer(leadId) {
   const statusOptions = leadStatusOptions(buyer)
     .map((item) => `<option value="${item.value}" ${status === item.value ? "selected" : ""}>${escapeHtml(item.label)}</option>`)
     .join("");
+  const assignField = dealerStaffEmails.length ? `
+                  <select name="assignedTo">
+                    <option value="">Unassigned</option>
+                    ${dealerStaffEmails.map((email) => `<option value="${escapeHtml(email)}" ${assignedTo === email ? "selected" : ""}>${escapeHtml(email)}</option>`).join("")}
+                  </select>` : `
+                  <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />`;
+  const quickAssignButtons = dealerStaffEmails.length ? `
+              <div class="admin-drawer-quick-assign" aria-label="Quick assign staff">
+                <span>One-click dispatch</span>
+                ${dealerStaffEmails.slice(0, 6).map((email) => `
+                  <button type="button" data-drawer-assign-to="${escapeHtml(email)}">${escapeHtml(shortEmail(email))}</button>
+                `).join("")}
+              </div>` : "";
   const sellerAdjustmentFields = buyer ? "" : `
                 <label>
                   <span>Owner wholesale</span>
@@ -2291,6 +2305,9 @@ function renderAdminDrawer(leadId) {
   const activityStatusButtons = leadStatusActions(buyer, status)
     .map((action) => `<button type="button" data-drawer-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
     .join("");
+  const hasOpenDuplicateReview = Boolean(lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed);
+  const drawerVehicleContext = hasOpenDuplicateReview ? "" : vehicleContextInline(lead);
+  const drawerDuplicateWarning = duplicateWarningInline(lead);
 
   adminLeadDrawer.hidden = false;
   adminLeadDrawer.classList.add("open");
@@ -2346,8 +2363,8 @@ function renderAdminDrawer(leadId) {
               </section>
             ` : ""}
             ${vehicleSignalInline(lead)}
-            ${vehicleContextInline(lead)}
-            ${duplicateWarningInline(lead)}
+            ${drawerVehicleContext}
+            ${drawerDuplicateWarning}
           </aside>
           <div class="drawer-workspace-main">
             ${renderAdminCommunicationStrip(lead)}
@@ -2363,7 +2380,7 @@ function renderAdminDrawer(leadId) {
                 <input type="hidden" name="notes" value="${escapeHtml(lead.notes || "")}" />
                 <label>
                   <span>Assigned to</span>
-                  <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+                  ${assignField}
                 </label>
                 <label>
                   <span>Next follow-up</span>
@@ -2385,6 +2402,7 @@ function renderAdminDrawer(leadId) {
                 </label>
                 <button type="submit">Save assignment</button>
               </form>
+              ${quickAssignButtons}
               ${renderLeadProgress(buyer, status)}
               <div class="lead-action-row admin-drawer-actions">
                 ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
@@ -2491,6 +2509,41 @@ async function loadAdminDrawerActivity(options = {}) {
   }
   adminDrawerActivityLoaded = true;
   list.innerHTML = renderActivity(data, { highlightLatest: Boolean(options.highlightLatest), limit: 12 });
+}
+
+async function quickAssignDrawerLead(button) {
+  const email = String(button.dataset.drawerAssignTo || "").trim().toLowerCase();
+  const lead = adminLeadsCache.find((item) => String(item.id || "") === activeAdminDrawerLeadId);
+  if (!email || !lead) return;
+  button.disabled = true;
+  statusEl.textContent = `Assigning lead to ${email}...`;
+  const nextStatus = String(lead.status || "new").toLowerCase() === "new" ? "assigned" : lead.status || "assigned";
+  const response = await fetch("/api/leads", {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: activeAdminDrawerLeadId,
+      status: nextStatus,
+      assignedTo: email,
+      priority: lead.priority || "normal",
+      nextFollowUpAt: lead.next_follow_up_at || "",
+      notes: lead.notes || "",
+      ownerWholesale: lead.owner_adjustment?.wholesale ?? "",
+      ownerRetail: lead.owner_adjustment?.retail ?? "",
+      reason: lead.owner_adjustment?.reason || ""
+    })
+  });
+  const data = await response.json();
+  if (!data.ok) {
+    statusEl.textContent = data.error || "Unable to assign lead.";
+    button.disabled = false;
+    return;
+  }
+  statusEl.textContent = `Assigned to ${shortEmail(email)}.`;
+  await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+  renderAdminDrawer(activeAdminDrawerLeadId);
+  adminDrawerActivityLoaded = false;
+  await loadAdminDrawerActivity({ force: true, highlightLatest: true });
 }
 
 function setActiveAdminLead(id) {
@@ -2998,6 +3051,12 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
   const deleteButton = event.target.closest("[data-delete-lead]");
   if (deleteButton) {
     await deleteSingleLead(deleteButton);
+    return;
+  }
+
+  const quickAssignButton = event.target.closest("[data-drawer-assign-to]");
+  if (quickAssignButton) {
+    await quickAssignDrawerLead(quickAssignButton);
     return;
   }
 

@@ -1698,6 +1698,37 @@ body.admin-drawer-open .admin-shell {
   min-height: 42px;
 }
 
+.admin-drawer-quick-assign {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-drawer-quick-assign span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.admin-drawer-quick-assign button {
+  background: #eef6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #0b4f9c;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.admin-drawer-quick-assign button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
 .admin-drawer-note-form,
 .admin-drawer-task-form {
   margin-top: 10px;
