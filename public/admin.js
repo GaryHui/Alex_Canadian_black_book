@@ -2709,6 +2709,44 @@ async function loadAdminDrawerActivity(options = {}) {
   list.innerHTML = renderActivity(data, { highlightLatest: Boolean(options.highlightLatest), limit: 12 });
 }
 
+async function readApiJson(response) {
+  const data = await response.json().catch(() => null);
+  if (data) return data;
+  return {
+    ok: false,
+    status: response?.status || 0,
+    error: response?.ok ? "Empty server response." : `Server returned ${response?.status || "an error"}.`
+  };
+}
+
+async function fetchApiJson(url, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return await readApiJson(response);
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return { ok: false, error: "Request timed out. Please try again." };
+    }
+    return { ok: false, error: error?.message || "Network request failed." };
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+function mergeLeadIntoCache(updatedLead) {
+  if (!updatedLead?.id) return null;
+  const id = String(updatedLead.id);
+  const index = adminLeadsCache.findIndex((item) => String(item.id || "") === id);
+  if (index === -1) return updatedLead;
+  adminLeadsCache[index] = {
+    ...adminLeadsCache[index],
+    ...updatedLead
+  };
+  return adminLeadsCache[index];
+}
+
 async function quickAssignDrawerLead(button) {
   const email = String(button.dataset.drawerAssignTo || "").trim().toLowerCase();
   const lead = adminLeadsCache.find((item) => String(item.id || "") === activeAdminDrawerLeadId);
@@ -2716,32 +2754,36 @@ async function quickAssignDrawerLead(button) {
   button.disabled = true;
   statusEl.textContent = `Assigning lead to ${email}...`;
   const nextStatus = String(lead.status || "new").toLowerCase() === "new" ? "assigned" : lead.status || "assigned";
-  const response = await fetch("/api/leads", {
-    method: "PATCH",
-    headers: { ...authHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "assign_lead",
-      id: activeAdminDrawerLeadId,
-      authorEmail: authUser.email || "",
-      status: nextStatus,
-      assignedTo: email,
-      priority: lead.priority || "normal",
-      nextFollowUpAt: lead.next_follow_up_at || ""
-    })
-  });
-  const data = await response.json();
-  if (!data.ok) {
-    statusEl.textContent = data.error || "Unable to assign lead.";
+  try {
+    const data = await fetchApiJson("/api/leads", {
+      method: "PATCH",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "assign_lead",
+        id: activeAdminDrawerLeadId,
+        authorEmail: authUser.email || "",
+        status: nextStatus,
+        assignedTo: email,
+        priority: lead.priority || "normal",
+        nextFollowUpAt: lead.next_follow_up_at || ""
+      })
+    });
+    if (!data.ok) {
+      throw new Error(formatApiError(data, "Unable to assign lead."));
+    }
+    mergeLeadIntoCache(data.lead);
+    if (lead.owner_review?.unread) {
+      await markManagerReviewedByLeadId(activeAdminDrawerLeadId, { silent: true, reload: false }).catch(() => null);
+    }
+    statusEl.textContent = `Assigned to ${shortEmail(email)}.`;
+    await loadLeads({ suppressAlerts: true, forceOpenActivity: true, refreshActiveDrawer: true }).catch(() => null);
+    adminDrawerActivityLoaded = false;
+    await loadAdminDrawerActivity({ force: true, highlightLatest: true }).catch(() => null);
+  } catch (error) {
+    statusEl.textContent = error.message || "Unable to assign lead.";
+  } finally {
     button.disabled = false;
-    return;
   }
-  if (lead.owner_review?.unread) {
-    await markManagerReviewedByLeadId(activeAdminDrawerLeadId, { silent: true, reload: false });
-  }
-  statusEl.textContent = `Assigned to ${shortEmail(email)}.`;
-  await loadLeads({ suppressAlerts: true, forceOpenActivity: true, refreshActiveDrawer: true });
-  adminDrawerActivityLoaded = false;
-  await loadAdminDrawerActivity({ force: true, highlightLatest: true });
 }
 
 function setActiveAdminLead(id) {
@@ -3446,13 +3488,9 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
     };
     if (isAssignForm) payload.action = "assign_lead";
     const formStatus = isAssignForm ? ownerForm.querySelector("[data-assign-status]") : null;
+    const submitButton = ownerForm.querySelector('button[type="submit"]');
+    if (submitButton) submitButton.disabled = true;
     if (formStatus) formStatus.textContent = "Saving...";
-    const response = await fetch("/api/leads", {
-      method: "PATCH",
-      headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const data = await response.json();
     const savedMessage = ownerForm.classList.contains("admin-drawer-assign-form")
       ? "Assignment saved."
       : ownerForm.classList.contains("admin-drawer-pricing-form")
@@ -3460,9 +3498,30 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
         : ownerForm.classList.contains("admin-drawer-vehicle-form")
           ? "Vehicle details saved."
         : "Lead tools saved.";
-    statusEl.textContent = data.ok ? savedMessage : (data.error || "Unable to save lead.");
-    if (formStatus) formStatus.textContent = data.ok ? savedMessage : formatApiError(data, "Unable to save assignment.");
-    if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true, refreshActiveDrawer: true });
+    try {
+      const data = await fetchApiJson("/api/leads", {
+        method: "PATCH",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!data.ok) {
+        throw new Error(formatApiError(data, isAssignForm ? "Unable to save assignment." : "Unable to save lead."));
+      }
+      mergeLeadIntoCache(data.lead);
+      statusEl.textContent = savedMessage;
+      if (formStatus) formStatus.textContent = savedMessage;
+      await loadLeads({ suppressAlerts: true, forceOpenActivity: true, refreshActiveDrawer: true }).catch(() => null);
+      if (isAssignForm) {
+        adminDrawerActivityLoaded = false;
+        await loadAdminDrawerActivity({ force: true, highlightLatest: true }).catch(() => null);
+      }
+    } catch (error) {
+      const message = error.message || (isAssignForm ? "Unable to save assignment." : "Unable to save lead.");
+      statusEl.textContent = message;
+      if (formStatus) formStatus.textContent = message;
+    } finally {
+      if (submitButton) submitButton.disabled = false;
+    }
     return;
   }
 

@@ -20,7 +20,7 @@ export default async function handler(req, res) {
         : req.body?.action === "assign_lead"
           ? await assignLead(req.body || {}, admin.user)
           : await updateLead(req.body || {});
-    return res.status(result.ok ? 200 : 400).json(result);
+    return res.status(result.ok ? 200 : result.status || 400).json(result);
   }
 
   if (req.method === "POST") {
@@ -414,53 +414,61 @@ async function markDuplicateReview(body, user) {
 }
 
 async function assignLead(body, user) {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const id = String(body.id || body.leadId || "").trim();
-  if (!id) return { ok: false, error: "Lead id is required" };
-  if (!url || !key) return { ok: false, error: "Supabase is not configured" };
+  try {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const id = String(body.id || body.leadId || "").trim();
+    if (!id) return { ok: false, status: 400, error: "Lead id is required" };
+    if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
 
-  const previous = await fetchLeadById({ url, key }, id);
-  if (!previous) return { ok: false, status: 404, error: "Lead not found" };
+    const previous = await fetchLeadById({ url, key }, id);
+    if (!previous) return { ok: false, status: 404, error: "Lead not found" };
 
-  const assignedTo = String(body.assignedTo || body.assigned_to || "").trim().toLowerCase();
-  if (!assignedTo) return { ok: false, status: 400, error: "Assigned rep is required" };
+    const assignedTo = String(body.assignedTo || body.assigned_to || "").trim().toLowerCase();
+    if (!assignedTo) return { ok: false, status: 400, error: "Assigned rep is required" };
 
-  const currentStatus = String(previous.status || "new").trim().toLowerCase();
-  const patch = {
-    assigned_to: assignedTo,
-    status: String(body.status || (currentStatus === "new" ? "assigned" : currentStatus || "assigned")).trim(),
-    priority: normalizePriority(body.priority || previous.priority),
-    next_follow_up_at: dateOrNull(body.nextFollowUpAt || body.next_follow_up_at || previous.next_follow_up_at),
-    last_activity_at: new Date().toISOString()
-  };
+    const currentStatus = String(previous.status || "new").trim().toLowerCase();
+    const patch = {
+      assigned_to: assignedTo,
+      status: String(body.status || (currentStatus === "new" ? "assigned" : currentStatus || "assigned")).trim(),
+      priority: normalizePriority(body.priority || previous.priority),
+      next_follow_up_at: dateOrNull(body.nextFollowUpAt || body.next_follow_up_at || previous.next_follow_up_at),
+      last_activity_at: new Date().toISOString()
+    };
 
-  const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation"
-    },
-    body: JSON.stringify(patch)
-  });
-
-  const data = await response.json().catch(() => null);
-  if (!response.ok) return { ok: false, status: response.status, error: data };
-
-  const timeline = buildLeadAssignmentTimeline(previous, patch);
-  if (timeline) {
-    await createLeadTimelineNote({
-      url,
-      key,
-      leadId: id,
-      authorEmail: String(body.authorEmail || user?.email || "").trim().toLowerCase() || "admin",
-      note: timeline
+    const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify(patch)
     });
-  }
 
-  return { ok: true, lead: data?.[0] || null };
+    const data = await response.json().catch(() => null);
+    if (!response.ok) return { ok: false, status: response.status, error: data || "Unable to assign lead" };
+
+    const timeline = buildLeadAssignmentTimeline(previous, patch);
+    if (timeline) {
+      await createLeadTimelineNote({
+        url,
+        key,
+        leadId: id,
+        authorEmail: String(body.authorEmail || user?.email || "").trim().toLowerCase() || "admin",
+        note: timeline
+      });
+    }
+
+    return { ok: true, lead: data?.[0] || null };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 500,
+      error: error?.message || "Unable to assign lead"
+    };
+  }
 }
 
 async function fetchLeadById(client, id) {
