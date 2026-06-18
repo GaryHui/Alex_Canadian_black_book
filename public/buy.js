@@ -60,11 +60,15 @@ const text = {
     inventoryEmptyIntro: "New dealer-reviewed vehicles will appear here when they are published.",
     financeEyebrow: "Finance estimate",
     financeTitle: "Monthly payment calculator",
+    paymentModeLabel: "Payment type",
+    paymentModeFinance: "Finance",
+    paymentModeLease: "Lease",
     priceLabel: "Vehicle price",
     downLabel: "Down payment",
     rateLabel: "Annual rate",
     termLabel: "Term",
     taxLabel: "Tax rate",
+    residualLabel: "Lease residual",
     financeNote: "Estimate only. Final approval, rate, term, and fees depend on the dealer and lender.",
     contactDealer: "Contact dealer",
     viewDetails: "View details",
@@ -148,11 +152,15 @@ const text = {
     inventoryEmptyIntro: "Les vehicules verifies par le concessionnaire apparaitront ici lorsqu'ils seront publies.",
     financeEyebrow: "Estimation de financement",
     financeTitle: "Calculateur de paiement mensuel",
+    paymentModeLabel: "Type de paiement",
+    paymentModeFinance: "Financement",
+    paymentModeLease: "Location",
     priceLabel: "Prix du vehicule",
     downLabel: "Mise de fonds",
     rateLabel: "Taux annuel",
     termLabel: "Duree",
     taxLabel: "Taux de taxe",
+    residualLabel: "Valeur residuelle",
     financeNote: "Estimation seulement. L'approbation, le taux, la duree et les frais dependent du concessionnaire et du preteur.",
     contactDealer: "Contacter le concessionnaire",
     viewDetails: "Voir les details",
@@ -415,12 +423,13 @@ function calculatePayment() {
   const annualRate = Number(data.get("annualRate") || 0);
   const termMonths = Number(data.get("termMonths") || 72);
   const taxRate = Number(data.get("taxRate") || 0);
-  const principal = Math.max(0, price * (1 + taxRate / 100) - downPayment);
-  const monthlyRate = annualRate / 100 / 12;
-  const payment = monthlyRate > 0
-    ? principal * (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / (Math.pow(1 + monthlyRate, termMonths) - 1)
-    : principal / termMonths;
+  const residualPercent = Number(data.get("residualPercent") || 48);
+  const mode = String(data.get("paymentMode") || "finance");
+  const payment = mode === "lease"
+    ? estimatedLeasePayment({ price, downPayment, annualRate, termMonths, taxRate, residualPercent })
+    : estimatedMonthlyPayment({ price, downPayment, annualRate, termMonths, taxRate });
   paymentOutput.textContent = `${money(payment)} / mo`;
+  financeForm?.classList.toggle("lease-mode", mode === "lease");
 }
 
 function estimatedMonthlyPayment({ price, downPayment, annualRate, termMonths, taxRate }) {
@@ -430,6 +439,17 @@ function estimatedMonthlyPayment({ price, downPayment, annualRate, termMonths, t
   return monthlyRate > 0
     ? principal * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1)
     : principal / months;
+}
+
+function estimatedLeasePayment({ price, downPayment, annualRate, termMonths, taxRate, residualPercent }) {
+  const months = Math.max(1, Number(termMonths || 36));
+  const vehiclePrice = Number(price || 0);
+  const residualValue = Math.max(0, vehiclePrice * Number(residualPercent || 0) / 100);
+  const capitalizedCost = Math.max(0, vehiclePrice - Number(downPayment || 0));
+  const depreciationCharge = Math.max(0, capitalizedCost - residualValue) / months;
+  const moneyFactor = Number(annualRate || 0) / 2400;
+  const financeCharge = (capitalizedCost + residualValue) * moneyFactor;
+  return (depreciationCharge + financeCharge) * (1 + Number(taxRate || 0) / 100);
 }
 
 function vehicleDeal(vehicle) {
@@ -712,8 +732,10 @@ function updateContactBuyingSummary() {
 
 function purchaseIntentPayload(formData = {}) {
   const finance = financeEstimatePayload();
+  const intent = String(formData.purchaseIntent || "finance").trim();
+  const monthlyPayment = intent === "lease" ? finance.leaseMonthlyPayment : finance.monthlyPayment;
   return {
-    intent: String(formData.purchaseIntent || "finance").trim(),
+    intent,
     buyingTimeline: String(formData.buyingTimeline || "").trim(),
     preferredContact: String(formData.preferredContact || "").trim(),
     vehiclePrice: finance.price || Number(currentContactVehicle?.price || 0),
@@ -721,7 +743,9 @@ function purchaseIntentPayload(formData = {}) {
     annualRate: finance.annualRate,
     taxRate: finance.taxRate,
     termMonths: finance.termMonths,
-    monthlyPayment: finance.monthlyPayment
+    residualPercent: finance.residualPercent,
+    paymentMode: finance.paymentMode,
+    monthlyPayment
   };
 }
 
@@ -749,13 +773,26 @@ function buyerVehiclePayload(vehicle) {
 function financeEstimatePayload() {
   if (!financeForm) return {};
   const data = new FormData(financeForm);
+  const price = Number(data.get("price") || 0);
+  const downPayment = Number(data.get("downPayment") || 0);
+  const annualRate = Number(data.get("annualRate") || 0);
+  const taxRate = Number(data.get("taxRate") || 0);
+  const termMonths = Number(data.get("termMonths") || 0);
+  const residualPercent = Number(data.get("residualPercent") || 48);
+  const financeMonthlyPayment = estimatedMonthlyPayment({ price, downPayment, annualRate, termMonths, taxRate });
+  const leaseMonthlyPayment = estimatedLeasePayment({ price, downPayment, annualRate, termMonths, taxRate, residualPercent });
+  const paymentMode = String(data.get("paymentMode") || "finance");
   return {
-    price: Number(data.get("price") || 0),
-    downPayment: Number(data.get("downPayment") || 0),
-    annualRate: Number(data.get("annualRate") || 0),
-    taxRate: Number(data.get("taxRate") || 0),
-    termMonths: Number(data.get("termMonths") || 0),
-    monthlyPayment: paymentOutput ? Number(paymentOutput.textContent.replace(/[^0-9.]/g, "")) : 0
+    paymentMode,
+    price,
+    downPayment,
+    annualRate,
+    taxRate,
+    termMonths,
+    residualPercent,
+    financeMonthlyPayment: Math.round(financeMonthlyPayment),
+    leaseMonthlyPayment: Math.round(leaseMonthlyPayment),
+    monthlyPayment: paymentMode === "lease" ? Math.round(leaseMonthlyPayment) : Math.round(financeMonthlyPayment)
   };
 }
 

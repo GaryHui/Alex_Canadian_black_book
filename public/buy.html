@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AutoSwitch Canada | Buy A Car</title>
-    <link rel="stylesheet" href="/customer.css?v=buy-card-20260618d" />
+    <link rel="stylesheet" href="/customer.css?v=buy-card-20260618e" />
   </head>
   <body>
     <header class="site-header">
@@ -70,6 +70,17 @@
             <p class="eyebrow" data-i18n="financeEyebrow">Finance estimate</p>
             <h2 data-i18n="financeTitle">Monthly payment calculator</h2>
             <form id="finance-form" class="finance-form">
+              <fieldset class="finance-mode-toggle">
+                <legend data-i18n="paymentModeLabel">Payment type</legend>
+                <label>
+                  <input type="radio" name="paymentMode" value="finance" checked />
+                  <span data-i18n="paymentModeFinance">Finance</span>
+                </label>
+                <label>
+                  <input type="radio" name="paymentMode" value="lease" />
+                  <span data-i18n="paymentModeLease">Lease</span>
+                </label>
+              </fieldset>
               <label>
                 <span data-i18n="priceLabel">Vehicle price</span>
                 <input name="price" type="number" value="45000" />
@@ -88,6 +99,10 @@
                   <input name="taxRate" type="number" step="0.01" value="12" />
                 </label>
               </div>
+              <label class="lease-only-field">
+                <span data-i18n="residualLabel">Lease residual</span>
+                <input name="residualPercent" type="number" step="0.01" value="48" />
+              </label>
               <label>
                 <span data-i18n="termLabel">Term</span>
                 <select name="termMonths">
@@ -203,6 +218,6 @@
       </section>
     </div>
 
-    <script src="/buy.js?v=buy-card-20260618d"></script>
+    <script src="/buy.js?v=buy-card-20260618e"></script>
   </body>
 </html>
