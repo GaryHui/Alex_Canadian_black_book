@@ -1077,7 +1077,7 @@ function renderLeadWorkbench(leads) {
   syncActiveAdminLeadCard();
   if (activeAdminDrawerLeadId) {
     if (adminLeadsCache.some((lead) => String(lead.id || "") === activeAdminDrawerLeadId)) {
-      if (!isEditingAdminDrawer()) {
+      if (options.refreshActiveDrawer || !isEditingAdminDrawer()) {
         renderAdminDrawer(activeAdminDrawerLeadId);
         loadAdminDrawerActivity({ force: true }).catch(() => null);
       }
@@ -2372,6 +2372,22 @@ function renderAdminDrawer(leadId) {
                   <span>Reason</span>
                   <input name="reason" value="${escapeHtml(adjustment.reason || "")}" placeholder="Why adjust this value?" />
                 </label>`;
+  const sellerPricingSection = buyer ? "" : `
+            <section class="admin-drawer-section admin-drawer-pricing-card">
+              <header>
+                <h3>Owner pricing</h3>
+                <span>Manager-approved vehicle numbers</span>
+              </header>
+              <form class="owner-review admin-drawer-owner-form admin-drawer-pricing-form">
+                <input type="hidden" name="status" value="${escapeHtml(status)}" />
+                <input type="hidden" name="assignedTo" value="${escapeHtml(assignedTo)}" />
+                <input type="hidden" name="priority" value="${escapeHtml(priority)}" />
+                <input type="hidden" name="nextFollowUpAt" value="${escapeHtml(datetimeLocalValue(followUp))}" />
+                <input type="hidden" name="notes" value="${escapeHtml(lead.notes || "")}" />
+                ${sellerAdjustmentFields}
+                <button type="submit">Save pricing</button>
+              </form>
+            </section>`;
   const activityStatusButtons = leadStatusActions(buyer, status)
     .map((action) => `<button type="button" data-drawer-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
     .join("");
@@ -2488,6 +2504,7 @@ function renderAdminDrawer(leadId) {
                 ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
               </div>
             </section>
+            ${sellerPricingSection}
             ${renderAdminDealChecklistSection(lead)}
             <section class="admin-drawer-section admin-drawer-update-card">
               <header>
@@ -2517,11 +2534,23 @@ function renderAdminDrawer(leadId) {
                 <button type="submit">Post update</button>
               </form>
             </section>
+            <section class="admin-drawer-section admin-drawer-task-card">
+              <header>
+                <h3>Task</h3>
+                <span>Give the next action to the team</span>
+              </header>
+              <form class="lead-task-form admin-drawer-task-form">
+                <input name="title" placeholder="Next task, e.g. call customer back" />
+                <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+                <input name="dueAt" type="datetime-local" />
+                <button type="submit">Add task</button>
+              </form>
+            </section>
             <details class="admin-drawer-section admin-drawer-settings-details">
               <summary>
                 <span>
                   <strong>More lead tools</strong>
-                  <small>Pricing, admin notes, tasks, email log, and delete</small>
+                  <small>Admin notes, email log, and delete</small>
                 </span>
               </summary>
               <form class="owner-review admin-drawer-owner-form">
@@ -2529,18 +2558,14 @@ function renderAdminDrawer(leadId) {
                 <input type="hidden" name="assignedTo" value="${escapeHtml(assignedTo)}" />
                 <input type="hidden" name="priority" value="${escapeHtml(priority)}" />
                 <input type="hidden" name="nextFollowUpAt" value="${escapeHtml(datetimeLocalValue(followUp))}" />
-                ${sellerAdjustmentFields}
+                <input type="hidden" name="ownerWholesale" value="${adjustment.wholesale ?? ""}" />
+                <input type="hidden" name="ownerRetail" value="${adjustment.retail ?? ""}" />
+                <input type="hidden" name="reason" value="${escapeHtml(adjustment.reason || "")}" />
                 <label class="review-notes">
                   <span>Admin notes</span>
                   <textarea name="notes" placeholder="Follow-up notes, CRM notes, customer preference...">${escapeHtml(lead.notes || "")}</textarea>
                 </label>
                 <button type="submit">Save lead notes</button>
-              </form>
-              <form class="lead-task-form admin-drawer-task-form">
-                <input name="title" placeholder="Next task, e.g. call customer back" />
-                <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
-                <input name="dueAt" type="datetime-local" />
-                <button type="submit">Add task</button>
               </form>
               <form class="lead-email-form admin-drawer-email-form">
                 <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
@@ -3311,7 +3336,7 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
     });
     const data = await response.json();
     statusEl.textContent = data.ok ? "Lead status updated." : (data.error || "Unable to update lead status.");
-    if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+    if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true, refreshActiveDrawer: true });
   }
 });
 
@@ -3335,9 +3360,13 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
       body: JSON.stringify(payload)
     });
     const data = await response.json();
-    const savedMessage = ownerForm.classList.contains("admin-drawer-assign-form") ? "Assignment saved." : "Lead tools saved.";
+    const savedMessage = ownerForm.classList.contains("admin-drawer-assign-form")
+      ? "Assignment saved."
+      : ownerForm.classList.contains("admin-drawer-pricing-form")
+        ? "Owner pricing saved."
+        : "Lead tools saved.";
     statusEl.textContent = data.ok ? savedMessage : (data.error || "Unable to save lead.");
-    if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+    if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true, refreshActiveDrawer: true });
     return;
   }
 
@@ -3362,7 +3391,7 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
       adminDrawerActivityLoaded = false;
       await Promise.all([
         loadAdminDrawerActivity({ force: true, highlightLatest: true }),
-        loadLeads({ suppressAlerts: true, forceOpenActivity: true })
+        loadLeads({ suppressAlerts: true, forceOpenActivity: true, refreshActiveDrawer: true })
       ]);
     }
     return;
@@ -3388,7 +3417,7 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
       adminDrawerActivityLoaded = false;
       await Promise.all([
         loadAdminDrawerActivity({ force: true, highlightLatest: true }),
-        loadLeads({ suppressAlerts: true, forceOpenActivity: true })
+        loadLeads({ suppressAlerts: true, forceOpenActivity: true, refreshActiveDrawer: true })
       ]);
     }
     return;
@@ -3416,7 +3445,7 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
       adminDrawerActivityLoaded = false;
       await Promise.all([
         loadAdminDrawerActivity({ force: true, highlightLatest: true }),
-        loadLeads({ suppressAlerts: true, forceOpenActivity: true })
+        loadLeads({ suppressAlerts: true, forceOpenActivity: true, refreshActiveDrawer: true })
       ]);
     }
   }
