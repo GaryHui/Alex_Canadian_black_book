@@ -1601,7 +1601,7 @@ function renderDealerLeads(leads, role) {
             ? "Buyer opportunity"
             : "Seller appraisal";
     const customerSummary = customerName || input.phone || customerEmail;
-    const progressSummary = leadStatusLabel(status, buyerLead);
+    const progressSummary = dealerLeadStatusLabel(status, buyerLead);
     const nextAction = dealerNextBestAction(lead);
     const compactTouchSummary = isDealerNoResponseLead(lead) ? "No response 48h+" : (dealerOutboundLabel(lead) || dealerLastTouchLabel(lead));
 
@@ -1738,7 +1738,7 @@ function renderDealerDrawer(leadId) {
   const customerDisplay = customerName || customerEmail;
   const customerPhone = input.phone || "No phone";
   const vehicleContext = lead.vehicle_context || {};
-  const pipelineLabel = leadStatusLabel(status, buyerLead);
+  const pipelineLabel = dealerLeadStatusLabel(status, buyerLead);
   const nextAction = dealerNextBestAction(lead);
   const clusterLabel = vehicleContext.cluster_label || title;
   const planSummary = buyerLead
@@ -2564,6 +2564,20 @@ function isDealerActiveWorkLead(lead) {
 
 function hasDealerOpenTask(lead) {
   return Number(lead?.task_summary?.open_count || 0) > 0;
+}
+
+function dealerLeadStatusLabel(status, buyerLead) {
+  const current = String(status || "new").toLowerCase();
+  const option = dealerLeadProgressSteps(buyerLead).find(([value]) => value === current);
+  if (option) return option[1];
+  if (current === "waiting_for_customer") return "Waiting";
+  if (current === "finance_sent") return "Finance sent";
+  if (current === "offer_sent") return "Offer sent";
+  if (current === "appointment_booked") return "Appointment";
+  if (current === "inspection_booked") return "Inspection";
+  if (current === "closed") return "Closed";
+  if (current === "deleted") return "Deleted";
+  return String(status || "new").replaceAll("_", " ");
 }
 
 function cleanDealerLeadTitle(title, buyerLead) {
