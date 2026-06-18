@@ -2133,53 +2133,14 @@ function renderDealerCommunicationStrip(lead) {
 function renderDealerTodayWork(leads) {
   if (!dealerTodayWorkEl) return;
   const activeLeads = leads.filter((lead) => !isDealerClosedLead(lead));
-  const callNowLeads = activeLeads
-    .filter((lead) => isDealerCallNowLead(lead))
-    .slice(0, 5);
-  const dueLeads = activeLeads
-    .filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"))
-    .slice(0, 5);
-  const noResponseLeads = activeLeads
-    .filter((lead) => isDealerNoResponseLead(lead))
-    .slice(0, 5);
-  const appointmentLeads = activeLeads
-    .filter((lead) => isDealerAppointmentLead(lead))
-    .slice(0, 5);
-  const dealDeskLeads = leads
-    .filter((lead) => isDealerDealDeskLead(lead))
-    .slice(0, 5);
-  const agingLeads = activeLeads
-    .filter((lead) => isDealerAgingCriticalLead(lead))
-    .sort((a, b) => dealerLeadAgeDays(b) - dealerLeadAgeDays(a))
-    .slice(0, 5);
-  const waitingReplyLeads = activeLeads
-    .filter((lead) => isDealerWaitingReply(lead))
-    .slice(0, 5);
-  const vehicleAlertLeads = activeLeads
-    .filter((lead) => lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market)
-    .slice(0, 5);
-  const priorityLaneLeads = [
-    ...callNowLeads,
-    ...waitingReplyLeads,
-    ...noResponseLeads,
-    ...agingLeads
-  ]
-    .filter((lead, index, list) => list.findIndex((item) => String(item.id || "") === String(lead.id || "")) === index)
-    .slice(0, 6);
-  const watchItems = [
-    ...appointmentLeads,
-    ...dealDeskLeads,
-    ...vehicleAlertLeads
-  ]
-    .filter((lead, index, list) => list.findIndex((item) => String(item.id || "") === String(lead.id || "")) === index)
-    .slice(0, 6);
+  const callNowCount = activeLeads.filter((lead) => isDealerCallNowLead(lead)).length;
+  const dueCount = activeLeads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new")).length;
+  const waitingReplyCount = activeLeads.filter((lead) => isDealerWaitingReply(lead)).length;
+  const freshCount = activeLeads.filter((lead) => String(lead.status || "new").toLowerCase() === "new").length;
+  const vehicleAlertCount = activeLeads.filter((lead) => lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market).length;
+  const noResponseCount = activeLeads.filter((lead) => isDealerNoResponseLead(lead)).length;
   dealerTodayWorkEl.hidden = false;
-  const totalAttention = new Set([
-    ...priorityLaneLeads,
-    ...dueLeads,
-    ...watchItems
-  ].map((lead) => String(lead.id || ""))).size;
-  dealerTodayWorkEl.innerHTML = totalAttention ? `
+  dealerTodayWorkEl.innerHTML = `
     ${renderDealerDashboardStats(leads)}
     <section class="dealer-manager-brief" aria-label="Dealer brief">
       <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="active">
@@ -2187,52 +2148,37 @@ function renderDealerTodayWork(leads) {
         <strong>${activeLeads.length}</strong>
         <small>All assigned active work</small>
       </button>
+      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="fresh">
+        <span>Fresh</span>
+        <strong>${freshCount}</strong>
+        <small>New assigned leads</small>
+      </button>
+      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="waiting-reply">
+        <span>Needs Reply</span>
+        <strong>${waitingReplyCount}</strong>
+        <small>Customer waiting</small>
+      </button>
       <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="call-now">
         <span>Call now</span>
-        <strong>${callNowLeads.length}</strong>
-        <small>Work the hottest leads first</small>
+        <strong>${callNowCount}</strong>
+        <small>Hot leads first</small>
       </button>
       <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="due">
         <span>Due today</span>
-        <strong>${dueLeads.length}</strong>
+        <strong>${dueCount}</strong>
         <small>Follow-up due or overdue</small>
+      </button>
+      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="no-response">
+        <span>No response</span>
+        <strong>${noResponseCount}</strong>
+        <small>Needs a touch</small>
       </button>
       <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="vehicle-alerts">
         <span>Vehicle alerts</span>
-        <strong>${vehicleAlertLeads.length}</strong>
+        <strong>${vehicleAlertCount}</strong>
         <small>Same-vehicle changes to review</small>
       </button>
     </section>
-    <header>
-      <div>
-        <span>Today</span>
-        <strong>${totalAttention} task${totalAttention === 1 ? "" : "s"} to work first</strong>
-      </div>
-      <button type="button" data-dealer-filter-shortcut="${callNowLeads.length ? "call-now" : dueLeads.length ? "due" : appointmentLeads.length ? "appointments" : dealDeskLeads.length ? "deal-desk" : vehicleAlertLeads.length ? "vehicle-alerts" : "active"}">${callNowLeads.length ? "Open call now" : dueLeads.length ? "Open due" : appointmentLeads.length ? "Open appointments" : dealDeskLeads.length ? "Open deal desk" : vehicleAlertLeads.length ? "Open vehicle alerts" : "View active"}</button>
-    </header>
-    <div class="dealer-today-sections">
-      ${renderDealerTodaySection("Priority lane", "Call now, waiting reply, and aging leads that need action first", priorityLaneLeads, callNowLeads.length ? "call-now" : waitingReplyLeads.length ? "waiting-reply" : noResponseLeads.length ? "no-response" : "aging-critical")}
-      ${renderDealerTodaySection("Due today", "Overdue or due follow-ups that should be touched today", dueLeads, "due")}
-      ${renderDealerDealerWatchSection({
-        appointments: appointmentLeads,
-        dealDesk: dealDeskLeads,
-        vehicleAlerts: vehicleAlertLeads,
-        watchItems
-      })}
-    </div>
-  ` : `
-    ${renderDealerDashboardStats(leads)}
-    <header>
-      <div>
-        <span>Today</span>
-        <strong>No due follow-ups right now</strong>
-      </div>
-      <button type="button" data-dealer-filter-shortcut="active">View active leads</button>
-    </header>
-    <div class="dealer-today-empty">
-      <b>Your current queue is clear.</b>
-      <span>Use Assigned leads for the full pipeline or Valuation when you need to price a vehicle manually.</span>
-    </div>
   `;
 }
 
@@ -2478,75 +2424,6 @@ function formatShortDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function renderDealerDealerWatchSection({ appointments = [], dealDesk = [], vehicleAlerts = [], watchItems = [] } = {}) {
-  return `
-    <section class="dealer-today-section dealer-today-section-watch">
-      <header>
-        <div>
-          <span>Desk watch</span>
-          <strong>${appointments.length + dealDesk.length + vehicleAlerts.length}</strong>
-          <small>Appointments, delivery handoffs, and same-vehicle updates</small>
-        </div>
-      </header>
-      <div class="dealer-watch-grid">
-        <button type="button" class="dealer-watch-tile" data-dealer-filter-shortcut="appointments">
-          <span>Appointments</span>
-          <b>${appointments.length}</b>
-          <small>Booked meetings to confirm</small>
-        </button>
-        <button type="button" class="dealer-watch-tile" data-dealer-filter-shortcut="deal-desk">
-          <span>Deal desk</span>
-          <b>${dealDesk.length}</b>
-          <small>Delivery and intake follow-through</small>
-        </button>
-        <button type="button" class="dealer-watch-tile" data-dealer-filter-shortcut="vehicle-alerts">
-          <span>Vehicle alerts</span>
-          <b>${vehicleAlerts.length}</b>
-          <small>Offer, sold, or off-market updates</small>
-        </button>
-        ${watchItems.length ? `<div class="dealer-today-list">${watchItems.map(renderDealerTodayLeadButton).join("")}</div>` : `
-          <div class="dealer-today-empty">
-            <b>No desk watch items waiting.</b>
-            <span>Appointments, handoffs, and same-vehicle updates will show here.</span>
-          </div>
-        `}
-      </div>
-    </section>
-  `;
-}
-
-function renderDealerTodaySection(label, hint, leads, filter) {
-  return `
-    <section class="dealer-today-section dealer-today-section-${escapeHtml(cssToken(label))}">
-      <header>
-        <div>
-          <span>${escapeHtml(label)}</span>
-          <strong>${leads.length}</strong>
-          <small>${escapeHtml(hint)}</small>
-        </div>
-        <button type="button" data-dealer-filter-shortcut="${escapeHtml(filter)}">Open</button>
-      </header>
-      <div class="dealer-today-list">
-        ${leads.length ? leads.map(renderDealerTodayLeadButton).join("") : `<p>No ${escapeHtml(label.toLowerCase())} items.</p>`}
-      </div>
-    </section>
-  `;
-}
-
-function renderDealerTodayLeadButton(lead) {
-  const input = lead.input || {};
-  const valuation = lead.valuation || {};
-  const title = cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || "Vehicle lead", isBuyerLead(lead));
-  const priority = String(lead.priority || "normal").toLowerCase();
-  const due = lead.next_follow_up_at ? formatDateTime(lead.next_follow_up_at) : dealerLastTouchLabel(lead);
-  return `
-    <button type="button" data-dealer-open-lead="${escapeHtml(lead.id || "")}">
-      <b>${escapeHtml(title)}</b>
-      <span>${escapeHtml(priority === "urgent" || priority === "high" ? `${priority.toUpperCase()} - ${dealerNextBestAction(lead)}` : `${dealerNextBestAction(lead) || due} | ${dealerLeadAgeLabel(lead)}`)}</span>
-    </button>
-  `;
 }
 
 function filterDealerLeads(leads) {
