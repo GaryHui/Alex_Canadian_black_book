@@ -141,11 +141,16 @@ dealerTodayWorkEl?.addEventListener("submit", (event) => {
   const form = event.target.closest("[data-dealer-dashboard-range]");
   if (!form) return;
   event.preventDefault();
-  const start = form.querySelector("[data-dashboard-start]")?.value || "";
-  const end = form.querySelector("[data-dashboard-end]")?.value || "";
-  dealerDashboardRange = normalizeDashboardDateRange({ start, end });
+  const result = validateDashboardRangeForm(form);
+  if (!result.ok) return;
+  dealerDashboardRange = normalizeDashboardDateRange(result.range);
   saveDashboardDateRange(DEALER_DASHBOARD_RANGE_KEY, dealerDashboardRange);
   renderDealerTodayWork(dealerLeadsCache);
+});
+dealerTodayWorkEl?.addEventListener("input", (event) => {
+  const form = event.target.closest("[data-dealer-dashboard-range]");
+  if (!form) return;
+  syncDashboardDateConstraints(form);
 });
 setLookupMode("free", { openModal: false });
 
@@ -2243,13 +2248,14 @@ function renderDealerDashboardStats(leads) {
         <form class="crm-dashboard-range" data-dealer-dashboard-range>
           <label>
             <span>From</span>
-            <input type="date" value="${escapeHtml(stats.startValue)}" data-dashboard-start>
+            <input type="date" value="${escapeHtml(stats.startValue)}" max="${escapeHtml(stats.endValue)}" data-dashboard-start>
           </label>
           <label>
             <span>To</span>
-            <input type="date" value="${escapeHtml(stats.endValue)}" data-dashboard-end>
+            <input type="date" value="${escapeHtml(stats.endValue)}" min="${escapeHtml(stats.startValue)}" data-dashboard-end>
           </label>
           <button type="submit">Apply</button>
+          <small class="crm-dashboard-range-status" data-dashboard-range-status>Showing ${escapeHtml(stats.rangeLabel)}</small>
         </form>
       </header>
       <div class="crm-dashboard-total-row">
@@ -2375,6 +2381,47 @@ function saveDashboardDateRange(key, range) {
     localStorage.setItem(key, JSON.stringify(normalizeDashboardDateRange(range)));
   } catch (error) {
     // Date range persistence is best-effort.
+  }
+}
+
+function validateDashboardRangeForm(form) {
+  const startInput = form.querySelector("[data-dashboard-start]");
+  const endInput = form.querySelector("[data-dashboard-end]");
+  const status = form.querySelector("[data-dashboard-range-status]");
+  const start = startInput?.value || "";
+  const end = endInput?.value || "";
+  if (!start || !end) {
+    if (status) status.textContent = "Choose both From and To dates.";
+    form.classList.add("has-error");
+    return { ok: false };
+  }
+  const startDate = parseDashboardDate(start);
+  const endDate = parseDashboardDate(end);
+  if (!startDate || !endDate || startDate.getTime() > endDate.getTime()) {
+    if (status) status.textContent = "To date cannot be earlier than From date.";
+    if (endInput) endInput.min = start;
+    if (startInput) startInput.max = end || "";
+    form.classList.add("has-error");
+    return { ok: false };
+  }
+  form.classList.remove("has-error");
+  return { ok: true, range: { start, end } };
+}
+
+function syncDashboardDateConstraints(form) {
+  const startInput = form.querySelector("[data-dashboard-start]");
+  const endInput = form.querySelector("[data-dashboard-end]");
+  const status = form.querySelector("[data-dashboard-range-status]");
+  const start = startInput?.value || "";
+  const end = endInput?.value || "";
+  if (endInput && start) endInput.min = start;
+  if (startInput && end) startInput.max = end;
+  if (start && end && parseDashboardDate(start)?.getTime() > parseDashboardDate(end)?.getTime()) {
+    form.classList.add("has-error");
+    if (status) status.textContent = "To date cannot be earlier than From date.";
+  } else {
+    form.classList.remove("has-error");
+    if (status) status.textContent = start && end ? `Ready to apply ${start.replaceAll("-", "/")} - ${end.replaceAll("-", "/")}` : "Choose both dates.";
   }
 }
 

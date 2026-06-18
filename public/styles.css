@@ -1730,6 +1730,21 @@ body.admin-drawer-open .admin-shell {
   padding: 0 14px;
 }
 
+.crm-dashboard-range-status {
+  color: #516174;
+  grid-column: 1 / -1;
+  min-height: 18px;
+}
+
+.crm-dashboard-range.has-error input {
+  border-color: #d90429;
+}
+
+.crm-dashboard-range.has-error .crm-dashboard-range-status {
+  color: #d90429;
+  font-weight: 800;
+}
+
 .crm-dashboard-total-row {
   border: 1px solid #d8e2ef;
   border-radius: 8px;
