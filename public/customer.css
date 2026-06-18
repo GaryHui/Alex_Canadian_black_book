@@ -2213,7 +2213,7 @@ input::placeholder {
 .inventory-spec-row {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
   min-width: 0;
 }
 
@@ -2254,7 +2254,7 @@ input::placeholder {
   font-size: 16px;
   line-height: 1.1;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .inventory-spec-row small {
@@ -2268,7 +2268,7 @@ input::placeholder {
   align-items: center;
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(170px, 210px) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(180px, 210px) minmax(260px, 1fr) auto;
 }
 
 .inventory-order-button {
