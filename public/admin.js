@@ -704,7 +704,7 @@ async function loadLeads(options = {}) {
   renderAdminOverview(adminLeadsCache);
   renderAdminLeadAlerts();
 
-  renderLeadWorkbench(adminLeadsCache);
+  renderLeadWorkbench(adminLeadsCache, options);
   if (data.storage === "not_configured") {
     statusEl.textContent = "Lead storage is not configured on this deployment. Add Supabase env vars to persist leads.";
   }
@@ -1059,7 +1059,7 @@ async function openAdminLeadFromAlert(id) {
   }
 }
 
-function renderLeadWorkbench(leads) {
+function renderLeadWorkbench(leads, options = {}) {
   const filtered = filterAdminLeads(leads);
   const sorted = sortAdminLeads(filtered);
   const collapsed = collapseVisibleAdminLeads(sorted);
@@ -2107,7 +2107,7 @@ function renderLead(lead, index = 0) {
   const customerName = input.ownerName || input.name || "";
   const sourceLabel = leadSourceLabel(lead);
   const dealerCreated = sourceLabel === "Dealer appraisal";
-  const customerEmail = input.email || (dealerCreated ? "" : lead.auth_email || authUser.email) || "-";
+  const customerEmail = input.email || (dealerCreated ? "" : lead.auth_email || currentAdminEmail()) || "-";
   const customerDisplay = customerName || customerEmail;
   const vin = input.vin || valuation.vin || "-";
   const status = lead.status || "new";
@@ -2761,7 +2761,7 @@ async function quickAssignDrawerLead(button) {
       body: JSON.stringify({
         action: "assign_lead",
         id: activeAdminDrawerLeadId,
-        authorEmail: authUser.email || "",
+        authorEmail: currentAdminEmail(),
         status: nextStatus,
         assignedTo: email,
         priority: lead.priority || "normal",
@@ -3483,7 +3483,7 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
     if (isAssignForm) syncAssignmentStatus(ownerForm);
     const payload = {
       id: activeAdminDrawerLeadId,
-      authorEmail: authUser.email || "",
+      authorEmail: currentAdminEmail(),
       ...Object.fromEntries(new FormData(ownerForm).entries())
     };
     if (isAssignForm) payload.action = "assign_lead";
@@ -4278,6 +4278,10 @@ function authHeaders() {
   return {
     Authorization: `Bearer ${adminSession?.access_token || ""}`
   };
+}
+
+function currentAdminEmail() {
+  return String(adminSession?.user?.email || "").trim().toLowerCase();
 }
 
 function escapeHtml(value) {
