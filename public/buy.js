@@ -44,13 +44,28 @@ const text = {
     heroPointThree: "Dealer follow-up",
     searchLabel: "Search",
     searchPlaceholder: "Lexus, SUV, 2024...",
+    makeLabel: "Make",
+    makeAny: "Any Make",
+    modelLabel: "Model",
+    modelAny: "Any Model",
+    priceRangeLabel: "Price",
+    priceAny: "Any Price",
+    typeLabel: "Type",
+    typeAny: "Any Type",
+    sortLabel: "Sort",
+    sortMonthlyAsc: "Monthly low to high",
+    sortPriceAsc: "Price low to high",
+    sortPriceDesc: "Price high to low",
+    sortYearDesc: "Newest year",
+    sortKmAsc: "Lowest km",
     budgetLabel: "Max price",
     monthlyBudgetLabel: "Max monthly payment",
     dealMonthlyLabel: "Finance from",
     dealDownLabel: "Initial down",
     dealTermLabel: "Term",
     dealRateLabel: "APR",
-    filterButton: "Search inventory",
+    filterButton: "Update search",
+    clearFilters: "Clear",
     sendEstimateButton: "Send this estimate to dealer",
     sendEstimateDisabled: "Choose a vehicle first",
     filterEyebrow: "Vehicle search",
@@ -136,13 +151,28 @@ const text = {
     heroPointThree: "Suivi concessionnaire",
     searchLabel: "Recherche",
     searchPlaceholder: "Lexus, VUS, 2024...",
+    makeLabel: "Marque",
+    makeAny: "Toute marque",
+    modelLabel: "Modele",
+    modelAny: "Tout modele",
+    priceRangeLabel: "Prix",
+    priceAny: "Tout prix",
+    typeLabel: "Type",
+    typeAny: "Tout type",
+    sortLabel: "Trier",
+    sortMonthlyAsc: "Mensuel croissant",
+    sortPriceAsc: "Prix croissant",
+    sortPriceDesc: "Prix decroissant",
+    sortYearDesc: "Annee recente",
+    sortKmAsc: "Kilometrage bas",
     budgetLabel: "Prix maximum",
     monthlyBudgetLabel: "Paiement mensuel max.",
     dealMonthlyLabel: "Financement des",
     dealDownLabel: "Mise initiale",
     dealTermLabel: "Duree",
     dealRateLabel: "TAEG",
-    filterButton: "Rechercher",
+    filterButton: "Mettre a jour",
+    clearFilters: "Effacer",
     sendEstimateButton: "Envoyer cette estimation",
     sendEstimateDisabled: "Choisissez d'abord un vehicule",
     filterEyebrow: "Recherche de vehicule",
@@ -355,7 +385,13 @@ function updateInventoryResultsCount() {
   if (!inventoryResultsCount) return;
   const count = filteredInventory.length;
   const data = inventoryFilter ? new FormData(inventoryFilter) : null;
-  const hasFilters = Boolean(String(data?.get("query") || "").trim() || String(data?.get("maxPrice") || "").trim() || String(data?.get("maxMonthly") || "").trim());
+  const hasFilters = Boolean(
+    String(data?.get("query") || "").trim()
+    || String(data?.get("make") || "").trim()
+    || String(data?.get("model") || "").trim()
+    || String(data?.get("priceRange") || "").trim()
+    || String(data?.get("type") || "").trim()
+  );
   const key = hasFilters
     ? count === 1 ? "resultsFilteredLabel" : "resultsFilteredLabelPlural"
     : count === 1 ? "resultsLabel" : "resultsLabelPlural";
@@ -391,6 +427,35 @@ function normalizeInventoryVehicle(vehicle) {
     tags: tags.length ? tags : ["Dealer reviewed"],
     photoTone: photoToneFor(vehicle.color || vehicle.make || title)
   };
+}
+
+function populateInventoryFilters() {
+  if (!inventoryFilter) return;
+  populateSelectOptions(inventoryFilter.elements.make, uniqueInventoryValues((vehicle) => vehicle.make), text[language].makeAny);
+  populateSelectOptions(inventoryFilter.elements.model, uniqueInventoryValues((vehicle) => vehicle.model), text[language].modelAny);
+  populateSelectOptions(inventoryFilter.elements.type, uniqueInventoryValues((vehicle) => vehicle.style || vehicle.series || firstTypeTag(vehicle)), text[language].typeAny);
+}
+
+function uniqueInventoryValues(selector) {
+  return [...new Set(inventory.map(selector).map((value) => String(value || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function firstTypeTag(vehicle) {
+  return (vehicle.tags || []).find((tag) => {
+    const value = String(tag || "").toLowerCase();
+    return value && !value.includes("british columbia") && value !== "bc" && value !== "on";
+  }) || "";
+}
+
+function populateSelectOptions(select, values, emptyLabel) {
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = [
+    `<option value="">${escapeHtml(emptyLabel)}</option>`,
+    ...values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`)
+  ].join("");
+  if (values.includes(current)) select.value = current;
 }
 
 function publicSummary(vehicle) {
@@ -508,17 +573,39 @@ function applyFilters(event) {
   event?.preventDefault();
   const data = new FormData(inventoryFilter);
   const query = String(data.get("query") || "").trim().toLowerCase();
-  const maxPrice = Number(data.get("maxPrice") || 0);
-  const maxMonthly = Number(data.get("maxMonthly") || 0);
+  const make = String(data.get("make") || "").trim().toLowerCase();
+  const model = String(data.get("model") || "").trim().toLowerCase();
+  const type = String(data.get("type") || "").trim().toLowerCase();
+  const priceRange = String(data.get("priceRange") || "").trim();
+  const sortBy = String(data.get("sortBy") || "monthly-asc");
+  const [minPrice, maxPrice] = priceRange ? priceRange.split("-").map((value) => Number(value || 0)) : [0, 0];
   filteredInventory = inventory.filter((vehicle) => {
-    const haystack = `${vehicle.title} ${vehicle.region} ${vehicle.color} ${vehicle.tags.join(" ")}`.toLowerCase();
+    const haystack = `${vehicle.title} ${vehicle.make} ${vehicle.model} ${vehicle.region} ${vehicle.color} ${vehicle.tags.join(" ")}`.toLowerCase();
+    const vehicleType = `${vehicle.style || ""} ${vehicle.series || ""} ${(vehicle.tags || []).join(" ")}`.toLowerCase();
     const matchesQuery = !query || haystack.includes(query);
-    const matchesPrice = !maxPrice || vehicle.price <= maxPrice;
-    const matchesMonthly = !maxMonthly || vehicleDeal(vehicle).monthly <= maxMonthly;
-    return matchesQuery && matchesPrice && matchesMonthly;
+    const matchesMake = !make || String(vehicle.make || "").toLowerCase() === make;
+    const matchesModel = !model || String(vehicle.model || "").toLowerCase() === model;
+    const matchesType = !type || vehicleType.includes(type);
+    const matchesPrice = !priceRange || (Number(vehicle.price || 0) >= minPrice && Number(vehicle.price || 0) <= maxPrice);
+    return matchesQuery && matchesMake && matchesModel && matchesType && matchesPrice;
   });
+  filteredInventory.sort((a, b) => compareVehicles(a, b, sortBy));
   renderInventory();
   syncFilterChipState();
+}
+
+function compareVehicles(a, b, sortBy) {
+  const comparisons = {
+    "monthly-asc": vehicleDeal(a).monthly - vehicleDeal(b).monthly,
+    "price-asc": Number(a.price || 0) - Number(b.price || 0),
+    "price-desc": Number(b.price || 0) - Number(a.price || 0),
+    "year-desc": Number(b.year || 0) - Number(a.year || 0),
+    "km-asc": Number(a.kilometers || 0) - Number(b.kilometers || 0)
+  };
+  const result = comparisons[sortBy] ?? comparisons["monthly-asc"];
+  return Number.isFinite(result) && result !== 0
+    ? result
+    : String(a.title || "").localeCompare(String(b.title || ""));
 }
 
 function applyFilterChip(button) {
@@ -557,6 +644,7 @@ function setLanguage(nextLanguage) {
     const key = node.dataset.i18nPlaceholder;
     if (text[language][key]) node.placeholder = text[language][key];
   });
+  populateInventoryFilters();
   updateInventoryIntro();
   updateInventorySourceStatus();
   renderInventory();
@@ -565,6 +653,7 @@ function setLanguage(nextLanguage) {
 
 function showVehicleDetails(vehicle) {
   if (!vehicleDetailModal || !vehicleDetailTitle || !vehicleDetailBody) return;
+  selectVehicleForFinance(vehicle);
   vehicleDetailTitle.textContent = vehicle.title;
   if (vehicleDetailPriceSummary) {
     vehicleDetailPriceSummary.innerHTML = `
@@ -574,7 +663,7 @@ function showVehicleDetails(vehicle) {
   }
   vehicleDetailBody.innerHTML = `
     ${vehicle.photos?.length ? `<figure class="vehicle-detail-photo"><img src="${escapeHtml(photoDisplayUrl(vehicle.photos[0].url))}" alt="${escapeHtml(vehicle.title)}" /><figcaption>${escapeHtml(vehicle.photos[0].label || "Vehicle photo")}</figcaption></figure>` : ""}
-    <div class="vehicle-detail-grid">
+    <div class="vehicle-detail-grid vehicle-detail-specs">
       ${detailItem(text[language].detailKilometers, isPublicFieldVisible(vehicle, "showKilometers") && vehicle.kilometers ? `${vehicle.kilometers.toLocaleString("en-CA")} km` : "")}
       ${detailItem(text[language].detailRegion, isPublicFieldVisible(vehicle, "showRegion") ? vehicle.region : "")}
       ${detailItem(text[language].detailColor, isPublicFieldVisible(vehicle, "showColor") ? vehicle.color : "")}
@@ -591,10 +680,6 @@ function showVehicleDetails(vehicle) {
     <div class="vehicle-detail-description">
       <span>${escapeHtml(text[language].detailDescription)}</span>
       <p>${escapeHtml(vehicle.description || text[language].notAvailable)}</p>
-    </div>
-    <div class="vehicle-detail-actions">
-      <button class="primary-button" type="button" data-detail-contact="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].contactDealer)}</button>
-      <button class="secondary-button" type="button" data-detail-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].detailUseCalculator)}</button>
     </div>
   `;
   vehicleDetailModal.hidden = false;
@@ -853,14 +938,6 @@ vehicleDetailModal?.addEventListener("click", (event) => {
     }
     return;
   }
-
-  const financeButton = event.target.closest("[data-detail-finance]");
-  if (!financeButton) return;
-  const vehicle = inventory.find((item) => item.id === financeButton.dataset.detailFinance);
-  if (!vehicle) return;
-  selectVehicleForFinance(vehicle);
-  closeVehicleDetails();
-  document.querySelector(".finance-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
 });
 
 contactDealerModal?.addEventListener("click", (event) => {
@@ -878,6 +955,7 @@ document.addEventListener("keydown", (event) => {
 async function init() {
   setLanguage(language);
   await loadInventory();
+  populateInventoryFilters();
   applyFilters();
   calculatePayment();
   updateSendEstimateButton();
