@@ -2,6 +2,13 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  attachLeadSignals,
+  buildVehicleClusters,
+  isBuyerLead,
+  notifyDuplicateSellerLead,
+  reviewDuplicateSellerLead
+} from "./api/_lead-signals.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(path.join(__dirname, ".env.local"));
@@ -270,6 +277,27 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, result.ok ? 200 : result.status || 400, result);
     }
 
+    if (url.pathname === "/api/vehicle-clusters") {
+      const admin = await requireAdmin(req);
+      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+      if (req.method !== "GET") return sendJson(res, 405, { ok: false, error: "Method not allowed" });
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!supabaseUrl || !key) {
+        return sendJson(res, 200, { ok: true, storage: "not_configured", clusters: [] });
+      }
+      const clusters = await buildVehicleClusters({ url: supabaseUrl, key });
+      return sendJson(res, 200, {
+        ok: true,
+        storage: "supabase",
+        clusters,
+        summary: {
+          clusters: clusters.length,
+          needsReview: clusters.filter((item) => Number(item.needs_review_count || 0) > 0).length
+        }
+      });
+    }
+
     if (url.pathname === "/api/leads") {
       if (req.method === "PATCH") {
         const admin = await requireAdmin(req);
@@ -277,6 +305,8 @@ const server = http.createServer(async (req, res) => {
         const body = await readJson(req);
         const result = body.action === "owner_read"
           ? await markOwnerRead(body, admin.user)
+          : body.action === "duplicate_review"
+            ? await markDuplicateReview(body, admin.user)
           : await updateLead(body);
         return sendJson(res, result.ok ? 200 : 400, result);
       }
@@ -746,6 +776,12 @@ async function saveLead(body) {
       authorEmail: "system",
       reason: "New lead received."
     });
+    if (!isBuyerLead(savedLead)) {
+      await notifyDuplicateSellerLead({
+        url: process.env.SUPABASE_URL,
+        key: process.env.SUPABASE_SERVICE_ROLE_KEY
+      }, savedLead);
+    }
   }
   const webhook = await submitLeadToWebhook(savedLead, uploadFiles);
   if (saved.ok && savedLead.id) {
@@ -1035,7 +1071,8 @@ async function listLeads() {
 
   const leads = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: leads, leads: [] };
-  return { ok: true, storage: "supabase", leads: await attachOwnerReviewState(leads, { url, key }) };
+  const withReview = await attachOwnerReviewState(leads, { url, key });
+  return { ok: true, storage: "supabase", leads: await attachLeadSignals(withReview, { url, key }) };
 }
 
 async function attachOwnerReviewState(leads, client) {
@@ -1323,6 +1360,21 @@ async function markOwnerRead(body, user) {
   });
   if (!result.ok) return result;
   return { ok: true, read: result.data?.[0] || null };
+}
+
+async function markDuplicateReview(body, user) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const leadId = String(body.id || body.leadId || "").trim();
+  if (!leadId) return { ok: false, error: "Lead id is required" };
+  if (!url || !key) return { ok: false, error: "Supabase is not configured" };
+  return reviewDuplicateSellerLead({
+    url,
+    key
+  }, leadId, body.decision, user?.email, {
+    targetLeadId: body.targetLeadId,
+    listingId: body.listingId
+  });
 }
 
 async function listPublishedInventory() {

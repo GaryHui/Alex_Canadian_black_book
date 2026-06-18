@@ -1117,7 +1117,7 @@ function filterAdminLeads(leads) {
 function renderDuplicateVehicleBlocks(leads) {
   const groups = new Map();
   leads
-    .filter((lead) => !isBuyerLead(lead) && !isClosedLead(lead))
+    .filter((lead) => !isBuyerLead(lead) && !isClosedLead(lead) && shouldGroupSellerLead(lead))
     .forEach((lead) => {
       const key = adminVehicleClusterKey(lead);
       if (!key) return;
@@ -1180,10 +1180,18 @@ function renderDuplicateVehicleCluster(group) {
       </div>
       <div class="duplicate-cluster-actions">
         <button type="button" data-admin-open-lead="${escapeHtml(primary.id || "")}">Review lead</button>
-        <button type="button" data-admin-open-url="${escapeHtml(adminVehicleClusterUrl(primary))}">Open vehicle file</button>
+        <button type="button" data-admin-set-filter="duplicate-review">Show duplicate queue</button>
       </div>
     </article>
   `;
+}
+
+function duplicateReviewDecision(lead) {
+  return String(lead?.duplicate_warning?.decision || "").trim().toLowerCase();
+}
+
+function shouldGroupSellerLead(lead) {
+  return !(lead?.duplicate_warning?.reviewed && duplicateReviewDecision(lead) === "keep_separate");
 }
 
 function sortAdminLeads(leads) {
@@ -1894,6 +1902,10 @@ function collapseVisibleAdminLeads(leads) {
       visibleUngroupedSellerLeads.push(lead);
       continue;
     }
+    if (!shouldGroupSellerLead(lead)) {
+      visibleUngroupedSellerLeads.push(lead);
+      continue;
+    }
     const group = sellerGroups.get(key) || [];
     group.push(lead);
     sellerGroups.set(key, group);
@@ -1936,7 +1948,9 @@ function adminClusterMembersForLead(lead) {
 
 function adminCollapsedSellerMembers(lead) {
   const id = String(lead?.id || "").trim();
-  return adminClusterMembersForLead(lead).filter((item) => String(item.id || "").trim() !== id);
+  return adminClusterMembersForLead(lead).filter((item) => (
+    String(item.id || "").trim() !== id && shouldGroupSellerLead(item)
+  ));
 }
 
 function adminVehicleClusterUrl(lead) {
@@ -1946,16 +1960,21 @@ function adminVehicleClusterUrl(lead) {
 
 function renderCollapsedSellerMembersInline(lead) {
   if (isBuyerLead(lead)) return "";
+  if (!shouldGroupSellerLead(lead)) return "";
   const hiddenMembers = adminCollapsedSellerMembers(lead);
   if (!hiddenMembers.length) return "";
+  const firstHiddenId = String(hiddenMembers[0]?.id || "").trim();
   return `
     <section class="lead-collapsed-cluster">
       <div>
-        <span>Collapsed SELL leads</span>
-        <strong>${escapeHtml(`${hiddenMembers.length} more seller lead${hiddenMembers.length === 1 ? "" : "s"} folded into this vehicle card`)}</strong>
+        <span>Same vehicle review</span>
+        <strong>${escapeHtml(`${hiddenMembers.length} related SELL lead${hiddenMembers.length === 1 ? "" : "s"} need an owner decision`)}</strong>
         <small>${escapeHtml(hiddenMembers.slice(0, 3).map((item) => item.input?.email || item.auth_email || item.id || "Seller lead").join(" | "))}${hiddenMembers.length > 3 ? ` +${hiddenMembers.length - 3} more` : ""}</small>
       </div>
-      <button type="button" data-admin-open-url="${escapeHtml(adminVehicleClusterUrl(lead))}">Open vehicle cluster</button>
+      <div class="lead-collapsed-actions">
+        <button type="button" data-admin-set-filter="duplicate-review">Review duplicate queue</button>
+        ${firstHiddenId ? `<button type="button" data-admin-open-lead="${escapeHtml(firstHiddenId)}">Open related lead</button>` : ""}
+      </div>
     </section>
   `;
 }
@@ -2875,6 +2894,14 @@ leadsEl.addEventListener("click", async (event) => {
   const openUrlButton = event.target.closest("[data-admin-open-url]");
   if (openUrlButton) {
     window.location.href = openUrlButton.dataset.adminOpenUrl || "/admin-vehicles.html";
+    return;
+  }
+
+  const filterButton = event.target.closest("[data-admin-set-filter]");
+  if (filterButton) {
+    setAdminLeadFilter(filterButton.dataset.adminSetFilter || "all");
+    renderLeadWorkbench(adminLeadsCache);
+    document.querySelector("#crm-leads")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
 
