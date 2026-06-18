@@ -136,6 +136,10 @@ main {
   margin: 0 auto;
 }
 
+.buy-page-main {
+  width: min(1540px, calc(100% - 36px));
+}
+
 .home-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(340px, 500px);
@@ -1836,6 +1840,10 @@ input::placeholder {
   margin: 28px auto 42px;
 }
 
+.buy-page-main .inventory-layout {
+  width: 100%;
+}
+
 .inventory-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
@@ -2406,7 +2414,8 @@ input::placeholder {
   border-radius: 8px;
 }
 
-.contact-buying-plan {
+.contact-buying-plan,
+.contact-finance-plan {
   display: grid;
   gap: 12px;
   padding: 14px;
@@ -2415,7 +2424,8 @@ input::placeholder {
   border-radius: 8px;
 }
 
-.contact-buying-plan h3 {
+.contact-buying-plan h3,
+.contact-finance-plan h3 {
   margin: 0;
   color: var(--blue-dark);
   font-size: 16px;
@@ -2577,6 +2587,7 @@ input::placeholder {
 .marketplace-search-bar {
   display: grid;
   grid-template-columns: repeat(5, minmax(132px, 1fr)) minmax(190px, auto);
+  width: 100%;
   overflow: hidden;
   margin-top: 10px;
   background: #07095f;
@@ -2734,9 +2745,62 @@ input::placeholder {
 }
 
 .vehicle-detail-dialog .vehicle-detail-body {
-  grid-template-columns: minmax(260px, 0.78fr) minmax(0, 1fr) minmax(320px, 0.9fr);
+  grid-template-columns: 1fr;
   align-content: start;
   padding: 24px;
+}
+
+.vehicle-detail-photo-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(160px, 220px);
+  gap: 10px;
+  min-width: 0;
+  padding-bottom: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+}
+
+.vehicle-detail-thumb,
+.vehicle-detail-thumb-placeholder {
+  min-height: 96px;
+  margin: 0;
+  overflow: hidden;
+  background: #f1f6fb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  scroll-snap-align: start;
+}
+
+.vehicle-detail-thumb img {
+  display: block;
+  width: 100%;
+  height: 92px;
+  object-fit: cover;
+}
+
+.vehicle-detail-thumb figcaption {
+  padding: 6px 8px;
+  color: #506176;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vehicle-detail-thumb-placeholder {
+  display: grid;
+  place-items: center;
+  color: #506176;
+  font-weight: 800;
+}
+
+.vehicle-detail-content {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.78fr) minmax(0, 1fr) minmax(320px, 0.9fr);
+  gap: 16px;
+  min-height: 0;
 }
 
 .vehicle-detail-gallery {
@@ -2937,6 +3001,10 @@ input::placeholder {
     grid-template-columns: 1fr;
   }
 
+  .vehicle-detail-content {
+    grid-template-columns: 1fr;
+  }
+
   .vehicle-detail-dialog .vehicle-detail-photo {
     grid-row: auto;
   }
@@ -3002,6 +3070,10 @@ input::placeholder {
     width: min(100% - 24px, 1180px);
   }
 
+  .buy-page-main {
+    width: min(100% - 24px, 1540px);
+  }
+
   h1 {
     font-size: 42px;
   }
@@ -3012,6 +3084,7 @@ input::placeholder {
   .inventory-deal-copy,
   .inventory-spec-row,
   .marketplace-search-bar,
+  .vehicle-detail-content,
   .mode-panel,
   .split-row,
   .value-cards,

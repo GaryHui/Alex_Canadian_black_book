@@ -111,13 +111,13 @@ const text = {
     detailsOrder: "Details & order",
     contactEyebrow: "Dealer message",
     contactTitle: "Send buying intent",
-    purchaseTitle: "Buying plan",
+    purchaseTitle: "Financial estimate",
     purchaseFinance: "Finance",
     purchaseLease: "Lease",
     purchaseCash: "Cash",
     purchaseUndecided: "Not sure",
     purchaseFinanceSummary: "Finance estimate",
-    purchaseLeaseSummary: "Lease interest",
+    purchaseLeaseSummary: "Lease estimate",
     purchaseCashSummary: "Cash purchase",
     purchaseUndecidedSummary: "Buyer is still deciding between cash, finance, and lease.",
     timelineLabel: "Buying timeline",
@@ -221,13 +221,13 @@ const text = {
     detailsOrder: "Details et commande",
     contactEyebrow: "Message au concessionnaire",
     contactTitle: "Envoyer mon intention d'achat",
-    purchaseTitle: "Plan d'achat",
+    purchaseTitle: "Estimation financiere",
     purchaseFinance: "Financement",
     purchaseLease: "Location",
     purchaseCash: "Comptant",
     purchaseUndecided: "Pas certain",
     purchaseFinanceSummary: "Estimation de financement",
-    purchaseLeaseSummary: "Interet pour la location",
+    purchaseLeaseSummary: "Estimation de location",
     purchaseCashSummary: "Achat comptant",
     purchaseUndecidedSummary: "L'acheteur hesite encore entre comptant, financement et location.",
     timelineLabel: "Delai d'achat",
@@ -755,32 +755,56 @@ function showVehicleDetails(vehicle) {
     `;
   }
   vehicleDetailBody.innerHTML = `
-    <section class="vehicle-detail-gallery">
-      ${vehicle.photos?.length ? `<figure class="vehicle-detail-photo"><img src="${escapeHtml(photoDisplayUrl(vehicle.photos[0].url))}" alt="${escapeHtml(vehicle.title)}" /><figcaption>${escapeHtml(vehicle.photos[0].label || "Vehicle photo")}</figcaption></figure>` : vehicleImageMarkup(vehicle)}
-    </section>
-    <section class="vehicle-detail-main">
-      <h3>Your vehicle details</h3>
-      <div class="vehicle-detail-grid vehicle-detail-specs">
-        ${detailItem(text[language].detailKilometers, isPublicFieldVisible(vehicle, "showKilometers") && vehicle.kilometers ? `${vehicle.kilometers.toLocaleString("en-CA")} km` : "")}
-        ${detailItem(text[language].detailRegion, isPublicFieldVisible(vehicle, "showRegion") ? vehicle.region : "")}
-        ${detailItem(text[language].detailColor, isPublicFieldVisible(vehicle, "showColor") ? vehicle.color : "")}
-        ${detailItem("Year", vehicle.year)}
-        ${detailItem("Make", vehicle.make)}
-        ${detailItem("Model", vehicle.model)}
-        ${detailItem("Series / Trim", vehicle.series)}
-        ${detailItem("Style", vehicle.style)}
-        ${detailItem(text[language].detailVin, isPublicFieldVisible(vehicle, "showVin") ? vehicle.vin : "")}
-        ${detailItem(text[language].detailUvc, isPublicFieldVisible(vehicle, "showUvc") ? vehicle.uvc : "")}
-      </div>
-      <div class="vehicle-detail-description">
-        <span>${escapeHtml(text[language].detailDescription)}</span>
-        <p>${escapeHtml(vehicle.description || text[language].notAvailable)}</p>
-      </div>
-    </section>
-    <aside class="vehicle-detail-payment-slot"></aside>
+    ${vehicleDetailPhotoStrip(vehicle)}
+    <div class="vehicle-detail-content">
+      <section class="vehicle-detail-gallery">
+        ${vehicle.photos?.length ? `<figure class="vehicle-detail-photo"><img src="${escapeHtml(photoDisplayUrl(vehicle.photos[0].url))}" alt="${escapeHtml(vehicle.title)}" /><figcaption>${escapeHtml(vehicle.photos[0].label || "Vehicle photo")}</figcaption></figure>` : vehicleImageMarkup(vehicle)}
+      </section>
+      <section class="vehicle-detail-main">
+        <h3>Your vehicle details</h3>
+        <div class="vehicle-detail-grid vehicle-detail-specs">
+          ${detailItem(text[language].detailKilometers, isPublicFieldVisible(vehicle, "showKilometers") && vehicle.kilometers ? `${vehicle.kilometers.toLocaleString("en-CA")} km` : "")}
+          ${detailItem(text[language].detailRegion, isPublicFieldVisible(vehicle, "showRegion") ? vehicle.region : "")}
+          ${detailItem(text[language].detailColor, isPublicFieldVisible(vehicle, "showColor") ? vehicle.color : "")}
+          ${detailItem("Year", vehicle.year)}
+          ${detailItem("Make", vehicle.make)}
+          ${detailItem("Model", vehicle.model)}
+          ${detailItem("Series / Trim", vehicle.series)}
+          ${detailItem("Style", vehicle.style)}
+          ${detailItem(text[language].detailVin, isPublicFieldVisible(vehicle, "showVin") ? vehicle.vin : "")}
+          ${detailItem(text[language].detailUvc, isPublicFieldVisible(vehicle, "showUvc") ? vehicle.uvc : "")}
+        </div>
+        <div class="vehicle-detail-description">
+          <span>${escapeHtml(text[language].detailDescription)}</span>
+          <p>${escapeHtml(vehicle.description || text[language].notAvailable)}</p>
+        </div>
+      </section>
+      <aside class="vehicle-detail-payment-slot"></aside>
+    </div>
   `;
   vehicleDetailBody.querySelector(".vehicle-detail-payment-slot")?.appendChild(detailPaymentPanel);
   vehicleDetailModal.hidden = false;
+}
+
+function vehicleDetailPhotoStrip(vehicle) {
+  const photos = Array.isArray(vehicle.photos) ? vehicle.photos.filter((photo) => photo?.url) : [];
+  if (!photos.length) {
+    return `
+      <div class="vehicle-detail-photo-strip" aria-label="Vehicle photos">
+        <div class="vehicle-detail-thumb-placeholder">Photo preview</div>
+      </div>
+    `;
+  }
+  return `
+    <div class="vehicle-detail-photo-strip" aria-label="Vehicle photos">
+      ${photos.map((photo, index) => `
+        <figure class="vehicle-detail-thumb">
+          <img src="${escapeHtml(photoDisplayUrl(photo.url))}" alt="${escapeHtml(photo.label || `${vehicle.title} photo ${index + 1}`)}" loading="lazy" />
+          <figcaption>${escapeHtml(photo.label || `Photo ${index + 1}`)}</figcaption>
+        </figure>
+      `).join("")}
+    </div>
+  `;
 }
 
 function vehicleImageMarkup(vehicle) {
