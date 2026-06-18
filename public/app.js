@@ -642,6 +642,11 @@ async function runValuation(extra = {}, options = {}) {
     authUserId: authSession?.user?.id || "",
     authEmail: authSession?.user?.email || ""
   };
+  if (dealerAdminAllowed) {
+    payload.leadSource = payload.leadSource || "dealer_appraisal";
+    payload.createdByDealer = true;
+    payload.dealerEmail = authSession?.user?.email || "";
+  }
 
   if (!payload.vin && !payload.uvc && payload.year && payload.make && (!payload.model || payload.model === unknownOption)) {
     statusEl.textContent = "Choose a model first, or use Find to search matching vehicles.";
@@ -1551,9 +1556,13 @@ function renderDealerLeads(leads, role) {
     const buyerLead = isBuyerLead(lead);
     const leadKind = buyerLead ? "buyer" : "seller";
     const leadTypeLabel = buyerLead ? "BUY lead" : "SELL lead";
+    const sourceLabel = dealerLeadSourceLabel(lead);
     const purchase = input.buyerPlan || valuation.buyerPlan || {};
     const title = cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || "Vehicle lead", buyerLead);
-    const customerEmail = input.email || lead.auth_email || lead.auth_user?.email || "-";
+    const customerName = input.ownerName || input.name || "";
+    const dealerCreated = sourceLabel === "Dealer appraisal";
+    const customerEmail = input.email || (dealerCreated ? "" : lead.auth_email || lead.auth_user?.email) || "-";
+    const customerPhone = input.phone || "No phone";
     const followUp = lead.next_follow_up_at || "";
     const lastActivity = lead.last_activity_at || "";
     const status = lead.status || "new";
@@ -1585,7 +1594,7 @@ function renderDealerLeads(leads, role) {
           : buyerLead
             ? "Buyer opportunity"
             : "Seller appraisal";
-    const customerSummary = input.phone || customerEmail;
+    const customerSummary = customerName || input.phone || customerEmail;
     const progressSummary = leadStatusLabel(status, buyerLead);
     const nextAction = dealerNextBestAction(lead);
     const compactTouchSummary = isDealerNoResponseLead(lead) ? "No response 48h+" : (dealerOutboundLabel(lead) || dealerLastTouchLabel(lead));
@@ -1596,6 +1605,7 @@ function renderDealerLeads(leads, role) {
           <div class="lead-list-col lead-list-col-main">
             <div class="dealer-lead-title">
               <b class="dealer-type-pill dealer-type-${leadKind}">${escapeHtml(leadTypeLabel)}</b>
+              <b class="lead-source-pill">${escapeHtml(sourceLabel)}</b>
               <strong>${escapeHtml(title)}</strong>
             </div>
             <div class="lead-list-subline">
@@ -1607,7 +1617,8 @@ function renderDealerLeads(leads, role) {
           <div class="lead-list-col">
             <strong>${escapeHtml(customerSummary)}</strong>
             <div class="lead-list-subline">
-              <span>${escapeHtml(customerEmail)}</span>
+              ${customerName && customerEmail !== "-" ? `<span>${escapeHtml(customerEmail)}</span>` : ""}
+              <span>${escapeHtml(customerPhone)}</span>
               <span>${escapeHtml(lead.assigned_to || "Assigned lead")}</span>
             </div>
           </div>
@@ -1713,7 +1724,11 @@ function renderDealerDrawer(leadId) {
   const lastActivity = lead.last_activity_at || "";
   const overdue = isDealerLeadOverdue(followUp, status);
   const title = cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || "Vehicle lead", buyerLead);
-  const customerEmail = input.email || lead.auth_user?.email || lead.auth_email || "-";
+  const customerName = input.ownerName || input.name || "";
+  const sourceLabel = dealerLeadSourceLabel(lead);
+  const dealerCreated = sourceLabel === "Dealer appraisal";
+  const customerEmail = input.email || (dealerCreated ? "" : lead.auth_user?.email || lead.auth_email) || "-";
+  const customerDisplay = customerName || customerEmail;
   const customerPhone = input.phone || "No phone";
   const vehicleContext = lead.vehicle_context || {};
   const pipelineLabel = leadStatusLabel(status, buyerLead);
@@ -1744,7 +1759,7 @@ function renderDealerDrawer(leadId) {
         <div>
           <span>Dealer workspace</span>
           <strong>${escapeHtml(title)}</strong>
-          <small>${escapeHtml(customerEmail)} | ${escapeHtml(customerPhone)}</small>
+          <small>${escapeHtml(sourceLabel)} | ${escapeHtml(customerDisplay)} | ${escapeHtml(customerPhone)}</small>
         </div>
         <div class="dealer-drawer-head-actions">
           <button type="button" data-dealer-drawer-open-card>Locate in queue</button>
@@ -1789,8 +1804,13 @@ function renderDealerDrawer(leadId) {
               <div class="drawer-meta-grid">
                 <div class="drawer-meta-item">
                   <span>Customer</span>
-                  <strong>${escapeHtml(customerEmail)}</strong>
-                  <small>${escapeHtml(customerPhone)}</small>
+                  <strong>${escapeHtml(customerDisplay)}</strong>
+                  <small>${escapeHtml([customerEmail !== customerDisplay ? customerEmail : "", customerPhone].filter(Boolean).join(" | "))}</small>
+                </div>
+                <div class="drawer-meta-item">
+                  <span>Source</span>
+                  <strong>${escapeHtml(sourceLabel)}</strong>
+                  <small>${escapeHtml(input.dealerEmail ? `Dealer ${input.dealerEmail}` : "Public owner flow")}</small>
                 </div>
                 <div class="drawer-meta-item">
                   <span>Plan</span>
@@ -2513,6 +2533,15 @@ function isBuyerLead(lead) {
   return input.leadType === "buyer_inquiry" || valuation.source === "buyer_inquiry";
 }
 
+function dealerLeadSourceLabel(lead = {}) {
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  const source = String(input.leadSource || input.sourceLabel || valuation.source || "").trim().toLowerCase();
+  if (input.leadType === "buyer_inquiry" || source === "buyer_inquiry") return "Buyer inquiry";
+  if (source.includes("dealer")) return "Dealer appraisal";
+  return "Owner appraisal";
+}
+
 function isDealerClosedLead(lead) {
   return ["won", "lost", "closed", "deleted", "in_inventory"].includes(String(lead?.status || "").toLowerCase());
 }
@@ -2887,7 +2916,7 @@ function latestDealerActivityKey(data) {
 function dealerActivityNoteLabel(type) {
   const value = String(type || "note").trim().toLowerCase();
   const labels = {
-    owner_review: "owner review request",
+    owner_review: "manager review request",
     correction: "correction request",
     internal: "internal note",
     inspection: "inspection note",

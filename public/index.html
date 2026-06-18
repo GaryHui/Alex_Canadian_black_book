@@ -163,9 +163,17 @@
             </form>
 
             <form id="valuation-form" class="form-grid">
-              <input name="email" type="hidden" />
+              <input name="leadSource" type="hidden" value="dealer_appraisal" />
               <label>
-                <span>Phone (optional)</span>
+                <span>Owner name (optional)</span>
+                <input name="ownerName" autocomplete="name" placeholder="Customer / seller name" />
+              </label>
+              <label>
+                <span>Owner email (optional)</span>
+                <input name="email" type="email" autocomplete="email" placeholder="owner@example.com" />
+              </label>
+              <label>
+                <span>Owner phone (optional)</span>
                 <input name="phone" type="tel" placeholder="604-000-0000" />
               </label>
               <label>

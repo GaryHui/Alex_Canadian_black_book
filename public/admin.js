@@ -2016,8 +2016,12 @@ function searchableLeadText(lead) {
     ownerReview.reason,
     ownerReview.by,
     input.name,
+    input.ownerName,
     input.email,
     input.phone,
+    input.leadSource,
+    input.sourceLabel,
+    input.dealerEmail,
     input.vin,
     input.uvc,
     input.year,
@@ -2051,6 +2055,15 @@ function cleanLeadTitle(title, buyer) {
   return buyer ? value.replace(/^Buyer inquiry\s*-\s*/i, "") : value;
 }
 
+function leadSourceLabel(lead = {}) {
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  const source = String(input.leadSource || input.sourceLabel || valuation.source || "").trim().toLowerCase();
+  if (input.leadType === "buyer_inquiry" || source === "buyer_inquiry") return "Buyer inquiry";
+  if (source.includes("dealer")) return "Dealer appraisal";
+  return "Owner appraisal";
+}
+
 function renderLead(lead, index = 0) {
   const input = lead.input || {};
   const valuation = lead.valuation || {};
@@ -2060,7 +2073,11 @@ function renderLead(lead, index = 0) {
   const wholesale = valuation.values?.wholesale?.adjusted?.avg;
   const retail = valuation.values?.retail?.adjusted?.avg;
   const title = cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), buyer) || "Vehicle lead";
-  const customerEmail = input.email || authUser.email || lead.auth_email || "-";
+  const customerName = input.ownerName || input.name || "";
+  const sourceLabel = leadSourceLabel(lead);
+  const dealerCreated = sourceLabel === "Dealer appraisal";
+  const customerEmail = input.email || (dealerCreated ? "" : lead.auth_email || authUser.email) || "-";
+  const customerDisplay = customerName || customerEmail;
   const vin = input.vin || valuation.vin || "-";
   const status = lead.status || "new";
   const assignedTo = lead.assigned_to || "";
@@ -2146,6 +2163,7 @@ function renderLead(lead, index = 0) {
         <div class="lead-list-col lead-list-col-main">
           <div class="lead-title-row">
             <b class="lead-type-pill lead-type-${leadType}">${escapeHtml(leadTypeLabel)}</b>
+            <b class="lead-source-pill">${escapeHtml(sourceLabel)}</b>
             ${unreadOwnerReview ? `<b class="lead-new-badge">NEW</b>` : ""}
             <strong>${escapeHtml(title)}</strong>
           </div>
@@ -2156,8 +2174,9 @@ function renderLead(lead, index = 0) {
           </div>
         </div>
         <div class="lead-list-col">
-          <strong>${escapeHtml(customerEmail)}</strong>
+          <strong>${escapeHtml(customerDisplay)}</strong>
           <div class="lead-list-subline">
+            ${customerName && customerEmail !== "-" ? `<span>${escapeHtml(customerEmail)}</span>` : ""}
             <span>${escapeHtml(input.phone || "No phone")}</span>
             <span>${escapeHtml(assignedTo ? `Rep ${shortEmail(assignedTo)}` : "No rep")}</span>
           </div>
@@ -2218,6 +2237,7 @@ function renderLead(lead, index = 0) {
 
 function renderSharedLeadMeta({
   customerEmail,
+  customerName,
   phone,
   vin,
   assignedTo,
@@ -2229,6 +2249,7 @@ function renderSharedLeadMeta({
   return `
     <dl class="lead-shared-meta">
       <div><dt>Customer</dt><dd>${escapeHtml(customerEmail || "-")}</dd></div>
+      ${customerName ? `<div><dt>Name</dt><dd>${escapeHtml(customerName)}</dd></div>` : ""}
       <div><dt>Phone</dt><dd>${escapeHtml(phone || "-")}</dd></div>
       <div><dt>VIN</dt><dd>${escapeHtml(vin || "-")}</dd></div>
       <div><dt>Lead type</dt><dd>${escapeHtml(leadTypeLabel || "-")}</dd></div>
@@ -2259,7 +2280,11 @@ function renderAdminDrawer(leadId) {
   const adjustment = lead.owner_adjustment || {};
   const buyer = isBuyerLead(lead);
   const title = cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), buyer) || "Vehicle lead";
-  const customerEmail = input.email || lead.auth_user?.email || lead.auth_email || "-";
+  const customerName = input.ownerName || input.name || "";
+  const sourceLabel = leadSourceLabel(lead);
+  const dealerCreated = sourceLabel === "Dealer appraisal";
+  const customerEmail = input.email || (dealerCreated ? "" : lead.auth_user?.email || lead.auth_email) || "-";
+  const customerDisplay = customerName || customerEmail;
   const customerPhone = input.phone || "No phone";
   const vin = input.vin || valuation.vin || "-";
   const status = lead.status || "new";
@@ -2322,7 +2347,7 @@ function renderAdminDrawer(leadId) {
         <div>
           <span>Lead workspace</span>
           <strong>${escapeHtml(title)}</strong>
-          <small>${escapeHtml(customerEmail)} | ${escapeHtml(customerPhone)} | VIN ${escapeHtml(vin)}</small>
+          <small>${escapeHtml(sourceLabel)} | ${escapeHtml(customerDisplay)} | ${escapeHtml(customerPhone)} | VIN ${escapeHtml(vin)}</small>
         </div>
         <div class="admin-drawer-head-actions">
           <button type="button" data-drawer-open-card>Locate in queue</button>
@@ -2341,8 +2366,13 @@ function renderAdminDrawer(leadId) {
               </div>
               <div class="admin-drawer-stat">
                 <span>Customer / seller</span>
-                <strong>${escapeHtml(customerEmail)}</strong>
-                <small>${escapeHtml(customerPhone)}</small>
+                <strong>${escapeHtml(customerDisplay)}</strong>
+                <small>${escapeHtml([customerEmail !== customerDisplay ? customerEmail : "", customerPhone].filter(Boolean).join(" | "))}</small>
+              </div>
+              <div class="admin-drawer-stat">
+                <span>Source</span>
+                <strong>${escapeHtml(sourceLabel)}</strong>
+                <small>${escapeHtml(input.dealerEmail ? `Dealer ${input.dealerEmail}` : "Public owner flow")}</small>
               </div>
               <div class="admin-drawer-stat">
                 <span>Assigned rep</span>
@@ -2531,6 +2561,7 @@ async function quickAssignDrawerLead(button) {
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({
       id: activeAdminDrawerLeadId,
+      authorEmail: authUser.email || "",
       status: nextStatus,
       assignedTo: email,
       priority: lead.priority || "normal",
@@ -3243,6 +3274,7 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const payload = {
       id: activeAdminDrawerLeadId,
+      authorEmail: authUser.email || "",
       ...Object.fromEntries(new FormData(ownerForm).entries())
     };
     const response = await fetch("/api/leads", {

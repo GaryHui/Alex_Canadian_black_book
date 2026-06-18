@@ -49,7 +49,14 @@ export default async function handler(req, res) {
         key: process.env.SUPABASE_SERVICE_ROLE_KEY,
         leadId: savedLead.id,
         authorEmail: "system",
-        reason: "New lead received."
+        reason: `${leadSourceLabel(savedLead.input?.leadSource)} received.`
+      });
+      await createLeadTimelineNote({
+        url: process.env.SUPABASE_URL,
+        key: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        leadId: savedLead.id,
+        authorEmail: "system",
+        note: `Lead created from ${leadSourceLabel(savedLead.input?.leadSource)}.${savedLead.input?.dealerEmail ? ` Dealer: ${savedLead.input.dealerEmail}.` : ""}`
       });
       if (!isBuyerLead(savedLead)) {
         await notifyDuplicateSellerLead({
@@ -203,7 +210,10 @@ function leadExportValues(lead) {
   const valuation = lead.valuation || {};
 
   return {
-    email: input.email || lead.auth_email || lead.auth_user?.email || "",
+    leadSource: leadSourceLabel(input.leadSource),
+    ownerName: input.ownerName || "",
+    email: input.email || "",
+    dealerEmail: input.dealerEmail || lead.auth_email || lead.auth_user?.email || "",
     phone: input.phone || "",
     vin: valuation.vin || input.vin || "",
     uvc: input.uvc || "",
@@ -401,6 +411,15 @@ async function markDuplicateReview(body, user) {
   });
 }
 
+async function fetchLeadById(client, id) {
+  const response = await fetch(`${client.url}/rest/v1/valuation_leads?select=*&id=eq.${encodeURIComponent(id)}&limit=1`, {
+    headers: authHeaders(client.key)
+  });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) return null;
+  return rows?.[0] || null;
+}
+
 async function createOwnerReviewNote({ url, key, leadId, authorEmail, reason }) {
   if (!url || !key || !leadId) return;
   await insertJson(`${url}/rest/v1/lead_notes`, key, {
@@ -408,6 +427,16 @@ async function createOwnerReviewNote({ url, key, leadId, authorEmail, reason }) 
     author_email: String(authorEmail || "").trim().toLowerCase(),
     note_type: "owner_review",
     note: reason
+  }).catch(() => null);
+}
+
+async function createLeadTimelineNote({ url, key, leadId, authorEmail, note }) {
+  if (!url || !key || !leadId || !String(note || "").trim()) return;
+  await insertJson(`${url}/rest/v1/lead_notes`, key, {
+    lead_id: leadId,
+    author_email: String(authorEmail || "system").trim().toLowerCase(),
+    note_type: "internal",
+    note: String(note || "").trim()
   }).catch(() => null);
 }
 
@@ -495,19 +524,21 @@ async function updateLead(body) {
   const id = String(body.id || "").trim();
   if (!id) return { ok: false, error: "Lead id is required" };
   if (!url || !key) return { ok: false, error: "Supabase is not configured" };
+  const previous = await fetchLeadById({ url, key }, id);
 
+  const now = new Date().toISOString();
   const patch = {
     status: String(body.status || "reviewing").trim(),
     assigned_to: String(body.assignedTo || body.assigned_to || "").trim().toLowerCase(),
     priority: normalizePriority(body.priority),
     next_follow_up_at: dateOrNull(body.nextFollowUpAt || body.next_follow_up_at),
-    last_activity_at: new Date().toISOString(),
+    last_activity_at: now,
     notes: String(body.notes || "").trim(),
     owner_adjustment: {
       wholesale: numberOrNull(body.ownerWholesale),
       retail: numberOrNull(body.ownerRetail),
       reason: String(body.reason || "").trim(),
-      updated_at: new Date().toISOString()
+      updated_at: now
     }
   };
 
@@ -524,6 +555,18 @@ async function updateLead(body) {
 
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
+  if (previous) {
+    const timeline = buildLeadUpdateTimeline(previous, patch);
+    if (timeline) {
+      await createLeadTimelineNote({
+        url,
+        key,
+        leadId: id,
+        authorEmail: String(body.authorEmail || body.updatedBy || "").trim().toLowerCase() || "admin",
+        note: timeline
+      });
+    }
+  }
   return { ok: true, lead: data?.[0] || null };
 }
 
@@ -538,8 +581,61 @@ function dateOrNull(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function normalizeLeadSource(value) {
+  const source = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (["dealer_appraisal", "dealer_valuation", "dealer_created"].includes(source)) return "dealer_appraisal";
+  if (["buyer_inquiry", "buy_page", "public_buy"].includes(source)) return "buyer_inquiry";
+  return "owner_self_valuation";
+}
+
+function leadSourceLabel(value) {
+  const source = normalizeLeadSource(value);
+  if (source === "dealer_appraisal") return "Dealer appraisal";
+  if (source === "buyer_inquiry") return "Buyer inquiry";
+  return "Owner self appraisal";
+}
+
+function buildLeadUpdateTimeline(previous = {}, patch = {}) {
+  const changes = [];
+  const previousStatus = String(previous.status || "").trim();
+  if (previousStatus !== patch.status) changes.push(`status ${previousStatus || "blank"} -> ${patch.status || "blank"}`);
+
+  const previousRep = String(previous.assigned_to || "").trim().toLowerCase();
+  if (previousRep !== patch.assigned_to) changes.push(`assigned rep ${previousRep || "unassigned"} -> ${patch.assigned_to || "unassigned"}`);
+
+  const previousPriority = String(previous.priority || "normal").trim().toLowerCase();
+  if (previousPriority !== patch.priority) changes.push(`priority ${previousPriority} -> ${patch.priority}`);
+
+  const previousFollowUp = normalizeIsoForCompare(previous.next_follow_up_at);
+  const nextFollowUp = normalizeIsoForCompare(patch.next_follow_up_at);
+  if (previousFollowUp !== nextFollowUp) changes.push(`next follow-up ${previousFollowUp || "not set"} -> ${nextFollowUp || "not set"}`);
+
+  const previousAdjustment = previous.owner_adjustment || {};
+  if (numberOrNull(previousAdjustment.wholesale) !== numberOrNull(patch.owner_adjustment?.wholesale)) {
+    changes.push(`approved wholesale ${previousAdjustment.wholesale ?? "not set"} -> ${patch.owner_adjustment?.wholesale ?? "not set"}`);
+  }
+  if (numberOrNull(previousAdjustment.retail) !== numberOrNull(patch.owner_adjustment?.retail)) {
+    changes.push(`approved retail ${previousAdjustment.retail ?? "not set"} -> ${patch.owner_adjustment?.retail ?? "not set"}`);
+  }
+
+  if (!changes.length) return "";
+  return `Lead updated: ${changes.join("; ")}.`;
+}
+
+function normalizeIsoForCompare(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
 function sanitizeLeadInput(input) {
+  const leadSource = normalizeLeadSource(input.leadSource || input.sourceContext || (input.leadType === "buyer_inquiry" ? "buyer_inquiry" : input.createdByDealer ? "dealer_appraisal" : "owner_self_valuation"));
   return {
+    leadSource,
+    sourceLabel: leadSourceLabel(leadSource),
+    ownerName: String(input.ownerName || input.customerName || "").trim(),
+    dealerEmail: String(input.dealerEmail || "").trim().toLowerCase(),
+    createdByDealer: Boolean(input.createdByDealer || leadSource === "dealer_appraisal"),
     email: String(input.email || "").trim(),
     phone: String(input.phone || "").trim(),
     vin: cleanVin(input.vin),

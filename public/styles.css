@@ -3993,6 +3993,20 @@ body.admin-drawer-open .admin-shell {
   text-transform: uppercase;
 }
 
+.lead-source-pill {
+  align-items: center;
+  background: #eef6ff;
+  border: 1px solid #bdd7ff;
+  border-radius: 999px;
+  color: #28527a;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 4px 7px;
+  text-transform: uppercase;
+}
+
 .lead-type-buyer {
   background: linear-gradient(180deg, #dbeeff 0%, #edf6ff 100%);
   border: 1px solid #9fc5f8;
