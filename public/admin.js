@@ -3609,7 +3609,16 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
 adminLeadDrawer?.addEventListener("change", async (event) => {
   const assignField = event.target.closest('.admin-drawer-assign-form [name="assignedTo"]');
   if (assignField) {
-    syncAssignmentStatus(assignField.closest(".admin-drawer-assign-form"));
+    const form = assignField.closest(".admin-drawer-assign-form");
+    syncAssignmentStatus(form);
+    const formStatus = form?.querySelector("[data-assign-status]");
+    const assignedValue = String(assignField.value || "").trim();
+    if (assignedValue) {
+      if (formStatus) formStatus.textContent = "Saving rep...";
+      form?.requestSubmit();
+    } else if (formStatus) {
+      formStatus.textContent = "Choose a rep, then save.";
+    }
     return;
   }
 

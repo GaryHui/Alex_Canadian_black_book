@@ -587,17 +587,25 @@ async function updateLead(body) {
   const previous = await fetchLeadById({ url, key }, id);
 
   const now = new Date().toISOString();
+  const hasStatus = hasBodyField(body, "status");
+  const hasAssignedTo = hasBodyField(body, "assignedTo") || hasBodyField(body, "assigned_to");
+  const hasPriority = hasBodyField(body, "priority");
+  const hasFollowUp = hasBodyField(body, "nextFollowUpAt") || hasBodyField(body, "next_follow_up_at");
+  const hasNotes = hasBodyField(body, "notes");
+  const previousAdjustment = previous?.owner_adjustment || {};
   const patch = {
-    status: String(body.status || "reviewing").trim(),
-    assigned_to: String(body.assignedTo || body.assigned_to || "").trim().toLowerCase(),
-    priority: normalizePriority(body.priority),
-    next_follow_up_at: dateOrNull(body.nextFollowUpAt || body.next_follow_up_at),
+    status: hasStatus ? String(body.status || "reviewing").trim() : String(previous?.status || "reviewing").trim(),
+    assigned_to: hasAssignedTo
+      ? String(body.assignedTo || body.assigned_to || "").trim().toLowerCase()
+      : String(previous?.assigned_to || "").trim().toLowerCase(),
+    priority: hasPriority ? normalizePriority(body.priority) : normalizePriority(previous?.priority),
+    next_follow_up_at: hasFollowUp ? dateOrNull(body.nextFollowUpAt || body.next_follow_up_at) : previous?.next_follow_up_at || null,
     last_activity_at: now,
-    notes: String(body.notes || "").trim(),
+    notes: hasNotes ? String(body.notes || "").trim() : String(previous?.notes || "").trim(),
     owner_adjustment: {
-      wholesale: numberOrNull(body.ownerWholesale),
-      retail: numberOrNull(body.ownerRetail),
-      reason: String(body.reason || "").trim(),
+      wholesale: hasBodyField(body, "ownerWholesale") ? numberOrNull(body.ownerWholesale) : numberOrNull(previousAdjustment.wholesale),
+      retail: hasBodyField(body, "ownerRetail") ? numberOrNull(body.ownerRetail) : numberOrNull(previousAdjustment.retail),
+      reason: hasBodyField(body, "reason") ? String(body.reason || "").trim() : String(previousAdjustment.reason || "").trim(),
       updated_at: now
     }
   };
@@ -631,6 +639,10 @@ async function updateLead(body) {
     }
   }
   return { ok: true, lead: data?.[0] || null };
+}
+
+function hasBodyField(body, field) {
+  return Object.prototype.hasOwnProperty.call(body || {}, field);
 }
 
 function normalizePriority(value) {
