@@ -1578,7 +1578,15 @@ function renderDealerLeads(leads, role) {
     const dealerRetail = ownerAdjustment.retail ?? "";
     const updateToken = dealerLeadUpdateToken(lead);
     const vehicleContext = lead.vehicle_context || {};
-    const nextStepSummary = overdue
+    const taskSummary = lead.task_summary || {};
+    const hasOpenTask = hasDealerOpenTask(lead);
+    const taskDue = taskSummary.latest_open_due_at || "";
+    const taskSummaryText = hasOpenTask
+      ? `${taskSummary.latest_open_title || "Open task"}${taskDue ? ` due ${formatDateTime(taskDue)}` : ""}`
+      : "";
+    const nextStepSummary = hasOpenTask
+      ? taskSummaryText
+      : overdue
       ? "Follow-up overdue"
       : followUp
         ? `Next follow-up ${formatDateTime(followUp)}`
@@ -1611,6 +1619,7 @@ function renderDealerLeads(leads, role) {
             <div class="lead-list-subline">
               <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
               <span>${escapeHtml(lead.priority || "normal")}</span>
+              ${hasOpenTask ? `<span>${escapeHtml(`${taskSummary.open_count} open task${Number(taskSummary.open_count) === 1 ? "" : "s"}`)}</span>` : ""}
               <span>${escapeHtml(statusLabel)}</span>
             </div>
           </div>
@@ -1633,7 +1642,7 @@ function renderDealerLeads(leads, role) {
           <div class="lead-list-col">
             <strong>${escapeHtml(nextStepSummary)}</strong>
             <div class="lead-list-subline">
-              <span>${escapeHtml(overdue ? "Overdue" : followUp ? "Scheduled" : "Unscheduled")}</span>
+              <span>${escapeHtml(hasOpenTask ? "Task assigned" : overdue ? "Overdue" : followUp ? "Scheduled" : "Unscheduled")}</span>
               <span>${escapeHtml(lead.assigned_to || "Assigned")}</span>
             </div>
           </div>
@@ -2112,6 +2121,10 @@ function dealerLastTouchLabel(lead) {
 function dealerNextBestAction(lead) {
   const buyer = isBuyerLead(lead);
   const status = String(lead?.status || "new").toLowerCase();
+  if (hasDealerOpenTask(lead)) {
+    const summary = lead.task_summary || {};
+    return summary.latest_open_title ? `Complete task: ${summary.latest_open_title}` : "Complete the assigned task";
+  }
   if (lead?.vehicle_signal?.message) return "Review the vehicle alert before the next customer update";
   if (isDealerDealDeskLead(lead) && dealerDealChecklistSummary(lead).pending > 0) return `Finish ${dealerDealChecklistProgressLabel(lead)} before closing the handoff`;
   if (buyer && status === "won") return "Prep delivery, finance docs, and final handoff";
@@ -2152,7 +2165,7 @@ function renderDealerCommunicationStrip(lead) {
 
 function renderDealerTodayWork(leads) {
   if (!dealerTodayWorkEl) return;
-  const activeLeads = leads.filter((lead) => !isDealerClosedLead(lead));
+  const activeLeads = leads.filter(isDealerActiveWorkLead);
   const callNowCount = activeLeads.filter((lead) => isDealerCallNowLead(lead)).length;
   const dueCount = activeLeads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new")).length;
   const waitingReplyCount = activeLeads.filter((lead) => isDealerWaitingReply(lead)).length;
@@ -2447,7 +2460,7 @@ function formatShortDate(value) {
 }
 
 function filterDealerLeads(leads) {
-  if (dealerLeadFilter === "active") return leads.filter((lead) => !isDealerClosedLead(lead));
+  if (dealerLeadFilter === "active") return leads.filter(isDealerActiveWorkLead);
   if (dealerLeadFilter === "closed") return leads.filter(isDealerClosedLead);
   if (dealerLeadFilter === "fresh") return leads.filter((lead) => !isDealerClosedLead(lead) && String(lead.status || "new").toLowerCase() === "new");
   if (dealerLeadFilter === "delivered") return leads.filter((lead) => ["delivered", "sold", "won"].includes(String(lead.status || "").toLowerCase()));
@@ -2481,6 +2494,7 @@ function sortDealerLeads(leads) {
 }
 
 function dealerLeadPinnedRank(lead) {
+  if (hasDealerOpenTask(lead)) return 0;
   if (isDealerClosedLead(lead)) return 4;
   const status = lead.status || "new";
   if (String(lead.priority || "").toLowerCase() === "urgent") return 0;
@@ -2544,6 +2558,14 @@ function dealerLeadSourceLabel(lead = {}) {
 
 function isDealerClosedLead(lead) {
   return ["won", "lost", "closed", "deleted", "in_inventory"].includes(String(lead?.status || "").toLowerCase());
+}
+
+function isDealerActiveWorkLead(lead) {
+  return !isDealerClosedLead(lead) || hasDealerOpenTask(lead);
+}
+
+function hasDealerOpenTask(lead) {
+  return Number(lead?.task_summary?.open_count || 0) > 0;
 }
 
 function cleanDealerLeadTitle(title, buyerLead) {

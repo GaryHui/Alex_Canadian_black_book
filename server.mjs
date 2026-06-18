@@ -1226,7 +1226,7 @@ async function listDealerLeads(dealer) {
   const leads = (Array.isArray(rows) ? rows : [])
     .filter((lead) => String(lead.status || "").toLowerCase() !== "deleted");
 
-  return { ok: true, storage: "supabase", role: dealer.role, email, leads };
+  return { ok: true, storage: "supabase", role: dealer.role, email, leads: await attachLeadSignals(leads, { url, key }) };
 }
 
 function compareDealerLeads(a, b) {
@@ -2427,8 +2427,11 @@ async function createLeadActivity(body, user, role) {
       title,
       due_at: dateOrNull(body.dueAt)
     });
+    const task = result.data?.[0] || null;
+    const assignedTo = String(task?.assigned_to || body.assignedTo || user?.email || "").trim().toLowerCase();
+    if (result.ok && assignedTo) await assignLeadForTask({ url, key, leadId, assignedTo });
     if (result.ok) await touchLeadActivity({ url, key, leadId });
-    return result.ok ? { ok: true, task: result.data?.[0] || null } : result;
+    return result.ok ? { ok: true, task } : result;
   }
 
   if (type === "email") {
@@ -2468,6 +2471,26 @@ async function createLeadActivity(body, user, role) {
   }
   if (result.ok) await touchLeadActivity({ url, key, leadId });
   return result.ok ? { ok: true, note: result.data?.[0] || null } : result;
+}
+
+async function assignLeadForTask({ url, key, leadId, assignedTo }) {
+  if (!url || !key || !leadId || !assignedTo) return;
+  const previous = await fetchSupabaseJson(`${url}/rest/v1/valuation_leads?select=status&id=eq.${encodeURIComponent(leadId)}&limit=1`, key);
+  const currentStatus = String(previous?.data?.[0]?.status || "new").trim().toLowerCase();
+  const patch = {
+    assigned_to: assignedTo,
+    last_activity_at: new Date().toISOString()
+  };
+  if (!currentStatus || currentStatus === "new") patch.status = "assigned";
+  await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify(patch)
+  }).catch(() => null);
 }
 
 async function updateLeadTask(body) {

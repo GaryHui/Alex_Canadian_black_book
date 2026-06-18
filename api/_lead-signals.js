@@ -62,6 +62,7 @@ export async function attachLeadSignals(leads, client) {
   const signalMap = latestSignalByLead(snapshot.notes);
   const ownerReviewMap = latestOwnerReviewStateByLead(snapshot.notes);
   const activitySummaryMap = buildLeadActivitySummaryMap(leads, snapshot);
+  const taskSummaryMap = buildLeadTaskSummaryMap(snapshot.tasks);
 
   return leads.map((lead) => {
     const id = String(lead.id || "").trim();
@@ -72,6 +73,7 @@ export async function attachLeadSignals(leads, client) {
       vehicle_context: vehicleContextMap.get(id) || null,
       owner_review: lead.owner_review || ownerReviewMap.get(id) || null,
       activity_summary: activitySummaryMap.get(id) || null,
+      task_summary: taskSummaryMap.get(id) || null,
       merge_state: snapshot.relationMap.get(id) || null
     };
   });
@@ -273,12 +275,46 @@ async function fetchLeadTasks(ids, client) {
   const validIds = (Array.isArray(ids) ? ids : []).map((id) => String(id || "").trim()).filter(Boolean);
   if (!client?.url || !client?.key || !validIds.length) return [];
   const encoded = validIds.map(encodeURIComponent).join(",");
-  const response = await fetch(`${client.url}/rest/v1/lead_tasks?select=lead_id,title,completed_at,due_at,assigned_to,created_at&lead_id=in.(${encoded})&order=created_at.desc&limit=1000`, {
+  const response = await fetch(`${client.url}/rest/v1/lead_tasks?select=id,lead_id,title,completed_at,due_at,assigned_to,created_at&lead_id=in.(${encoded})&order=created_at.desc&limit=1000`, {
     headers: authHeaders(client.key)
   });
   const rows = await response.json().catch(() => []);
   if (!response.ok) return [];
   return Array.isArray(rows) ? rows : [];
+}
+
+function buildLeadTaskSummaryMap(tasks) {
+  const map = new Map();
+  for (const task of Array.isArray(tasks) ? tasks : []) {
+    const leadId = String(task?.lead_id || "").trim();
+    if (!leadId) continue;
+    const current = map.get(leadId) || {
+      open_count: 0,
+      completed_count: 0,
+      latest_open_title: "",
+      latest_open_assigned_to: "",
+      latest_open_due_at: "",
+      latest_open_created_at: "",
+      assigned_to: []
+    };
+    const assignedTo = String(task.assigned_to || "").trim().toLowerCase();
+    if (assignedTo && !current.assigned_to.includes(assignedTo)) current.assigned_to.push(assignedTo);
+    if (task.completed_at) {
+      current.completed_count += 1;
+    } else {
+      current.open_count += 1;
+      const currentTime = new Date(current.latest_open_due_at || current.latest_open_created_at || 0).getTime();
+      const nextTime = new Date(task.due_at || task.created_at || 0).getTime();
+      if (!current.latest_open_title || (!Number.isNaN(nextTime) && (Number.isNaN(currentTime) || nextTime < currentTime))) {
+        current.latest_open_title = String(task.title || "Task").trim();
+        current.latest_open_assigned_to = assignedTo;
+        current.latest_open_due_at = task.due_at || "";
+        current.latest_open_created_at = task.created_at || "";
+      }
+    }
+    map.set(leadId, current);
+  }
+  return map;
 }
 
 async function fetchAllLeads(client) {

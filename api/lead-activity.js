@@ -153,8 +153,29 @@ async function createTask(body, user) {
 
   const result = await insertJson(`${client.url}/rest/v1/lead_tasks`, client.key, payload);
   if (!result.ok) return result;
+  if (payload.assigned_to) await assignLeadForTask(client, leadId, payload.assigned_to);
   await touchLead(client, leadId);
   return { ok: true, task: result.data?.[0] || null };
+}
+
+async function assignLeadForTask(client, leadId, assignedTo) {
+  if (!client?.url || !client?.key || !leadId || !assignedTo) return;
+  const previous = await fetchJson(`${client.url}/rest/v1/valuation_leads?select=status&id=eq.${encodeURIComponent(leadId)}&limit=1`, client.key);
+  const currentStatus = String(previous?.data?.[0]?.status || "new").trim().toLowerCase();
+  const patch = {
+    assigned_to: assignedTo,
+    last_activity_at: new Date().toISOString()
+  };
+  if (!currentStatus || currentStatus === "new") patch.status = "assigned";
+  await fetch(`${client.url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: {
+      ...authHeaders(client.key),
+      "Content-Type": "application/json",
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify(patch)
+  }).catch(() => null);
 }
 
 async function recordEmail(body, user) {
