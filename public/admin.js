@@ -966,27 +966,22 @@ function duplicateWarningInline(lead) {
       </section>
     `;
   }
-  const count = Number(duplicate.count || 0);
   const currentId = String(lead?.id || "").trim();
   const mergeTargetId = String(lead?.vehicle_context?.primary_lead_id || "").trim();
   const safeMergeTargetId = mergeTargetId && mergeTargetId !== currentId ? mergeTargetId : "";
   const listingId = String(lead?.vehicle_context?.primary_listing_id || "").trim();
-  const actionHint = safeMergeTargetId || listingId
-    ? `${safeMergeTargetId ? `Primary CRM ${safeMergeTargetId}` : ""}${safeMergeTargetId && listingId ? " | " : ""}${listingId ? `Warehouse ${listingId}` : ""}`
-    : "Open Vehicle clusters to review the related records.";
   return `
     <section class="owner-review-required duplicate-vehicle-warning">
       <div>
-        <span>Duplicate vehicle warning</span>
-        <strong>${escapeHtml(duplicate.message)}</strong>
-        <small>${escapeHtml(count ? `${count} related CRM / Warehouse record${count === 1 ? "" : "s"} detected.` : "Related records detected.")}</small>
-        <small>${escapeHtml(actionHint)}</small>
+        <span>Same vehicle review</span>
+        <strong>Possible same vehicle. Review before warehouse.</strong>
+        <small>Choose merge, keep separate, or open the vehicle group.</small>
       </div>
       <div class="duplicate-review-actions">
         <button type="button" data-duplicate-review="keep_separate">Keep separate</button>
         <button type="button" data-duplicate-review="merge_existing" data-target-lead-id="${escapeHtml(safeMergeTargetId)}" ${safeMergeTargetId ? "" : "disabled"}>Merge into primary</button>
         <button type="button" data-duplicate-review="link_inventory" data-target-lead-id="${escapeHtml(safeMergeTargetId)}" data-listing-id="${escapeHtml(listingId)}" ${listingId ? "" : "disabled"}>Link warehouse</button>
-        <a class="duplicate-review-link" href="/admin-vehicles.html" target="_blank" rel="noreferrer">Open vehicle clusters</a>
+        <a class="duplicate-review-link" href="${escapeHtml(adminVehicleClusterUrl(lead))}" target="_blank" rel="noreferrer">Open vehicle group</a>
       </div>
     </section>
   `;
@@ -1972,6 +1967,7 @@ function renderCollapsedSellerMembersInline(lead) {
         <small>${escapeHtml(hiddenMembers.slice(0, 3).map((item) => item.input?.email || item.auth_email || item.id || "Seller lead").join(" | "))}${hiddenMembers.length > 3 ? ` +${hiddenMembers.length - 3} more` : ""}</small>
       </div>
       <div class="lead-collapsed-actions">
+        <button type="button" data-admin-open-url="${escapeHtml(adminVehicleClusterUrl(lead))}">Open vehicle group</button>
         <button type="button" data-admin-set-filter="duplicate-review">Review duplicate queue</button>
         ${firstHiddenId ? `<button type="button" data-admin-open-lead="${escapeHtml(firstHiddenId)}">Open related lead</button>` : ""}
       </div>
@@ -2310,6 +2306,7 @@ function renderAdminDrawer(leadId) {
         </div>
         <div class="admin-drawer-head-actions">
           <button type="button" data-drawer-open-card>Locate in queue</button>
+          <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(id)}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
           <button type="button" data-drawer-close>Close</button>
         </div>
       </header>
@@ -2440,7 +2437,6 @@ function renderAdminDrawer(leadId) {
                   <textarea name="notes" placeholder="Follow-up notes, CRM notes, customer preference...">${escapeHtml(lead.notes || "")}</textarea>
                 </label>
                 <button type="submit">Save lead notes</button>
-                <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(id)}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
               </form>
               <form class="lead-task-form admin-drawer-task-form">
                 <input name="title" placeholder="Next task, e.g. call customer back" />

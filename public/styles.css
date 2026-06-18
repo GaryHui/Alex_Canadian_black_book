@@ -1555,6 +1555,11 @@ body.admin-drawer-open .admin-shell {
   padding: 0 12px;
 }
 
+.admin-drawer-head-actions .danger-outline {
+  border-color: #f2a0aa !important;
+  color: #b42332 !important;
+}
+
 .admin-drawer-summary {
   display: grid;
   gap: 10px;
