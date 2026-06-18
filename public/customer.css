@@ -2096,6 +2096,18 @@ input::placeholder {
   align-items: baseline;
 }
 
+.inventory-deal-price {
+  align-items: flex-start;
+  background: #f7fbff;
+  border: 1px solid #d7e7f6;
+  border-radius: 8px;
+  display: grid;
+  gap: 3px;
+  justify-items: end;
+  margin-top: 2px;
+  padding: 12px;
+}
+
 .inventory-card-price strong {
   font-size: 26px;
 }
@@ -2104,6 +2116,49 @@ input::placeholder {
   color: #506176;
   font-size: 14px;
   font-weight: 800;
+}
+
+.inventory-deal-price span {
+  color: #506176;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.inventory-deal-price strong {
+  color: var(--blue-dark);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.inventory-deal-price small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.inventory-deal-terms {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.inventory-deal-terms span {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #506176;
+  display: grid;
+  font-size: 11px;
+  font-weight: 900;
+  gap: 2px;
+  padding: 8px 10px;
+  text-transform: uppercase;
+}
+
+.inventory-deal-terms b {
+  color: var(--ink);
+  font-size: 15px;
+  text-transform: none;
 }
 
 .inventory-card-actions {

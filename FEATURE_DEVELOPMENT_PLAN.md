@@ -115,6 +115,8 @@ These are the next areas to keep tightening without making the product heavier:
 - staff Today work should mirror the owner's urgency model: separate urgent/high-priority leads, due follow-ups, and updated leads so owner-dispatched urgent work is not hidden in a long list
 - inventory photos need two layers: original Drive folder assets stay preserved by default for audit/reuse, while the Buy page photo set can be replaced or pruned; true Drive deletion should require a clear admin confirmation and Apps Script Drive permission
 - CRM alerts and work queues should not duplicate each other: alerts are the unread change inbox, while Today / Attention queues are for priority work, due follow-ups, assignment decisions, and warehouse decisions
+- Buy page inventory should behave like a used leasing / finance deal list: every vehicle card should expose estimated monthly payment, initial down payment, term, APR, price, and clear contact intent before the buyer opens details
+- Admin and dealer workbenches should share the same CRM skeleton: Dashboard for daily work, Up Sheets for lead queue, Inventory for owner warehouse permissions, and Settings for owner-only operations
 
 ## Product Structure
 

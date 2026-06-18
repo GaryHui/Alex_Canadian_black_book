@@ -340,7 +340,10 @@ function renderInventoryWarehouse(inventory) {
   const filtered = filterInventory(inventory);
   renderInventorySummary(inventory);
   if (adminLeadsCache.length) renderAdminOverview(adminLeadsCache);
-  inventoryStatusEl.textContent = `${filtered.length} shown of ${inventory.length} inventory listing(s).`;
+  const draftCount = inventory.filter((item) => ["draft", "review"].includes(String(item.status || "").toLowerCase())).length;
+  const publishedCount = inventory.filter((item) => String(item.status || "").toLowerCase() === "published").length;
+  const soldCount = inventory.filter((item) => String(item.status || "").toLowerCase() === "sold").length;
+  inventoryStatusEl.textContent = `${filtered.length} shown of ${inventory.length} inventory listing(s). Draft ${draftCount} / Published ${publishedCount} / Sold ${soldCount}.`;
   inventoryEl.innerHTML = renderInventoryGroups(filtered) || "<p>No inventory listings in this view. Add a SELL lead as a draft inventory item first.</p>";
 }
 
@@ -353,24 +356,8 @@ function filterInventory(inventory) {
 
 function renderInventorySummary(inventory) {
   if (!inventorySummaryEl) return;
-  const counts = {
-    published: inventory.filter((item) => item.status === "published").length,
-    draft: inventory.filter((item) => ["draft", "review"].includes(item.status)).length,
-    sold: inventory.filter((item) => item.status === "sold").length,
-    archived: inventory.filter((item) => item.status === "archived").length
-  };
-  inventorySummaryEl.innerHTML = [
-    ["Published", counts.published, "Visible on Buy page"],
-    ["Draft / review", counts.draft, "Not public yet"],
-    ["Sold", counts.sold, "Closed stock"],
-    ["Archived", counts.archived, "Hidden history"]
-  ].map(([label, value, hint]) => `
-    <article>
-      <span>${escapeHtml(label)}</span>
-      <strong>${escapeHtml(String(value))}</strong>
-      <small>${escapeHtml(hint)}</small>
-    </article>
-  `).join("");
+  inventorySummaryEl.hidden = true;
+  inventorySummaryEl.innerHTML = "";
 }
 
 function renderInventoryGroups(inventory) {
@@ -1022,10 +1009,12 @@ async function openAdminLeadFromAlert(id) {
   card.classList.add("lead-card-flash");
   window.setTimeout(() => card.classList.remove("lead-card-flash"), 1600);
   card.scrollIntoView({ behavior: "smooth", block: "center" });
-  const details = card.querySelector(".lead-manage");
+  const details = card.querySelector(".lead-queue-more");
   if (details) details.open = true;
   highlightLeadChangeAreas(card);
-  await loadLeadActivity(card, { force: true, highlightLatest: true });
+  renderAdminDrawer(id);
+  adminDrawerActivityLoaded = false;
+  await loadAdminDrawerActivity({ force: true, highlightLatest: true });
 }
 
 function renderLeadWorkbench(leads) {
@@ -1330,16 +1319,6 @@ function isAdminReadyForWarehouse(lead) {
   return ["inspection_booked", "offer_sent", "won"].includes(String(lead?.status || "").toLowerCase());
 }
 
-function renderAdminOverviewCard(filter, tone, label, value, hint) {
-  return `
-    <button class="admin-overview-card ${escapeHtml(tone)}" type="button" data-admin-set-filter="${escapeHtml(filter)}">
-      <span>${escapeHtml(label)}</span>
-      <strong>${escapeHtml(String(value))}</strong>
-      <small>${escapeHtml(hint)}</small>
-    </button>
-  `;
-}
-
 function renderAdminControlCard(config = {}) {
   return `
     <section class="admin-control-card ${escapeHtml(config.tone || "")}">
@@ -1370,117 +1349,14 @@ function renderAdminControlCard(config = {}) {
 
 function renderAdminControlBoard(leads) {
   if (!adminControlBoardEl) return;
-  const activeLeads = leads.filter((lead) => !isClosedLead(lead));
-  const crmQueueCount = activeLeads.length;
-  const callNowCount = activeLeads.filter(isAdminCallNowLead).length;
-  const ownerUnreadCount = activeLeads.filter((lead) => Boolean(lead.owner_review?.unread)).length;
-  const duplicateReviewCount = activeLeads.filter((lead) => Boolean(lead.duplicate_warning?.message) && !lead.duplicate_warning?.reviewed).length;
-  const dealDeskCount = leads.filter(isAdminDealDeskLead).length;
-  const dealDeskPendingCount = leads.filter((lead) => isAdminDealDeskLead(lead) && adminDealChecklistSummary(lead).pending > 0).length;
-  const deliveryBookedCount = leads.filter((lead) => isAdminDealDeskLead(lead) && Boolean(adminDealChecklistSummary(lead).delivery_at)).length;
-  const keyReadyCount = leads.filter((lead) => isAdminDealDeskLead(lead) && ["ready", "complete"].includes(String(adminDealChecklistSummary(lead).key_handoff_status || "").toLowerCase())).length;
-  const inventoryActiveCount = inventoryCache.filter((item) => !["sold", "archived"].includes(String(item.status || "").toLowerCase())).length;
-  const inventoryDraftCount = inventoryCache.filter((item) => ["draft", "review"].includes(String(item.status || "").toLowerCase())).length;
-  const inventoryPublishedCount = inventoryCache.filter((item) => String(item.status || "").toLowerCase() === "published").length;
-  const inventorySoldCount = inventoryCache.filter((item) => String(item.status || "").toLowerCase() === "sold").length;
-  const clusterCount = new Set(
-    leads
-      .filter((lead) => (lead?.vehicle_context?.related_lead_count || 0) > 0 || (lead?.vehicle_context?.inventory_count || 0) > 0 || lead?.duplicate_warning?.message || lead?.vehicle_signal?.message)
-      .map(adminVehicleClusterKey)
-      .filter(Boolean)
-  ).size;
-  const clusterAlertCount = leads.filter((lead) => lead?.vehicle_signal?.message || (lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed)).length;
-
-  adminControlBoardEl.innerHTML = `
-    ${renderAdminControlCard({
-      tone: "control-crm",
-      kicker: "CRM",
-      title: "Manager queue",
-      total: crmQueueCount,
-      caption: "Work live BUY and SELL opportunities, unread updates, and follow-ups from one lane.",
-      chips: [`Call now ${callNowCount}`, `Owner unread ${ownerUnreadCount}`, `Duplicate review ${duplicateReviewCount}`],
-      actions: [
-        { label: "Open active CRM", filter: "active" },
-        { label: "Open call now", filter: "call-now" },
-        { label: "Open owner unread", filter: "owner-unread" }
-      ]
-    })}
-    ${renderAdminControlCard({
-      tone: "control-inventory",
-      kicker: "Inventory",
-      title: "Warehouse board",
-      total: inventoryActiveCount,
-      caption: "Move seller vehicles through draft, publish, sold, and archive without losing CRM context.",
-      chips: [`Draft / review ${inventoryDraftCount}`, `Published ${inventoryPublishedCount}`, `Sold ${inventorySoldCount}`],
-      actions: [
-        { label: "Open active stock", inventoryFilter: "active" },
-        { label: "Open draft / review", inventoryFilter: "draft" },
-        { label: "Open sold stock", inventoryFilter: "sold" }
-      ]
-    })}
-    ${renderAdminControlCard({
-      tone: "control-dealdesk",
-      kicker: "Deal Desk",
-      title: "Handoff and delivery",
-      total: dealDeskCount,
-      caption: "Track won buyers, warehouse intake, checklist progress, delivery booking, and key handoff.",
-      chips: [`Checklist open ${dealDeskPendingCount}`, `Delivery booked ${deliveryBookedCount}`, `Keys ready ${keyReadyCount}`],
-      actions: [
-        { label: "Open deal desk", filter: "deal-desk" },
-        { label: "Open sold inventory", inventoryFilter: "sold" },
-        { label: "Open ready for warehouse", filter: "seller" }
-      ]
-    })}
-    ${renderAdminControlCard({
-      tone: "control-clusters",
-      kicker: "Vehicle Clusters",
-      title: "Duplicate and shared vehicle watch",
-      total: clusterCount,
-      caption: "Review duplicate seller vehicles, same-vehicle buyer activity, and cross-lane vehicle signals.",
-      chips: [`Vehicle alerts ${clusterAlertCount}`, `Needs duplicate review ${duplicateReviewCount}`, `Shared vehicle map ${clusterCount}`],
-      actions: [
-        { label: "Open duplicate review", filter: "duplicate-review" },
-        { label: "Open owner watchlist", filter: "owner-unread" },
-        { label: "Open vehicle clusters", url: "/admin-vehicles.html" }
-      ]
-    })}
-  `;
+  adminControlBoardEl.hidden = true;
+  adminControlBoardEl.innerHTML = "";
 }
 
 function renderAdminOverview(leads) {
   if (!adminOverviewEl) return;
-  const activeLeads = leads.filter((lead) => !isClosedLead(lead));
-  const newCount = activeLeads.filter((lead) => String(lead.status || "").toLowerCase() === "new").length;
-  const dueTodayCount = activeLeads.filter((lead) => isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).length;
-  const callNowCount = activeLeads.filter(isAdminCallNowLead).length;
-  const staleCount = activeLeads.filter(isAdminStaleLead).length;
-  const waitingReplyCount = activeLeads.filter(isAdminWaitingReplyLead).length;
-  const agingCriticalCount = activeLeads.filter(isAdminAgingCriticalLead).length;
-  const dealDeskCount = leads.filter(isAdminDealDeskLead).length;
-  const assignmentCount = activeLeads.filter((lead) => !String(lead.assigned_to || "").trim()).length;
-  const duplicateReviewCount = activeLeads.filter((lead) => Boolean(lead.duplicate_warning?.message) && !lead.duplicate_warning?.reviewed).length;
-  const handoffCount = activeLeads.filter(isAdminReadyForWarehouse).length;
-  const ownerUnreadCount = activeLeads.filter((lead) => Boolean(lead.owner_review?.unread)).length;
-  const appointmentCount = activeLeads.filter(isAdminAppointmentLead).length;
-  const closedCount = leads.length - activeLeads.length;
-  const urgentCount = activeLeads.filter((lead) => String(lead.priority || "").toLowerCase() === "urgent").length;
-  adminOverviewEl.innerHTML = `
-    ${renderAdminOverviewCard("active", "overview-total", "Manager queue", activeLeads.length, "All active CRM work")}
-    ${renderAdminOverviewCard("call-now", "overview-urgent", "Call now", callNowCount, "Hot leads needing immediate touch")}
-    ${renderAdminOverviewCard("needs-follow-up", "overview-follow", "Due today", dueTodayCount, "Call, text, or close next step")}
-    ${renderAdminOverviewCard("stale", "overview-unassigned", "No response", staleCount, "No touch in the last 48h")}
-    ${renderAdminOverviewCard("waiting-reply", "overview-owner", "Waiting reply", waitingReplyCount, "Customer owes the next answer")}
-    ${renderAdminOverviewCard("deal-desk", "overview-closed", "Deal desk", dealDeskCount, "Won buyers and intake handoffs")}
-    ${renderAdminOverviewCard("aging-critical", "overview-urgent", "Aging 7d+", agingCriticalCount, "Older leads that need manager attention")}
-    ${renderAdminOverviewCard("unassigned", "overview-unassigned", "Needs assignment", assignmentCount, "New leads waiting for owner")}
-    ${renderAdminOverviewCard("duplicate-review", "overview-owner", "Duplicate vehicles", duplicateReviewCount, "SELL conflicts waiting for review")}
-    ${renderAdminOverviewCard("seller", "overview-seller", "Ready for warehouse", handoffCount, "SELL leads ready to hand off")}
-    ${renderAdminOverviewCard("owner-unread", "overview-owner", "Owner unread", ownerUnreadCount, "Important dealer updates")}
-    ${renderAdminOverviewCard("appointments", "overview-follow", "Appointments", appointmentCount, "Booked meetings and inspections")}
-    ${renderAdminOverviewCard("urgent", "overview-urgent", "Urgent", urgentCount, "Hot deals or escalation")}
-    ${renderAdminOverviewCard("closed", "overview-closed", "Closed", closedCount, "Won, lost, or archived")}
-    ${renderAdminOverviewCard("active", "overview-buyer", "New leads", newCount, "Fresh opportunities to route")}
-  `;
+  adminOverviewEl.hidden = true;
+  adminOverviewEl.innerHTML = "";
   renderAdminControlBoard(leads);
   renderAdminToday(leads);
 }
@@ -1529,6 +1405,20 @@ function renderAdminToday(leads) {
     .slice(0, 4);
   const draftCount = inventoryCache.filter((item) => ["draft", "review"].includes(String(item.status || "").toLowerCase())).length;
   const soldCount = inventoryCache.filter((item) => String(item.status || "").toLowerCase() === "sold").length;
+  const activeCount = leads.filter((lead) => !isClosedLead(lead)).length;
+  const callNowCount = leads.filter((lead) => !isClosedLead(lead) && isAdminCallNowLead(lead)).length;
+  const managerWatchItems = [
+    ...duplicateItems.map((lead) => ({ order: 0, markup: renderAdminDuplicateButton(lead) })),
+    ...ownerUnreadItems.map((lead) => ({ order: 1, markup: renderAdminDueButton(lead, "Owner") })),
+    ...appointmentItems.map((lead) => ({ order: 2, markup: renderAdminDueButton(lead, "Appointment") })),
+    ...waitingReplyItems.map((lead) => ({ order: 3, markup: renderAdminDueButton(lead, "Waiting") })),
+    ...dealDeskItems.map((lead) => ({ order: 4, markup: renderAdminDueButton(lead, adminDealDeskLabel(lead)) })),
+    ...warehouseReadyItems.map((lead) => ({ order: 5, markup: renderAdminDueButton(lead, "Warehouse") })),
+    ...staleItems.map((lead) => ({ order: 6, markup: renderAdminDueButton(lead, "No response") })),
+    ...agingCriticalItems.map((lead) => ({ order: 7, markup: renderAdminDueButton(lead, adminLeadAgeLabel(lead)) }))
+  ]
+    .sort((a, b) => a.order - b.order)
+    .slice(0, 6);
   const attentionMarkup = attention.length
     ? visibleAttention.map((item) => `
         <button type="button" class="admin-today-item admin-today-${escapeHtml(item.tone)} manager-queue-item" data-admin-open-lead="${escapeHtml(item.id)}">
@@ -1552,19 +1442,41 @@ function renderAdminToday(leads) {
     ` : "";
 
   adminTodayListEl.innerHTML = `
+    <section class="admin-manager-brief" aria-label="Manager brief">
+      <button type="button" class="admin-brief-card" data-admin-set-filter="active">
+        <span>CRM active</span>
+        <strong>${activeCount}</strong>
+        <small>All live queue work</small>
+      </button>
+      <button type="button" class="admin-brief-card" data-admin-set-filter="call-now">
+        <span>Call now</span>
+        <strong>${callNowCount}</strong>
+        <small>Hot leads first</small>
+      </button>
+      <button type="button" class="admin-brief-card" data-admin-set-filter="duplicate-review">
+        <span>Duplicate review</span>
+        <strong>${duplicateItems.length}</strong>
+        <small>Seller conflicts to clear</small>
+      </button>
+      <button type="button" class="admin-brief-card" data-open-inventory-filter="draft">
+        <span>Inventory draft</span>
+        <strong>${draftCount}</strong>
+        <small>Stock waiting on review</small>
+      </button>
+    </section>
     <div class="admin-today-grid">
       <section class="admin-attention-panel admin-manager-panel">
         <header>
-          <span>Manager queue</span>
+          <span>Priority lane</span>
           <b>${attention.length}</b>
         </header>
-        <p class="admin-panel-caption">Work the hot lane first: urgent, overdue, unassigned, and fresh opportunities.</p>
+        <p class="admin-panel-caption">Work the hottest lane first: urgent, overdue, unassigned, and fresh opportunities.</p>
         <div class="admin-today-items">${attentionMarkup}</div>
         ${attentionFooter}
       </section>
       <section class="admin-due-panel admin-lane-panel">
         <header>
-          <span>Today follow-up lane</span>
+          <span>Today follow-up</span>
           <b>${dueItems.length}</b>
         </header>
         <div class="admin-today-actions admin-due-actions">
@@ -1582,42 +1494,8 @@ function renderAdminToday(leads) {
       </section>
       <section class="admin-duplicate-panel admin-watch-panel">
         <header>
-          <span>Deal desk</span>
-          <b>${dealDeskItems.length + soldCount}</b>
-        </header>
-        <div class="admin-watch-grid">
-          <button type="button" class="admin-watch-tile" data-admin-set-filter="deal-desk">
-            <span>Won and handoff</span>
-            <b>${dealDeskItems.length}</b>
-            <small>Buyer delivery and seller intake work</small>
-          </button>
-          <button type="button" class="admin-watch-tile" data-open-inventory-filter="sold">
-            <span>Sold inventory</span>
-            <b>${soldCount}</b>
-            <small>Closed stock to archive or review</small>
-          </button>
-        </div>
-        <div class="admin-today-actions">
-          <button type="button" data-admin-set-filter="deal-desk">
-            <b>${dealDeskItems.length}</b>
-            <span>Open deal desk queue</span>
-          </button>
-          <button type="button" data-open-inventory-filter="sold">
-            <b>${soldCount}</b>
-            <span>Open sold inventory</span>
-          </button>
-          ${dealDeskItems.length ? `<div class="admin-due-list">${dealDeskItems.map((lead) => renderAdminDueButton(lead, adminDealDeskLabel(lead))).join("")}</div>` : `
-            <div class="admin-today-empty">
-              <b>No delivery or intake handoffs waiting.</b>
-              <span>Won buyers and seller warehouse intake leads will show here.</span>
-            </div>
-          `}
-        </div>
-      </section>
-      <section class="admin-duplicate-panel admin-watch-panel">
-        <header>
-          <span>Manager watchlist</span>
-          <b>${duplicateItems.length + staleItems.length + ownerUnreadItems.length + appointmentItems.length + waitingReplyItems.length + agingCriticalItems.length}</b>
+          <span>Manager watch</span>
+          <b>${duplicateItems.length + ownerUnreadItems.length + appointmentItems.length + waitingReplyItems.length + dealDeskItems.length + warehouseReadyItems.length + draftCount + soldCount}</b>
         </header>
         <div class="admin-watch-grid">
           <button type="button" class="admin-watch-tile" data-admin-set-filter="duplicate-review">
@@ -1640,61 +1518,22 @@ function renderAdminToday(leads) {
             <b>${appointmentItems.length}</b>
             <small>Booked buyer or seller meetings</small>
           </button>
-          <button type="button" class="admin-watch-tile" data-admin-set-filter="waiting-reply">
-            <span>Waiting reply</span>
-            <b>${waitingReplyItems.length}</b>
-            <small>Customer owes the next answer</small>
+          <button type="button" class="admin-watch-tile" data-admin-set-filter="deal-desk">
+            <span>Deal desk</span>
+            <b>${dealDeskItems.length}</b>
+            <small>Delivery and intake handoffs</small>
           </button>
-          <button type="button" class="admin-watch-tile" data-admin-set-filter="aging-critical">
-            <span>Aging 7d+</span>
-            <b>${agingCriticalItems.length}</b>
-            <small>Older leads drifting too long</small>
+          <button type="button" class="admin-watch-tile" data-open-inventory-filter="draft">
+            <span>Inventory draft</span>
+            <b>${draftCount}</b>
+            <small>Seller vehicles waiting on stock review</small>
           </button>
-        </div>
-        <div class="admin-today-actions">
-          <button type="button" data-admin-set-filter="duplicate-review">
-            <b>${duplicateItems.length}</b>
-            <span>Open duplicate vehicle queue</span>
-          </button>
-          <button type="button" data-admin-set-filter="appointments">
-            <b>${appointmentItems.length}</b>
-            <span>Open appointment queue</span>
-          </button>
-          <button type="button" data-admin-set-filter="waiting-reply">
-            <b>${waitingReplyItems.length}</b>
-            <span>Open waiting reply queue</span>
-          </button>
-          <button type="button" data-admin-set-filter="aging-critical">
-            <b>${agingCriticalItems.length}</b>
-            <span>Open aging queue</span>
-          </button>
-          ${(duplicateItems.length || staleItems.length || appointmentItems.length || waitingReplyItems.length || agingCriticalItems.length) ? `<div class="admin-due-list">${duplicateItems.map(renderAdminDuplicateButton).join("")}${staleItems.map((lead) => renderAdminDueButton(lead, "No response")).join("")}${appointmentItems.map((lead) => renderAdminDueButton(lead, "Appointment")).join("")}${waitingReplyItems.map((lead) => renderAdminDueButton(lead, "Waiting")).join("")}${agingCriticalItems.map((lead) => renderAdminDueButton(lead, adminLeadAgeLabel(lead))).join("")}</div>` : `
+          ${managerWatchItems.length ? `<div class="admin-due-list">${managerWatchItems.map((item) => item.markup).join("")}</div>` : `
             <div class="admin-today-empty">
               <b>No manager watch items waiting.</b>
-              <span>Duplicate VINs, unread reviews, and stale leads will show here.</span>
+              <span>Duplicate VINs, unread updates, delivery handoffs, and inventory drafts will show here.</span>
             </div>
           `}
-        </div>
-      </section>
-      <section class="admin-warehouse-panel">
-        <header>
-          <span>Warehouse handoff</span>
-          <b>${warehouseReadyItems.length + draftCount}</b>
-        </header>
-        <div class="admin-today-actions">
-          <button type="button" data-admin-set-filter="seller">
-            <b>${warehouseReadyItems.length}</b>
-            <span>SELL leads ready for warehouse</span>
-          </button>
-          <button type="button" data-open-inventory-filter="draft">
-            <b>${draftCount}</b>
-            <span>Draft / review vehicles</span>
-          </button>
-          <button type="button" data-open-inventory-filter="sold">
-            <b>${soldCount}</b>
-            <span>Sold vehicles to close or archive</span>
-          </button>
-          ${warehouseReadyItems.length ? `<div class="admin-due-list">${warehouseReadyItems.map((lead) => renderAdminDueButton(lead, "Warehouse")).join("")}</div>` : ""}
         </div>
       </section>
     </div>
@@ -1836,7 +1675,7 @@ function isEditingLeads() {
 
 function getOpenLeadIds() {
   return [...leadsEl.querySelectorAll(".lead-card")]
-    .filter((card) => card.querySelector(".lead-manage")?.open)
+    .filter((card) => card.querySelector(".lead-queue-more")?.open)
     .map((card) => card.dataset.id)
     .filter(Boolean);
 }
@@ -1846,10 +1685,9 @@ async function restoreOpenLeads(openIds, options = {}) {
   const openSet = new Set(openIds);
   const cards = [...leadsEl.querySelectorAll(".lead-card")].filter((card) => openSet.has(card.dataset.id));
   for (const card of cards) {
-    const details = card.querySelector(".lead-manage");
+    const details = card.querySelector(".lead-queue-more");
     if (details) details.open = true;
   }
-  await Promise.all(cards.map((card) => loadLeadActivity(card, { force: Boolean(options.forceActivity) })));
 }
 
 function isBuyerLead(lead) {
@@ -2025,9 +1863,7 @@ function cleanLeadTitle(title, buyer) {
 
 function renderLead(lead, index = 0) {
   const input = lead.input || {};
-  const authUser = lead.auth_user || {};
   const valuation = lead.valuation || {};
-  const adjustment = lead.owner_adjustment || {};
   const buyer = isBuyerLead(lead);
   const leadType = buyer ? "buyer" : "seller";
   const leadTypeLabel = buyer ? "Buyer lead" : "Seller lead";
@@ -2051,9 +1887,6 @@ function renderLead(lead, index = 0) {
   const pendingAlert = Boolean(ownerReview.unread) || hasAdminVisibleAlert(String(lead.id || ""));
   const progressSteps = renderLeadProgress(buyer, status);
   const inventoryListing = inventoryCache.find((item) => item.sourceLeadId && item.sourceLeadId === lead.id);
-  const actionButtons = leadStatusActions(buyer, status)
-    .map((action) => `<button type="button" data-lead-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
-    .join("");
   const warehousePanel = buyer ? "" : inventoryListing ? `
       <section class="lead-warehouse-handoff lead-warehouse-linked">
         <div>
@@ -2071,36 +1904,6 @@ function renderLead(lead, index = 0) {
         </div>
         <button type="button" data-quick-inventory="${escapeHtml(lead.id || "")}">Move to warehouse</button>
       </section>`;
-  const quickAssign = dealerStaffEmails.length ? `
-      <div class="quick-assign-row" aria-label="Quick assign lead">
-        <span>Assign</span>
-        ${dealerStaffEmails.map((email) => `
-          <button type="button" data-quick-assign="${escapeHtml(email)}" ${email === assignedTo ? "disabled" : ""}>
-            ${escapeHtml(shortEmail(email))}
-          </button>
-        `).join("")}
-      </div>` : "";
-  const statusOptions = leadStatusOptions(buyer)
-    .map((item) => `<option value="${item.value}" ${status === item.value ? "selected" : ""}>${escapeHtml(item.label)}</option>`)
-    .join("");
-  const sellerAdjustmentFields = buyer ? "" : `
-          <label>
-            <span>Owner wholesale</span>
-            <input name="ownerWholesale" type="number" value="${adjustment.wholesale ?? ""}" placeholder="Manual wholesale" />
-          </label>
-          <label>
-            <span>Owner retail</span>
-            <input name="ownerRetail" type="number" value="${adjustment.retail ?? ""}" placeholder="Manual retail" />
-          </label>
-          <label>
-            <span>Reason</span>
-            <input name="reason" value="${escapeHtml(adjustment.reason || "")}" placeholder="Why adjust this value?" />
-          </label>`;
-  const valueRows = buyer ? `
-          <span>Asking price</span><b>${retail ? formatNumber(retail) : input.askingPrice ? formatNumber(input.askingPrice) : "-"}</b>
-          <span>Payment target</span><b>${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)} / mo` : "-"}</b>` : `
-          <span>AVG Wholesale</span><b>${wholesale ? formatNumber(wholesale) : "-"}</b>
-          <span>AVG Retail</span><b>${retail ? formatNumber(retail) : "-"}</b>`;
   const ownerReviewBanner = ownerReview.unread ? `
       <section class="owner-review-required">
         <div>
@@ -2136,16 +1939,15 @@ function renderLead(lead, index = 0) {
           : "Seller valuation in CRM";
   const responseSummary = lastActivity ? `Last activity ${formatDateTime(lastActivity)}` : "No recent activity logged";
   const progressSummary = leadStatusLabel(status, buyer);
-  const sharedMeta = renderSharedLeadMeta({
-    customerEmail,
-    phone: input.phone || "-",
-    vin,
-    assignedTo,
-    priority,
-    followUp,
-    lastActivity,
-    leadTypeLabel
-  });
+  const nextAction = adminNextBestAction(lead);
+  const compactTouchSummary = isAdminStaleLead(lead) ? "No response 48h+" : (adminOutboundLabel(lead) || adminLastTouchLabel(lead));
+  const compactAlertLabel = lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed
+    ? "Duplicate review required"
+    : ownerReview.unread
+      ? "Owner review required"
+      : pendingAlert
+        ? "New update on this lead"
+        : "";
   return `
     <article class="lead-card lead-card-${leadType} lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${priority === "urgent" ? "lead-card-urgent" : ""} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "lead-card-updated" : ""} ${mergeState.kind ? "lead-card-vehicle-child" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <section class="lead-list-row">
@@ -2202,130 +2004,20 @@ function renderLead(lead, index = 0) {
           </div>
         </div>
       </section>
-      ${renderAdminCommunicationStrip(lead)}
-      ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${ownerReview.unread ? "Owner review required" : "New update on this lead"}</button>` : ""}
-      ${signalBanner}
-      ${contextBanner}
-      ${collapsedMembersBanner}
-      ${mergeBanner}
-      ${duplicateBanner}
-      ${ownerReviewBanner}
-      ${quickAssign}
-      ${actionButtons ? `<div class="lead-action-row">${actionButtons}</div>` : ""}
-      ${warehousePanel}
-      <details class="lead-manage">
-        <summary>Open lead workspace</summary>
-        ${sharedMeta}
-        ${progressSteps}
-        ${vehicleContext.related_lead_count || vehicleContext.inventory_count ? `
-          <section class="lead-detail-section lead-vehicle-ops-panel">
-            <header>
-              <h3>Vehicle operations</h3>
-              <span>Same-vehicle activity across CRM and Warehouse</span>
-            </header>
-            <dl class="lead-grid">
-              <span>Related leads</span><b>${escapeHtml(String(vehicleContext.related_lead_count || 0))}</b>
-              <span>Active buyer leads</span><b>${escapeHtml(String(vehicleContext.active_buyer_count || 0))}</b>
-              <span>Warehouse records</span><b>${escapeHtml(String(vehicleContext.inventory_count || 0))}</b>
-              <span>Warehouse status</span><b>${escapeHtml(vehicleContext.primary_inventory_status ? String(vehicleContext.primary_inventory_status).replaceAll("_", " ") : "Not in warehouse")}</b>
-              <span>Offer activity</span><b>${escapeHtml(vehicleContext.has_active_offer ? "Active" : "None")}</b>
-              <span>Vehicle availability</span><b>${escapeHtml(vehicleContext.sold_elsewhere ? "Sold" : vehicleContext.off_market ? "Off market" : "Available / unknown")}</b>
-              <span>Primary CRM lead</span><b>${escapeHtml(vehicleContext.primary_lead_title || vehicleContext.primary_lead_id || "-")}</b>
-            </dl>
-            ${collapsedMembersBanner}
-          </section>` : ""}
-        <section class="lead-detail-section lead-detail-summary">
-          <header>
-            <h3>Customer and vehicle summary</h3>
-            <span>${escapeHtml(leadTypeLabel)}</span>
-          </header>
-          <div class="lead-grid">
-          <span>Email</span><b>${escapeHtml(input.email || "-")}</b>
-          <span>Google user</span><b>${escapeHtml(authUser.email || "-")}</b>
-          <span>Phone</span><b>${escapeHtml(input.phone || "-")}</b>
-          ${buyer ? `<span>Lead type</span><b>Buyer inquiry</b>` : ""}
-          ${buyer ? `<span>Purchase intent</span><b>${escapeHtml(purchase.intent || input.purchaseIntent || "-")}</b>` : ""}
-          ${buyer ? `<span>Buying timeline</span><b>${escapeHtml(purchase.buyingTimeline || input.buyingTimeline || "-")}</b>` : ""}
-          ${buyer ? `<span>Preferred contact</span><b>${escapeHtml(purchase.preferredContact || input.preferredContact || "-")}</b>` : ""}
-          ${buyer ? `<span>Payment target</span><b>${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)} / mo` : "-"}</b>` : ""}
-          <span>VIN</span><b>${escapeHtml(vin)}</b>
-          <span>UVC</span><b>${escapeHtml(input.uvc || "-")}</b>
-          <span>Vehicle</span><b>${escapeHtml([input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" ") || "-")}</b>
-          <span>Kilometers</span><b>${formatNumber(input.kilometers || 0)}</b>
-          <span>Ownership</span><b>${escapeHtml(input.ownershipType || (input.ownsVehicle ? "Owned" : "-"))}</b>
-          <span>Color</span><b>${escapeHtml(input.color || "-")}</b>
-          <span>Region</span><b>${escapeHtml(input.region || valuation.region || "-")}</b>
-          ${valueRows}
-          </div>
-        </section>
-        <div class="lead-workspace-grid">
-        <section class="lead-detail-section lead-owner-action-panel">
-          <header>
-            <h3>Next action</h3>
-            <span>Owner decision, assignment, priority, and follow-up</span>
-          </header>
-        <form class="owner-review">
-          <label>
-            <span>Status</span>
-            <select name="status">
-              ${statusOptions}
-            </select>
-          </label>
-          <label>
-            <span>Assigned to</span>
-            <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
-          </label>
-          <label>
-            <span>Priority</span>
-            <select name="priority">
-              ${["low", "normal", "high", "urgent"].map((item) =>
-                `<option value="${item}" ${priority === item ? "selected" : ""}>${item}</option>`
-              ).join("")}
-            </select>
-          </label>
-          <label>
-            <span>Next follow-up</span>
-            <input name="nextFollowUpAt" type="datetime-local" value="${escapeHtml(datetimeLocalValue(followUp))}" />
-          </label>
-          ${sellerAdjustmentFields}
-          <label class="review-notes">
-            <span>Admin notes</span>
-            <textarea name="notes" placeholder="Follow-up notes, CRM notes, customer preference...">${escapeHtml(lead.notes || "")}</textarea>
-          </label>
-          <button type="submit">Save owner review</button>
-          <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(lead.id || "")}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
-        </form>
-        </section>
-        <section class="lead-detail-section lead-activity-panel">
-          <div class="lead-activity-head">
-            <h3>Activity timeline</h3>
-            <button type="button" data-load-activity>Refresh activity</button>
-          </div>
-          <form class="lead-note-form">
-            <select name="noteType">
-              <option value="internal">Internal note</option>
-              <option value="call">Call</option>
-              <option value="email">Email</option>
-              <option value="sms">SMS</option>
-              <option value="inspection">Inspection</option>
-              <option value="offer">Offer</option>
-            </select>
-            <textarea name="note" placeholder="Record a call, inspection result, quote discussion, or next-step detail..."></textarea>
-            <button type="submit">Add note</button>
-          </form>
-          <form class="lead-task-form">
-            <input name="title" placeholder="Next task, e.g. Call customer" />
-            <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
-            <input name="dueAt" type="datetime-local" />
-            <button type="submit">Add task</button>
-          </form>
-          <div class="lead-activity-list">Activity not loaded yet.</div>
-        </section>
-        </div>
-      </details>
-      <details class="lead-raw">
-        <summary>Raw valuation summary</summary>
-        <pre>${escapeHtml(JSON.stringify(valuation, null, 2))}</pre>
+      <section class="lead-queue-insight">
+        <strong>${escapeHtml(nextAction)}</strong>
+        <span>${escapeHtml(queueSummary)} | ${escapeHtml(compactTouchSummary)}</span>
+      </section>
+      ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${escapeHtml(compactAlertLabel)}</button>` : ""}
+      <details class="lead-queue-more">
+        <summary>More details and alerts</summary>
+        ${signalBanner}
+        ${contextBanner}
+        ${collapsedMembersBanner}
+        ${mergeBanner}
+        ${duplicateBanner}
+        ${ownerReviewBanner}
+        ${warehousePanel}
       </details>
     </article>
   `;
@@ -2371,9 +2063,11 @@ function renderAdminDrawer(leadId) {
 
   const input = lead.input || {};
   const valuation = lead.valuation || {};
+  const adjustment = lead.owner_adjustment || {};
   const buyer = isBuyerLead(lead);
   const title = cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), buyer) || "Vehicle lead";
   const customerEmail = input.email || lead.auth_user?.email || lead.auth_email || "-";
+  const customerPhone = input.phone || "No phone";
   const vin = input.vin || valuation.vin || "-";
   const status = lead.status || "new";
   const priority = lead.priority || "normal";
@@ -2383,6 +2077,28 @@ function renderAdminDrawer(leadId) {
   const overdue = isOverdue(followUp, status);
   const ownerReview = lead.owner_review || {};
   const vehicleContext = lead.vehicle_context || {};
+  const pipelineLabel = leadStatusLabel(status, buyer);
+  const nextAction = adminNextBestAction(lead);
+  const clusterLabel = vehicleContext.cluster_label || title;
+  const warehouseLabel = vehicleContext.primary_inventory_status
+    ? `Warehouse ${String(vehicleContext.primary_inventory_status).replaceAll("_", " ")}`
+    : "CRM only";
+  const statusOptions = leadStatusOptions(buyer)
+    .map((item) => `<option value="${item.value}" ${status === item.value ? "selected" : ""}>${escapeHtml(item.label)}</option>`)
+    .join("");
+  const sellerAdjustmentFields = buyer ? "" : `
+                <label>
+                  <span>Owner wholesale</span>
+                  <input name="ownerWholesale" type="number" value="${adjustment.wholesale ?? ""}" placeholder="Manual wholesale" />
+                </label>
+                <label>
+                  <span>Owner retail</span>
+                  <input name="ownerRetail" type="number" value="${adjustment.retail ?? ""}" placeholder="Manual retail" />
+                </label>
+                <label>
+                  <span>Reason</span>
+                  <input name="reason" value="${escapeHtml(adjustment.reason || "")}" placeholder="Why adjust this value?" />
+                </label>`;
   const activityStatusButtons = leadStatusActions(buyer, status)
     .map((action) => `<button type="button" data-drawer-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
     .join("");
@@ -2397,100 +2113,186 @@ function renderAdminDrawer(leadId) {
         <div>
           <span>Lead workspace</span>
           <strong>${escapeHtml(title)}</strong>
-          <small>${escapeHtml(customerEmail)} | VIN ${escapeHtml(vin)}</small>
+          <small>${escapeHtml(customerEmail)} | ${escapeHtml(customerPhone)} | VIN ${escapeHtml(vin)}</small>
         </div>
         <div class="admin-drawer-head-actions">
-          <button type="button" data-drawer-open-card>Open full</button>
+          <button type="button" data-drawer-open-card>Locate in queue</button>
           <button type="button" data-drawer-close>Close</button>
         </div>
       </header>
-      <section class="admin-drawer-summary">
-        <div class="admin-drawer-stat">
-          <span>Pipeline</span>
-          <strong>${escapeHtml(leadStatusLabel(status, buyer))}</strong>
-          <small>${escapeHtml(overdue ? "Overdue follow-up" : followUp ? formatDateTime(followUp) : "No follow-up scheduled")}</small>
-        </div>
-        <div class="admin-drawer-stat">
-          <span>Owner</span>
-          <strong>${escapeHtml(assignedTo || "Unassigned")}</strong>
-          <small>${escapeHtml(priority)} priority</small>
-        </div>
-        <div class="admin-drawer-stat">
-          <span>Vehicle</span>
-          <strong>${escapeHtml(vehicleContext.cluster_label || title)}</strong>
-          <small>${escapeHtml(vehicleContext.primary_inventory_status ? `Warehouse ${String(vehicleContext.primary_inventory_status).replaceAll("_", " ")}` : "CRM only")}</small>
-        </div>
-      </section>
-      ${renderAdminCommunicationStrip(lead)}
-      ${ownerReview.unread ? `
-        <section class="owner-review-required admin-drawer-owner-review">
-          <div>
-            <span>Owner review required</span>
-            <strong>${escapeHtml(ownerReview.reason || "Important staff update needs review.")}</strong>
-            <small>${escapeHtml(ownerReview.at ? formatDateTime(ownerReview.at) : "Unread update")}</small>
+      <div class="drawer-workspace-scroll">
+        <div class="drawer-workspace-grid">
+          <aside class="drawer-workspace-side">
+            <section class="admin-drawer-summary">
+              <div class="admin-drawer-stat">
+                <span>Pipeline</span>
+                <strong>${escapeHtml(pipelineLabel)}</strong>
+                <small>${escapeHtml(overdue ? "Overdue follow-up" : followUp ? formatDateTime(followUp) : "No follow-up scheduled")}</small>
+              </div>
+              <div class="admin-drawer-stat">
+                <span>Owner</span>
+                <strong>${escapeHtml(assignedTo || "Unassigned")}</strong>
+                <small>${escapeHtml(priority)} priority</small>
+              </div>
+              <div class="admin-drawer-stat">
+                <span>Vehicle</span>
+                <strong>${escapeHtml(clusterLabel)}</strong>
+                <small>${escapeHtml(warehouseLabel)}</small>
+              </div>
+              <div class="admin-drawer-stat">
+                <span>Last touch</span>
+                <strong>${escapeHtml(adminLeadAgeLabel(lead))}</strong>
+                <small>${escapeHtml(lastActivity ? formatDateTime(lastActivity) : "No recent activity")}</small>
+              </div>
+            </section>
+            <section class="admin-drawer-section drawer-overview-panel">
+              <header>
+                <h3>Overview</h3>
+                <span>${escapeHtml(buyer ? "BUY lead" : "SELL lead")}</span>
+              </header>
+              <div class="drawer-spotlight">
+                <strong>${escapeHtml(nextAction)}</strong>
+                <small>${escapeHtml(followUp ? `Next follow-up ${formatDateTime(followUp)}` : "Set the next follow-up before leaving this workspace.")}</small>
+              </div>
+              ${renderLeadProgress(buyer, status)}
+              <div class="drawer-meta-grid">
+                <div class="drawer-meta-item">
+                  <span>Customer</span>
+                  <strong>${escapeHtml(customerEmail)}</strong>
+                  <small>${escapeHtml(customerPhone)}</small>
+                </div>
+                <div class="drawer-meta-item">
+                  <span>Lead age</span>
+                  <strong>${escapeHtml(adminLeadAgeLabel(lead))}</strong>
+                  <small>${escapeHtml(adminLastTouchLabel(lead))}</small>
+                </div>
+                <div class="drawer-meta-item">
+                  <span>Vehicle lane</span>
+                  <strong>${escapeHtml(clusterLabel)}</strong>
+                  <small>${escapeHtml(warehouseLabel)}</small>
+                </div>
+                <div class="drawer-meta-item">
+                  <span>Status</span>
+                  <strong>${escapeHtml(pipelineLabel)}</strong>
+                  <small>${escapeHtml(overdue ? "Follow-up overdue" : "Pipeline on track")}</small>
+                </div>
+              </div>
+              <div class="drawer-inline-actions">
+                <button type="button" data-admin-open-url="${escapeHtml(adminVehicleClusterUrl(lead))}">Open vehicle cluster</button>
+              </div>
+            </section>
+            ${ownerReview.unread ? `
+              <section class="owner-review-required admin-drawer-owner-review">
+                <div>
+                  <span>Owner review required</span>
+                  <strong>${escapeHtml(ownerReview.reason || "Important staff update needs review.")}</strong>
+                  <small>${escapeHtml(ownerReview.at ? formatDateTime(ownerReview.at) : "Unread update")}</small>
+                </div>
+                <button type="button" data-owner-read="${escapeHtml(id)}">Mark reviewed</button>
+              </section>
+            ` : ""}
+            ${vehicleSignalInline(lead)}
+            ${vehicleContextInline(lead)}
+            ${duplicateWarningInline(lead)}
+          </aside>
+          <div class="drawer-workspace-main">
+            ${renderAdminCommunicationStrip(lead)}
+            <section class="admin-drawer-section">
+              <header>
+                <h3>Pipeline actions</h3>
+                <span>Move the lead without opening the full CRM card</span>
+              </header>
+              <div class="lead-action-row admin-drawer-actions">
+                ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
+              </div>
+            </section>
+            ${renderAdminDealChecklistSection(lead)}
+            <section class="admin-drawer-section">
+              <header>
+                <h3>Lead settings</h3>
+                <span>Owner decision, assignment, priority, and follow-up</span>
+              </header>
+              <form class="owner-review admin-drawer-owner-form">
+                <label>
+                  <span>Status</span>
+                  <select name="status">
+                    ${statusOptions}
+                  </select>
+                </label>
+                <label>
+                  <span>Assigned to</span>
+                  <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+                </label>
+                <label>
+                  <span>Priority</span>
+                  <select name="priority">
+                    ${["low", "normal", "high", "urgent"].map((item) =>
+                      `<option value="${item}" ${priority === item ? "selected" : ""}>${item}</option>`
+                    ).join("")}
+                  </select>
+                </label>
+                <label>
+                  <span>Next follow-up</span>
+                  <input name="nextFollowUpAt" type="datetime-local" value="${escapeHtml(datetimeLocalValue(followUp))}" />
+                </label>
+                ${sellerAdjustmentFields}
+                <label class="review-notes">
+                  <span>Admin notes</span>
+                  <textarea name="notes" placeholder="Follow-up notes, CRM notes, customer preference...">${escapeHtml(lead.notes || "")}</textarea>
+                </label>
+                <button type="submit">Save owner review</button>
+                <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(id)}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
+              </form>
+            </section>
+            <section class="admin-drawer-section">
+              <header>
+                <h3>Log touch</h3>
+                <span>Record the latest customer contact, then review recent activity below</span>
+              </header>
+              <div class="admin-drawer-comm-shortcuts">
+                <button type="button" data-drawer-note-type="call">Call</button>
+                <button type="button" data-drawer-note-type="sms">Text</button>
+                <button type="button" data-drawer-focus-email>Email</button>
+                <button type="button" data-drawer-note-type="internal">Note</button>
+              </div>
+              <form class="lead-note-form admin-drawer-note-form">
+                <select name="noteType">
+                  <option value="internal">Internal note</option>
+                  <option value="call">Call</option>
+                  <option value="email">Email</option>
+                  <option value="sms">SMS</option>
+                  <option value="inspection">Inspection</option>
+                  <option value="offer">Offer</option>
+                </select>
+                <textarea name="note" placeholder="Record the latest call, text, email, or manager instruction..."></textarea>
+                <button type="submit">Save note</button>
+              </form>
+              <details class="drawer-secondary-forms">
+                <summary>Task and email tools</summary>
+                <form class="lead-task-form admin-drawer-task-form">
+                  <input name="title" placeholder="Next task, e.g. call customer back" />
+                  <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+                  <input name="dueAt" type="datetime-local" />
+                  <button type="submit">Add task</button>
+                </form>
+                <form class="lead-email-form admin-drawer-email-form">
+                  <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
+                  <input name="subject" placeholder="Email subject" />
+                  <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
+                  <button type="submit">Log email</button>
+                </form>
+              </details>
+            </section>
+            <section class="admin-drawer-section">
+              <header>
+                <h3>Recent activity</h3>
+                <button type="button" data-drawer-load-activity>Refresh</button>
+              </header>
+              <div class="lead-activity-list admin-drawer-activity-list">Activity not loaded yet.</div>
+            </section>
           </div>
-          <button type="button" data-owner-read="${escapeHtml(id)}">Mark reviewed</button>
-        </section>
-      ` : ""}
-      ${vehicleSignalInline(lead)}
-      ${vehicleContextInline(lead)}
-      ${duplicateWarningInline(lead)}
-      <section class="admin-drawer-section">
-        <header>
-          <h3>Pipeline actions</h3>
-          <span>Move the lead without opening the full CRM card</span>
-        </header>
-        <div class="lead-action-row admin-drawer-actions">
-          ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
         </div>
-      </section>
-      ${renderAdminDealChecklistSection(lead)}
-      <section class="admin-drawer-section">
-        <header>
-          <h3>Log touch</h3>
-          <span>Record the latest customer contact, then review recent activity below</span>
-        </header>
-        <div class="admin-drawer-comm-shortcuts">
-          <button type="button" data-drawer-note-type="call">Call</button>
-          <button type="button" data-drawer-note-type="sms">Text</button>
-          <button type="button" data-drawer-focus-email>Email</button>
-          <button type="button" data-drawer-note-type="internal">Note</button>
-        </div>
-        <form class="lead-note-form admin-drawer-note-form">
-          <select name="noteType">
-            <option value="internal">Internal note</option>
-            <option value="call">Call</option>
-            <option value="email">Email</option>
-            <option value="sms">SMS</option>
-            <option value="inspection">Inspection</option>
-            <option value="offer">Offer</option>
-          </select>
-          <textarea name="note" placeholder="Record the latest call, text, email, or manager instruction..."></textarea>
-          <button type="submit">Save note</button>
-        </form>
-        <details class="drawer-secondary-forms">
-          <summary>Task and email tools</summary>
-          <form class="lead-task-form admin-drawer-task-form">
-            <input name="title" placeholder="Next task, e.g. call customer back" />
-            <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
-            <input name="dueAt" type="datetime-local" />
-            <button type="submit">Add task</button>
-          </form>
-          <form class="lead-email-form admin-drawer-email-form">
-            <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
-            <input name="subject" placeholder="Email subject" />
-            <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
-            <button type="submit">Log email</button>
-          </form>
-        </details>
-      </section>
-      <section class="admin-drawer-section">
-        <header>
-          <h3>Recent activity</h3>
-          <button type="button" data-drawer-load-activity>Refresh</button>
-        </header>
-        <div class="lead-activity-list admin-drawer-activity-list">Activity not loaded yet.</div>
-      </section>
+      </div>
     </section>
   `;
 }
@@ -2520,7 +2322,7 @@ async function loadAdminDrawerActivity(options = {}) {
     return;
   }
   adminDrawerActivityLoaded = true;
-  list.innerHTML = renderActivity(data, { highlightLatest: Boolean(options.highlightLatest), limit: 8 });
+  list.innerHTML = renderActivity(data, { highlightLatest: Boolean(options.highlightLatest), limit: 12 });
 }
 
 function setActiveAdminLead(id) {
@@ -2637,26 +2439,6 @@ function renderLeadProgress(buyer, status) {
     </ol>
   `;
 }
-
-leadsEl.addEventListener("submit", async (event) => {
-  const form = event.target.closest(".owner-review");
-  if (!form) return;
-  event.preventDefault();
-
-  const card = form.closest(".lead-card");
-  const payload = {
-    id: card.dataset.id,
-    ...Object.fromEntries(new FormData(form).entries())
-  };
-  const response = await fetch("/api/leads", {
-    method: "PATCH",
-    headers: { ...authHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  const data = await response.json();
-  statusEl.textContent = data.ok ? "Owner review saved." : (data.error || "Unable to save owner review.");
-  if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
-});
 
 inventoryEl?.addEventListener("submit", async (event) => {
   const form = event.target.closest(".inventory-card-admin");
@@ -2906,30 +2688,6 @@ function driveFileIdFromUrl(url) {
 }
 
 leadsEl.addEventListener("submit", async (event) => {
-  const form = event.target.closest(".lead-note-form");
-  if (!form) return;
-  event.preventDefault();
-
-  const card = form.closest(".lead-card");
-  const payload = {
-    leadId: card.dataset.id,
-    type: "note",
-    ...Object.fromEntries(new FormData(form).entries())
-  };
-  const response = await fetch("/api/lead-activity", {
-    method: "POST",
-    headers: { ...authHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  const data = await response.json();
-  statusEl.textContent = data.ok ? "Note saved." : (data.error || "Unable to save note.");
-  if (data.ok) {
-    form.reset();
-    await loadLeadActivity(card, { force: true });
-  }
-});
-
-leadsEl.addEventListener("submit", async (event) => {
   const form = event.target.closest(".inventory-publish-form");
   if (!form) return;
   event.preventDefault();
@@ -2957,30 +2715,6 @@ leadsEl.addEventListener("submit", async (event) => {
   }
 });
 
-leadsEl.addEventListener("submit", async (event) => {
-  const form = event.target.closest(".lead-task-form");
-  if (!form) return;
-  event.preventDefault();
-
-  const card = form.closest(".lead-card");
-  const payload = {
-    leadId: card.dataset.id,
-    type: "task",
-    ...Object.fromEntries(new FormData(form).entries())
-  };
-  const response = await fetch("/api/lead-activity", {
-    method: "POST",
-    headers: { ...authHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  const data = await response.json();
-  statusEl.textContent = data.ok ? "Task saved." : (data.error || "Unable to save task.");
-  if (data.ok) {
-    form.reset();
-    await loadLeadActivity(card, { force: true });
-  }
-});
-
 leadsEl.addEventListener("click", async (event) => {
   const clickedCard = event.target.closest(".lead-card");
   if (clickedCard?.dataset?.id) setActiveAdminLead(clickedCard.dataset.id);
@@ -2998,12 +2732,6 @@ leadsEl.addEventListener("click", async (event) => {
   const openUrlButton = event.target.closest("[data-admin-open-url]");
   if (openUrlButton) {
     window.location.href = openUrlButton.dataset.adminOpenUrl || "/admin-vehicles.html";
-    return;
-  }
-
-  const quickAssignButton = event.target.closest("[data-quick-assign]");
-  if (quickAssignButton) {
-    await quickAssignLead(quickAssignButton);
     return;
   }
 
@@ -3053,12 +2781,6 @@ leadsEl.addEventListener("click", async (event) => {
     return;
   }
 
-  const loadButton = event.target.closest("[data-load-activity]");
-  if (loadButton) {
-    await loadLeadActivity(loadButton.closest(".lead-card"), { force: true });
-    return;
-  }
-
   const uploadLeadPhotosButton = event.target.closest("[data-upload-lead-photos]");
   if (uploadLeadPhotosButton) {
     await uploadLeadPhotos(uploadLeadPhotosButton);
@@ -3071,40 +2793,7 @@ leadsEl.addEventListener("click", async (event) => {
     return;
   }
 
-  const completeButton = event.target.closest("[data-complete-task]");
-  if (completeButton) {
-    const card = completeButton.closest(".lead-card");
-    const response = await fetch("/api/lead-activity", {
-      method: "PATCH",
-      headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({
-        leadId: card.dataset.id,
-        taskId: completeButton.dataset.completeTask,
-        completed: completeButton.dataset.completed !== "true"
-      })
-    });
-    const data = await response.json();
-    statusEl.textContent = data.ok ? "Task updated." : (data.error || "Unable to update task.");
-    if (data.ok) await loadLeadActivity(card, { force: true });
-    return;
-  }
-
-  const statusButton = event.target.closest("[data-lead-status]");
-  if (!statusButton) return;
-  const card = statusButton.closest(".lead-card");
-  const response = await fetch("/api/lead-activity", {
-    method: "PATCH",
-    headers: { ...authHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({
-      leadId: card.dataset.id,
-      action: "status",
-      status: statusButton.dataset.leadStatus,
-      note: `Admin updated status to ${String(statusButton.dataset.leadStatus || "").replaceAll("_", " ")}.`
-    })
-  });
-  const data = await response.json();
-  statusEl.textContent = data.ok ? "Lead status updated." : (data.error || "Unable to update lead status.");
-  if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+  return;
 });
 
 adminLeadDrawer?.addEventListener("click", async (event) => {
@@ -3291,6 +2980,24 @@ document.addEventListener("keydown", (event) => {
 });
 
 adminLeadDrawer?.addEventListener("submit", async (event) => {
+  const ownerForm = event.target.closest(".admin-drawer-owner-form");
+  if (ownerForm && activeAdminDrawerLeadId) {
+    event.preventDefault();
+    const payload = {
+      id: activeAdminDrawerLeadId,
+      ...Object.fromEntries(new FormData(ownerForm).entries())
+    };
+    const response = await fetch("/api/leads", {
+      method: "PATCH",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    statusEl.textContent = data.ok ? "Owner review saved." : (data.error || "Unable to save owner review.");
+    if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+    return;
+  }
+
   const noteForm = event.target.closest(".admin-drawer-note-form");
   if (noteForm && activeAdminDrawerLeadId) {
     event.preventDefault();
@@ -3432,25 +3139,24 @@ async function openAdminLeadWorkspace(card, options = {}) {
     adminDrawerActivityLoaded = false;
     await loadAdminDrawerActivity({ force: true, highlightLatest: true });
   }
-  const details = card.querySelector(".lead-manage");
+  const details = card.querySelector(".lead-queue-more");
   if (details && !details.open) details.open = true;
-  await loadLeadActivity(card, { force: Boolean(options.forceActivity) });
 
   if (options.focus === "followup") {
-    const input = card.querySelector('.owner-review input[name="nextFollowUpAt"]');
+    const input = adminLeadDrawerContent?.querySelector('.admin-drawer-owner-form input[name="nextFollowUpAt"]');
     input?.focus();
     return;
   }
 
   if (options.focus === "task") {
-    const taskInput = card.querySelector('.lead-task-form input[name="title"]');
+    const taskInput = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form input[name="title"]');
     taskInput?.focus();
     return;
   }
 
   if (options.focus === "note") {
-    const noteType = card.querySelector('.lead-note-form select[name="noteType"]');
-    const noteField = card.querySelector('.lead-note-form textarea[name="note"]');
+    const noteType = adminLeadDrawerContent?.querySelector('.admin-drawer-note-form select[name="noteType"]');
+    const noteField = adminLeadDrawerContent?.querySelector('.admin-drawer-note-form textarea[name="note"]');
     if (noteType && options.noteType) noteType.value = options.noteType;
     noteField?.focus();
   }
@@ -3463,44 +3169,6 @@ async function openFullLeadFromDrawer() {
   closeAdminDrawer();
   target.scrollIntoView({ behavior: "smooth", block: "center" });
   setActiveAdminLead(activeAdminDrawerLeadId);
-  await openAdminLeadWorkspace(target, { forceActivity: true });
-}
-
-async function quickAssignLead(button) {
-  const card = button.closest(".lead-card");
-  const email = String(button.dataset.quickAssign || "").trim().toLowerCase();
-  if (!card?.dataset?.id || !email) return;
-
-  button.disabled = true;
-  statusEl.textContent = `Assigning lead to ${email}...`;
-  try {
-    const response = await fetch("/api/leads", {
-      method: "PATCH",
-      headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: card.dataset.id,
-        assignedTo: email,
-        status: "assigned"
-      })
-    });
-    const data = await response.json();
-    if (!data.ok) throw new Error(formatApiError(data, "Unable to assign lead."));
-    await fetch("/api/lead-activity", {
-      method: "POST",
-      headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({
-        leadId: card.dataset.id,
-        type: "note",
-        noteType: "internal",
-        note: `Admin assigned this lead to ${email}.`
-      })
-    }).catch(() => null);
-    statusEl.textContent = `Lead assigned to ${email}.`;
-    await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
-  } catch (error) {
-    statusEl.textContent = error.message || "Unable to assign lead.";
-    button.disabled = false;
-  }
 }
 
 async function quickAddDraftInventory(button) {
@@ -3560,7 +3228,7 @@ function openInventoryListing(id) {
 }
 
 leadsEl.addEventListener("toggle", async (event) => {
-  const details = event.target.closest(".lead-manage");
+  const details = event.target.closest(".lead-queue-more");
   if (!details || !details.open) return;
 
   const card = details.closest(".lead-card");
@@ -3571,8 +3239,6 @@ leadsEl.addEventListener("toggle", async (event) => {
     renderAdminLeadAlerts();
     card.classList.remove("lead-card-updated");
   }
-  if (card.dataset.activityLoaded === "true") return;
-  await loadLeadActivity(card, { force: true });
 }, true);
 
 leadsEl.addEventListener("click", async (event) => {
@@ -3669,7 +3335,11 @@ async function uploadLeadPhotos(button) {
     statusEl.textContent = message;
     if (data.ok) {
       if (fileInput) fileInput.value = "";
-      await loadLeadActivity(card, { force: true });
+      if (activeAdminDrawerLeadId === card?.dataset?.id) {
+        adminDrawerActivityLoaded = false;
+        await loadAdminDrawerActivity({ force: true, highlightLatest: true });
+      }
+      await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
     }
   } catch (error) {
     const message = error.message || "Unable to upload photos.";
@@ -3747,25 +3417,6 @@ function normalizeDeleteConfirm(value) {
 function cancelClearAllLeads() {
   clearLeadsConfirmEl?.remove();
   clearLeadsConfirmEl = null;
-}
-
-async function loadLeadActivity(card, options = {}) {
-  if (!card?.dataset?.id) return;
-  if (card.dataset.activityLoaded === "true" && !options.force) return;
-  const list = card.querySelector(".lead-activity-list");
-  if (list) list.textContent = "Loading activity...";
-
-  const response = await fetch(`/api/lead-activity?leadId=${encodeURIComponent(card.dataset.id)}`, {
-    headers: authHeaders()
-  });
-  const data = await response.json();
-  if (!data.ok) {
-    if (list) list.textContent = data.error || "Unable to load activity.";
-    return;
-  }
-
-  card.dataset.activityLoaded = "true";
-  if (list) list.innerHTML = renderActivity(data, { highlightLatest: Boolean(options.highlightLatest) });
 }
 
 function renderActivity(data, options = {}) {

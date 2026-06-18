@@ -45,6 +45,11 @@ const text = {
     searchLabel: "Search",
     searchPlaceholder: "Lexus, SUV, 2024...",
     budgetLabel: "Max price",
+    monthlyBudgetLabel: "Max monthly payment",
+    dealMonthlyLabel: "Finance from",
+    dealDownLabel: "Initial down",
+    dealTermLabel: "Term",
+    dealRateLabel: "APR",
     filterButton: "Search inventory",
     sendEstimateButton: "Send this estimate to dealer",
     sendEstimateDisabled: "Choose a vehicle first",
@@ -127,6 +132,11 @@ const text = {
     searchLabel: "Recherche",
     searchPlaceholder: "Lexus, VUS, 2024...",
     budgetLabel: "Prix maximum",
+    monthlyBudgetLabel: "Paiement mensuel max.",
+    dealMonthlyLabel: "Financement des",
+    dealDownLabel: "Mise initiale",
+    dealTermLabel: "Duree",
+    dealRateLabel: "TAEG",
     filterButton: "Rechercher",
     sendEstimateButton: "Envoyer cette estimation",
     sendEstimateDisabled: "Choisissez d'abord un vehicule",
@@ -238,17 +248,25 @@ function renderInventory() {
     return;
   }
 
-  inventoryList.innerHTML = filteredInventory.map((vehicle) => `
-    <article class="inventory-card">
+  inventoryList.innerHTML = filteredInventory.map((vehicle) => {
+    const deal = vehicleDeal(vehicle);
+    return `
+    <article class="inventory-card inventory-deal-card">
       ${vehicleImageMarkup(vehicle)}
       <div class="inventory-card-body">
         <div class="inventory-card-copy">
           <h3>${escapeHtml(vehicle.title)}</h3>
           <p>${escapeHtml(publicSummary(vehicle))}</p>
         </div>
-        <div class="inventory-card-price">
-          <strong>${money(vehicle.price)}</strong>
-          ${vehicle.monthlyPaymentEstimate ? `<span>${escapeHtml(money(vehicle.monthlyPaymentEstimate))} / mo</span>` : ""}
+        <div class="inventory-card-price inventory-deal-price">
+          <span>${escapeHtml(text[language].dealMonthlyLabel)}</span>
+          <strong>${money(deal.monthly)} / mo</strong>
+          <small>${escapeHtml(money(vehicle.price))} vehicle price</small>
+        </div>
+        <div class="inventory-deal-terms" aria-label="Estimated payment terms">
+          <span><b>${escapeHtml(money(deal.downPayment))}</b>${escapeHtml(text[language].dealDownLabel)}</span>
+          <span><b>${escapeHtml(String(deal.termMonths))}</b>${escapeHtml(text[language].dealTermLabel)}</span>
+          <span><b>${escapeHtml(String(deal.annualRate))}%</b>${escapeHtml(text[language].dealRateLabel)}</span>
         </div>
         <div class="inventory-tags">
           ${vehicle.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
@@ -260,7 +278,8 @@ function renderInventory() {
         </div>
       </div>
     </article>
-  `).join("");
+  `;
+  }).join("");
 }
 
 async function loadInventory() {
@@ -312,7 +331,7 @@ function updateInventoryResultsCount() {
   if (!inventoryResultsCount) return;
   const count = filteredInventory.length;
   const data = inventoryFilter ? new FormData(inventoryFilter) : null;
-  const hasFilters = Boolean(String(data?.get("query") || "").trim() || String(data?.get("maxPrice") || "").trim());
+  const hasFilters = Boolean(String(data?.get("query") || "").trim() || String(data?.get("maxPrice") || "").trim() || String(data?.get("maxMonthly") || "").trim());
   const key = hasFilters
     ? count === 1 ? "resultsFilteredLabel" : "resultsFilteredLabelPlural"
     : count === 1 ? "resultsLabel" : "resultsLabelPlural";
@@ -388,6 +407,31 @@ function calculatePayment() {
   paymentOutput.textContent = `${money(payment)} / mo`;
 }
 
+function estimatedMonthlyPayment({ price, downPayment, annualRate, termMonths, taxRate }) {
+  const principal = Math.max(0, Number(price || 0) * (1 + Number(taxRate || 0) / 100) - Number(downPayment || 0));
+  const monthlyRate = Number(annualRate || 0) / 100 / 12;
+  const months = Number(termMonths || 72);
+  return monthlyRate > 0
+    ? principal * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1)
+    : principal / months;
+}
+
+function vehicleDeal(vehicle) {
+  const price = Number(vehicle.price || 0);
+  const downPayment = Math.max(2500, Math.round(price * 0.1 / 500) * 500);
+  const termMonths = 72;
+  const annualRate = 7.99;
+  const taxRate = 12;
+  const monthly = Number(vehicle.monthlyPaymentEstimate || 0) || estimatedMonthlyPayment({ price, downPayment, annualRate, termMonths, taxRate });
+  return {
+    downPayment,
+    termMonths,
+    annualRate,
+    taxRate,
+    monthly: Math.round(monthly)
+  };
+}
+
 function selectVehicleForFinance(vehicle) {
   if (!vehicle || !financeForm) return;
   selectedFinanceVehicle = vehicle;
@@ -409,11 +453,13 @@ function applyFilters(event) {
   const data = new FormData(inventoryFilter);
   const query = String(data.get("query") || "").trim().toLowerCase();
   const maxPrice = Number(data.get("maxPrice") || 0);
+  const maxMonthly = Number(data.get("maxMonthly") || 0);
   filteredInventory = inventory.filter((vehicle) => {
     const haystack = `${vehicle.title} ${vehicle.region} ${vehicle.color} ${vehicle.tags.join(" ")}`.toLowerCase();
     const matchesQuery = !query || haystack.includes(query);
     const matchesPrice = !maxPrice || vehicle.price <= maxPrice;
-    return matchesQuery && matchesPrice;
+    const matchesMonthly = !maxMonthly || vehicleDeal(vehicle).monthly <= maxMonthly;
+    return matchesQuery && matchesPrice && matchesMonthly;
   });
   renderInventory();
   syncFilterChipState();

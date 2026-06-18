@@ -22,8 +22,8 @@
       <section id="dealer-workbench" class="dealer-app-shell" hidden>
         <aside class="dealer-sidebar" aria-label="Dealer workspace">
           <nav class="dealer-module-nav" aria-label="Dealer modules">
-            <a href="#dealer-today-section">Today</a>
-            <a href="#dealer-assigned-leads">Assigned leads</a>
+            <a href="#dealer-today-section">Dashboard</a>
+            <a href="#dealer-assigned-leads">Up Sheets</a>
             <a href="#dealer-valuation-tool">Valuation</a>
             <a href="#history-panel">My quotes</a>
           </nav>
@@ -33,8 +33,8 @@
         <div class="history-head dealer-workbench-head">
           <div>
             <p class="eyebrow">Dealer workbench</p>
-            <h1>Today work queue</h1>
-            <p>Start with assigned updates and due follow-ups, then open the full lead only when details are needed.</p>
+            <h1>Dashboard</h1>
+            <p>Start with the priority lane, due follow-ups, and desk watch, then open the lead drawer only when needed.</p>
           </div>
           <button id="reload-dealer-leads" type="button">Reload leads</button>
         </div>
@@ -50,32 +50,39 @@
           </div>
           <button id="logout" type="button" hidden>Sign out</button>
         </section>
-        <div id="dealer-lead-summary" class="dealer-lead-summary"></div>
         <section id="dealer-lead-alerts" class="lead-alerts" aria-live="polite" hidden></section>
         <section id="dealer-today-work" class="dealer-today-work"></section>
         </section>
         <section id="dealer-assigned-leads" class="history-panel dealer-leads-panel dealer-assigned-panel">
         <div class="history-head dealer-workbench-head">
           <div>
-            <p class="eyebrow">Assigned leads</p>
-            <h2>Lead pipeline</h2>
-            <p>Use filters for your current work. Open a lead for vehicle details, notes, tasks, and activity.</p>
+            <p class="eyebrow">CRM queue</p>
+            <h2>Up Sheets</h2>
+            <p>Use the core work filters first. Open a lead only when details, notes, or activity are needed.</p>
           </div>
         </div>
-        <div class="dealer-lead-filters" role="tablist" aria-label="Lead filters">
-          <button class="active" type="button" data-dealer-filter="active">Active</button>
-          <button type="button" data-dealer-filter="priority">High priority</button>
-          <button type="button" data-dealer-filter="call-now">Call now</button>
-          <button type="button" data-dealer-filter="due">Needs follow-up</button>
-          <button type="button" data-dealer-filter="no-response">No response</button>
-          <button type="button" data-dealer-filter="aging-critical">Aging 7d+</button>
-          <button type="button" data-dealer-filter="deal-desk">Deal desk</button>
-          <button type="button" data-dealer-filter="appointments">Appointments</button>
-          <button type="button" data-dealer-filter="waiting-reply">Waiting reply</button>
-          <button type="button" data-dealer-filter="buyer">BUY leads</button>
-          <button type="button" data-dealer-filter="seller">SELL leads</button>
-          <button type="button" data-dealer-filter="closed">Closed</button>
-          <button type="button" data-dealer-filter="all">All</button>
+        <div class="lead-filter-shell">
+          <div class="dealer-lead-filters" role="tablist" aria-label="Lead filters">
+            <button class="active" type="button" data-dealer-filter="active">Active</button>
+            <button type="button" data-dealer-filter="call-now">Call now</button>
+            <button type="button" data-dealer-filter="due">Needs follow-up</button>
+            <button type="button" data-dealer-filter="appointments">Appointments</button>
+            <button type="button" data-dealer-filter="deal-desk">Deal desk</button>
+            <button type="button" data-dealer-filter="vehicle-alerts">Vehicle alerts</button>
+            <button type="button" data-dealer-filter="all">All</button>
+          </div>
+          <details class="lead-filter-more">
+            <summary>More filters</summary>
+            <div class="dealer-lead-filters dealer-lead-filters-secondary" role="tablist" aria-label="More lead filters">
+              <button type="button" data-dealer-filter="priority">High priority</button>
+              <button type="button" data-dealer-filter="no-response">No response</button>
+              <button type="button" data-dealer-filter="aging-critical">Aging 7d+</button>
+              <button type="button" data-dealer-filter="waiting-reply">Waiting reply</button>
+              <button type="button" data-dealer-filter="buyer">BUY leads</button>
+              <button type="button" data-dealer-filter="seller">SELL leads</button>
+              <button type="button" data-dealer-filter="closed">Closed</button>
+            </div>
+          </details>
         </div>
         <div class="dealer-lead-toolbar">
           <label class="lead-sort-control">

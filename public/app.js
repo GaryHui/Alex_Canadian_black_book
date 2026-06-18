@@ -28,7 +28,6 @@ const dealerWorkbench = document.querySelector("#dealer-workbench");
 const dealerLeadsStatus = document.querySelector("#dealer-leads-status");
 const dealerLeadsList = document.querySelector("#dealer-leads-list");
 const reloadDealerLeadsButton = document.querySelector("#reload-dealer-leads");
-const dealerLeadSummary = document.querySelector("#dealer-lead-summary");
 const dealerLeadAlertsEl = document.querySelector("#dealer-lead-alerts");
 const dealerTodayWorkEl = document.querySelector("#dealer-today-work");
 const dealerLeadFilterButtons = document.querySelectorAll("[data-dealer-filter]");
@@ -118,13 +117,6 @@ dealerLeadSortSelect?.addEventListener("change", () => {
   dealerLeadSort = dealerLeadSortSelect.value === "oldest" ? "oldest" : "newest";
   renderDealerLeads(dealerLeadsCache, dealerLeadRole);
 });
-dealerLeadSummary?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-dealer-summary-filter]");
-  if (!button) return;
-  setDealerLeadFilter(button.dataset.dealerSummaryFilter || "all");
-  renderDealerLeads(dealerLeadsCache, dealerLeadRole);
-  document.querySelector("#dealer-assigned-leads")?.scrollIntoView({ behavior: "smooth", block: "start" });
-});
 dealerLeadAlertsEl?.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-dealer-open-alert]");
   if (!button) return;
@@ -145,45 +137,6 @@ dealerTodayWorkEl?.addEventListener("click", async (event) => {
 });
 setLookupMode("free", { openModal: false });
 
-dealerLeadsList?.addEventListener("submit", async (event) => {
-  const noteForm = event.target.closest(".dealer-note-form");
-  const taskForm = event.target.closest(".dealer-task-form");
-  if (!noteForm && !taskForm) return;
-  event.preventDefault();
-
-  const card = event.target.closest(".dealer-lead-card");
-  const leadId = card?.dataset?.leadId || "";
-  const isTask = Boolean(taskForm);
-  const payload = {
-    leadId,
-    type: isTask ? "task" : "note",
-    ...Object.fromEntries(new FormData(isTask ? taskForm : noteForm).entries())
-  };
-
-  dealerLeadsStatus.textContent = isTask ? "Saving task..." : "Saving note...";
-  try {
-    const response = await fetch("/api/lead-activity", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${authSession?.access_token || ""}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-    const data = await response.json();
-    if (!data.ok) throw new Error(data.error || "Unable to save follow-up");
-    dealerLeadsStatus.textContent = isTask ? "Task saved." : "Note saved.";
-    (isTask ? taskForm : noteForm).reset();
-    await loadDealerActivity(card, { force: true });
-    if (leadId && activeDealerDrawerLeadId === leadId) {
-      dealerDrawerActivityLoaded = false;
-      await loadDealerDrawerActivity({ force: true, highlightLatest: true });
-    }
-  } catch (error) {
-    dealerLeadsStatus.textContent = error.message || "Unable to save follow-up";
-  }
-});
-
 dealerLeadsList?.addEventListener("click", async (event) => {
   const clickedCard = event.target.closest(".dealer-lead-card");
   if (clickedCard?.dataset?.leadId) setActiveDealerLead(clickedCard.dataset.leadId);
@@ -192,44 +145,6 @@ dealerLeadsList?.addEventListener("click", async (event) => {
     await openDealerWorkspace(row.closest(".dealer-lead-card"), { forceActivity: false });
     return;
   }
-  const completeButton = event.target.closest("[data-complete-dealer-task]");
-  if (completeButton) {
-    const card = completeButton.closest(".dealer-lead-card");
-    const leadId = card?.dataset?.leadId || "";
-    const taskId = completeButton.dataset.completeDealerTask || "";
-    if (!leadId || !taskId) return;
-    completeButton.disabled = true;
-    dealerLeadsStatus.textContent = "Marking task complete...";
-    try {
-      const response = await fetch("/api/lead-activity", {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${authSession?.access_token || ""}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ leadId, taskId, completed: true })
-      });
-      const data = await response.json();
-      if (!data.ok) throw new Error(data.error || "Unable to complete task");
-      dealerLeadsStatus.textContent = "Task completed. Admin can review it.";
-      await loadDealerActivity(card, { force: true });
-      if (leadId && activeDealerDrawerLeadId === leadId) {
-        dealerDrawerActivityLoaded = false;
-        await loadDealerDrawerActivity({ force: true, highlightLatest: true });
-      }
-    } catch (error) {
-      completeButton.disabled = false;
-      dealerLeadsStatus.textContent = error.message || "Unable to complete task";
-    }
-    return;
-  }
-
-  const button = event.target.closest("[data-load-dealer-activity]");
-  if (button) {
-    await loadDealerActivity(button.closest(".dealer-lead-card"), { force: true });
-    return;
-  }
-
   const openWorkspaceButton = event.target.closest("[data-dealer-open-workspace]");
   if (openWorkspaceButton) {
     await openDealerWorkspace(openWorkspaceButton.closest(".dealer-lead-card"), { forceActivity: true });
@@ -252,26 +167,16 @@ dealerLeadsList?.addEventListener("click", async (event) => {
     return;
   }
 
-  const statusButton = event.target.closest("[data-dealer-status]");
-  if (statusButton) {
-    await updateDealerLeadStatus(statusButton);
-    return;
-  }
-
-  const followUpButton = event.target.closest("[data-dealer-follow-up]");
-  if (followUpButton) {
-    await updateDealerFollowUp(followUpButton);
-  }
+  return;
 });
 
 dealerLeadsList?.addEventListener("toggle", async (event) => {
-  const details = event.target.closest(".dealer-lead-details");
+  const details = event.target.closest(".lead-queue-more");
   if (!details || !details.open) return;
   const card = details.closest(".dealer-lead-card");
   if (!card) return;
   if (card.dataset.leadId) setActiveDealerLead(card.dataset.leadId);
   clearDealerLeadUpdateNotice(card);
-  await loadDealerActivity(card);
 }, true);
 
 dealerLeadsList?.addEventListener("focusin", (event) => {
@@ -1340,7 +1245,6 @@ async function setSession(session) {
       disableDealerTools(true);
       quotaPanel.hidden = true;
       historyPanel.hidden = true;
-      if (dealerLeadSummary) dealerLeadSummary.innerHTML = "";
       if (dealerLeadsList) dealerLeadsList.innerHTML = "";
       if (dealerLeadsStatus) dealerLeadsStatus.textContent = dealer.error || "Dealer access denied.";
       statusEl.textContent = "Ask the site owner to add this email in Admin > Dealer portal access.";
@@ -1605,7 +1509,6 @@ function markDealerLeadTokenRead(id) {
 }
 
 function renderDealerLeads(leads, role) {
-  renderDealerLeadSummary(leads);
   if (!leads.length) {
     dealerLeadsStatus.textContent = role === "admin"
       ? "No active leads yet."
@@ -1628,12 +1531,10 @@ function renderDealerLeads(leads, role) {
   dealerLeadsList.innerHTML = renderDealerLeadGroups(visibleLeads, (lead, index) => {
     const input = lead.input || {};
     const valuation = lead.valuation || {};
-    const ownerAdjustment = lead.owner_adjustment || {};
     const buyerLead = isBuyerLead(lead);
     const leadKind = buyerLead ? "buyer" : "seller";
     const leadTypeLabel = buyerLead ? "BUY lead" : "SELL lead";
     const purchase = input.buyerPlan || valuation.buyerPlan || {};
-    const adminNotes = buyerLead && isAutoBuyerInquiryNote(lead.notes) ? "" : lead.notes;
     const title = cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || "Vehicle lead", buyerLead);
     const customerEmail = input.email || lead.auth_email || lead.auth_user?.email || "-";
     const followUp = lead.next_follow_up_at || "";
@@ -1649,68 +1550,8 @@ function renderDealerLeads(leads, role) {
     const retailAvg = historyMarketAverage(valuation, "retail");
     const dealerWholesale = ownerAdjustment.wholesale ?? "";
     const dealerRetail = ownerAdjustment.retail ?? "";
-    const buyerPlanSummary = buyerLead ? `
-          <section class="dealer-review-summary dealer-buyer-plan">
-            <h3>Buyer plan</h3>
-            <dl class="history-meta">
-              <div><dt>Intent</dt><dd>${escapeHtml(purchase.intent || input.purchaseIntent || "-")}</dd></div>
-              <div><dt>Timeline</dt><dd>${escapeHtml(purchase.buyingTimeline || input.buyingTimeline || "-")}</dd></div>
-              <div><dt>Preferred contact</dt><dd>${escapeHtml(purchase.preferredContact || input.preferredContact || "-")}</dd></div>
-              <div><dt>Payment target</dt><dd>${purchase.monthlyPayment ? `$${escapeHtml(formatNumber(purchase.monthlyPayment))} / mo` : "-"}</dd></div>
-            </dl>
-            ${adminNotes ? `<div class="dealer-admin-notes"><strong>Owner notes</strong><p>${escapeHtml(adminNotes)}</p></div>` : ""}
-          </section>` : `
-          <section class="dealer-review-summary">
-            <h3>Owner review from admin</h3>
-            <dl class="history-meta">
-              <div><dt>Owner wholesale</dt><dd>${dealerWholesale !== "" && dealerWholesale !== null ? `$${escapeHtml(formatNumber(dealerWholesale))}` : "-"}</dd></div>
-              <div><dt>Owner retail</dt><dd>${dealerRetail !== "" && dealerRetail !== null ? `$${escapeHtml(formatNumber(dealerRetail))}` : "-"}</dd></div>
-              <div><dt>Reason</dt><dd>${escapeHtml(ownerAdjustment.reason || "-")}</dd></div>
-            </dl>
-            ${adminNotes ? `<div class="dealer-admin-notes"><strong>Owner notes</strong><p>${escapeHtml(adminNotes)}</p></div>` : ""}
-          </section>`;
-    const dealerEmailOptionsId = `dealer-email-options-${cssToken(lead.id || String(Math.random()))}`;
-    const dealerEmailOptions = dealerDirectoryEmails.map((email) => `<option value="${escapeHtml(email)}"></option>`).join("");
-    const vehicleDetails = [
-      ["Year", input.year || valuation.year || ""],
-      ["Make", input.make || valuation.make || ""],
-      ["Model", input.model || valuation.model || ""],
-      ["Series / Trim", input.series || valuation.series || ""],
-      ["Style", input.style || valuation.style || ""],
-      ["UVC", input.uvc || valuation.uvc || ""],
-      ["Odometer", input.kilometers ? `${formatNumber(input.kilometers)} km` : ""],
-      ["Region", input.region || valuation.region || ""],
-      ["Postal code", input.postalCode || input.postal_code || ""],
-      ["Color", input.color || ""],
-      ["Ownership", input.ownershipType || input.ownership || ""],
-      ["Condition notes", input.conditionNotes || input.condition_notes || ""],
-      buyerLead ? ["Purchase intent", purchase.intent || input.purchaseIntent || ""] : null,
-      buyerLead ? ["Buying timeline", purchase.buyingTimeline || input.buyingTimeline || ""] : null,
-      buyerLead ? ["Preferred contact", purchase.preferredContact || input.preferredContact || ""] : null,
-      buyerLead ? ["Payment target", purchase.monthlyPayment ? `$${formatNumber(purchase.monthlyPayment)} / mo` : ""] : null,
-      buyerLead ? ["Asking price", retailAvg ? `$${formatNumber(retailAvg)}` : input.askingPrice ? `$${formatNumber(input.askingPrice)}` : ""] : ["CBB wholesale AVG", wholesaleAvg ? `$${formatNumber(wholesaleAvg)}` : ""],
-      buyerLead ? null : ["CBB retail AVG", retailAvg ? `$${formatNumber(retailAvg)}` : ""]
-    ].filter(Boolean).filter(([, value]) => value !== "" && value !== null && value !== undefined);
-
     const updateToken = dealerLeadUpdateToken(lead);
     const vehicleContext = lead.vehicle_context || {};
-    const progressSteps = renderDealerLeadProgress(buyerLead, status);
-    const sharedMeta = renderDealerSharedLeadMeta({
-      customerEmail,
-      phone: input.phone || "-",
-      vin: valuation.vin || input.vin || "-",
-      assignedTo: lead.assigned_to || "",
-      priority: lead.priority || "normal",
-      followUp,
-      lastActivity,
-      leadTypeLabel
-    });
-    const actionButtons = dealerStatusActions(buyerLead, status)
-      .map((action) => `<button type="button" data-dealer-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
-      .join("");
-    const followUpButtons = dealerFollowUpActions()
-      .map((action) => `<button type="button" data-dealer-follow-up="${escapeHtml(action.key)}">${escapeHtml(action.label)}</button>`)
-      .join("");
     const nextStepSummary = overdue
       ? "Follow-up overdue"
       : followUp
@@ -1729,6 +1570,8 @@ function renderDealerLeads(leads, role) {
             : "Seller appraisal";
     const customerSummary = input.phone || customerEmail;
     const progressSummary = leadStatusLabel(status, buyerLead);
+    const nextAction = dealerNextBestAction(lead);
+    const compactTouchSummary = isDealerNoResponseLead(lead) ? "No response 48h+" : (dealerOutboundLabel(lead) || dealerLastTouchLabel(lead));
 
     return `
       <article class="history-card dealer-lead-card dealer-lead-${leadKind} dealer-lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${String(lead.priority || "").toLowerCase() === "urgent" ? "dealer-lead-card-urgent" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "dealer-lead-updated" : ""}" data-lead-id="${escapeHtml(lead.id || "")}" data-update-token="${escapeHtml(updateToken)}">
@@ -1785,64 +1628,16 @@ function renderDealerLeads(leads, role) {
             </div>
           </div>
         </section>
-        ${renderDealerCommunicationStrip(lead)}
+        <section class="lead-queue-insight">
+          <strong>${escapeHtml(nextAction)}</strong>
+          <span>${escapeHtml(nextStepSummary)} | ${escapeHtml(compactTouchSummary)}</span>
+        </section>
         ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-dealer-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
-        ${dealerVehicleSignalInline(lead)}
-        ${dealerVehicleContextInline(lead)}
-        <p class="dealer-update-notice" ${pendingAlert ? "" : "hidden"}>Task or follow-up activity changed. Open this lead to review the latest update.</p>
-        ${actionButtons ? `<div class="dealer-lead-actions">${actionButtons}</div>` : ""}
-        <div class="dealer-lead-actions dealer-follow-up-actions" aria-label="Set next follow-up">
-          ${followUpButtons}
-        </div>
-        <details class="dealer-lead-details">
-          <summary>Open lead details, tasks, and activity</summary>
-          ${sharedMeta}
-          ${progressSteps}
-          ${vehicleContext.related_lead_count || vehicleContext.inventory_count ? `
-            <section class="dealer-info-block">
-              <h3>Vehicle operations</h3>
-              <dl class="history-meta dealer-detail-grid">
-                <div><dt>Related leads</dt><dd>${escapeHtml(String(vehicleContext.related_lead_count || 0))}</dd></div>
-                <div><dt>Active buyer leads</dt><dd>${escapeHtml(String(vehicleContext.active_buyer_count || 0))}</dd></div>
-                <div><dt>Warehouse records</dt><dd>${escapeHtml(String(vehicleContext.inventory_count || 0))}</dd></div>
-                <div><dt>Warehouse status</dt><dd>${escapeHtml(vehicleContext.primary_inventory_status ? String(vehicleContext.primary_inventory_status).replaceAll("_", " ") : "Not in warehouse")}</dd></div>
-                <div><dt>Offer activity</dt><dd>${escapeHtml(vehicleContext.has_active_offer ? "Active" : "None")}</dd></div>
-                <div><dt>Availability</dt><dd>${escapeHtml(vehicleContext.sold_elsewhere ? "Sold" : vehicleContext.off_market ? "Off market" : "Available / unknown")}</dd></div>
-              </dl>
-            </section>` : ""}
-          <section class="dealer-info-block">
-            <h3>Vehicle details</h3>
-            <dl class="history-meta dealer-detail-grid">
-              ${vehicleDetails.map(([label, value]) => `
-                <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>
-              `).join("")}
-            </dl>
-          </section>
-          ${buyerPlanSummary}
-          ${overdue ? `<p class="status overdue-text">Overdue follow-up</p>` : ""}
-          <form class="dealer-note-form">
-            <select name="noteType">
-              <option value="call">Call</option>
-              <option value="email">Email</option>
-              <option value="sms">SMS</option>
-              <option value="inspection">Inspection</option>
-              <option value="correction">Correction request</option>
-              <option value="offer">Offer</option>
-              <option value="internal">Internal note</option>
-            </select>
-            <textarea name="note" placeholder="Record calls, inspection result, or corrections for admin approval. Price and inventory fields are owner-only."></textarea>
-            <button type="submit">Add note</button>
-          </form>
-          <form class="dealer-task-form">
-            <input name="title" placeholder="Next task" />
-            <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to dealer email" />
-            <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
-            <input name="dueAt" type="datetime-local" />
-            <button type="submit">Add task</button>
-          </form>
-          <div class="dealer-activity-list">
-            <button type="button" data-load-dealer-activity>Refresh activity</button>
-          </div>
+        <details class="lead-queue-more dealer-queue-more">
+          <summary>More details and alerts</summary>
+          ${dealerVehicleSignalInline(lead)}
+          ${dealerVehicleContextInline(lead)}
+          <p class="dealer-update-notice" ${pendingAlert ? "" : "hidden"}>Task or follow-up activity changed. Open this lead to review the latest update.</p>
         </details>
       </article>
     `;
@@ -1904,6 +1699,12 @@ function renderDealerDrawer(leadId) {
   const customerEmail = input.email || lead.auth_user?.email || lead.auth_email || "-";
   const customerPhone = input.phone || "No phone";
   const vehicleContext = lead.vehicle_context || {};
+  const pipelineLabel = leadStatusLabel(status, buyerLead);
+  const nextAction = dealerNextBestAction(lead);
+  const clusterLabel = vehicleContext.cluster_label || title;
+  const warehouseLabel = vehicleContext.primary_inventory_status
+    ? `Warehouse ${String(vehicleContext.primary_inventory_status).replaceAll("_", " ")}`
+    : planSummary;
   const dealerEmailOptionsId = `dealer-drawer-email-options-${cssToken(lead.id || id)}`;
   const dealerEmailOptions = dealerDirectoryEmails.map((email) => `<option value="${escapeHtml(email)}"></option>`).join("");
   const actionButtons = dealerStatusActions(buyerLead, status)
@@ -1929,91 +1730,137 @@ function renderDealerDrawer(leadId) {
           <small>${escapeHtml(customerEmail)} | ${escapeHtml(customerPhone)}</small>
         </div>
         <div class="dealer-drawer-head-actions">
-          <button type="button" data-dealer-drawer-open-card>Open full</button>
+          <button type="button" data-dealer-drawer-open-card>Locate in queue</button>
           <button type="button" data-dealer-drawer-close>Close</button>
         </div>
       </header>
-      <section class="dealer-drawer-summary">
-        <div class="dealer-drawer-stat">
-          <span>Pipeline</span>
-          <strong>${escapeHtml(leadStatusLabel(status, buyerLead))}</strong>
-          <small>${escapeHtml(overdue ? "Overdue follow-up" : followUp ? formatDateTime(followUp) : "No follow-up scheduled")}</small>
+      <div class="drawer-workspace-scroll">
+        <div class="drawer-workspace-grid">
+          <aside class="drawer-workspace-side">
+            <section class="dealer-drawer-summary">
+              <div class="dealer-drawer-stat">
+                <span>Pipeline</span>
+                <strong>${escapeHtml(pipelineLabel)}</strong>
+                <small>${escapeHtml(overdue ? "Overdue follow-up" : followUp ? formatDateTime(followUp) : "No follow-up scheduled")}</small>
+              </div>
+              <div class="dealer-drawer-stat">
+                <span>Priority</span>
+                <strong>${escapeHtml(priority)}</strong>
+                <small>${escapeHtml(lastActivity ? `Last touch ${formatDateTime(lastActivity)}` : "No recent activity")}</small>
+              </div>
+              <div class="dealer-drawer-stat">
+                <span>Vehicle</span>
+                <strong>${escapeHtml(clusterLabel)}</strong>
+                <small>${escapeHtml(warehouseLabel)}</small>
+              </div>
+              <div class="dealer-drawer-stat">
+                <span>Lead age</span>
+                <strong>${escapeHtml(dealerLeadAgeLabel(lead))}</strong>
+                <small>${escapeHtml(dealerLastTouchLabel(lead))}</small>
+              </div>
+            </section>
+            <section class="dealer-drawer-section drawer-overview-panel">
+              <header>
+                <h3>Overview</h3>
+                <span>${escapeHtml(buyerLead ? "BUY lead" : "SELL lead")}</span>
+              </header>
+              <div class="drawer-spotlight">
+                <strong>${escapeHtml(nextAction)}</strong>
+                <small>${escapeHtml(followUp ? `Next follow-up ${formatDateTime(followUp)}` : "Set the next follow-up before leaving this workspace.")}</small>
+              </div>
+              ${renderDealerLeadProgress(buyerLead, status)}
+              <div class="drawer-meta-grid">
+                <div class="drawer-meta-item">
+                  <span>Customer</span>
+                  <strong>${escapeHtml(customerEmail)}</strong>
+                  <small>${escapeHtml(customerPhone)}</small>
+                </div>
+                <div class="drawer-meta-item">
+                  <span>Plan</span>
+                  <strong>${escapeHtml(planSummary)}</strong>
+                  <small>${escapeHtml(warehouseLabel)}</small>
+                </div>
+                <div class="drawer-meta-item">
+                  <span>Vehicle</span>
+                  <strong>${escapeHtml(clusterLabel)}</strong>
+                  <small>${escapeHtml(vehicleContext.primary_inventory_status ? warehouseLabel : "CRM lead only")}</small>
+                </div>
+                <div class="drawer-meta-item">
+                  <span>Status</span>
+                  <strong>${escapeHtml(pipelineLabel)}</strong>
+                  <small>${escapeHtml(overdue ? "Follow-up overdue" : "Pipeline on track")}</small>
+                </div>
+              </div>
+            </section>
+            ${dealerVehicleSignalInline(lead)}
+            ${dealerVehicleContextInline(lead)}
+          </aside>
+          <div class="drawer-workspace-main">
+            ${renderDealerCommunicationStrip(lead)}
+            <section class="dealer-drawer-section">
+              <header>
+                <h3>Quick follow-up</h3>
+                <span>Move the lead forward without opening the full CRM card</span>
+              </header>
+              <div class="dealer-lead-actions dealer-drawer-actions">
+                ${actionButtons}
+              </div>
+              <div class="dealer-lead-actions dealer-follow-up-actions dealer-drawer-followups">
+                ${followUpButtons}
+              </div>
+            </section>
+            ${renderDealerDealChecklistSection(lead)}
+            <section class="dealer-drawer-section">
+              <header>
+                <h3>Log touch</h3>
+                <span>Record the latest customer touch, then review recent activity below</span>
+              </header>
+              <div class="dealer-drawer-comm-shortcuts">
+                <button type="button" data-drawer-note-type="call">Call</button>
+                <button type="button" data-drawer-note-type="sms">Text</button>
+                <button type="button" data-drawer-focus-email>Email</button>
+                <button type="button" data-drawer-note-type="internal">Note</button>
+              </div>
+              <form class="dealer-note-form dealer-drawer-note-form">
+                <select name="noteType">
+                  <option value="call">Call</option>
+                  <option value="email">Email</option>
+                  <option value="sms">SMS</option>
+                  <option value="inspection">Inspection</option>
+                  <option value="correction">Correction request</option>
+                  <option value="offer">Offer</option>
+                  <option value="internal">Internal note</option>
+                </select>
+                <textarea name="note" placeholder="Record the latest customer touch, inspection result, correction, or quote update..."></textarea>
+                <button type="submit">Save note</button>
+              </form>
+              <details class="drawer-secondary-forms">
+                <summary>Task and email tools</summary>
+                <form class="dealer-task-form dealer-drawer-task-form">
+                  <input name="title" placeholder="Next task" />
+                  <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to dealer email" />
+                  <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
+                  <input name="dueAt" type="datetime-local" />
+                  <button type="submit">Add task</button>
+                </form>
+                <form class="lead-email-form dealer-email-form dealer-drawer-email-form">
+                  <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
+                  <input name="subject" placeholder="Email subject" />
+                  <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
+                  <button type="submit">Log email</button>
+                </form>
+              </details>
+            </section>
+            <section class="dealer-drawer-section">
+              <header>
+                <h3>Recent activity</h3>
+                <button type="button" data-drawer-load-dealer-activity>Refresh</button>
+              </header>
+              <div class="dealer-activity-list dealer-drawer-activity-list">Activity not loaded yet.</div>
+            </section>
+          </div>
         </div>
-        <div class="dealer-drawer-stat">
-          <span>Priority</span>
-          <strong>${escapeHtml(priority)}</strong>
-          <small>${escapeHtml(lastActivity ? `Last touch ${formatDateTime(lastActivity)}` : "No recent activity")}</small>
-        </div>
-        <div class="dealer-drawer-stat">
-          <span>Vehicle</span>
-          <strong>${escapeHtml(vehicleContext.cluster_label || title)}</strong>
-          <small>${escapeHtml(vehicleContext.primary_inventory_status ? `Warehouse ${String(vehicleContext.primary_inventory_status).replaceAll("_", " ")}` : planSummary)}</small>
-        </div>
-      </section>
-      ${renderDealerCommunicationStrip(lead)}
-      ${dealerVehicleSignalInline(lead)}
-      ${dealerVehicleContextInline(lead)}
-      <section class="dealer-drawer-section">
-        <header>
-          <h3>Quick follow-up</h3>
-          <span>Move the lead forward without opening the full CRM card</span>
-        </header>
-        <div class="dealer-lead-actions dealer-drawer-actions">
-          ${actionButtons}
-        </div>
-        <div class="dealer-lead-actions dealer-follow-up-actions dealer-drawer-followups">
-          ${followUpButtons}
-        </div>
-      </section>
-      ${renderDealerDealChecklistSection(lead)}
-      <section class="dealer-drawer-section">
-        <header>
-          <h3>Log touch</h3>
-          <span>Record the latest customer touch, then review recent activity below</span>
-        </header>
-        <div class="dealer-drawer-comm-shortcuts">
-          <button type="button" data-drawer-note-type="call">Call</button>
-          <button type="button" data-drawer-note-type="sms">Text</button>
-          <button type="button" data-drawer-focus-email>Email</button>
-          <button type="button" data-drawer-note-type="internal">Note</button>
-        </div>
-        <form class="dealer-note-form dealer-drawer-note-form">
-          <select name="noteType">
-            <option value="call">Call</option>
-            <option value="email">Email</option>
-            <option value="sms">SMS</option>
-            <option value="inspection">Inspection</option>
-            <option value="correction">Correction request</option>
-            <option value="offer">Offer</option>
-            <option value="internal">Internal note</option>
-          </select>
-          <textarea name="note" placeholder="Record the latest customer touch, inspection result, correction, or quote update..."></textarea>
-          <button type="submit">Save note</button>
-        </form>
-        <details class="drawer-secondary-forms">
-          <summary>Task and email tools</summary>
-          <form class="dealer-task-form dealer-drawer-task-form">
-            <input name="title" placeholder="Next task" />
-            <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to dealer email" />
-            <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
-            <input name="dueAt" type="datetime-local" />
-            <button type="submit">Add task</button>
-          </form>
-          <form class="lead-email-form dealer-email-form dealer-drawer-email-form">
-            <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
-            <input name="subject" placeholder="Email subject" />
-            <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
-            <button type="submit">Log email</button>
-          </form>
-        </details>
-      </section>
-      <section class="dealer-drawer-section">
-        <header>
-          <h3>Recent activity</h3>
-          <button type="button" data-drawer-load-dealer-activity>Refresh</button>
-        </header>
-        <div class="dealer-activity-list dealer-drawer-activity-list">Activity not loaded yet.</div>
-      </section>
+      </div>
     </section>
   `;
 }
@@ -2043,7 +1890,7 @@ async function loadDealerDrawerActivity(options = {}) {
     const data = await response.json();
     if (!data.ok) throw new Error(data.error || "Unable to load activity");
     dealerDrawerActivityLoaded = true;
-    list.innerHTML = renderDealerActivity(data, { highlightLatest: Boolean(options.highlightLatest), limit: 8 });
+    list.innerHTML = renderDealerActivity(data, { highlightLatest: Boolean(options.highlightLatest), limit: 12 });
   } catch (error) {
     list.textContent = error.message || "Unable to load activity";
   }
@@ -2266,43 +2113,6 @@ function renderDealerCommunicationStrip(lead) {
   `;
 }
 
-function renderDealerSummaryCard(filter, tone, label, value, hint) {
-  return `
-    <button type="button" class="dealer-summary-card ${escapeHtml(tone)}" data-dealer-summary-filter="${escapeHtml(filter)}">
-      <span>${escapeHtml(label)}</span>
-      <strong>${escapeHtml(String(value))}</strong>
-      <small>${escapeHtml(hint)}</small>
-    </button>
-  `;
-}
-
-function renderDealerLeadSummary(leads) {
-  if (!dealerLeadSummary) return;
-  const activeLeads = leads.filter((lead) => !isDealerClosedLead(lead));
-  const due = activeLeads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new")).length;
-  const callNow = activeLeads.filter(isDealerCallNowLead).length;
-  const noResponse = activeLeads.filter(isDealerNoResponseLead).length;
-  const vehicleAlerts = activeLeads.filter((lead) => lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market).length;
-  const waitingReplies = activeLeads.filter(isDealerWaitingReply).length;
-  const appointments = activeLeads.filter(isDealerAppointmentLead).length;
-  const agingCritical = activeLeads.filter(isDealerAgingCriticalLead).length;
-  const dealDesk = leads.filter(isDealerDealDeskLead).length;
-  const closed = leads.length - activeLeads.length;
-  dealerLeadSummary.innerHTML = `
-    ${renderDealerSummaryCard("active", "dealer-summary-total", "My queue", activeLeads.length, "All assigned active work")}
-    ${renderDealerSummaryCard("call-now", "dealer-summary-priority", "Call now", callNow, "New, high priority, or hot leads")}
-    ${renderDealerSummaryCard("due", "dealer-summary-due", "Due today", due, "Follow-up due or overdue")}
-    ${renderDealerSummaryCard("no-response", "dealer-summary-waiting", "No response", noResponse, "No touch logged in the last 48h")}
-    ${renderDealerSummaryCard("appointments", "dealer-summary-appointment", "Appointments", appointments, "Booked buyer or seller meetings")}
-    ${renderDealerSummaryCard("waiting-reply", "dealer-summary-alert", "Waiting reply", waitingReplies, "Waiting on customer response")}
-    ${renderDealerSummaryCard("deal-desk", "dealer-summary-closed", "Deal desk", dealDesk, "Won buyers and intake handoffs")}
-    ${renderDealerSummaryCard("aging-critical", "dealer-summary-priority", "Aging 7d+", agingCritical, "Older leads drifting too long")}
-    ${renderDealerSummaryCard("vehicle-alerts", "dealer-summary-alert", "Vehicle alerts", vehicleAlerts, "Same-vehicle inventory changes")}
-    ${renderDealerSummaryCard("closed", "dealer-summary-closed", "Closed", closed, "Done or moved to inventory")}
-    ${renderDealerSummaryCard("all", "dealer-summary-updated", "Updated", dealerLeadAlertMap.size, "Changed since last refresh")}
-  `;
-}
-
 function renderDealerTodayWork(leads) {
   if (!dealerTodayWorkEl) return;
   const activeLeads = leads.filter((lead) => !isDealerClosedLead(lead));
@@ -2331,34 +2141,66 @@ function renderDealerTodayWork(leads) {
   const vehicleAlertLeads = activeLeads
     .filter((lead) => lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market)
     .slice(0, 5);
-  dealerTodayWorkEl.hidden = false;
-  const totalAttention = new Set([
+  const priorityLaneLeads = [
     ...callNowLeads,
-    ...dueLeads,
+    ...waitingReplyLeads,
     ...noResponseLeads,
+    ...agingLeads
+  ]
+    .filter((lead, index, list) => list.findIndex((item) => String(item.id || "") === String(lead.id || "")) === index)
+    .slice(0, 6);
+  const watchItems = [
     ...appointmentLeads,
     ...dealDeskLeads,
-    ...agingLeads,
-    ...waitingReplyLeads,
     ...vehicleAlertLeads
+  ]
+    .filter((lead, index, list) => list.findIndex((item) => String(item.id || "") === String(lead.id || "")) === index)
+    .slice(0, 6);
+  dealerTodayWorkEl.hidden = false;
+  const totalAttention = new Set([
+    ...priorityLaneLeads,
+    ...dueLeads,
+    ...watchItems
   ].map((lead) => String(lead.id || ""))).size;
   dealerTodayWorkEl.innerHTML = totalAttention ? `
+    <section class="dealer-manager-brief" aria-label="Dealer brief">
+      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="active">
+        <span>My queue</span>
+        <strong>${activeLeads.length}</strong>
+        <small>All assigned active work</small>
+      </button>
+      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="call-now">
+        <span>Call now</span>
+        <strong>${callNowLeads.length}</strong>
+        <small>Work the hottest leads first</small>
+      </button>
+      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="due">
+        <span>Due today</span>
+        <strong>${dueLeads.length}</strong>
+        <small>Follow-up due or overdue</small>
+      </button>
+      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="vehicle-alerts">
+        <span>Vehicle alerts</span>
+        <strong>${vehicleAlertLeads.length}</strong>
+        <small>Same-vehicle changes to review</small>
+      </button>
+    </section>
     <header>
       <div>
         <span>Today</span>
         <strong>${totalAttention} task${totalAttention === 1 ? "" : "s"} to work first</strong>
       </div>
-      <button type="button" data-dealer-filter-shortcut="${callNowLeads.length ? "call-now" : dueLeads.length ? "due" : noResponseLeads.length ? "no-response" : dealDeskLeads.length ? "deal-desk" : agingLeads.length ? "aging-critical" : appointmentLeads.length ? "appointments" : "active"}">${callNowLeads.length ? "Open call now" : dueLeads.length ? "Open due" : noResponseLeads.length ? "Open no response" : dealDeskLeads.length ? "Open deal desk" : agingLeads.length ? "Open aging" : appointmentLeads.length ? "Open appointments" : "View active"}</button>
+      <button type="button" data-dealer-filter-shortcut="${callNowLeads.length ? "call-now" : dueLeads.length ? "due" : appointmentLeads.length ? "appointments" : dealDeskLeads.length ? "deal-desk" : vehicleAlertLeads.length ? "vehicle-alerts" : "active"}">${callNowLeads.length ? "Open call now" : dueLeads.length ? "Open due" : appointmentLeads.length ? "Open appointments" : dealDeskLeads.length ? "Open deal desk" : vehicleAlertLeads.length ? "Open vehicle alerts" : "View active"}</button>
     </header>
     <div class="dealer-today-sections">
-      ${renderDealerTodaySection("Call now", "New, urgent, or high-priority leads to contact first", callNowLeads, "call-now")}
+      ${renderDealerTodaySection("Priority lane", "Call now, waiting reply, and aging leads that need action first", priorityLaneLeads, callNowLeads.length ? "call-now" : waitingReplyLeads.length ? "waiting-reply" : noResponseLeads.length ? "no-response" : "aging-critical")}
       ${renderDealerTodaySection("Due today", "Overdue or due follow-ups that should be touched today", dueLeads, "due")}
-      ${renderDealerTodaySection("No response", "Leads with no touch in the last 48 hours", noResponseLeads, "no-response")}
-      ${renderDealerTodaySection("Deal desk", "Won buyers and intake handoffs that need after-sale follow-through", dealDeskLeads, "deal-desk")}
-      ${renderDealerTodaySection("Aging 7d+", "Older leads still open and needing a clear next step", agingLeads, "aging-critical")}
-      ${renderDealerTodaySection("Appointments", "Booked meetings or inspections that need confirmation", appointmentLeads, "appointments")}
-      ${renderDealerTodaySection("Waiting reply", "Customers waiting for a callback, text, or answer", waitingReplyLeads, "waiting-reply")}
-      ${renderDealerTodaySection("Vehicle alerts", "Offer, sold, or off-market updates on the same vehicle", vehicleAlertLeads, "vehicle-alerts")}
+      ${renderDealerDealerWatchSection({
+        appointments: appointmentLeads,
+        dealDesk: dealDeskLeads,
+        vehicleAlerts: vehicleAlertLeads,
+        watchItems
+      })}
     </div>
   ` : `
     <header>
@@ -2372,6 +2214,43 @@ function renderDealerTodayWork(leads) {
       <b>Your current queue is clear.</b>
       <span>Use Assigned leads for the full pipeline or Valuation when you need to price a vehicle manually.</span>
     </div>
+  `;
+}
+
+function renderDealerDealerWatchSection({ appointments = [], dealDesk = [], vehicleAlerts = [], watchItems = [] } = {}) {
+  return `
+    <section class="dealer-today-section dealer-today-section-watch">
+      <header>
+        <div>
+          <span>Desk watch</span>
+          <strong>${appointments.length + dealDesk.length + vehicleAlerts.length}</strong>
+          <small>Appointments, delivery handoffs, and same-vehicle updates</small>
+        </div>
+      </header>
+      <div class="dealer-watch-grid">
+        <button type="button" class="dealer-watch-tile" data-dealer-filter-shortcut="appointments">
+          <span>Appointments</span>
+          <b>${appointments.length}</b>
+          <small>Booked meetings to confirm</small>
+        </button>
+        <button type="button" class="dealer-watch-tile" data-dealer-filter-shortcut="deal-desk">
+          <span>Deal desk</span>
+          <b>${dealDesk.length}</b>
+          <small>Delivery and intake follow-through</small>
+        </button>
+        <button type="button" class="dealer-watch-tile" data-dealer-filter-shortcut="vehicle-alerts">
+          <span>Vehicle alerts</span>
+          <b>${vehicleAlerts.length}</b>
+          <small>Offer, sold, or off-market updates</small>
+        </button>
+        ${watchItems.length ? `<div class="dealer-today-list">${watchItems.map(renderDealerTodayLeadButton).join("")}</div>` : `
+          <div class="dealer-today-empty">
+            <b>No desk watch items waiting.</b>
+            <span>Appointments, handoffs, and same-vehicle updates will show here.</span>
+          </div>
+        `}
+      </div>
+    </section>
   `;
 }
 
@@ -2586,71 +2465,6 @@ function dealerFollowUpDate(key) {
   return date.toISOString();
 }
 
-async function updateDealerFollowUp(button) {
-  const card = button.closest(".dealer-lead-card");
-  const leadId = card?.dataset?.leadId || "";
-  const key = button.dataset.dealerFollowUp || "tomorrow";
-  if (!leadId) return;
-
-  const dueAt = dealerFollowUpDate(key);
-  button.disabled = true;
-  dealerLeadsStatus.textContent = "Setting next follow-up...";
-  try {
-    const response = await fetch("/api/lead-activity", {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${authSession?.access_token || ""}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        leadId,
-        action: "follow_up",
-        dueAt,
-        note: `Dealer set next follow-up for ${formatDateTime(dueAt)}.`
-      })
-    });
-    const data = await response.json();
-    if (!data.ok) throw new Error(data.error || "Unable to set follow-up");
-    dealerLeadsStatus.textContent = "Next follow-up updated.";
-    await loadDealerLeads({ forceActivity: true, suppressAlerts: true });
-  } catch (error) {
-    dealerLeadsStatus.textContent = error.message || "Unable to set follow-up";
-    button.disabled = false;
-  }
-}
-
-async function updateDealerLeadStatus(button) {
-  const card = button.closest(".dealer-lead-card");
-  const leadId = card?.dataset?.leadId || "";
-  const status = button.dataset.dealerStatus || "";
-  if (!leadId || !status) return;
-
-  button.disabled = true;
-  dealerLeadsStatus.textContent = "Updating lead status...";
-  try {
-    const response = await fetch("/api/lead-activity", {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${authSession?.access_token || ""}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        leadId,
-        action: "status",
-        status,
-        note: `Dealer updated status to ${status.replaceAll("_", " ")}.`
-      })
-    });
-    const data = await response.json();
-    if (!data.ok) throw new Error(data.error || "Unable to update lead status");
-    dealerLeadsStatus.textContent = "Lead status updated.";
-    await loadDealerLeads({ forceActivity: true, suppressAlerts: true });
-  } catch (error) {
-    dealerLeadsStatus.textContent = error.message || "Unable to update lead status";
-    button.disabled = false;
-  }
-}
-
 async function openDealerWorkspace(card, options = {}) {
   if (!card) return;
   if (card.dataset.leadId) {
@@ -2658,19 +2472,18 @@ async function openDealerWorkspace(card, options = {}) {
     dealerDrawerActivityLoaded = false;
     await loadDealerDrawerActivity({ force: true, highlightLatest: true });
   }
-  const details = card.querySelector(".dealer-lead-details");
+  const details = card.querySelector(".lead-queue-more");
   if (details && !details.open) details.open = true;
-  await loadDealerActivity(card, { force: Boolean(options.forceActivity) });
 
   if (options.focus === "task") {
-    const taskInput = card.querySelector('.dealer-task-form input[name="title"]');
+    const taskInput = dealerLeadDrawerContent?.querySelector('.dealer-drawer-task-form input[name="title"]');
     taskInput?.focus();
     return;
   }
 
   if (options.focus === "note") {
-    const noteType = card.querySelector('.dealer-note-form select[name="noteType"]');
-    const noteField = card.querySelector('.dealer-note-form textarea[name="note"]');
+    const noteType = dealerLeadDrawerContent?.querySelector('.dealer-drawer-note-form select[name="noteType"]');
+    const noteField = dealerLeadDrawerContent?.querySelector('.dealer-drawer-note-form textarea[name="note"]');
     if (noteType && options.noteType) noteType.value = options.noteType;
     noteField?.focus();
   }
@@ -2683,9 +2496,6 @@ async function openFullDealerLeadFromDrawer() {
   closeDealerDrawer();
   target.scrollIntoView({ behavior: "smooth", block: "center" });
   setActiveDealerLead(activeDealerDrawerLeadId);
-  const details = target.querySelector(".dealer-lead-details");
-  if (details) details.open = true;
-  await openDealerWorkspace(target, { forceActivity: true });
 }
 
 function startDealerAutoRefresh() {
@@ -2706,11 +2516,6 @@ async function refreshOpenDealerTasks() {
 function isEditingDealerLeads() {
   const active = document.activeElement;
   return Boolean(active && dealerLeadsList?.contains(active) && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(active.tagName));
-}
-
-async function loadVisibleDealerActivities(options = {}) {
-  const cards = [...dealerLeadsList.querySelectorAll(".dealer-lead-card")];
-  await Promise.all(cards.map((card) => loadDealerActivity(card, { force: Boolean(options.force) })));
 }
 
 async function checkDealerLeadUpdates() {
@@ -2760,7 +2565,6 @@ async function checkDealerLeadUpdates() {
     }
     dealerLeadsCache = data.leads || [];
     renderDealerLeadAlerts();
-    renderDealerLeadSummary(dealerLeadsCache);
     renderDealerTodayWork(dealerLeadsCache);
     if (newCount) {
       dealerLeadsStatus.textContent = `${newCount} new assigned lead${newCount === 1 ? "" : "s"}. Click the update above to open.`;
@@ -2822,7 +2626,6 @@ async function openDealerLead(id, options = {}) {
     markDealerLeadTokenRead(id);
     dealerLeadAlertMap.delete(id);
     renderDealerLeadAlerts();
-    renderDealerLeadSummary(dealerLeadsCache);
     clearDealerLeadUpdateNotice(card);
   }
   card.classList.add("lead-card-flash");
@@ -2830,13 +2633,10 @@ async function openDealerLead(id, options = {}) {
   card.scrollIntoView({ behavior: "smooth", block: "center" });
   renderDealerDrawer(id);
   dealerDrawerActivityLoaded = false;
-  const details = card.querySelector(".dealer-lead-details");
+  const details = card.querySelector(".lead-queue-more");
   if (details) details.open = true;
   if (options.fromAlert) highlightDealerLeadChangeAreas(card);
-  await Promise.all([
-    loadDealerActivity(card, { force: true, highlightLatest: Boolean(options.fromAlert) }),
-    loadDealerDrawerActivity({ force: true, highlightLatest: Boolean(options.fromAlert) })
-  ]);
+  await loadDealerDrawerActivity({ force: true, highlightLatest: Boolean(options.fromAlert) });
 }
 
 function dealerLeadUpdateToken(lead = {}) {
@@ -2870,28 +2670,6 @@ function clearDealerLeadUpdateNotice(card) {
   const notice = card.querySelector(".dealer-update-notice");
   if (notice) notice.hidden = true;
   renderDealerLeadAlerts();
-  renderDealerLeadSummary(dealerLeadsCache);
-}
-
-async function loadDealerActivity(card, options = {}) {
-  if (!card?.dataset?.leadId) return;
-  if (card.dataset.activityLoaded === "true" && !options.force) return;
-  const list = card.querySelector(".dealer-activity-list");
-  if (list) list.textContent = "Loading activity...";
-
-  try {
-    const response = await fetch(`/api/lead-activity?leadId=${encodeURIComponent(card.dataset.leadId)}`, {
-      headers: {
-        Authorization: `Bearer ${authSession?.access_token || ""}`
-      }
-    });
-    const data = await response.json();
-    if (!data.ok) throw new Error(data.error || "Unable to load activity");
-    card.dataset.activityLoaded = "true";
-    if (list) list.innerHTML = renderDealerActivity(data, { highlightLatest: Boolean(options.highlightLatest) });
-  } catch (error) {
-    if (list) list.textContent = error.message || "Unable to load activity";
-  }
 }
 
 function renderDealerActivity(data, options = {}) {

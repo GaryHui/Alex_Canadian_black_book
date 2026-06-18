@@ -22,7 +22,7 @@
           </div>
           <button id="admin-logout" type="button" hidden>Sign out</button>
           <a href="/admin-vehicles.html">Vehicle clusters</a>
-          <a href="/dealer.html" target="_blank" rel="noreferrer">Open dealer portal</a>
+          <a href="/" target="_blank" rel="noreferrer">Open dealer portal</a>
           <a href="/">Back to demo</a>
         </div>
       </header>
@@ -30,13 +30,12 @@
       <div class="admin-workbench-layout">
       <aside class="admin-sidebar" aria-label="Admin workspace">
         <nav class="admin-module-nav" aria-label="Admin modules">
-          <a href="#admin-control-board">Control board</a>
-          <a href="#admin-today">Today</a>
-          <a href="#crm-leads">CRM leads</a>
-          <a href="/admin-vehicles.html">Vehicle clusters</a>
+          <a href="#admin-today">Dashboard</a>
+          <a href="#crm-leads">Up Sheets</a>
           <a href="#inventory-warehouse">Inventory</a>
+          <a href="/admin-vehicles.html">Vehicle clusters</a>
           <a href="#operations-settings">Settings</a>
-          <a href="/dealer.html" target="_blank" rel="noreferrer">Dealer portal</a>
+          <a href="/" target="_blank" rel="noreferrer">Dealer portal</a>
         </nav>
       </aside>
       <div class="admin-workspace-main">
@@ -44,13 +43,13 @@
         <div class="admin-section-head">
           <div>
             <p class="section-kicker">Owner desk</p>
-            <h2>Today needs attention</h2>
-            <p>Start here for new updates, overdue follow-ups, unassigned leads, urgent leads, and inventory drafts.</p>
+            <h2>Dashboard</h2>
+            <p>Start with the priority lane, follow-ups, manager watch, and duplicate vehicle review.</p>
           </div>
           <button id="reload-leads" type="button">Reload workbench</button>
         </div>
-        <section id="admin-control-board" class="admin-control-board" aria-label="Manager control board"></section>
-        <section class="admin-overview" id="admin-overview" aria-label="Lead overview"></section>
+        <section id="admin-control-board" class="admin-control-board" aria-label="Manager control board" hidden></section>
+        <section class="admin-overview" id="admin-overview" aria-label="Workbench summary"></section>
         <section id="admin-lead-alerts" class="lead-alerts" aria-live="polite" hidden></section>
         <div id="admin-today-list" class="admin-today-list" aria-live="polite"></div>
       </section>
@@ -58,8 +57,8 @@
         <div class="admin-section-head">
           <div>
             <p class="section-kicker">CRM</p>
-            <h2>Leads follow-up</h2>
-            <p>Assign BUY and SELL leads, track status, and move seller vehicles into warehouse drafts when they are ready.</p>
+            <h2>Up Sheets</h2>
+            <p>Assign BUY and SELL leads, track the next step, and move seller vehicles into warehouse drafts when ready.</p>
           </div>
           <div class="admin-section-actions">
             <button id="clear-leads" class="danger-outline" type="button">Clear all leads</button>
@@ -78,22 +77,29 @@
             </select>
           </label>
         </div>
-        <div class="admin-lead-filters" aria-label="Lead filters">
-          <button class="active" type="button" data-admin-lead-filter="active">Active</button>
-          <button type="button" data-admin-lead-filter="call-now">Call now</button>
-          <button type="button" data-admin-lead-filter="waiting-reply">Waiting reply</button>
-          <button type="button" data-admin-lead-filter="deal-desk">Deal desk</button>
-          <button type="button" data-admin-lead-filter="owner-unread">Owner unread</button>
-          <button type="button" data-admin-lead-filter="duplicate-review">Duplicate review</button>
-          <button type="button" data-admin-lead-filter="needs-follow-up">Needs follow-up</button>
-          <button type="button" data-admin-lead-filter="stale">No response</button>
-          <button type="button" data-admin-lead-filter="appointments">Appointments</button>
-          <button type="button" data-admin-lead-filter="buyer">BUY</button>
-          <button type="button" data-admin-lead-filter="seller">SELL</button>
-          <button type="button" data-admin-lead-filter="unassigned">Unassigned</button>
-          <button type="button" data-admin-lead-filter="urgent">Urgent</button>
-          <button type="button" data-admin-lead-filter="closed">Closed</button>
-          <button type="button" data-admin-lead-filter="all">All</button>
+        <div class="lead-filter-shell">
+          <div class="admin-lead-filters" aria-label="Lead filters">
+            <button class="active" type="button" data-admin-lead-filter="active">Active</button>
+            <button type="button" data-admin-lead-filter="call-now">Call now</button>
+            <button type="button" data-admin-lead-filter="needs-follow-up">Needs follow-up</button>
+            <button type="button" data-admin-lead-filter="appointments">Appointments</button>
+            <button type="button" data-admin-lead-filter="deal-desk">Deal desk</button>
+            <button type="button" data-admin-lead-filter="duplicate-review">Duplicate review</button>
+            <button type="button" data-admin-lead-filter="all">All</button>
+          </div>
+          <details class="lead-filter-more">
+            <summary>More filters</summary>
+            <div class="admin-lead-filters admin-lead-filters-secondary" aria-label="More lead filters">
+              <button type="button" data-admin-lead-filter="waiting-reply">Waiting reply</button>
+              <button type="button" data-admin-lead-filter="owner-unread">Owner unread</button>
+              <button type="button" data-admin-lead-filter="stale">No response</button>
+              <button type="button" data-admin-lead-filter="buyer">BUY</button>
+              <button type="button" data-admin-lead-filter="seller">SELL</button>
+              <button type="button" data-admin-lead-filter="unassigned">Unassigned</button>
+              <button type="button" data-admin-lead-filter="urgent">Urgent</button>
+              <button type="button" data-admin-lead-filter="closed">Closed</button>
+            </div>
+          </details>
         </div>
         <p id="admin-status" class="status">Loading...</p>
         <div id="admin-leads" class="admin-leads"></div>
@@ -103,11 +109,10 @@
           <div>
             <p class="section-kicker">Warehouse</p>
             <h2>Inventory warehouse</h2>
-            <p>Review draft vehicles, publish public listings, mark sold, or archive old stock.</p>
+            <p>Work draft vehicles, publish live stock, and close sold units without repeating CRM work.</p>
           </div>
           <button id="reload-inventory" type="button">Reload inventory</button>
         </div>
-        <div id="inventory-summary" class="inventory-summary"></div>
         <div class="admin-lead-filters" aria-label="Inventory filters">
           <button class="active" type="button" data-inventory-filter="active">Active</button>
           <button type="button" data-inventory-filter="published">Published</button>
