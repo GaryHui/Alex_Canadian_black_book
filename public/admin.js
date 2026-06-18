@@ -2354,38 +2354,29 @@ function renderAdminDrawer(leadId) {
           </aside>
           <div class="drawer-workspace-main">
             ${renderAdminCommunicationStrip(lead)}
-            <section class="admin-drawer-section">
+            <section class="admin-drawer-section admin-drawer-command-card">
               <header>
-                <h3>Pipeline actions</h3>
-                <span>Move the lead without opening the full CRM card</span>
+                <h3>Assign & next step</h3>
+                <span>Owner, priority, due time, and pipeline</span>
               </header>
-              <div class="drawer-spotlight">
-                <strong>${escapeHtml(nextAction)}</strong>
-                <small>${escapeHtml(followUp ? `Next follow-up ${formatDateTime(followUp)}` : "Set the next follow-up before leaving this workspace.")}</small>
-              </div>
-              ${renderLeadProgress(buyer, status)}
-              <div class="lead-action-row admin-drawer-actions">
-                ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
-              </div>
-            </section>
-            ${renderAdminDealChecklistSection(lead)}
-            <details class="admin-drawer-section admin-drawer-settings-details">
-              <summary>
-                <span>
-                  <strong>Owner settings</strong>
-                  <small>Assignment, priority, follow-up, pricing, and delete</small>
-                </span>
-              </summary>
-              <form class="owner-review admin-drawer-owner-form">
+              <form class="owner-review admin-drawer-owner-form admin-drawer-assign-form">
+                <input type="hidden" name="ownerWholesale" value="${adjustment.wholesale ?? ""}" />
+                <input type="hidden" name="ownerRetail" value="${adjustment.retail ?? ""}" />
+                <input type="hidden" name="reason" value="${escapeHtml(adjustment.reason || "")}" />
+                <input type="hidden" name="notes" value="${escapeHtml(lead.notes || "")}" />
+                <label>
+                  <span>Assigned to</span>
+                  <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+                </label>
+                <label>
+                  <span>Next follow-up</span>
+                  <input name="nextFollowUpAt" type="datetime-local" value="${escapeHtml(datetimeLocalValue(followUp))}" />
+                </label>
                 <label>
                   <span>Status</span>
                   <select name="status">
                     ${statusOptions}
                   </select>
-                </label>
-                <label>
-                  <span>Assigned to</span>
-                  <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
                 </label>
                 <label>
                   <span>Priority</span>
@@ -2395,29 +2386,28 @@ function renderAdminDrawer(leadId) {
                     ).join("")}
                   </select>
                 </label>
-                <label>
-                  <span>Next follow-up</span>
-                  <input name="nextFollowUpAt" type="datetime-local" value="${escapeHtml(datetimeLocalValue(followUp))}" />
-                </label>
-                ${sellerAdjustmentFields}
-                <label class="review-notes">
-                  <span>Admin notes</span>
-                  <textarea name="notes" placeholder="Follow-up notes, CRM notes, customer preference...">${escapeHtml(lead.notes || "")}</textarea>
-                </label>
-                <button type="submit">Save owner review</button>
-                <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(id)}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
+                <button type="submit">Save assignment</button>
               </form>
-            </details>
-            <section class="admin-drawer-section">
+              ${renderLeadProgress(buyer, status)}
+              <div class="lead-action-row admin-drawer-actions">
+                ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
+              </div>
+            </section>
+            ${renderAdminDealChecklistSection(lead)}
+            <section class="admin-drawer-section admin-drawer-update-card">
               <header>
-                <h3>Log touch</h3>
-                <span>Record the latest customer contact, then review recent activity below</span>
+                <h3>Log update</h3>
+                <span>Share the latest customer touch with the team</span>
               </header>
+              <div class="drawer-spotlight">
+                <strong>${escapeHtml(nextAction)}</strong>
+                <small>${escapeHtml(followUp ? `Next follow-up ${formatDateTime(followUp)}` : "No follow-up scheduled yet.")}</small>
+              </div>
               <div class="admin-drawer-comm-shortcuts">
                 <button type="button" data-drawer-note-type="call">Call</button>
                 <button type="button" data-drawer-note-type="sms">Text</button>
                 <button type="button" data-drawer-focus-email>Email</button>
-                <button type="button" data-drawer-note-type="internal">Note</button>
+                <button type="button" data-drawer-note-type="internal">Internal note</button>
               </div>
               <form class="lead-note-form admin-drawer-note-form">
                 <select name="noteType">
@@ -2428,28 +2418,46 @@ function renderAdminDrawer(leadId) {
                   <option value="inspection">Inspection</option>
                   <option value="offer">Offer</option>
                 </select>
-                <textarea name="note" placeholder="Record the latest call, text, email, or manager instruction..."></textarea>
-                <button type="submit">Save note</button>
+                <textarea name="note" placeholder="What changed? What should the next person know?"></textarea>
+                <button type="submit">Post update</button>
               </form>
-              <details class="drawer-secondary-forms">
-                <summary>Task and email tools</summary>
-                <form class="lead-task-form admin-drawer-task-form">
-                  <input name="title" placeholder="Next task, e.g. call customer back" />
-                  <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
-                  <input name="dueAt" type="datetime-local" />
-                  <button type="submit">Add task</button>
-                </form>
-                <form class="lead-email-form admin-drawer-email-form">
-                  <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
-                  <input name="subject" placeholder="Email subject" />
-                  <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
-                  <button type="submit">Log email</button>
-                </form>
-              </details>
             </section>
+            <details class="admin-drawer-section admin-drawer-settings-details">
+              <summary>
+                <span>
+                  <strong>More lead tools</strong>
+                  <small>Pricing, admin notes, tasks, email log, and delete</small>
+                </span>
+              </summary>
+              <form class="owner-review admin-drawer-owner-form">
+                <input type="hidden" name="status" value="${escapeHtml(status)}" />
+                <input type="hidden" name="assignedTo" value="${escapeHtml(assignedTo)}" />
+                <input type="hidden" name="priority" value="${escapeHtml(priority)}" />
+                <input type="hidden" name="nextFollowUpAt" value="${escapeHtml(datetimeLocalValue(followUp))}" />
+                ${sellerAdjustmentFields}
+                <label class="review-notes">
+                  <span>Admin notes</span>
+                  <textarea name="notes" placeholder="Follow-up notes, CRM notes, customer preference...">${escapeHtml(lead.notes || "")}</textarea>
+                </label>
+                <button type="submit">Save lead notes</button>
+                <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(id)}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
+              </form>
+              <form class="lead-task-form admin-drawer-task-form">
+                <input name="title" placeholder="Next task, e.g. call customer back" />
+                <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+                <input name="dueAt" type="datetime-local" />
+                <button type="submit">Add task</button>
+              </form>
+              <form class="lead-email-form admin-drawer-email-form">
+                <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
+                <input name="subject" placeholder="Email subject" />
+                <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
+                <button type="submit">Log email</button>
+              </form>
+            </details>
             <section class="admin-drawer-section">
               <header>
-                <h3>Recent activity</h3>
+                <h3>Team timeline</h3>
                 <button type="button" data-drawer-load-activity>Refresh</button>
               </header>
               <div class="lead-activity-list admin-drawer-activity-list">Activity not loaded yet.</div>
@@ -3177,7 +3185,8 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
       body: JSON.stringify(payload)
     });
     const data = await response.json();
-    statusEl.textContent = data.ok ? "Owner review saved." : (data.error || "Unable to save owner review.");
+    const savedMessage = ownerForm.classList.contains("admin-drawer-assign-form") ? "Assignment saved." : "Lead tools saved.";
+    statusEl.textContent = data.ok ? savedMessage : (data.error || "Unable to save lead.");
     if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
     return;
   }

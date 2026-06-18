@@ -1672,6 +1672,27 @@ body.admin-drawer-open .admin-shell {
   margin-top: 10px;
 }
 
+.admin-drawer-command-card,
+.admin-drawer-update-card {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-drawer-assign-form {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(170px, 1fr) minmax(130px, .8fr) minmax(120px, .7fr) auto;
+}
+
+.admin-drawer-assign-form label {
+  min-width: 0;
+}
+
+.admin-drawer-assign-form button {
+  min-height: 42px;
+}
+
 .admin-drawer-note-form,
 .admin-drawer-task-form {
   margin-top: 10px;
@@ -1684,11 +1705,22 @@ body.admin-drawer-open .admin-shell {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.admin-drawer-assign-form {
+  grid-template-columns: minmax(160px, 1.2fr) minmax(170px, 1fr) minmax(130px, .8fr) minmax(120px, .7fr) auto;
+}
+
 .admin-drawer-note-form button,
 .admin-drawer-task-form button,
 .admin-drawer-email-form button,
 .admin-drawer-owner-form button {
   justify-self: start;
+}
+
+.admin-drawer-settings-details .lead-task-form,
+.admin-drawer-settings-details .lead-email-form {
+  border-top: 1px solid #d8e2ef;
+  margin-top: 12px;
+  padding-top: 12px;
 }
 
 .admin-drawer-activity-list {
@@ -5301,6 +5333,7 @@ body.admin-drawer-open .admin-shell {
   .lead-note-form,
   .lead-task-form,
   .lead-email-form,
+  .admin-drawer-assign-form,
   .dealer-note-form,
   .dealer-task-form,
   .dealer-email-form {
