@@ -523,26 +523,42 @@ function renderInventoryListing(listing) {
     <form class="inventory-card-admin" data-id="${escapeHtml(listing.id || "")}" data-source-lead-id="${escapeHtml(listing.sourceLeadId || "")}">
       <input type="hidden" name="sourceLeadId" value="${escapeHtml(listing.sourceLeadId || "")}" />
       ${publicOptionInputs}
-      <div class="inventory-card-head">
-        <div>
+      <section class="inventory-list-row">
+        <div class="inventory-list-col inventory-list-col-main">
           <strong>${escapeHtml(listing.title || "Untitled vehicle")}</strong>
-          <span>${escapeHtml([listing.year, listing.make, listing.model, listing.series, listing.style].filter(Boolean).join(" ") || "-")}</span>
+          <div class="lead-list-subline">
+            <span>${escapeHtml([listing.year, listing.make, listing.model, listing.series, listing.style].filter(Boolean).join(" ") || "-")}</span>
+            <span>VIN ${escapeHtml(listing.vin || "-")}</span>
+          </div>
         </div>
-        <b class="status-pill status-${escapeHtml(cssToken(listing.status || "draft"))}">${escapeHtml(listing.status || "draft")}</b>
-      </div>
-      <div class="inventory-card-facts">
-        <span>Price <b>${listing.price ? `$${formatNumber(listing.price)}` : "-"}</b></span>
-        <span>KM <b>${formatNumber(listing.kilometers || 0)}</b></span>
-        <span>Region <b>${escapeHtml(listing.region || "-")}</b></span>
-        <span>Photos <b>${photos.length}</b></span>
-      </div>
-      <div class="inventory-actions">
-        <button type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="published" ${canPublish ? "" : "disabled"}>Publish</button>
-        <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="draft" ${canUnpublish ? "" : "disabled"}>Unpublish</button>
-        <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="sold">Mark sold</button>
-        <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="archived" ${canArchive ? "" : "disabled"}>Archive</button>
-        <button class="danger-outline" type="button" data-remove-inventory="${escapeHtml(listing.id || "")}">Remove from inventory</button>
-      </div>
+        <div class="inventory-list-col">
+          <strong>${listing.price ? `$${formatNumber(listing.price)}` : "-"}</strong>
+          <div class="lead-list-subline">
+            <span>KM ${escapeHtml(formatNumber(listing.kilometers || 0))}</span>
+            <span>${escapeHtml(listing.region || "-")}</span>
+          </div>
+        </div>
+        <div class="inventory-list-col">
+          <strong>${escapeHtml(String(photos.length))}</strong>
+          <div class="lead-list-subline">
+            <span>${escapeHtml(photos.length === 1 ? "photo" : "photos")}</span>
+            <span>${escapeHtml(listing.publicOptions?.showPhotos ? "public" : "hidden")}</span>
+          </div>
+        </div>
+        <div class="inventory-list-col">
+          <strong class="status-pill status-${escapeHtml(cssToken(listing.status || "draft"))}">${escapeHtml(listing.status || "draft")}</strong>
+          <div class="lead-list-subline">
+            <span>${escapeHtml(listing.sourceLeadId ? "From SELL lead" : "Manual listing")}</span>
+          </div>
+        </div>
+        <div class="inventory-actions inventory-list-actions">
+          <button type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="published" ${canPublish ? "" : "disabled"}>Publish</button>
+          <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="draft" ${canUnpublish ? "" : "disabled"}>Unpublish</button>
+          <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="sold">Mark sold</button>
+          <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="archived" ${canArchive ? "" : "disabled"}>Archive</button>
+          <button class="danger-outline" type="button" data-remove-inventory="${escapeHtml(listing.id || "")}">Remove</button>
+        </div>
+      </section>
       <details class="inventory-edit-details">
         <summary>Edit listing details</summary>
         <div class="inventory-edit-grid">
@@ -971,6 +987,9 @@ function duplicateWarningInline(lead) {
   const mergeTargetId = String(lead?.vehicle_context?.primary_lead_id || "").trim();
   const safeMergeTargetId = mergeTargetId && mergeTargetId !== currentId ? mergeTargetId : "";
   const listingId = String(lead?.vehicle_context?.primary_listing_id || "").trim();
+  const warehouseLinkButton = listingId
+    ? `<button type="button" data-duplicate-review="link_inventory" data-target-lead-id="${escapeHtml(safeMergeTargetId)}" data-listing-id="${escapeHtml(listingId)}">Link warehouse</button>`
+    : "";
   return `
     <section class="owner-review-required duplicate-vehicle-warning">
       <div>
@@ -981,7 +1000,7 @@ function duplicateWarningInline(lead) {
       <div class="duplicate-review-actions">
         <button type="button" data-duplicate-review="keep_separate">Keep separate</button>
         <button type="button" data-duplicate-review="merge_existing" data-target-lead-id="${escapeHtml(safeMergeTargetId)}" ${safeMergeTargetId ? "" : "disabled"}>Merge into primary</button>
-        <button type="button" data-duplicate-review="link_inventory" data-target-lead-id="${escapeHtml(safeMergeTargetId)}" data-listing-id="${escapeHtml(listingId)}" ${listingId ? "" : "disabled"}>Link warehouse</button>
+        ${warehouseLinkButton}
         <a class="duplicate-review-link" href="${escapeHtml(adminVehicleClusterUrl(lead))}" target="_blank" rel="noreferrer">Open vehicle group</a>
       </div>
     </section>
@@ -2844,7 +2863,7 @@ async function saveInventoryListing(form, overrides = {}) {
 
 async function removeInventoryListing(button) {
   const form = button.closest(".inventory-card-admin");
-  const title = form?.querySelector(".inventory-card-head strong")?.textContent || "this vehicle";
+  const title = form?.querySelector(".inventory-list-col-main strong")?.textContent || "this vehicle";
   const id = button.dataset.removeInventory || form?.dataset.id || "";
   if (!id) return;
   const confirmed = window.confirm(

@@ -4467,9 +4467,9 @@ body.admin-drawer-open {
 
 .inventory-card-admin {
   display: grid;
-  gap: 12px;
-  padding: 16px;
-  background: #fff;
+  gap: 10px;
+  padding: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
   border-color: #d8e2ef;
   border-radius: 0;
   border-style: solid;
@@ -4477,46 +4477,35 @@ body.admin-drawer-open {
   box-shadow: none;
 }
 
+.inventory-card-admin:nth-child(odd) {
+  background: linear-gradient(180deg, #eef4fb 0%, #f7faff 100%);
+}
+
 .inventory-card-admin:last-child {
   border-radius: 0 0 8px 8px;
 }
 
-.inventory-card-head {
+.inventory-list-row {
   display: grid;
-  align-items: flex-start;
-  gap: 16px;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1.6fr);
+  align-items: start;
+  column-gap: 12px;
+  grid-template-columns: 1.35fr 1fr .65fr .8fr 1.45fr;
 }
 
-.inventory-card-head > div {
+.inventory-list-col {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
-.inventory-card-head strong {
-  font-size: 17px;
-}
-
-.inventory-card-head span {
-  color: #666;
-  font-size: 13px;
-}
-
-.inventory-card-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.inventory-card-facts span {
-  border: 1px solid #d8e2ef;
-  border-radius: 6px;
-  color: #516174;
-  padding: 7px 9px;
-}
-
-.inventory-card-facts b {
+.inventory-list-col > strong {
   color: #16243a;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.inventory-list-col .status-pill {
+  justify-self: start;
 }
 
 .inventory-edit-details {
@@ -4725,6 +4714,10 @@ body.admin-drawer-open {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.inventory-list-actions {
+  align-items: flex-start;
 }
 
 .inventory-actions button {

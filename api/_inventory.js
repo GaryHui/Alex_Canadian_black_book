@@ -76,6 +76,10 @@ export async function updateInventoryListing(body, user) {
   if (Array.isArray(body.selectedPhotoUrls)) {
     await syncSelectedListingPhotos(client, id, String(body.sourceLeadId || "").trim(), body.selectedPhotoUrls);
   }
+  const timeline = buildInventoryUpdateTimeline(currentListing, patch, body);
+  if (currentListing.source_lead_id && timeline) {
+    await createLeadNote(client, currentListing.source_lead_id, user, timeline);
+  }
   await notifyBuyerLeadsForInventoryChange(client, currentListing, {
     nextStatus: status,
     actorEmail: String(user?.email || "").trim().toLowerCase()
@@ -203,6 +207,21 @@ function missingSchemaColumn(error) {
   const text = [error?.message, error?.details, error?.hint, JSON.stringify(error || {})].filter(Boolean).join(" ");
   const match = text.match(/'([^']+)'\s+column/i);
   return match?.[1] || "";
+}
+
+function buildInventoryUpdateTimeline(current = {}, patch = {}, body = {}) {
+  const changes = [];
+  if (String(current.status || "") !== String(patch.status || "")) changes.push(`status ${current.status || "blank"} -> ${patch.status || "blank"}`);
+  if (String(current.title || "") !== String(patch.title || "")) changes.push("title updated");
+  if (numberOrNull(current.asking_price) !== numberOrNull(patch.asking_price)) changes.push(`asking price ${current.asking_price ?? "not set"} -> ${patch.asking_price ?? "not set"}`);
+  if (numberOrNull(current.monthly_payment_estimate) !== numberOrNull(patch.monthly_payment_estimate)) {
+    changes.push(`monthly estimate ${current.monthly_payment_estimate ?? "not set"} -> ${patch.monthly_payment_estimate ?? "not set"}`);
+  }
+  if (String(current.description || "") !== String(patch.description || "")) changes.push("description updated");
+  if (JSON.stringify(current.public_options || {}) !== JSON.stringify(patch.public_options || {})) changes.push("public listing options updated");
+  if (Array.isArray(body.selectedPhotoUrls)) changes.push(`public photos selected (${body.selectedPhotoUrls.length})`);
+  if (!changes.length) return "";
+  return `Inventory updated: ${changes.join("; ")}.`;
 }
 
 function buildListingFromLead(lead, body, user) {
