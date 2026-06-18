@@ -86,6 +86,7 @@ const text = {
     detailSource: "Source lead",
     detailDescription: "Description",
     detailUseCalculator: "Estimate payment",
+    detailsOrder: "Details & order",
     contactEyebrow: "Dealer message",
     contactTitle: "Send buying intent",
     purchaseTitle: "Buying plan",
@@ -173,6 +174,7 @@ const text = {
     detailSource: "Lead source",
     detailDescription: "Description",
     detailUseCalculator: "Estimer le paiement",
+    detailsOrder: "Details et commande",
     contactEyebrow: "Message au concessionnaire",
     contactTitle: "Envoyer mon intention d'achat",
     purchaseTitle: "Plan d'achat",
@@ -251,6 +253,7 @@ function renderInventory() {
   inventoryList.innerHTML = filteredInventory.map((vehicle) => {
     const deal = vehicleDeal(vehicle);
     const specs = vehicleSpecItems(vehicle);
+    const tags = vehicle.tags.filter((tag) => tag && !specs.some((item) => String(item.value).toLowerCase() === String(tag).toLowerCase())).slice(0, 2);
     return `
     <article class="inventory-card inventory-deal-card">
       ${vehicleImageMarkup(vehicle)}
@@ -258,35 +261,35 @@ function renderInventory() {
         <div class="inventory-card-copy inventory-deal-copy">
           <div>
             <h3>${escapeHtml(vehicle.title)}</h3>
-            <p>${escapeHtml(publicSummary(vehicle))}</p>
+            <p>${escapeHtml(vehicle.description || `${money(vehicle.price)} CBB-based dealer price`)}</p>
           </div>
-          <div class="inventory-tags">
-            ${vehicle.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
-          </div>
-        </div>
-        <div class="inventory-spec-row" aria-label="Vehicle specs">
-          ${specs.map((item) => `
-            <span>
-              <b>${escapeHtml(item.value)}</b>
-              <small>${escapeHtml(item.label)}</small>
-            </span>
-          `).join("")}
+          ${tags.length ? `<div class="inventory-tags">${tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
         </div>
         <div class="inventory-offer-row">
-          <div class="inventory-deal-terms" aria-label="Estimated payment terms">
-            <span><b>${escapeHtml(money(deal.downPayment))}</b>${escapeHtml(text[language].dealDownLabel)}</span>
-            <span><b>${escapeHtml(String(deal.termMonths))} mo</b>${escapeHtml(text[language].dealTermLabel)}</span>
-            <span><b>${escapeHtml(String(deal.annualRate))}%</b>${escapeHtml(text[language].dealRateLabel)}</span>
-          </div>
           <div class="inventory-card-price inventory-deal-price">
             <span>${escapeHtml(text[language].dealMonthlyLabel)}</span>
             <strong>${money(deal.monthly)} / mo</strong>
             <small>${escapeHtml(money(vehicle.price))} CBB-based dealer price</small>
+            <div class="inventory-deal-terms" aria-label="Estimated payment terms">
+              <span><b>${escapeHtml(money(deal.downPayment))}</b>${escapeHtml(text[language].dealDownLabel)}</span>
+              <span><b>${escapeHtml(String(deal.termMonths))} mo</b>${escapeHtml(text[language].dealTermLabel)}</span>
+              <span><b>${escapeHtml(String(deal.annualRate))}%</b>${escapeHtml(text[language].dealRateLabel)}</span>
+            </div>
+          </div>
+          <div class="inventory-spec-row" aria-label="Vehicle specs">
+            ${specs.map((item) => `
+              <span>
+                ${specIcon(item.icon)}
+                <b>${escapeHtml(item.value)}</b>
+                <small>${escapeHtml(item.label)}</small>
+              </span>
+            `).join("")}
           </div>
           <div class="inventory-card-actions">
-            <button class="primary-button" type="button" data-contact-vehicle="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].contactDealer)}</button>
-            <button class="secondary-button" type="button" data-view-vehicle="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].viewDetails)}</button>
-            <button class="secondary-button compact" type="button" data-fill-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].detailUseCalculator)}</button>
+            <button class="primary-button inventory-order-button" type="button" data-view-vehicle="${escapeHtml(vehicle.id)}">
+              <span>${escapeHtml(text[language].detailsOrder)}</span>
+              ${specIcon("arrow")}
+            </button>
           </div>
         </div>
       </div>
@@ -447,11 +450,22 @@ function vehicleDeal(vehicle) {
 
 function vehicleSpecItems(vehicle) {
   return [
-    { label: "Year", value: vehicle.year || "CBB" },
-    { label: "KM", value: vehicle.kilometers ? vehicle.kilometers.toLocaleString("en-CA") : "-" },
-    { label: "Region", value: vehicle.region || "-" },
-    { label: "Style", value: vehicle.style || vehicle.series || "-" }
+    { label: "Year", value: vehicle.year || "CBB", icon: "calendar" },
+    { label: "KM", value: vehicle.kilometers ? vehicle.kilometers.toLocaleString("en-CA") : "-", icon: "gauge" },
+    { label: "Region", value: vehicle.region || "-", icon: "map" },
+    { label: "Style", value: vehicle.style || vehicle.series || "-", icon: "body" }
   ];
+}
+
+function specIcon(type) {
+  const icons = {
+    calendar: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v4M17 3v4M4 9h16M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg>',
+    gauge: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14a8 8 0 0 1 16 0M7 14h.01M17 14h.01M12 14l4-5M9 20h6"/></svg>',
+    map: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.4 7-12a7 7 0 1 0-14 0c0 6.6 7 12 7 12Z"/><path d="M12 11.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/></svg>',
+    body: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14h16l-2-5H6l-2 5Z"/><path d="M6 14v4M18 14v4M7 18h10M8 9V6h8v3"/></svg>',
+    arrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
+  };
+  return icons[type] || icons.body;
 }
 
 function selectVehicleForFinance(vehicle) {
