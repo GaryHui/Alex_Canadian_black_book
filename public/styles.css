@@ -1615,6 +1615,55 @@ body.admin-drawer-open .admin-shell {
   margin-bottom: 10px;
 }
 
+.admin-drawer-settings-details {
+  background: #f8fafc;
+}
+
+.admin-drawer-settings-details summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+}
+
+.admin-drawer-settings-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-drawer-settings-details summary::after {
+  color: #0b4f9c;
+  content: "Open";
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.admin-drawer-settings-details[open] summary {
+  border-bottom: 1px solid #d8e2ef;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+}
+
+.admin-drawer-settings-details[open] summary::after {
+  content: "Close";
+}
+
+.admin-drawer-settings-details summary strong,
+.admin-drawer-settings-details summary small {
+  display: block;
+}
+
+.admin-drawer-settings-details summary strong {
+  color: #16243a;
+  font-size: 16px;
+}
+
+.admin-drawer-settings-details summary small {
+  color: #64748b;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
 .admin-drawer-owner-review {
   margin: 0;
 }

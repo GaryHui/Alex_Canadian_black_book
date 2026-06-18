@@ -2317,42 +2317,6 @@ function renderAdminDrawer(leadId) {
                 <small>${escapeHtml(lastActivity ? formatDateTime(lastActivity) : "No recent activity")}</small>
               </div>
             </section>
-            <section class="admin-drawer-section drawer-overview-panel">
-              <header>
-                <h3>Overview</h3>
-                <span>${escapeHtml(buyer ? "BUY lead" : "SELL lead")}</span>
-              </header>
-              <div class="drawer-spotlight">
-                <strong>${escapeHtml(nextAction)}</strong>
-                <small>${escapeHtml(followUp ? `Next follow-up ${formatDateTime(followUp)}` : "Set the next follow-up before leaving this workspace.")}</small>
-              </div>
-              ${renderLeadProgress(buyer, status)}
-              <div class="drawer-meta-grid">
-                <div class="drawer-meta-item">
-                  <span>Customer</span>
-                  <strong>${escapeHtml(customerEmail)}</strong>
-                  <small>${escapeHtml(customerPhone)}</small>
-                </div>
-                <div class="drawer-meta-item">
-                  <span>Lead age</span>
-                  <strong>${escapeHtml(adminLeadAgeLabel(lead))}</strong>
-                  <small>${escapeHtml(adminLastTouchLabel(lead))}</small>
-                </div>
-                <div class="drawer-meta-item">
-                  <span>Vehicle lane</span>
-                  <strong>${escapeHtml(clusterLabel)}</strong>
-                  <small>${escapeHtml(warehouseLabel)}</small>
-                </div>
-                <div class="drawer-meta-item">
-                  <span>Status</span>
-                  <strong>${escapeHtml(pipelineLabel)}</strong>
-                  <small>${escapeHtml(overdue ? "Follow-up overdue" : "Pipeline on track")}</small>
-                </div>
-              </div>
-              <div class="drawer-inline-actions">
-                <button type="button" data-admin-open-url="${escapeHtml(adminVehicleClusterUrl(lead))}">Open vehicle cluster</button>
-              </div>
-            </section>
             ${ownerReview.unread ? `
               <section class="owner-review-required admin-drawer-owner-review">
                 <div>
@@ -2374,16 +2338,23 @@ function renderAdminDrawer(leadId) {
                 <h3>Pipeline actions</h3>
                 <span>Move the lead without opening the full CRM card</span>
               </header>
+              <div class="drawer-spotlight">
+                <strong>${escapeHtml(nextAction)}</strong>
+                <small>${escapeHtml(followUp ? `Next follow-up ${formatDateTime(followUp)}` : "Set the next follow-up before leaving this workspace.")}</small>
+              </div>
+              ${renderLeadProgress(buyer, status)}
               <div class="lead-action-row admin-drawer-actions">
                 ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
               </div>
             </section>
             ${renderAdminDealChecklistSection(lead)}
-            <section class="admin-drawer-section">
-              <header>
-                <h3>Lead settings</h3>
-                <span>Owner decision, assignment, priority, and follow-up</span>
-              </header>
+            <details class="admin-drawer-section admin-drawer-settings-details">
+              <summary>
+                <span>
+                  <strong>Owner settings</strong>
+                  <small>Assignment, priority, follow-up, pricing, and delete</small>
+                </span>
+              </summary>
               <form class="owner-review admin-drawer-owner-form">
                 <label>
                   <span>Status</span>
@@ -2415,7 +2386,7 @@ function renderAdminDrawer(leadId) {
                 <button type="submit">Save owner review</button>
                 <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(id)}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
               </form>
-            </section>
+            </details>
             <section class="admin-drawer-section">
               <header>
                 <h3>Log touch</h3>
@@ -2991,6 +2962,12 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
     return;
   }
 
+  const deleteButton = event.target.closest("[data-delete-lead]");
+  if (deleteButton) {
+    await deleteSingleLead(deleteButton);
+    return;
+  }
+
   const refreshButton = event.target.closest("[data-drawer-load-activity]");
   if (refreshButton) {
     adminDrawerActivityLoaded = false;
@@ -3475,7 +3452,10 @@ async function deleteSingleLead(button) {
   });
   const data = await response.json();
   statusEl.textContent = data.ok ? `Deleted ${data.deleted || 0} lead record.` : formatApiError(data, "Unable to delete lead.");
-  if (data.ok) await loadLeads({ suppressAlerts: true });
+  if (data.ok) {
+    if (activeAdminDrawerLeadId === id) closeAdminDrawer();
+    await loadLeads({ suppressAlerts: true });
+  }
   button.disabled = false;
 }
 
