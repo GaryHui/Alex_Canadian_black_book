@@ -712,7 +712,7 @@ function collectAdminLeadAlerts(leads) {
           id,
           type: "owner",
           title: leadAlertTitle(lead),
-          message: lead.owner_review.reason || "Owner review required"
+          message: lead.owner_review.reason || "Manager review required"
         });
       } else if (lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed && shouldShowAdminPassiveAlert(readTokens, id, token)) {
         adminLeadAlertMap.set(id, {
@@ -758,7 +758,7 @@ function collectAdminLeadAlerts(leads) {
         id,
         type: "owner",
         title: leadAlertTitle(lead),
-        message: lead.owner_review.reason || "Owner review required"
+        message: lead.owner_review.reason || "Manager review required"
       });
     } else if (lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed && shouldShowAdminPassiveAlert(readTokens, id, token)) {
       adminLeadAlertMap.set(id, {
@@ -1034,6 +1034,9 @@ async function openAdminLeadFromAlert(id) {
   renderAdminDrawer(id);
   adminDrawerActivityLoaded = false;
   await loadAdminDrawerActivity({ force: true, highlightLatest: true });
+  if (lead?.owner_review?.unread) {
+    await markManagerReviewedByLeadId(String(lead.id || id), { silent: true });
+  }
 }
 
 function renderLeadWorkbench(leads) {
@@ -1134,9 +1137,9 @@ function renderDuplicateVehicleBlocks(leads) {
     <section class="duplicate-cluster-block" aria-label="Duplicate vehicle review">
       <header>
         <div>
-          <span>Owner alert</span>
+          <span>Manager alert</span>
           <h3>Duplicate vehicle review</h3>
-          <p>One vehicle should have one owner. These SELL leads look like the same vehicle and should be reviewed before warehouse work.</p>
+          <p>These SELL leads look like the same vehicle. Pick one primary record before warehouse work.</p>
         </div>
         <b>${duplicateGroups.length}</b>
       </header>
@@ -1381,7 +1384,7 @@ function adminNextBestAction(lead) {
   if (buyer && status === "won") return "Start delivery checklist, docs, and final customer handoff";
   if (!buyer && status === "in_inventory") return "Confirm warehouse intake, pricing, and publish plan";
   if (!buyer && status === "won") return "Confirm purchase paperwork and stock transfer";
-  if (!String(lead?.assigned_to || "").trim()) return "Assign an owner and start first contact";
+  if (!String(lead?.assigned_to || "").trim()) return "Assign a rep and start first contact";
   if (isOverdue(lead?.next_follow_up_at || "", status)) return "Call now and reset follow-up SLA";
   if (isAdminWaitingReplyLead(lead)) return "Follow up on the pending reply before this goes cold";
   if (isAdminAppointmentLead(lead)) return buyer ? "Confirm the buyer appointment and prep the next step" : "Confirm the inspection appointment and prep the appraisal";
@@ -1405,7 +1408,7 @@ function renderAdminCommunicationStrip(lead) {
   else if (isAdminWaitingReplyLead(lead)) chips.push("Waiting for customer reply");
   else if (isAdminDealDeskLead(lead) && adminDealChecklistProgressLabel(lead)) chips.push(adminDealChecklistProgressLabel(lead));
   else if (isAdminDealDeskLead(lead)) chips.push(adminDealDeskLabel(lead));
-  else if (lead?.owner_review?.unread) chips.push("Owner review unread");
+  else if (lead?.owner_review?.unread) chips.push("Manager review unread");
   else chips.push(adminLeadAgeLabel(lead));
   return `
     <section class="lead-communication-strip">
@@ -1498,7 +1501,7 @@ function renderAdminToday(leads) {
       <button type="button" class="admin-brief-card" data-admin-set-filter="unassigned">
         <span>Unassigned</span>
         <strong>${unassignedCount}</strong>
-        <small>Needs staff owner</small>
+        <small>Needs staff rep</small>
       </button>
       <button type="button" class="admin-brief-card" data-admin-set-filter="needs-follow-up">
         <span>Due</span>
@@ -1508,7 +1511,7 @@ function renderAdminToday(leads) {
       <button type="button" class="admin-brief-card" data-admin-set-filter="owner-unread">
         <span>Updates</span>
         <strong>${ownerUnreadCount}</strong>
-        <small>Owner review items</small>
+        <small>Manager review items</small>
       </button>
       <button type="button" class="admin-brief-card" data-admin-set-filter="duplicate-review">
         <span>Duplicate review</span>
@@ -2095,14 +2098,14 @@ function renderLead(lead, index = 0) {
   const ownerReviewBanner = ownerReview.unread ? `
       <section class="owner-review-required">
         <div>
-          <span>Owner review required</span>
+          <span>Manager review required</span>
           <strong>${escapeHtml(ownerReview.reason || "Important staff update needs review.")}</strong>
           <small>${escapeHtml(ownerReview.at ? `${formatDateTime(ownerReview.at)}${ownerReview.by ? ` by ${ownerReview.by}` : ""}` : "Unread important update")}</small>
         </div>
         <button type="button" data-owner-read="${escapeHtml(lead.id || "")}">Mark reviewed</button>
       </section>` : ownerReview.read_at ? `
       <section class="owner-review-read">
-        <span>Owner reviewed ${escapeHtml(formatDateTime(ownerReview.read_at))}${ownerReview.read_by ? ` by ${escapeHtml(ownerReview.read_by)}` : ""}</span>
+        <span>Manager reviewed ${escapeHtml(formatDateTime(ownerReview.read_at))}${ownerReview.read_by ? ` by ${escapeHtml(ownerReview.read_by)}` : ""}</span>
       </section>` : "";
   const signalBanner = vehicleSignalInline(lead);
   const hasOpenDuplicateReview = Boolean(lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed);
@@ -2111,7 +2114,7 @@ function renderLead(lead, index = 0) {
   const mergeBanner = mergeStateInline(lead);
   const duplicateBanner = duplicateWarningInline(lead);
   const queueSummary = overdue
-    ? "Owner follow-up is overdue"
+    ? "Rep follow-up is overdue"
     : followUp
       ? `Next follow-up ${formatDateTime(followUp)}`
       : String(status || "").toLowerCase() === "new"
@@ -2133,7 +2136,7 @@ function renderLead(lead, index = 0) {
   const compactAlertLabel = lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed
     ? "Duplicate review required"
     : ownerReview.unread
-      ? "Owner review required"
+      ? "Manager review required"
       : pendingAlert
         ? "New update on this lead"
         : "";
@@ -2156,7 +2159,7 @@ function renderLead(lead, index = 0) {
           <strong>${escapeHtml(customerEmail)}</strong>
           <div class="lead-list-subline">
             <span>${escapeHtml(input.phone || "No phone")}</span>
-            <span>${escapeHtml(assignedTo || "Unassigned")}</span>
+            <span>${escapeHtml(assignedTo ? `Rep ${shortEmail(assignedTo)}` : "No rep")}</span>
           </div>
         </div>
         <div class="lead-list-col">
@@ -2170,7 +2173,7 @@ function renderLead(lead, index = 0) {
         <div class="lead-list-col">
           <strong>${escapeHtml(queueSummary)}</strong>
           <div class="lead-list-subline">
-            <span>${escapeHtml(assignedTo ? `Owner ${assignedTo}` : "Assign owner")}</span>
+            <span>${escapeHtml(assignedTo ? `Rep ${shortEmail(assignedTo)}` : "Assign rep")}</span>
             <span>${escapeHtml(overdue ? "Overdue" : followUp ? "Scheduled" : "Unscheduled")}</span>
           </div>
         </div>
@@ -2229,7 +2232,7 @@ function renderSharedLeadMeta({
       <div><dt>Phone</dt><dd>${escapeHtml(phone || "-")}</dd></div>
       <div><dt>VIN</dt><dd>${escapeHtml(vin || "-")}</dd></div>
       <div><dt>Lead type</dt><dd>${escapeHtml(leadTypeLabel || "-")}</dd></div>
-      <div><dt>Owner</dt><dd>${escapeHtml(assignedTo || "Unassigned")}</dd></div>
+      <div><dt>Rep</dt><dd>${escapeHtml(assignedTo || "Unassigned")}</dd></div>
       <div><dt>Priority</dt><dd>${escapeHtml(priority || "normal")}</dd></div>
       <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "Not set")}</dd></div>
       <div><dt>Last activity</dt><dd>${escapeHtml(lastActivity ? formatDateTime(lastActivity) : "No recent activity")}</dd></div>
@@ -2291,11 +2294,11 @@ function renderAdminDrawer(leadId) {
               </div>` : "";
   const sellerAdjustmentFields = buyer ? "" : `
                 <label>
-                  <span>Owner wholesale</span>
+                  <span>Approved wholesale</span>
                   <input name="ownerWholesale" type="number" value="${adjustment.wholesale ?? ""}" placeholder="Manual wholesale" />
                 </label>
                 <label>
-                  <span>Owner retail</span>
+                  <span>Approved retail</span>
                   <input name="ownerRetail" type="number" value="${adjustment.retail ?? ""}" placeholder="Manual retail" />
                 </label>
                 <label>
@@ -2337,8 +2340,13 @@ function renderAdminDrawer(leadId) {
                 <small>${escapeHtml(overdue ? "Overdue follow-up" : followUp ? formatDateTime(followUp) : "No follow-up scheduled")}</small>
               </div>
               <div class="admin-drawer-stat">
-                <span>Owner</span>
-                <strong>${escapeHtml(assignedTo || "Unassigned")}</strong>
+                <span>Customer / seller</span>
+                <strong>${escapeHtml(customerEmail)}</strong>
+                <small>${escapeHtml(customerPhone)}</small>
+              </div>
+              <div class="admin-drawer-stat">
+                <span>Assigned rep</span>
+                <strong>${escapeHtml(assignedTo ? shortEmail(assignedTo) : "Unassigned")}</strong>
                 <small>${escapeHtml(priority)} priority</small>
               </div>
               <div class="admin-drawer-stat">
@@ -2355,7 +2363,7 @@ function renderAdminDrawer(leadId) {
             ${ownerReview.unread ? `
               <section class="owner-review-required admin-drawer-owner-review">
                 <div>
-                  <span>Owner review required</span>
+                  <span>Manager review required</span>
                   <strong>${escapeHtml(ownerReview.reason || "Important staff update needs review.")}</strong>
                   <small>${escapeHtml(ownerReview.at ? formatDateTime(ownerReview.at) : "Unread update")}</small>
                 </div>
@@ -2371,7 +2379,7 @@ function renderAdminDrawer(leadId) {
             <section class="admin-drawer-section admin-drawer-command-card">
               <header>
                 <h3>Assign & next step</h3>
-                <span>Owner, priority, due time, and pipeline</span>
+                <span>Rep, priority, due time, and pipeline</span>
               </header>
               <form class="owner-review admin-drawer-owner-form admin-drawer-assign-form">
                 <input type="hidden" name="ownerWholesale" value="${adjustment.wholesale ?? ""}" />
@@ -2379,7 +2387,7 @@ function renderAdminDrawer(leadId) {
                 <input type="hidden" name="reason" value="${escapeHtml(adjustment.reason || "")}" />
                 <input type="hidden" name="notes" value="${escapeHtml(lead.notes || "")}" />
                 <label>
-                  <span>Assigned to</span>
+                  <span>Assigned rep</span>
                   ${assignField}
                 </label>
                 <label>
@@ -2538,6 +2546,9 @@ async function quickAssignDrawerLead(button) {
     statusEl.textContent = data.error || "Unable to assign lead.";
     button.disabled = false;
     return;
+  }
+  if (lead.owner_review?.unread) {
+    await markManagerReviewedByLeadId(activeAdminDrawerLeadId, { silent: true, reload: false });
   }
   statusEl.textContent = `Assigned to ${shortEmail(email)}.`;
   await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
@@ -3354,26 +3365,34 @@ adminLeadDrawer?.addEventListener("change", async (event) => {
   }
 });
 
+async function markManagerReviewedByLeadId(leadId, options = {}) {
+  const id = String(leadId || "").trim();
+  if (!id) return null;
+  const response = await fetch("/api/leads", {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "owner_read",
+      id
+    })
+  });
+  const data = await response.json();
+  if (!data.ok) throw new Error(formatApiError(data, "Unable to mark reviewed."));
+  adminLeadAlertMap.delete(id);
+  markAdminLeadTokenRead(id);
+  if (!options.silent) statusEl.textContent = "Manager review marked read.";
+  if (options.reload !== false) await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+  return data;
+}
+
 async function markOwnerReviewed(button) {
   const card = button.closest(".lead-card");
   const leadId = button.dataset.ownerRead || card?.dataset?.id || "";
   if (!leadId) return;
   button.disabled = true;
-  statusEl.textContent = "Marking owner update as reviewed...";
+  statusEl.textContent = "Marking manager review as read...";
   try {
-    const response = await fetch("/api/leads", {
-      method: "PATCH",
-      headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "owner_read",
-        id: leadId
-      })
-    });
-    const data = await response.json();
-    if (!data.ok) throw new Error(formatApiError(data, "Unable to mark reviewed."));
-    adminLeadAlertMap.delete(leadId);
-    statusEl.textContent = "Owner review marked read.";
-    await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+    await markManagerReviewedByLeadId(leadId);
   } catch (error) {
     statusEl.textContent = error.message || "Unable to mark reviewed.";
     button.disabled = false;
@@ -3383,9 +3402,14 @@ async function markOwnerReviewed(button) {
 async function openAdminLeadWorkspace(card, options = {}) {
   if (!card) return;
   if (card.dataset.id) {
-    renderAdminDrawer(card.dataset.id);
+    const leadId = card.dataset.id;
+    const lead = adminLeadsCache.find((item) => String(item.id || "") === String(leadId));
+    renderAdminDrawer(leadId);
     adminDrawerActivityLoaded = false;
     await loadAdminDrawerActivity({ force: true, highlightLatest: true });
+    if (lead?.owner_review?.unread) {
+      await markManagerReviewedByLeadId(leadId, { silent: true });
+    }
   }
   const details = card.querySelector(".lead-queue-more");
   if (details && !details.open) details.open = true;
@@ -3737,7 +3761,7 @@ function latestActivityKey(data) {
 function activityNoteLabel(type) {
   const value = String(type || "note").trim().toLowerCase();
   const labels = {
-    owner_review: "owner review request",
+    owner_review: "manager review request",
     correction: "correction request",
     internal: "internal note",
     inspection: "inspection note",
