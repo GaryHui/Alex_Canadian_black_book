@@ -1970,6 +1970,7 @@ input::placeholder {
   flex-wrap: wrap;
   gap: 10px 16px;
   align-items: center;
+  justify-content: space-between;
   padding-top: 4px;
 }
 
@@ -1981,6 +1982,30 @@ input::placeholder {
 .inventory-results-bar .status {
   margin: 0;
   color: #506176;
+}
+
+.marketplace-sort-control {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--blue-dark);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.marketplace-sort-control span {
+  margin: 0;
+  color: var(--blue-dark);
+  font-size: 13px;
+}
+
+.marketplace-sort-control select {
+  width: auto;
+  min-height: 36px;
+  padding-inline: 12px;
+  color: #07106d;
+  border-color: #07106d;
+  font-weight: 850;
 }
 
 .inventory-list {
@@ -2551,7 +2576,7 @@ input::placeholder {
 
 .marketplace-search-bar {
   display: grid;
-  grid-template-columns: repeat(5, minmax(132px, 1fr)) minmax(180px, 1.2fr) minmax(170px, auto) auto;
+  grid-template-columns: repeat(5, minmax(132px, 1fr)) minmax(190px, auto);
   overflow: hidden;
   margin-top: 10px;
   background: #07095f;
@@ -2560,7 +2585,8 @@ input::placeholder {
   box-shadow: 0 16px 32px rgba(7, 9, 95, 0.16);
 }
 
-.marketplace-search-bar label {
+.marketplace-search-bar label,
+.marketplace-filter-button {
   display: grid;
   gap: 3px;
   min-width: 0;
@@ -2569,7 +2595,8 @@ input::placeholder {
   border-right: 1px solid rgba(255, 255, 255, 0.18);
 }
 
-.marketplace-search-bar label span {
+.marketplace-search-bar label span,
+.marketplace-filter-button span {
   margin: 0;
   color: rgba(255, 255, 255, 0.62);
   font-size: 12px;
@@ -2607,6 +2634,20 @@ input::placeholder {
   background: rgba(255, 255, 255, 0.06);
 }
 
+.marketplace-filter-button {
+  text-align: left;
+  background: #07095f;
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0;
+}
+
+.marketplace-filter-button strong {
+  color: #fff;
+  font-size: 15px;
+}
+
 .marketplace-search-button {
   display: inline-flex;
   gap: 10px;
@@ -2636,6 +2677,40 @@ input::placeholder {
   border-radius: 0;
 }
 
+.marketplace-more-filters {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+  background: #fff;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.marketplace-more-filters[hidden] {
+  display: none;
+}
+
+.marketplace-more-filters label {
+  padding: 0;
+  color: var(--ink);
+  border-right: 0;
+}
+
+.marketplace-more-filters label span {
+  color: var(--muted);
+}
+
+.marketplace-more-filters select,
+.marketplace-more-filters input {
+  min-height: 42px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
 .vehicle-detail-dialog {
   width: min(1080px, calc(100vw - 40px));
   max-height: min(840px, calc(100vh - 40px));
@@ -2659,16 +2734,24 @@ input::placeholder {
 }
 
 .vehicle-detail-dialog .vehicle-detail-body {
-  grid-template-columns: minmax(300px, 0.92fr) minmax(0, 1fr);
+  grid-template-columns: minmax(260px, 0.78fr) minmax(0, 1fr) minmax(320px, 0.9fr);
   align-content: start;
-  padding-bottom: 22px;
+  padding: 24px;
 }
 
-.vehicle-detail-dialog .vehicle-detail-photo {
-  grid-row: span 2;
+.vehicle-detail-gallery {
+  min-width: 0;
 }
 
-.vehicle-detail-dialog .vehicle-detail-photo img {
+.vehicle-detail-dialog .vehicle-detail-photo,
+.vehicle-detail-gallery .inventory-photo,
+.vehicle-detail-gallery .inventory-image {
+  min-height: 360px;
+  height: 100%;
+}
+
+.vehicle-detail-dialog .vehicle-detail-photo img,
+.vehicle-detail-gallery .inventory-photo img {
   height: 100%;
   max-height: 500px;
   min-height: 360px;
@@ -2678,14 +2761,25 @@ input::placeholder {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.vehicle-detail-main {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.vehicle-detail-main h3 {
+  margin: 0;
+  color: #07106d;
+  font-size: 22px;
+}
+
 .vehicle-detail-payment-panel {
   margin: 0;
-  padding: 16px 24px 18px;
-  background: #07095f;
-  border: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 0 0 8px 8px;
-  box-shadow: none;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 12px 26px rgba(20, 32, 51, 0.08);
 }
 
 .vehicle-detail-payment-panel .eyebrow,
@@ -2694,7 +2788,7 @@ input::placeholder {
 .vehicle-detail-payment-panel label,
 .vehicle-detail-payment-panel label span,
 .vehicle-detail-payment-panel .finance-mode-toggle legend {
-  color: #fff;
+  color: var(--ink);
 }
 
 .vehicle-detail-payment-panel h2 {
@@ -2703,10 +2797,9 @@ input::placeholder {
 }
 
 .vehicle-detail-payment-panel .finance-form {
-  align-items: end;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(168px, .9fr) minmax(128px, .7fr) minmax(128px, .7fr) minmax(190px, 1fr) minmax(160px, .85fr) minmax(178px, auto);
+  grid-template-columns: 1fr;
 }
 
 .vehicle-detail-payment-panel .finance-mode-toggle {
@@ -2719,13 +2812,13 @@ input::placeholder {
 
 .vehicle-detail-payment-panel .finance-form > label,
 .vehicle-detail-payment-panel .finance-row label {
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
 }
 
 .vehicle-detail-payment-panel input,
 .vehicle-detail-payment-panel select {
   min-height: 40px;
-  border-color: rgba(255, 255, 255, 0.22);
+  border-color: var(--line);
 }
 
 .vehicle-detail-payment-panel .payment-output {
@@ -2734,26 +2827,59 @@ input::placeholder {
   place-items: center;
   min-height: 58px;
   padding: 8px 12px;
-  color: #fff;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #07106d;
+  background: #eef6ff;
+  border: 1px solid #dbe8f6;
   font-size: 28px;
   white-space: nowrap;
 }
 
 .vehicle-detail-payment-panel .fine-print {
-  grid-column: 1 / -2;
+  grid-column: auto;
   margin: 0;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
   font-size: 12px;
 }
 
 .vehicle-detail-payment-panel #send-estimate-button {
-  grid-column: 6;
-  grid-row: 1 / span 2;
-  align-self: stretch;
-  min-width: 178px;
+  display: none;
+}
+
+.vehicle-detail-order-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(190px, auto) minmax(210px, auto);
+  gap: 18px;
+  align-items: center;
+  padding: 18px 24px;
+  color: #fff;
+  background: #07095f;
+}
+
+.vehicle-detail-order-title strong,
+.vehicle-detail-order-title span,
+.vehicle-detail-order-payment span,
+.vehicle-detail-order-payment strong,
+.vehicle-detail-order-fees {
+  display: block;
+}
+
+.vehicle-detail-order-title strong,
+.vehicle-detail-order-payment strong {
+  font-size: 24px;
+  line-height: 1.05;
+}
+
+.vehicle-detail-order-title span,
+.vehicle-detail-order-payment span,
+.vehicle-detail-order-fees {
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 13px;
+}
+
+.vehicle-detail-order-bar .primary-button {
+  width: 100%;
   background: #2d9b38;
+  box-shadow: none;
 }
 
 @media (max-width: 980px) {
@@ -2791,6 +2917,10 @@ input::placeholder {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .marketplace-more-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .marketplace-search-button,
   .marketplace-clear-button {
     min-height: 48px;
@@ -2805,13 +2935,16 @@ input::placeholder {
   }
 
   .vehicle-detail-payment-panel .finance-form {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
-  .vehicle-detail-payment-panel .fine-print,
-  .vehicle-detail-payment-panel #send-estimate-button {
+  .vehicle-detail-payment-panel .fine-print {
     grid-column: 1 / -1;
     grid-row: auto;
+  }
+
+  .vehicle-detail-order-bar {
+    grid-template-columns: 1fr;
   }
 
   .inventory-card {

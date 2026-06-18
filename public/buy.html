@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AutoSwitch Canada | Buy A Car</title>
-    <link rel="stylesheet" href="/customer.css?v=buyer-search-20260618a" />
+    <link rel="stylesheet" href="/customer.css?v=buyer-search-20260618b" />
   </head>
   <body>
     <header class="site-header">
@@ -48,10 +48,10 @@
                 <span data-i18n="priceRangeLabel">Price</span>
                 <select name="priceRange">
                   <option value="" data-i18n="priceAny">Any Price</option>
-                  <option value="0-30000">Under $30,000</option>
-                  <option value="30000-50000">$30,000 - $50,000</option>
-                  <option value="50000-75000">$50,000 - $75,000</option>
-                  <option value="75000-999999999">$75,000+</option>
+                  <option value="0-650">Under $650 / mo</option>
+                  <option value="650-850">$650 - $850 / mo</option>
+                  <option value="850-1100">$850 - $1,100 / mo</option>
+                  <option value="1100-999999">$1,100+ / mo</option>
                 </select>
               </label>
               <label>
@@ -60,29 +60,46 @@
                   <option value="" data-i18n="typeAny">Any Type</option>
                 </select>
               </label>
-              <label>
-                <span data-i18n="sortLabel">Sort</span>
-                <select name="sortBy">
-                  <option value="monthly-asc" data-i18n="sortMonthlyAsc">Monthly low to high</option>
-                  <option value="price-asc" data-i18n="sortPriceAsc">Price low to high</option>
-                  <option value="price-desc" data-i18n="sortPriceDesc">Price high to low</option>
-                  <option value="year-desc" data-i18n="sortYearDesc">Newest year</option>
-                  <option value="km-asc" data-i18n="sortKmAsc">Lowest km</option>
-                </select>
-              </label>
-              <label class="marketplace-keyword-field">
-                <span data-i18n="searchLabel">Search</span>
-                <input name="query" placeholder="Lexus, SUV, 2024..." data-i18n-placeholder="searchPlaceholder" />
-              </label>
+              <button class="marketplace-filter-button" type="button" data-toggle-marketplace-filters>
+                <span data-i18n="filtersLabel">Filters</span>
+                <strong id="marketplace-filter-count">0 Selected</strong>
+              </button>
               <button class="primary-button marketplace-search-button" type="submit">
                 <span data-i18n="filterButton">Update search</span>
                 <span aria-hidden="true">&rarr;</span>
               </button>
-              <button class="secondary-button marketplace-clear-button" type="button" data-clear-filters data-i18n="clearFilters">Clear</button>
+              <section id="marketplace-more-filters" class="marketplace-more-filters" hidden>
+                <label>
+                  <span data-i18n="regionLabel">Region</span>
+                  <select name="region">
+                    <option value="" data-i18n="regionAny">Any Region</option>
+                  </select>
+                </label>
+                <label>
+                  <span data-i18n="maxKmLabel">Max KM</span>
+                  <input name="maxKm" type="number" inputmode="numeric" placeholder="80000" />
+                </label>
+                <label>
+                  <span data-i18n="searchLabel">Keyword</span>
+                  <input name="query" placeholder="Lexus, AWD, hybrid..." data-i18n-placeholder="searchPlaceholder" />
+                </label>
+                <button class="secondary-button marketplace-clear-button" type="button" data-clear-filters data-i18n="clearFilters">Clear filters</button>
+              </section>
             </form>
             <div class="inventory-results-bar">
-              <strong id="inventory-results-count"></strong>
-              <span id="inventory-source-status" class="status"></span>
+              <div>
+                <strong id="inventory-results-count"></strong>
+                <span id="inventory-source-status" class="status"></span>
+              </div>
+              <label class="marketplace-sort-control">
+                <span data-i18n="sortLabel">Sort By</span>
+                <select id="inventory-sort">
+                  <option value="monthly-asc" data-i18n="sortMonthlyAsc">Monthly low to high</option>
+                  <option value="monthly-desc" data-i18n="sortMonthlyDesc">Monthly high to low</option>
+                  <option value="year-desc" data-i18n="sortYearDesc">Newest year</option>
+                  <option value="recent" data-i18n="sortRecent">Recently added</option>
+                </select>
+              </label>
             </div>
           </div>
           <div id="inventory-list" class="inventory-list"></div>
@@ -154,6 +171,18 @@
             <button id="send-estimate-button" class="primary-button" type="button" disabled data-i18n="sendEstimateButton">Send this estimate to dealer</button>
           </form>
         </section>
+        <footer class="vehicle-detail-order-bar">
+          <div class="vehicle-detail-order-title">
+            <strong id="detail-order-title"></strong>
+            <span id="detail-order-subtitle"></span>
+          </div>
+          <div class="vehicle-detail-order-payment">
+            <span data-i18n="dealMonthlyLabel">Finance from</span>
+            <strong id="detail-order-payment">$0 / mo</strong>
+          </div>
+          <div class="vehicle-detail-order-fees" id="detail-order-fees"></div>
+          <button class="primary-button" type="button" data-order-contact data-i18n="contactDealer">Contact dealer</button>
+        </footer>
       </section>
     </div>
 
@@ -238,6 +267,6 @@
       </section>
     </div>
 
-    <script src="/buy.js?v=buyer-search-20260618a"></script>
+    <script src="/buy.js?v=buyer-search-20260618b"></script>
   </body>
 </html>
