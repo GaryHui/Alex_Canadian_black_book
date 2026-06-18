@@ -2075,7 +2075,8 @@ function renderLead(lead, index = 0) {
   const overdue = isOverdue(followUp, status);
   const statusClass = overdue ? "status-overdue" : `status-${cssToken(status)}`;
   const statusLabel = overdue ? "Overdue" : leadStatusLabel(status, buyer);
-  const pendingAlert = Boolean(ownerReview.unread) || hasAdminVisibleAlert(String(lead.id || ""));
+  const unreadOwnerReview = Boolean(ownerReview.unread);
+  const pendingAlert = unreadOwnerReview || hasAdminVisibleAlert(String(lead.id || ""));
   const progressSteps = renderLeadProgress(buyer, status);
   const inventoryListing = inventoryCache.find((item) => item.sourceLeadId && item.sourceLeadId === lead.id);
   const warehousePanel = buyer ? "" : inventoryListing ? `
@@ -2140,11 +2141,12 @@ function renderLead(lead, index = 0) {
         ? "New update on this lead"
         : "";
   return `
-    <article class="lead-card lead-card-${leadType} lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${priority === "urgent" ? "lead-card-urgent" : ""} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "lead-card-updated" : ""} ${mergeState.kind ? "lead-card-vehicle-child" : ""}" data-id="${escapeHtml(lead.id || "")}">
+    <article class="lead-card lead-card-${leadType} lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${priority === "urgent" ? "lead-card-urgent" : ""} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert && !unreadOwnerReview ? "lead-card-updated" : ""} ${mergeState.kind ? "lead-card-vehicle-child" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <section class="lead-list-row">
         <div class="lead-list-col lead-list-col-main">
           <div class="lead-title-row">
             <b class="lead-type-pill lead-type-${leadType}">${escapeHtml(leadTypeLabel)}</b>
+            ${unreadOwnerReview ? `<b class="lead-new-badge">NEW</b>` : ""}
             <strong>${escapeHtml(title)}</strong>
           </div>
           <div class="lead-list-subline">

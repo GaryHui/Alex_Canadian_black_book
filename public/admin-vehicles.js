@@ -22,6 +22,12 @@ loginButton?.addEventListener("click", signInAdmin);
 logoutButton?.addEventListener("click", signOutAdmin);
 reloadButton?.addEventListener("click", loadVehicleClusters);
 listEl?.addEventListener("click", async (event) => {
+  const mergeAllButton = event.target.closest("[data-cluster-merge-all]");
+  if (mergeAllButton) {
+    await mergeAllDuplicateLeads(mergeAllButton);
+    return;
+  }
+
   const button = event.target.closest("[data-cluster-review]");
   if (!button) return;
   await saveVehicleReview(button);
@@ -186,6 +192,9 @@ function renderClusterCard(cluster) {
   const pendingSellerLeads = (cluster.seller_leads || []).filter((lead) => lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed && !lead.merge_state);
   const primaryLead = (cluster.seller_leads || []).find((lead) => lead.id === cluster.primary_lead_id) || null;
   const primaryListing = (cluster.inventory || []).find((listing) => listing.id === cluster.primary_listing_id) || cluster.inventory?.[0] || null;
+  const mergeablePendingLeads = primaryLead
+    ? pendingSellerLeads.filter((lead) => lead.id !== primaryLead.id)
+    : [];
   return `
     <article class="vehicle-cluster-card ${clusterMatchesFocus(cluster) ? "vehicle-cluster-card-focus" : ""}" data-cluster-key="${escapeHtml(cluster.key || "")}">
       <header class="vehicle-cluster-head">
@@ -225,6 +234,15 @@ function renderClusterCard(cluster) {
           <span>Open duplicate SELL leads</span>
           <b>${pendingSellerLeads.length}</b>
         </header>
+        ${mergeablePendingLeads.length > 1 ? `
+          <div class="vehicle-cluster-bulk-review">
+            <div>
+              <strong>Recommended</strong>
+              <small>Keep the earliest seller record as Primary and merge the newer duplicate leads into it.</small>
+            </div>
+            <button type="button" data-cluster-merge-all="${escapeHtml(cluster.key || "")}">Merge all into primary</button>
+          </div>
+        ` : ""}
         ${pendingSellerLeads.length ? `
           <div class="vehicle-cluster-items">
             ${pendingSellerLeads.map((lead) => renderPendingClusterLead(lead, cluster)).join("")}
@@ -267,21 +285,27 @@ function renderClusterCard(cluster) {
 function renderPendingClusterLead(lead, cluster) {
   const targetLeadId = cluster.primary_lead_id && cluster.primary_lead_id !== lead.id ? cluster.primary_lead_id : "";
   const listingId = cluster.primary_listing_id || "";
+  const isPrimary = cluster.primary_lead_id && cluster.primary_lead_id === lead.id;
+  const isNewUnread = Boolean(lead.owner_review?.unread);
   return `
     <article class="vehicle-cluster-item vehicle-cluster-pending">
       <div>
-        <strong>${escapeHtml(lead.title || lead.id || "Seller lead")}</strong>
+        <strong>${escapeHtml(lead.title || lead.id || "Seller lead")} ${isNewUnread ? `<span class="vehicle-cluster-new-badge">NEW</span>` : ""}</strong>
         <small>${escapeHtml([
-          lead.status,
+          isPrimary ? "Primary CRM" : "Suggested duplicate",
           lead.assigned_to ? `Owner ${shortEmail(lead.assigned_to)}` : "Unassigned",
           lead.created_at ? formatDateTime(lead.created_at) : ""
         ].filter(Boolean).join(" | "))}</small>
-        <p>${escapeHtml(lead.duplicate_warning?.message || "Duplicate review required.")}</p>
+        <p>${escapeHtml(isPrimary ? "This is the primary CRM record to keep." : "Review whether this seller record should merge into the primary CRM lead.")}</p>
       </div>
       <div class="vehicle-cluster-actions">
-        <button type="button" data-cluster-review="keep_separate" data-lead-id="${escapeHtml(lead.id || "")}">Keep separate</button>
-        <button type="button" data-cluster-review="merge_existing" data-lead-id="${escapeHtml(lead.id || "")}" data-target-lead-id="${escapeHtml(targetLeadId)}" ${targetLeadId ? "" : "disabled"}>Merge into primary</button>
-        <button type="button" data-cluster-review="link_inventory" data-lead-id="${escapeHtml(lead.id || "")}" data-target-lead-id="${escapeHtml(targetLeadId)}" data-listing-id="${escapeHtml(listingId)}" ${listingId ? "" : "disabled"}>Link warehouse</button>
+        ${isPrimary
+          ? `<button type="button" disabled>Primary record</button>`
+          : `
+            <button type="button" data-cluster-review="keep_separate" data-lead-id="${escapeHtml(lead.id || "")}">Keep separate</button>
+            <button type="button" data-cluster-review="merge_existing" data-lead-id="${escapeHtml(lead.id || "")}" data-target-lead-id="${escapeHtml(targetLeadId)}" ${targetLeadId ? "" : "disabled"}>Merge into primary</button>
+            <button type="button" data-cluster-review="link_inventory" data-lead-id="${escapeHtml(lead.id || "")}" data-target-lead-id="${escapeHtml(targetLeadId)}" data-listing-id="${escapeHtml(listingId)}" ${listingId ? "" : "disabled"}>Link warehouse</button>
+          `}
       </div>
     </article>
   `;
@@ -370,6 +394,47 @@ async function saveVehicleReview(button) {
     await loadVehicleClusters();
   } catch (error) {
     statusEl.textContent = error.message || "Unable to save vehicle review.";
+    button.disabled = false;
+  }
+}
+
+async function mergeAllDuplicateLeads(button) {
+  const key = String(button.dataset.clusterMergeAll || "").trim();
+  const cluster = clustersCache.find((item) => String(item.key || "") === key);
+  const primaryLeadId = String(cluster?.primary_lead_id || "").trim();
+  const mergeLeads = (cluster?.seller_leads || [])
+    .filter((lead) => lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed && !lead.merge_state)
+    .filter((lead) => String(lead.id || "") && String(lead.id || "") !== primaryLeadId);
+
+  if (!cluster || !primaryLeadId || !mergeLeads.length) {
+    statusEl.textContent = "No duplicate leads are ready to merge.";
+    return;
+  }
+
+  const confirmed = window.confirm(`Merge ${mergeLeads.length} duplicate seller lead(s) into the Primary CRM record?\n\nUse Keep separate first for any record that is not the same vehicle.`);
+  if (!confirmed) return;
+
+  button.disabled = true;
+  statusEl.textContent = `Merging ${mergeLeads.length} duplicate lead(s)...`;
+  try {
+    for (const lead of mergeLeads) {
+      const response = await fetch("/api/leads", {
+        method: "PATCH",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "duplicate_review",
+          id: lead.id,
+          decision: "merge_existing",
+          targetLeadId: primaryLeadId
+        })
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(formatApiError(data, "Unable to merge all duplicate leads."));
+    }
+    statusEl.textContent = "Duplicate leads merged into the Primary CRM record.";
+    await loadVehicleClusters();
+  } catch (error) {
+    statusEl.textContent = error.message || "Unable to merge all duplicate leads.";
     button.disabled = false;
   }
 }

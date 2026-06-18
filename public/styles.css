@@ -3653,7 +3653,49 @@ body.admin-drawer-open .admin-shell {
 }
 
 .vehicle-cluster-pending {
-  border-left: 4px solid #f59e0b;
+  border-left: 4px solid #d8e2ef;
+}
+
+.vehicle-cluster-bulk-review {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #d8e2ef;
+  border-radius: 10px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+}
+
+.vehicle-cluster-bulk-review div {
+  display: grid;
+  gap: 3px;
+}
+
+.vehicle-cluster-bulk-review strong {
+  color: #16243a;
+}
+
+.vehicle-cluster-bulk-review small {
+  color: #516174;
+}
+
+.vehicle-cluster-bulk-review button {
+  background: #0b4f9c;
+  border: 1px solid #0b4f9c;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  min-height: 34px;
+  padding: 0 14px;
+}
+
+.vehicle-cluster-bulk-review button:disabled {
+  cursor: wait;
+  opacity: .65;
 }
 
 .vehicle-cluster-card-focus {
@@ -3893,6 +3935,20 @@ body.admin-drawer-open .admin-shell {
   background: linear-gradient(180deg, #efe2ff 0%, #f7f0ff 100%);
   border: 1px solid #c4a7ff;
   color: #6d28d9;
+}
+
+.lead-new-badge,
+.vehicle-cluster-new-badge {
+  align-items: center;
+  background: #fff7ed;
+  border: 1px solid #fb923c;
+  border-radius: 999px;
+  color: #c2410c;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 4px 7px;
 }
 
 .admin-workspace-main .lead-type-pill {

@@ -60,6 +60,7 @@ export async function attachLeadSignals(leads, client) {
   const duplicateMap = buildDuplicateWarningMap(leads, snapshot);
   const vehicleContextMap = buildVehicleContextMap(leads, snapshot);
   const signalMap = latestSignalByLead(snapshot.notes);
+  const ownerReviewMap = latestOwnerReviewStateByLead(snapshot.notes);
   const activitySummaryMap = buildLeadActivitySummaryMap(leads, snapshot);
 
   return leads.map((lead) => {
@@ -69,6 +70,7 @@ export async function attachLeadSignals(leads, client) {
       vehicle_signal: signalMap.get(id) || null,
       duplicate_warning: duplicateMap.get(id) || null,
       vehicle_context: vehicleContextMap.get(id) || null,
+      owner_review: lead.owner_review || ownerReviewMap.get(id) || null,
       activity_summary: activitySummaryMap.get(id) || null,
       merge_state: snapshot.relationMap.get(id) || null
     };
@@ -581,6 +583,40 @@ function latestDuplicateReviewByLead(notes) {
   return map;
 }
 
+function latestOwnerReviewStateByLead(notes) {
+  const latestReview = latestNoteByType(notes, "owner_review");
+  const latestRead = latestNoteByType(notes, "owner_read");
+  const leadIds = new Set([...latestReview.keys(), ...latestRead.keys()]);
+  const map = new Map();
+  for (const leadId of leadIds) {
+    const review = latestReview.get(leadId) || null;
+    const read = latestRead.get(leadId) || null;
+    const reviewTime = review ? new Date(review.created_at || 0).getTime() : 0;
+    const readTime = read ? new Date(read.created_at || 0).getTime() : 0;
+    map.set(leadId, {
+      unread: Boolean(review && reviewTime > readTime),
+      reason: review?.note || "",
+      at: review?.created_at || "",
+      by: review?.author_email || "",
+      read_at: read?.created_at || "",
+      read_by: read?.author_email || ""
+    });
+  }
+  return map;
+}
+
+function latestNoteByType(notes, type) {
+  const map = new Map();
+  const expectedType = String(type || "").trim().toLowerCase();
+  for (const note of Array.isArray(notes) ? notes : []) {
+    if (String(note?.note_type || "").trim().toLowerCase() !== expectedType) continue;
+    const leadId = String(note?.lead_id || "").trim();
+    if (!leadId || map.has(leadId)) continue;
+    map.set(leadId, note);
+  }
+  return map;
+}
+
 function latestVehicleRelationByLead(notes) {
   const map = new Map();
   for (const note of Array.isArray(notes) ? notes : []) {
@@ -944,6 +980,7 @@ function clusterLeadItem(lead) {
     priority: String(lead.priority || "normal").trim().toLowerCase(),
     created_at: lead.created_at || "",
     last_activity_at: lead.last_activity_at || "",
+    owner_review: lead.owner_review || null,
     duplicate_warning: lead.duplicate_warning || null,
     merge_state: lead.merge_state || null,
     vehicle_context: lead.vehicle_context || null
