@@ -1661,10 +1661,11 @@ body.admin-drawer-open .admin-shell {
 }
 
 .crm-dashboard-panel {
-  background: #173949;
-  border: 1px solid #31576a;
-  border-radius: 4px;
-  color: #fff;
+  background: #fff;
+  border: 1px solid #d8e2ef;
+  border-left: 6px solid #0b4f9c;
+  border-radius: 8px;
+  color: #16243a;
   display: grid;
   gap: 18px;
   margin: 14px 0 16px;
@@ -1680,52 +1681,82 @@ body.admin-drawer-open .admin-shell {
 }
 
 .crm-dashboard-hero span {
-  color: #d6e7ef;
+  color: #516174;
   font-size: 12px;
   font-weight: 900;
   text-transform: uppercase;
 }
 
 .crm-dashboard-hero h3 {
-  color: #fff;
+  color: #16243a;
   font-size: 15px;
   margin: 4px 0 0;
 }
 
-.crm-dashboard-hero b {
-  background: #fff;
-  border-radius: 4px;
-  color: #16243a;
-  font-size: 13px;
-  padding: 10px 14px;
-  white-space: nowrap;
+.crm-dashboard-range {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(130px, 1fr)) auto;
+}
+
+.crm-dashboard-range label {
+  display: grid;
+  gap: 4px;
+}
+
+.crm-dashboard-range span {
+  color: #516174;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.crm-dashboard-range input {
+  border: 1px solid #c7d2e1;
+  border-radius: 6px;
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.crm-dashboard-range button {
+  background: #0f4f9a;
+  border: 1px solid #0f4f9a;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 900;
+  min-height: 38px;
+  padding: 0 14px;
 }
 
 .crm-dashboard-total-row {
-  border: 1px solid rgba(226, 242, 250, .3);
+  border: 1px solid #d8e2ef;
   border-radius: 8px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
 }
 
 .crm-dashboard-total-row div {
+  background: #f8fbff;
   display: grid;
   gap: 5px;
   padding: 12px 14px;
 }
 
 .crm-dashboard-total-row div + div {
-  border-left: 1px solid rgba(226, 242, 250, .25);
+  border-left: 1px solid #d8e2ef;
 }
 
 .crm-dashboard-total-row span {
-  color: #d6e7ef;
+  color: #516174;
   font-size: 12px;
   text-transform: uppercase;
 }
 
 .crm-dashboard-total-row strong {
-  color: #fff;
+  color: #0f4f9a;
   font-size: 28px;
   line-height: 1;
 }
@@ -1742,29 +1773,30 @@ body.admin-drawer-open .admin-shell {
 
 .crm-dashboard-table th,
 .crm-dashboard-table td {
-  border-bottom: 1px solid rgba(226, 242, 250, .22);
+  border-bottom: 1px solid #e5edf6;
   padding: 10px 12px;
   text-align: left;
 }
 
 .crm-dashboard-table thead th {
-  color: #d6e7ef;
+  background: #f8fafc;
+  color: #516174;
   font-size: 12px;
   text-transform: uppercase;
 }
 
 .crm-dashboard-table tbody th {
-  color: #fff;
+  color: #16243a;
   font-weight: 800;
 }
 
 .crm-dashboard-table td {
-  color: #eaf4f8;
+  color: #1f3652;
 }
 
 .crm-dashboard-dealer-row th,
 .crm-dashboard-dealer-row td {
-  color: #fff;
+  color: #0f4f9a;
   font-weight: 900;
 }
 
@@ -5555,6 +5587,10 @@ body.admin-drawer-open .admin-shell {
     grid-template-columns: 1fr;
   }
 
+  .crm-dashboard-range {
+    grid-template-columns: 1fr;
+  }
+
   .crm-dashboard-hero {
     align-items: stretch;
     flex-direction: column;
@@ -5562,7 +5598,7 @@ body.admin-drawer-open .admin-shell {
 
   .crm-dashboard-total-row div + div {
     border-left: 0;
-    border-top: 1px solid rgba(226, 242, 250, .25);
+    border-top: 1px solid #d8e2ef;
   }
 
   .admin-lead-toolbar {

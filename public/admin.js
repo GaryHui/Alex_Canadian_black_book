@@ -35,6 +35,7 @@ const adminTurnstile = document.querySelector("#admin-turnstile");
 const adminTurnstileStatus = document.querySelector("#admin-turnstile-status");
 const AUTO_REFRESH_MS = 30000;
 const ADMIN_LEAD_READ_TOKENS_KEY = "autoswitch-admin-lead-read-tokens";
+const ADMIN_DASHBOARD_RANGE_KEY = "autoswitch-admin-dashboard-range";
 
 let supabaseClient = null;
 let adminSession = null;
@@ -56,6 +57,7 @@ let adminAttentionExpanded = false;
 let activeAdminDrawerLeadId = "";
 let adminDrawerActivityLoaded = false;
 let pendingAdminDeepLinkLeadId = new URLSearchParams(window.location.search).get("leadId") || "";
+let adminDashboardRange = loadDashboardDateRange(ADMIN_DASHBOARD_RANGE_KEY);
 
 reloadUsersButton.addEventListener("click", loadUsers);
 reloadLeadsButton.addEventListener("click", () => Promise.all([
@@ -143,6 +145,16 @@ adminTodayListEl?.addEventListener("click", async (event) => {
     renderInventoryWarehouse(inventoryCache);
     document.querySelector("#inventory-warehouse")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+});
+adminTodayListEl?.addEventListener("submit", (event) => {
+  const form = event.target.closest("[data-admin-dashboard-range]");
+  if (!form) return;
+  event.preventDefault();
+  const start = form.querySelector("[data-dashboard-start]")?.value || "";
+  const end = form.querySelector("[data-dashboard-end]")?.value || "";
+  adminDashboardRange = normalizeDashboardDateRange({ start, end });
+  saveDashboardDateRange(ADMIN_DASHBOARD_RANGE_KEY, adminDashboardRange);
+  renderAdminToday(adminLeadsCache);
 });
 inventoryFilterButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -1627,10 +1639,10 @@ function renderAdminToday(leads) {
 }
 
 function renderAdminDashboardStats(leads) {
-  const stats = buildLeadDashboardStats(leads);
+  const stats = buildLeadDashboardStats(leads, adminDashboardRange);
   return renderLeadDashboardPanel({
     title: "Account totals",
-    caption: "Up Sheet performance by time period.",
+    caption: "Real Up Sheet totals from current CRM data.",
     dealership: "AutoSwitch Canada",
     stats,
     columns: stats.columns,
@@ -1645,7 +1657,7 @@ function renderAdminDashboardStats(leads) {
   });
 }
 
-function buildLeadDashboardStats(leads) {
+function buildLeadDashboardStats(leads, selectedRange) {
   const now = new Date();
   const today = startOfLocalDay(now);
   const tomorrow = addLocalDays(today, 1);
@@ -1653,32 +1665,34 @@ function buildLeadDashboardStats(leads) {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const thisTimeLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, Math.min(now.getDate(), daysInMonth(lastMonthStart)), now.getHours(), now.getMinutes(), now.getSeconds());
-  const monthDaysElapsed = Math.max(1, now.getDate());
+  const range = normalizeDashboardDateRange(selectedRange);
+  const start = parseDashboardDate(range.start) || monthStart;
+  const endInclusive = parseDashboardDate(range.end) || now;
+  const endExclusive = addLocalDays(startOfLocalDay(endInclusive), 1);
+  const selectedMonthCount = countCalendarMonths(start, endInclusive);
   const ranges = [
-    { key: "today", label: "Today", start: today, end: tomorrow, averageDays: 1 },
-    { key: "yesterday", label: "Yesterday", start: yesterday, end: today, averageDays: 1 },
-    { key: "thisMonth", label: "This Month", start: monthStart, end: nextMonthStart, averageDays: monthDaysElapsed },
-    { key: "thisTimeLastMonth", label: "This Time Last Month", start: lastMonthStart, end: thisTimeLastMonth, averageDays: Math.max(1, thisTimeLastMonth.getDate()) },
-    { key: "lastMonth", label: "Last Month", start: lastMonthStart, end: monthStart, averageDays: daysInMonth(lastMonthStart) },
-    { key: "monthlyAverage", label: "Monthly Average", start: monthStart, end: nextMonthStart, averageDays: monthDaysElapsed, monthlyAverage: true }
+    { key: "selected", label: "Selected Range", start, end: endExclusive },
+    { key: "today", label: "Today", start: today, end: tomorrow },
+    { key: "yesterday", label: "Yesterday", start: yesterday, end: today },
+    { key: "thisMonth", label: "This Month", start: monthStart, end: nextMonthStart },
+    { key: "lastMonth", label: "Last Month", start: lastMonthStart, end: monthStart },
+    { key: "monthlyAverage", label: "Monthly Average", start, end: endExclusive, averageMonths: selectedMonthCount }
   ];
-  const metricForRange = (range, predicate = () => true, statusPredicate = null) => {
+  const metricForRange = (range, predicate = () => true, timestampGetter = leadCreatedTimestamp) => {
     const count = leads.filter((lead) => {
-      const at = leadCreatedTimestamp(lead);
+      const at = timestampGetter(lead);
       if (!at || at < range.start.getTime() || at >= range.end.getTime()) return false;
-      if (statusPredicate && !statusPredicate(lead)) return false;
       return predicate(lead);
     }).length;
-    return range.monthlyAverage ? Math.round(count / Math.max(1, range.averageDays) * 30) : count;
+    return range.averageMonths ? Math.round(count / Math.max(1, range.averageMonths)) : count;
   };
   const created = ranges.map((range) => metricForRange(range));
   const buyers = ranges.map((range) => metricForRange(range, isBuyerLead));
   const sellers = ranges.map((range) => metricForRange(range, (lead) => !isBuyerLead(lead)));
-  const sold = ranges.map((range) => metricForRange(range, () => true, isDashboardSoldLead));
-  const lost = ranges.map((range) => metricForRange(range, () => true, isDashboardLostLead));
+  const sold = ranges.map((range) => metricForRange(range, isDashboardSoldLead, leadStatusTimestamp));
+  const lost = ranges.map((range) => metricForRange(range, isDashboardLostLead, leadStatusTimestamp));
   const closing = created.map((value, index) => value ? Math.round((sold[index] / value) * 100) : 0);
-  const thisMonthIndex = 2;
+  const selectedIndex = 0;
   return {
     columns: ranges.map((range) => range.label),
     created,
@@ -1687,10 +1701,12 @@ function buildLeadDashboardStats(leads) {
     sold,
     lost,
     closing,
-    monthCreated: created[thisMonthIndex],
-    monthSold: sold[thisMonthIndex],
-    monthClosing: closing[thisMonthIndex],
-    rangeLabel: `${formatShortDate(monthStart)} - ${formatShortDate(now)}`
+    rangeCreated: created[selectedIndex],
+    rangeSold: sold[selectedIndex],
+    rangeClosing: closing[selectedIndex],
+    rangeLabel: `${formatShortDate(start)} - ${formatShortDate(addLocalDays(endExclusive, -1))}`,
+    startValue: formatDateInputValue(start),
+    endValue: formatDateInputValue(addLocalDays(endExclusive, -1))
   };
 }
 
@@ -1702,20 +1718,30 @@ function renderLeadDashboardPanel({ title, caption, dealership, stats, columns, 
           <span>${escapeHtml(title)}</span>
           <h3>${escapeHtml(caption)}</h3>
         </div>
-        <b>${escapeHtml(stats.rangeLabel)}</b>
+        <form class="crm-dashboard-range" data-admin-dashboard-range>
+          <label>
+            <span>From</span>
+            <input type="date" value="${escapeHtml(stats.startValue)}" data-dashboard-start>
+          </label>
+          <label>
+            <span>To</span>
+            <input type="date" value="${escapeHtml(stats.endValue)}" data-dashboard-end>
+          </label>
+          <button type="submit">Apply</button>
+        </form>
       </header>
       <div class="crm-dashboard-total-row">
         <div>
           <span>Created</span>
-          <strong>${formatNumber(stats.monthCreated)}</strong>
+          <strong>${formatNumber(stats.rangeCreated)}</strong>
         </div>
         <div>
           <span>Sold</span>
-          <strong>${formatNumber(stats.monthSold)}</strong>
+          <strong>${formatNumber(stats.rangeSold)}</strong>
         </div>
         <div>
           <span>Closing Percentage</span>
-          <strong>${formatNumber(stats.monthClosing)}%</strong>
+          <strong>${formatNumber(stats.rangeClosing)}%</strong>
         </div>
       </div>
       <div class="crm-dashboard-table-wrap">
@@ -1752,6 +1778,49 @@ function isDashboardLostLead(lead) {
   return ["lost", "failed"].includes(String(lead?.status || "").toLowerCase());
 }
 
+function leadStatusTimestamp(lead) {
+  const value = lead?.updated_at || lead?.last_activity_at || lead?.created_at || 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function loadDashboardDateRange(key) {
+  try {
+    return normalizeDashboardDateRange(JSON.parse(localStorage.getItem(key) || "{}"));
+  } catch (error) {
+    return normalizeDashboardDateRange({});
+  }
+}
+
+function saveDashboardDateRange(key, range) {
+  try {
+    localStorage.setItem(key, JSON.stringify(normalizeDashboardDateRange(range)));
+  } catch (error) {
+    // Date range persistence is best-effort.
+  }
+}
+
+function normalizeDashboardDateRange(range = {}) {
+  const now = new Date();
+  const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const defaultEnd = now;
+  let start = parseDashboardDate(range.start) || defaultStart;
+  let end = parseDashboardDate(range.end) || defaultEnd;
+  if (start.getTime() > end.getTime()) [start, end] = [end, start];
+  return {
+    start: formatDateInputValue(start),
+    end: formatDateInputValue(end)
+  };
+}
+
+function parseDashboardDate(value) {
+  const text = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+  const [year, month, day] = text.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function startOfLocalDay(value) {
   const date = new Date(value);
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -1766,6 +1835,18 @@ function addLocalDays(value, days) {
 function daysInMonth(value) {
   const date = new Date(value);
   return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+function countCalendarMonths(startValue, endValue) {
+  const start = new Date(startValue.getFullYear(), startValue.getMonth(), 1);
+  const end = new Date(endValue.getFullYear(), endValue.getMonth(), 1);
+  return Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1);
+}
+
+function formatDateInputValue(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function formatShortDate(value) {
