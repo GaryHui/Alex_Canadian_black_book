@@ -2211,9 +2211,10 @@ input::placeholder {
 }
 
 .inventory-spec-row {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  align-content: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
   min-width: 0;
 }
 
@@ -2222,8 +2223,10 @@ input::placeholder {
   border-left: 0;
   display: grid;
   gap: 4px;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: 22px minmax(76px, 1fr);
+  grid-template-rows: auto auto;
   min-width: 0;
+  width: 132px;
   padding: 0;
 }
 
@@ -2254,7 +2257,10 @@ input::placeholder {
   font-size: 16px;
   line-height: 1.1;
   min-width: 0;
+  overflow: hidden;
   overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .inventory-spec-row small {
@@ -2265,10 +2271,10 @@ input::placeholder {
 }
 
 .inventory-offer-row {
-  align-items: center;
+  align-items: end;
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(180px, 210px) minmax(260px, 1fr) auto;
+  grid-template-columns: minmax(180px, 210px) minmax(300px, 1fr) auto;
 }
 
 .inventory-order-button {
