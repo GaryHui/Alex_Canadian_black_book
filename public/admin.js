@@ -1077,8 +1077,10 @@ function renderLeadWorkbench(leads) {
   syncActiveAdminLeadCard();
   if (activeAdminDrawerLeadId) {
     if (adminLeadsCache.some((lead) => String(lead.id || "") === activeAdminDrawerLeadId)) {
-      renderAdminDrawer(activeAdminDrawerLeadId);
-      loadAdminDrawerActivity({ force: true }).catch(() => null);
+      if (!isEditingAdminDrawer()) {
+        renderAdminDrawer(activeAdminDrawerLeadId);
+        loadAdminDrawerActivity({ force: true }).catch(() => null);
+      }
     } else {
       closeAdminDrawer();
     }
@@ -1871,7 +1873,13 @@ async function refreshOpenAdminTasks() {
 
 function isEditingLeads() {
   const active = document.activeElement;
-  return Boolean(active && leadsEl.contains(active) && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(active.tagName));
+  return Boolean(active && (leadsEl.contains(active) || adminLeadDrawer?.contains(active)) && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(active.tagName));
+}
+
+function isEditingAdminDrawer() {
+  const active = document.activeElement;
+  if (!active || !adminLeadDrawer?.contains(active)) return false;
+  return ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName);
 }
 
 function getOpenLeadIds() {
@@ -2180,8 +2188,28 @@ function renderLead(lead, index = 0) {
       : pendingAlert
         ? "New update on this lead"
         : "";
+  const needsDetailLayer = String(activeAdminLeadId || "") === String(lead.id || "")
+    || Boolean(pendingAlert)
+    || Boolean(unreadOwnerReview)
+    || Boolean(hasOpenDuplicateReview)
+    || Boolean(signalBanner)
+    || Boolean(contextBanner)
+    || Boolean(collapsedMembersBanner)
+    || Boolean(mergeBanner)
+    || Boolean(inventoryListing);
+  const detailLayer = `
+      <details class="lead-queue-more">
+        <summary>More details and alerts</summary>
+        ${signalBanner}
+        ${contextBanner}
+        ${collapsedMembersBanner}
+        ${mergeBanner}
+        ${duplicateBanner}
+        ${ownerReviewBanner}
+        ${warehousePanel}
+      </details>`;
   return `
-    <article class="lead-card lead-card-${leadType} lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${priority === "urgent" ? "lead-card-urgent" : ""} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert && !unreadOwnerReview ? "lead-card-updated" : ""} ${mergeState.kind ? "lead-card-vehicle-child" : ""}" data-id="${escapeHtml(lead.id || "")}">
+    <article class="lead-card lead-card-${leadType} lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${priority === "urgent" ? "lead-card-urgent" : ""} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert && !unreadOwnerReview ? "lead-card-updated" : ""} ${mergeState.kind ? "lead-card-vehicle-child" : ""} ${needsDetailLayer ? "lead-card-has-detail-layer" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <section class="lead-list-row">
         <div class="lead-list-col lead-list-col-main">
           <div class="lead-title-row">
@@ -2244,16 +2272,7 @@ function renderLead(lead, index = 0) {
         <span>${escapeHtml(queueSummary)} | ${escapeHtml(compactTouchSummary)}</span>
       </section>
       ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${escapeHtml(compactAlertLabel)}</button>` : ""}
-      <details class="lead-queue-more">
-        <summary>More details and alerts</summary>
-        ${signalBanner}
-        ${contextBanner}
-        ${collapsedMembersBanner}
-        ${mergeBanner}
-        ${duplicateBanner}
-        ${ownerReviewBanner}
-        ${warehousePanel}
-      </details>
+      ${detailLayer}
     </article>
   `;
 }
@@ -2461,7 +2480,7 @@ function renderAdminDrawer(leadId) {
                     ).join("")}
                   </select>
                 </label>
-                <button type="submit">Save assignment</button>
+                <button type="submit">Save next step</button>
               </form>
               ${quickAssignButtons}
               ${renderLeadProgress(buyer, status)}
@@ -3304,6 +3323,7 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
   const ownerForm = event.target.closest(".admin-drawer-owner-form");
   if (ownerForm && activeAdminDrawerLeadId) {
     event.preventDefault();
+    if (ownerForm.classList.contains("admin-drawer-assign-form")) syncAssignmentStatus(ownerForm);
     const payload = {
       id: activeAdminDrawerLeadId,
       authorEmail: authUser.email || "",
@@ -3337,6 +3357,7 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
     const data = await response.json();
     statusEl.textContent = data.ok ? "Note saved." : (data.error || "Unable to save note.");
     if (data.ok) {
+      await maybeAdvanceStatusAfterCustomerTouch(payload.noteType);
       noteForm.reset();
       adminDrawerActivityLoaded = false;
       await Promise.all([
@@ -3402,6 +3423,12 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
 });
 
 adminLeadDrawer?.addEventListener("change", async (event) => {
+  const assignField = event.target.closest('.admin-drawer-assign-form [name="assignedTo"]');
+  if (assignField) {
+    syncAssignmentStatus(assignField.closest(".admin-drawer-assign-form"));
+    return;
+  }
+
   const deliveryField = event.target.closest("[data-drawer-dealdesk-delivery]");
   if (!deliveryField || !activeAdminDrawerLeadId) return;
   statusEl.textContent = "Saving delivery date...";
@@ -3428,6 +3455,35 @@ adminLeadDrawer?.addEventListener("change", async (event) => {
     statusEl.textContent = error.message || "Unable to save delivery date.";
   }
 });
+
+function syncAssignmentStatus(form) {
+  if (!form) return;
+  const assignedField = form.querySelector('[name="assignedTo"]');
+  const statusField = form.querySelector('select[name="status"]');
+  if (!assignedField || !statusField) return;
+  const currentStatus = String(statusField.value || "").trim().toLowerCase();
+  if (String(assignedField.value || "").trim() && (!currentStatus || currentStatus === "new")) {
+    statusField.value = "assigned";
+  }
+}
+
+async function maybeAdvanceStatusAfterCustomerTouch(noteType) {
+  const type = String(noteType || "").trim().toLowerCase();
+  if (!["call", "sms", "email"].includes(type) || !activeAdminDrawerLeadId) return;
+  const lead = adminLeadsCache.find((item) => String(item.id || "") === String(activeAdminDrawerLeadId));
+  const currentStatus = String(lead?.status || "").trim().toLowerCase();
+  if (!["new", "assigned"].includes(currentStatus)) return;
+  await fetch("/api/lead-activity", {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      leadId: activeAdminDrawerLeadId,
+      action: "status",
+      status: "contacted",
+      note: "Customer touch logged; status advanced to contacted."
+    })
+  }).catch(() => null);
+}
 
 async function markManagerReviewedByLeadId(leadId, options = {}) {
   const id = String(leadId || "").trim();

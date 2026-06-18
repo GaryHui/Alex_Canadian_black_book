@@ -3091,8 +3091,15 @@ body.admin-drawer-open {
   background: rgba(248, 250, 252, .72);
   border: 1px solid #d8e2ef;
   border-radius: 10px;
+  display: none;
   margin-top: 10px;
   padding: 10px 12px;
+}
+
+.lead-card-current .lead-queue-more,
+.lead-card-updated .lead-queue-more,
+.lead-card-has-detail-layer .lead-queue-more {
+  display: block;
 }
 
 .lead-queue-more > summary {
