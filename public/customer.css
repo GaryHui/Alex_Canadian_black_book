@@ -2207,7 +2207,7 @@ input::placeholder {
   align-items: start;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .inventory-spec-row {
@@ -2274,7 +2274,7 @@ input::placeholder {
   align-items: end;
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(180px, 210px) minmax(300px, 1fr) auto;
+  grid-template-columns: minmax(170px, 190px) minmax(0, 1fr);
 }
 
 .inventory-order-button {
@@ -2284,6 +2284,11 @@ input::placeholder {
   justify-content: center;
   min-width: 150px;
   white-space: nowrap;
+}
+
+.inventory-offer-row .inventory-card-actions {
+  grid-column: 2;
+  justify-self: end;
 }
 
 .finance-panel h2 {
