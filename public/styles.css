@@ -1456,6 +1456,14 @@ body.admin-drawer-open .admin-shell {
   padding-right: 0;
 }
 
+body.admin-drawer-open {
+  left: 0;
+  overflow: hidden;
+  position: fixed;
+  right: 0;
+  width: 100%;
+}
+
 .admin-lead-drawer {
   bottom: 0;
   left: 0;
@@ -2535,10 +2543,24 @@ body.admin-drawer-open .admin-shell {
 .dealer-lead-card-current {
   background: linear-gradient(180deg, #eaf3ff 0%, #f7fbff 100%);
   border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, .24), 0 18px 42px rgba(37, 99, 235, .18);
+  box-shadow:
+    0 0 0 3px rgba(37, 99, 235, .28),
+    0 0 0 7px rgba(96, 165, 250, .16),
+    0 18px 42px rgba(37, 99, 235, .22);
   isolation: isolate;
   position: relative;
   z-index: 4;
+}
+
+.lead-card-current::before,
+.dealer-lead-card-current::before {
+  border: 1px solid rgba(147, 197, 253, .95);
+  border-radius: inherit;
+  box-shadow: inset 0 0 18px rgba(96, 165, 250, .4), 0 0 22px rgba(96, 165, 250, .28);
+  content: "";
+  inset: 3px;
+  pointer-events: none;
+  position: absolute;
 }
 
 .lead-current-badge {
@@ -2570,34 +2592,56 @@ body.admin-drawer-open .admin-shell {
   opacity: .72;
 }
 
-.lead-card-buyer.lead-card-alt-even,
 .dealer-lead-buyer.dealer-lead-card-alt-even {
   background: linear-gradient(180deg, #edf5ff 0%, #f8fbff 100%);
 }
 
-.lead-card-buyer.lead-card-alt-odd,
 .dealer-lead-buyer.dealer-lead-card-alt-odd {
   background: linear-gradient(180deg, #e6f1ff 0%, #f4f9ff 100%);
 }
 
-.lead-card-seller.lead-card-alt-even,
 .dealer-lead-seller.dealer-lead-card-alt-even {
   background: linear-gradient(180deg, #f5efff 0%, #fcf9ff 100%);
 }
 
-.lead-card-seller.lead-card-alt-odd,
 .dealer-lead-seller.dealer-lead-card-alt-odd {
   background: linear-gradient(180deg, #efe6ff 0%, #f8f4ff 100%);
+}
+
+.lead-card-alt-even {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.lead-card-alt-odd {
+  background: linear-gradient(180deg, #eef4fb 0%, #f7faff 100%);
+}
+
+.lead-card-buyer {
+  box-shadow: inset 5px 0 0 var(--lead-buy), 0 1px 2px rgba(15, 23, 42, .04), 0 10px 24px rgba(15, 23, 42, .06);
+}
+
+.lead-card-seller {
+  box-shadow: inset 5px 0 0 var(--lead-sell), 0 1px 2px rgba(15, 23, 42, .04), 0 10px 24px rgba(15, 23, 42, .06);
 }
 
 .lead-card-buyer.lead-card-current,
 .dealer-lead-buyer.dealer-lead-card-current {
   background: linear-gradient(180deg, #dcecff 0%, #eef6ff 100%);
+  box-shadow:
+    inset 5px 0 0 var(--lead-buy),
+    0 0 0 3px rgba(37, 99, 235, .3),
+    0 0 0 7px rgba(96, 165, 250, .16),
+    0 18px 42px rgba(37, 99, 235, .22);
 }
 
 .lead-card-seller.lead-card-current,
 .dealer-lead-seller.dealer-lead-card-current {
   background: linear-gradient(180deg, #e9deff 0%, #f5edff 100%);
+  box-shadow:
+    inset 5px 0 0 var(--lead-sell),
+    0 0 0 3px rgba(124, 58, 237, .28),
+    0 0 0 7px rgba(167, 139, 250, .16),
+    0 18px 42px rgba(124, 58, 237, .2);
 }
 
 .lead-card-urgent,

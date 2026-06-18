@@ -56,6 +56,7 @@ let activeAdminLeadId = "";
 let adminAttentionExpanded = false;
 let activeAdminDrawerLeadId = "";
 let adminDrawerActivityLoaded = false;
+let adminDrawerLockedScrollY = 0;
 let pendingAdminDeepLinkLeadId = new URLSearchParams(window.location.search).get("leadId") || "";
 let adminDashboardRange = loadDashboardDateRange(ADMIN_DASHBOARD_RANGE_KEY);
 
@@ -1205,12 +1206,15 @@ function compareAdminLeadOrder(a, b) {
 }
 
 function adminLeadPinnedRank(lead) {
-  if (isClosedLead(lead)) return 4;
+  if (isClosedLead(lead)) return 7;
+  if (lead?.owner_review?.unread || hasAdminVisibleAlert(lead?.id)) return 0;
+  if (lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed) return 1;
+  if (lead?.vehicle_signal?.message) return 2;
   const status = lead.status || "new";
-  if (String(lead.priority || "").toLowerCase() === "urgent") return 0;
-  if (isOverdue(lead.next_follow_up_at || "", status)) return 1;
-  if (String(status).toLowerCase() === "new") return 2;
-  return 3;
+  if (String(lead.priority || "").toLowerCase() === "urgent") return 3;
+  if (isOverdue(lead.next_follow_up_at || "", status)) return 4;
+  if (String(status).toLowerCase() === "new") return 5;
+  return 6;
 }
 
 function leadCreatedTimestamp(lead) {
@@ -2269,7 +2273,7 @@ function renderAdminDrawer(leadId) {
     adminLeadDrawer.hidden = true;
     adminLeadDrawer.classList.remove("open");
     adminLeadDrawerContent.innerHTML = "";
-    document.body.classList.remove("admin-drawer-open");
+    unlockAdminDrawerPageScroll();
     activeAdminDrawerLeadId = "";
     adminDrawerActivityLoaded = false;
     return;
@@ -2339,7 +2343,7 @@ function renderAdminDrawer(leadId) {
 
   adminLeadDrawer.hidden = false;
   adminLeadDrawer.classList.add("open");
-  document.body.classList.add("admin-drawer-open");
+  lockAdminDrawerPageScroll();
   activeAdminDrawerLeadId = id;
   adminLeadDrawerContent.innerHTML = `
     <section class="admin-drawer-shell" data-drawer-lead-id="${escapeHtml(id)}">
@@ -2526,9 +2530,23 @@ function closeAdminDrawer() {
   adminLeadDrawer.classList.remove("open");
   adminLeadDrawer.hidden = true;
   adminLeadDrawerContent.innerHTML = "";
-  document.body.classList.remove("admin-drawer-open");
+  unlockAdminDrawerPageScroll();
   activeAdminDrawerLeadId = "";
   adminDrawerActivityLoaded = false;
+}
+
+function lockAdminDrawerPageScroll() {
+  if (document.body.classList.contains("admin-drawer-open")) return;
+  adminDrawerLockedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  document.body.style.top = `-${adminDrawerLockedScrollY}px`;
+  document.body.classList.add("admin-drawer-open");
+}
+
+function unlockAdminDrawerPageScroll() {
+  if (!document.body.classList.contains("admin-drawer-open")) return;
+  document.body.classList.remove("admin-drawer-open");
+  document.body.style.top = "";
+  window.scrollTo(0, adminDrawerLockedScrollY || 0);
 }
 
 async function loadAdminDrawerActivity(options = {}) {
@@ -2981,11 +2999,6 @@ leadsEl.addEventListener("submit", async (event) => {
 leadsEl.addEventListener("click", async (event) => {
   const clickedCard = event.target.closest(".lead-card");
   if (clickedCard?.dataset?.id) setActiveAdminLead(clickedCard.dataset.id);
-  const row = event.target.closest(".lead-list-row");
-  if (row && !event.target.closest("button, a, input, select, textarea, summary")) {
-    await openAdminLeadWorkspace(row.closest(".lead-card"), { forceActivity: false });
-    return;
-  }
   const alertButton = event.target.closest("[data-admin-open-alert]");
   if (alertButton) {
     await openAdminLeadFromAlert(alertButton.dataset.adminOpenAlert || "");
@@ -3436,6 +3449,13 @@ async function openAdminLeadWorkspace(card, options = {}) {
   if (card.dataset.id) {
     const leadId = card.dataset.id;
     const lead = adminLeadsCache.find((item) => String(item.id || "") === String(leadId));
+    setActiveAdminLead(leadId);
+    if (hasAdminVisibleAlert(leadId)) {
+      clearAdminVisibleAlertGroup(leadId);
+      renderAdminLeadAlerts();
+      card.classList.remove("lead-card-updated");
+      renderLeadWorkbench(adminLeadsCache);
+    }
     renderAdminDrawer(leadId);
     adminDrawerActivityLoaded = false;
     await loadAdminDrawerActivity({ force: true, highlightLatest: true });
