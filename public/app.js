@@ -1617,7 +1617,7 @@ function renderDealerLeads(leads, role) {
           </div>
           <div class="lead-list-col lead-list-col-actions">
             <div class="lead-quick-strip dealer-quick-strip" aria-label="Dealer quick actions">
-              <button type="button" class="lead-quick-button" data-dealer-open-workspace>Open</button>
+              <button type="button" class="lead-quick-button lead-quick-button-primary" data-dealer-open-workspace>Open workspace</button>
               <button type="button" class="lead-quick-button" data-dealer-focus-note="call">Log call</button>
               <button type="button" class="lead-quick-button" data-dealer-focus-note="sms">Text</button>
               <button type="button" class="lead-quick-button" data-dealer-focus-task>Add task</button>
@@ -1702,6 +1702,9 @@ function renderDealerDrawer(leadId) {
   const pipelineLabel = leadStatusLabel(status, buyerLead);
   const nextAction = dealerNextBestAction(lead);
   const clusterLabel = vehicleContext.cluster_label || title;
+  const planSummary = buyerLead
+    ? `${purchase.intent || input.purchaseIntent || "Buyer opportunity"} | ${purchase.buyingTimeline || input.buyingTimeline || "Timeline open"}`
+    : `${valuation.wholesale?.avg ? `Wholesale ${formatNumber(valuation.wholesale.avg)}` : "Seller appraisal"} | ${input.ownershipType || input.ownership || "Ownership unknown"}`;
   const warehouseLabel = vehicleContext.primary_inventory_status
     ? `Warehouse ${String(vehicleContext.primary_inventory_status).replaceAll("_", " ")}`
     : planSummary;
@@ -1713,9 +1716,6 @@ function renderDealerDrawer(leadId) {
   const followUpButtons = dealerFollowUpActions()
     .map((action) => `<button type="button" data-drawer-dealer-follow-up="${escapeHtml(action.key)}">${escapeHtml(action.label)}</button>`)
     .join("");
-  const planSummary = buyerLead
-    ? `${purchase.intent || input.purchaseIntent || "Buyer opportunity"} | ${purchase.buyingTimeline || input.buyingTimeline || "Timeline open"}`
-    : `${valuation.wholesale?.avg ? `Wholesale ${formatNumber(valuation.wholesale.avg)}` : "Seller appraisal"} | ${input.ownershipType || input.ownership || "Ownership unknown"}`;
 
   dealerLeadDrawer.hidden = false;
   dealerLeadDrawer.classList.add("open");
@@ -2289,12 +2289,17 @@ function renderDealerTodayLeadButton(lead) {
 function filterDealerLeads(leads) {
   if (dealerLeadFilter === "active") return leads.filter((lead) => !isDealerClosedLead(lead));
   if (dealerLeadFilter === "closed") return leads.filter(isDealerClosedLead);
+  if (dealerLeadFilter === "fresh") return leads.filter((lead) => !isDealerClosedLead(lead) && String(lead.status || "new").toLowerCase() === "new");
+  if (dealerLeadFilter === "delivered") return leads.filter((lead) => ["delivered", "sold", "won"].includes(String(lead.status || "").toLowerCase()));
+  if (dealerLeadFilter === "lost") return leads.filter((lead) => ["lost", "failed"].includes(String(lead.status || "").toLowerCase()));
+  if (dealerLeadFilter === "inactive") return leads.filter((lead) => isDealerClosedLead(lead) && !["delivered", "sold", "won", "lost", "failed", "deleted"].includes(String(lead.status || "").toLowerCase()));
   if (dealerLeadFilter === "call-now") return leads.filter(isDealerCallNowLead);
   if (dealerLeadFilter === "no-response") return leads.filter(isDealerNoResponseLead);
   if (dealerLeadFilter === "appointments") return leads.filter(isDealerAppointmentLead);
   if (dealerLeadFilter === "deal-desk") return leads.filter(isDealerDealDeskLead);
   if (dealerLeadFilter === "aging-critical") return leads.filter(isDealerAgingCriticalLead);
   if (dealerLeadFilter === "priority") return leads.filter((lead) => !isDealerClosedLead(lead) && ["high", "urgent"].includes(String(lead.priority || "").toLowerCase()));
+  if (dealerLeadFilter === "unassigned") return leads.filter((lead) => !isDealerClosedLead(lead) && !String(lead.assigned_to || "").trim());
   if (dealerLeadFilter === "buyer") return leads.filter((lead) => !isDealerClosedLead(lead) && isBuyerLead(lead));
   if (dealerLeadFilter === "seller") return leads.filter((lead) => !isDealerClosedLead(lead) && !isBuyerLead(lead));
   if (dealerLeadFilter === "waiting-reply") return leads.filter(isDealerWaitingReply);

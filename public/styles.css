@@ -71,8 +71,8 @@ select {
 
 .dealer-sidebar {
   align-self: start;
-  position: sticky;
-  top: var(--workbench-head-top);
+  position: static;
+  top: auto;
   z-index: 12;
 }
 
@@ -416,8 +416,8 @@ body.dealer-drawer-open .dealer-app-shell {
   justify-content: space-between;
   margin: 16px 24px 0;
   padding: 16px 18px;
-  position: sticky;
-  top: var(--workbench-head-top);
+  position: static;
+  top: auto;
   z-index: 28;
 }
 
@@ -1399,8 +1399,8 @@ select {
   justify-content: space-between;
   margin-bottom: 18px;
   padding: 16px 18px;
-  position: sticky;
-  top: var(--workbench-head-top);
+  position: static;
+  top: auto;
   z-index: 28;
 }
 
@@ -1437,8 +1437,8 @@ select {
 
 .admin-sidebar {
   align-self: start;
-  position: sticky;
-  top: var(--workbench-head-top);
+  position: static;
+  top: auto;
   z-index: 12;
 }
 
@@ -2812,6 +2812,134 @@ body.admin-drawer-open .admin-shell {
   font-weight: 900;
 }
 
+.duplicate-cluster-block {
+  background: #fff8ed;
+  border: 1px solid #f3c678;
+  border-left: 6px solid #f59e0b;
+  border-radius: 8px;
+  box-shadow: 0 10px 26px rgba(120, 53, 15, .08);
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.duplicate-cluster-block > header {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.duplicate-cluster-block h3,
+.duplicate-cluster-block p {
+  margin: 0;
+}
+
+.duplicate-cluster-block h3 {
+  color: #7c2d12;
+  font-size: 18px;
+}
+
+.duplicate-cluster-block p {
+  color: #854d0e;
+  margin-top: 3px;
+}
+
+.duplicate-cluster-block span {
+  color: #9a3412;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.duplicate-cluster-block > header b {
+  background: #fff;
+  border: 1px solid #f3c678;
+  border-radius: 999px;
+  min-width: 38px;
+  padding: 7px 10px;
+  text-align: center;
+}
+
+.duplicate-cluster-list {
+  display: grid;
+  gap: 10px;
+}
+
+.duplicate-cluster-card {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #f5d49b;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1.1fr 1.6fr auto;
+  padding: 12px;
+}
+
+.duplicate-cluster-main,
+.duplicate-cluster-members {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.duplicate-cluster-main b {
+  color: #9a3412;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.duplicate-cluster-main strong {
+  color: #16243a;
+  overflow-wrap: anywhere;
+}
+
+.duplicate-cluster-main small,
+.duplicate-cluster-main span {
+  color: #64748b;
+  overflow-wrap: anywhere;
+  text-transform: none;
+}
+
+.duplicate-cluster-members {
+  gap: 6px;
+}
+
+.duplicate-cluster-members button {
+  background: #fffaf3;
+  border: 1px solid #f5d49b;
+  border-radius: 6px;
+  color: #16243a;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.duplicate-cluster-members button:hover {
+  border-color: #f59e0b;
+}
+
+.duplicate-cluster-members span,
+.duplicate-cluster-members small {
+  color: #64748b;
+  font-size: 12px;
+  text-transform: none;
+}
+
+.duplicate-cluster-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.duplicate-cluster-actions button {
+  background: #0f4f9a;
+  border-color: #0f4f9a;
+  color: #fff;
+}
+
 .lead-card-buyer {
   border-left: 6px solid var(--lead-buy);
 }
@@ -2935,6 +3063,18 @@ body.admin-drawer-open .admin-shell {
   background: #eef6ff;
   border-color: #0b4f9c;
   color: #0b4f9c;
+}
+
+.lead-quick-button-primary {
+  background: #0f4f9a;
+  border-color: #0f4f9a;
+  color: #fff;
+}
+
+.lead-quick-button-primary:hover {
+  background: #0b3f7f;
+  border-color: #0b3f7f;
+  color: #fff;
 }
 
 .dealer-quick-strip .lead-quick-button {
@@ -4299,14 +4439,15 @@ body.admin-drawer-open .admin-shell {
 
 .inventory-group {
   display: grid;
-  gap: 10px;
+  gap: 0;
+  overflow: hidden;
 }
 
 .inventory-group > header {
   align-items: center;
   background: #f8fafc;
   border: 1px solid #d8e2ef;
-  border-radius: 8px;
+  border-radius: 8px 8px 0 0;
   display: flex;
   justify-content: space-between;
   padding: 12px 14px;
@@ -4331,7 +4472,23 @@ body.admin-drawer-open .admin-shell {
 
 .inventory-group-list {
   display: grid;
-  gap: 10px;
+  gap: 0;
+}
+
+.inventory-list-header {
+  align-items: center;
+  background: #fff;
+  border-color: #d8e2ef;
+  border-style: solid;
+  border-width: 0 1px 1px;
+  color: #64748b;
+  display: grid;
+  font-size: 11px;
+  font-weight: 900;
+  gap: 12px;
+  grid-template-columns: 1.5fr 1fr .8fr .8fr 1fr;
+  padding: 10px 14px;
+  text-transform: uppercase;
 }
 
 .admin-inquiries {
@@ -4382,15 +4539,22 @@ body.admin-drawer-open .admin-shell {
   gap: 12px;
   padding: 16px;
   background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border-color: #d8e2ef;
+  border-radius: 0;
+  border-style: solid;
+  border-width: 0 1px 1px;
+  box-shadow: none;
+}
+
+.inventory-card-admin:last-child {
+  border-radius: 0 0 8px 8px;
 }
 
 .inventory-card-head {
-  display: flex;
+  display: grid;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 16px;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1.6fr);
 }
 
 .inventory-card-head > div {
@@ -4629,6 +4793,7 @@ body.admin-drawer-open .admin-shell {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  justify-content: flex-end;
 }
 
 .inventory-actions button {
@@ -5236,7 +5401,7 @@ body.admin-drawer-open .admin-shell {
 
   .admin-sidebar,
   .dealer-sidebar {
-    top: 84px;
+    top: auto;
   }
 
   .admin-module-nav,
@@ -5293,6 +5458,7 @@ body.admin-drawer-open .admin-shell {
   .owner-review,
   .lead-workspace-grid,
   .drawer-workspace-grid,
+  .duplicate-cluster-card,
   .drawer-meta-grid,
   .lead-shared-meta,
   .lead-photo-manager,
@@ -5300,6 +5466,7 @@ body.admin-drawer-open .admin-shell {
   .inventory-photo-upload,
   .dealer-today-sections,
   .inventory-edit-grid,
+  .inventory-card-head,
   .lead-note-form,
   .lead-task-form,
   .lead-email-form,
@@ -5364,6 +5531,10 @@ body.admin-drawer-open .admin-shell {
   }
 
   .lead-list-header {
+    display: none;
+  }
+
+  .inventory-list-header {
     display: none;
   }
 

@@ -117,6 +117,11 @@ These are the next areas to keep tightening without making the product heavier:
 - CRM alerts and work queues should not duplicate each other: alerts are the unread change inbox, while Today / Attention queues are for priority work, due follow-ups, assignment decisions, and warehouse decisions
 - Buy page inventory should behave like a used leasing / finance deal list: every vehicle card should expose estimated monthly payment, initial down payment, term, APR, price, and clear contact intent before the buyer opens details
 - Admin and dealer workbenches should share the same CRM skeleton: Dashboard for daily work, Up Sheets for lead queue, Inventory for owner warehouse permissions, and Settings for owner-only operations
+- Workbench navigation and the Workbench title should behave as one normal page region. Avoid independent sticky bars that make staff feel trapped between multiple fixed controls.
+- Same-vehicle SELL leads must remain separate records, but owner/admin should see a single duplicate vehicle review block. A vehicle should normally have one owner, so matching VIN or vehicle identity needs a clear abnormality warning before warehouse work.
+- Up Sheet filters should follow the mature CRM mental model: All, Active, Delivered, Lost, Inactive, Fresh, Needs Reply, AI Escalated, Unassigned, then secondary operational filters.
+- Opening the lead workspace must be obvious. Do not rely on clicking a hidden row area; keep an explicit Open workspace action visible in the lead list.
+- Inventory warehouse should use the same list language as Up Sheets: grouped sections, compact row headers, visible status/actions, and edit details only when needed.
 
 ## Product Structure
 

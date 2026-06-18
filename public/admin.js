@@ -383,6 +383,13 @@ function renderInventoryGroups(inventory) {
         <b>${group.listings.length}</b>
       </header>
       <div class="inventory-group-list">
+        <div class="inventory-list-header" aria-hidden="true">
+          <span>Vehicle</span>
+          <span>Price and stock</span>
+          <span>Photos</span>
+          <span>Status</span>
+          <span>Actions</span>
+        </div>
         ${group.listings.map(renderInventoryListing).join("")}
       </div>
     </section>
@@ -1031,7 +1038,7 @@ function renderLeadWorkbench(leads) {
     ? ` ${collapsed.hiddenSellerDuplicates} duplicate SELL lead${collapsed.hiddenSellerDuplicates === 1 ? "" : "s"} collapsed into Vehicle clusters.`
     : "";
   statusEl.textContent = `${collapsed.visible.length} shown. ${activeCount} active / ${closedCount} closed. ${buyerCount} BUY / ${sellerCount} SELL. Sort: ${sortLabel}, with urgent, overdue, and new pinned first.${duplicateLabel}${searchLabel}`;
-  leadsEl.innerHTML = renderLeadGroups(collapsed.visible);
+  leadsEl.innerHTML = `${renderDuplicateVehicleBlocks(sorted)}${renderLeadGroups(collapsed.visible)}`;
   syncActiveAdminLeadCard();
   if (activeAdminDrawerLeadId) {
     if (adminLeadsCache.some((lead) => String(lead.id || "") === activeAdminDrawerLeadId)) {
@@ -1061,6 +1068,11 @@ function filterAdminLeads(leads) {
   let filtered = leads;
   if (adminLeadFilter === "active") filtered = leads.filter((lead) => !isClosedLead(lead));
   if (adminLeadFilter === "closed") filtered = leads.filter(isClosedLead);
+  if (adminLeadFilter === "fresh") filtered = leads.filter((lead) => !isClosedLead(lead) && String(lead.status || "new").toLowerCase() === "new");
+  if (adminLeadFilter === "delivered") filtered = leads.filter((lead) => ["delivered", "sold", "won"].includes(String(lead.status || "").toLowerCase()));
+  if (adminLeadFilter === "lost") filtered = leads.filter((lead) => ["lost", "failed"].includes(String(lead.status || "").toLowerCase()));
+  if (adminLeadFilter === "inactive") filtered = leads.filter((lead) => isClosedLead(lead) && !["delivered", "sold", "won", "lost", "failed", "deleted"].includes(String(lead.status || "").toLowerCase()));
+  if (adminLeadFilter === "deleted") filtered = leads.filter((lead) => ["deleted", "archived"].includes(String(lead.status || "").toLowerCase()));
   if (adminLeadFilter === "call-now") filtered = leads.filter(isAdminCallNowLead);
   if (adminLeadFilter === "waiting-reply") filtered = leads.filter(isAdminWaitingReplyLead);
   if (adminLeadFilter === "deal-desk") filtered = leads.filter(isAdminDealDeskLead);
@@ -1083,6 +1095,78 @@ function filterAdminLeads(leads) {
     const haystack = searchableLeadText(lead);
     return terms.every((term) => haystack.includes(term));
   });
+}
+
+function renderDuplicateVehicleBlocks(leads) {
+  const groups = new Map();
+  leads
+    .filter((lead) => !isBuyerLead(lead) && !isClosedLead(lead))
+    .forEach((lead) => {
+      const key = adminVehicleClusterKey(lead);
+      if (!key) return;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(lead);
+    });
+  const duplicateGroups = [...groups.entries()]
+    .map(([key, members]) => ({
+      key,
+      members: members.sort(compareAdminLeadOrder),
+      flagged: members.some((lead) => lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed)
+    }))
+    .filter((group) => group.members.length > 1 || group.flagged)
+    .sort((a, b) => Number(b.flagged) - Number(a.flagged) || b.members.length - a.members.length)
+    .slice(0, 5);
+
+  if (!duplicateGroups.length) return "";
+  return `
+    <section class="duplicate-cluster-block" aria-label="Duplicate vehicle review">
+      <header>
+        <div>
+          <span>Owner alert</span>
+          <h3>Duplicate vehicle review</h3>
+          <p>One vehicle should have one owner. These SELL leads look like the same vehicle and should be reviewed before warehouse work.</p>
+        </div>
+        <b>${duplicateGroups.length}</b>
+      </header>
+      <div class="duplicate-cluster-list">
+        ${duplicateGroups.map(renderDuplicateVehicleCluster).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderDuplicateVehicleCluster(group) {
+  const primary = group.members[0] || {};
+  const title = cleanLeadTitle(primary.valuation?.title || historyVehicleTitle(primary.input || {}) || "Vehicle lead", false);
+  const warning = group.members.find((lead) => lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed)?.duplicate_warning?.message
+    || `${group.members.length} seller leads may reference the same vehicle.`;
+  return `
+    <article class="duplicate-cluster-card">
+      <div class="duplicate-cluster-main">
+        <b>Same vehicle group</b>
+        <strong>${escapeHtml(title)}</strong>
+        <span>${escapeHtml(group.key)}</span>
+        <small>${escapeHtml(warning)}</small>
+      </div>
+      <div class="duplicate-cluster-members">
+        ${group.members.map((lead) => {
+          const input = lead.input || {};
+          const valuation = lead.valuation || {};
+          const label = input.email || input.phone || lead.auth_email || "Seller lead";
+          const status = leadStatusLabel(lead.status || "new", false);
+          return `<button type="button" data-admin-open-lead="${escapeHtml(lead.id || "")}">
+            <strong>${escapeHtml(label)}</strong>
+            <span>${escapeHtml(status)} | ${escapeHtml(formatDateTime(lead.created_at))}</span>
+            <small>${escapeHtml(valuation.vin || input.vin || "No VIN")}</small>
+          </button>`;
+        }).join("")}
+      </div>
+      <div class="duplicate-cluster-actions">
+        <button type="button" data-admin-open-lead="${escapeHtml(primary.id || "")}">Review lead</button>
+        <button type="button" data-admin-open-url="${escapeHtml(adminVehicleClusterUrl(primary))}">Open vehicle file</button>
+      </div>
+    </article>
+  `;
 }
 
 function sortAdminLeads(leads) {
@@ -1993,7 +2077,7 @@ function renderLead(lead, index = 0) {
         <div class="lead-list-col lead-list-col-actions">
           <div class="lead-quick-strip" aria-label="Lead quick actions">
             <span class="lead-current-badge" aria-hidden="true">CURRENT</span>
-            <button type="button" class="lead-quick-button" data-admin-open-workspace>Open</button>
+            <button type="button" class="lead-quick-button lead-quick-button-primary" data-admin-open-workspace>Open workspace</button>
             <button type="button" class="lead-quick-button" data-admin-focus-followup>Follow-up</button>
             <button type="button" class="lead-quick-button" data-admin-focus-note="call">Log call</button>
             <button type="button" class="lead-quick-button" data-admin-focus-task>Add task</button>
@@ -2732,6 +2816,12 @@ leadsEl.addEventListener("click", async (event) => {
   const openUrlButton = event.target.closest("[data-admin-open-url]");
   if (openUrlButton) {
     window.location.href = openUrlButton.dataset.adminOpenUrl || "/admin-vehicles.html";
+    return;
+  }
+
+  const openLeadButton = event.target.closest("[data-admin-open-lead]");
+  if (openLeadButton) {
+    await openAdminLeadFromAlert(openLeadButton.dataset.adminOpenLead || "");
     return;
   }
 
