@@ -10,7 +10,8 @@
   --soft: #f3eeee;
   --sage: #a9bfb9;
   --workbench-head-top: 10px;
-  --workbench-sidebar-top: 108px;
+  --workbench-head-height: 92px;
+  --workbench-sidebar-top: var(--workbench-head-height);
 }
 
 * {
@@ -66,14 +67,14 @@ select {
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(0, 1fr);
-  padding: 24px;
+  padding: 14px 24px 24px;
 }
 
 .dealer-sidebar {
   align-self: start;
-  position: static;
-  top: auto;
-  z-index: 12;
+  position: sticky;
+  top: var(--workbench-sidebar-top);
+  z-index: 27;
 }
 
 .dealer-module-nav {
@@ -414,11 +415,11 @@ body.dealer-drawer-open .dealer-app-shell {
   display: flex;
   gap: 16px;
   justify-content: space-between;
-  margin: 16px 24px 0;
+  margin: 0;
   padding: 16px 18px;
-  position: static;
-  top: auto;
-  z-index: 28;
+  position: sticky;
+  top: 0;
+  z-index: 32;
 }
 
 .dealer-head h1 {
@@ -1385,7 +1386,7 @@ select {
 .admin-shell {
   background: #f6f8fb;
   min-height: 100vh;
-  padding: 24px;
+  padding: 0 24px 24px;
 }
 
 .admin-head {
@@ -1397,11 +1398,11 @@ select {
   display: flex;
   gap: 16px;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin: 0 -24px 14px;
   padding: 16px 18px;
-  position: static;
-  top: auto;
-  z-index: 28;
+  position: sticky;
+  top: 0;
+  z-index: 32;
 }
 
 .admin-actions {
@@ -1437,13 +1438,18 @@ select {
 
 .admin-sidebar {
   align-self: start;
-  position: static;
-  top: auto;
-  z-index: 12;
+  position: sticky;
+  top: var(--workbench-sidebar-top);
+  z-index: 27;
 }
 
 .admin-workspace-main {
   min-width: 0;
+}
+
+.admin-section,
+.history-panel {
+  scroll-margin-top: calc(var(--workbench-head-height) + 76px);
 }
 
 body.admin-drawer-open .admin-shell {
@@ -1651,7 +1657,115 @@ body.admin-drawer-open .admin-shell {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  margin: 16px 0 14px;
+  margin: 12px 0 14px;
+}
+
+.crm-dashboard-panel {
+  background: #173949;
+  border: 1px solid #31576a;
+  border-radius: 4px;
+  color: #fff;
+  display: grid;
+  gap: 18px;
+  margin: 14px 0 16px;
+  overflow: hidden;
+  padding: 24px;
+}
+
+.crm-dashboard-hero {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.crm-dashboard-hero span {
+  color: #d6e7ef;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.crm-dashboard-hero h3 {
+  color: #fff;
+  font-size: 15px;
+  margin: 4px 0 0;
+}
+
+.crm-dashboard-hero b {
+  background: #fff;
+  border-radius: 4px;
+  color: #16243a;
+  font-size: 13px;
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+
+.crm-dashboard-total-row {
+  border: 1px solid rgba(226, 242, 250, .3);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.crm-dashboard-total-row div {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+}
+
+.crm-dashboard-total-row div + div {
+  border-left: 1px solid rgba(226, 242, 250, .25);
+}
+
+.crm-dashboard-total-row span {
+  color: #d6e7ef;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.crm-dashboard-total-row strong {
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.crm-dashboard-table-wrap {
+  overflow-x: auto;
+}
+
+.crm-dashboard-table {
+  border-collapse: collapse;
+  min-width: 860px;
+  width: 100%;
+}
+
+.crm-dashboard-table th,
+.crm-dashboard-table td {
+  border-bottom: 1px solid rgba(226, 242, 250, .22);
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.crm-dashboard-table thead th {
+  color: #d6e7ef;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.crm-dashboard-table tbody th {
+  color: #fff;
+  font-weight: 800;
+}
+
+.crm-dashboard-table td {
+  color: #eaf4f8;
+}
+
+.crm-dashboard-dealer-row th,
+.crm-dashboard-dealer-row td {
+  color: #fff;
+  font-weight: 900;
 }
 
 .admin-brief-card {
@@ -5326,6 +5440,10 @@ body.admin-drawer-open .admin-shell {
 }
 
 @media (max-width: 900px) {
+  :root {
+    --workbench-head-height: 156px;
+  }
+
   body.admin-drawer-open .admin-shell {
     padding-right: 0;
   }
@@ -5401,7 +5519,7 @@ body.admin-drawer-open .admin-shell {
 
   .admin-sidebar,
   .dealer-sidebar {
-    top: auto;
+    top: var(--workbench-sidebar-top);
   }
 
   .admin-module-nav,
@@ -5427,6 +5545,26 @@ body.admin-drawer-open .admin-shell {
     flex-direction: column;
   }
 
+  .admin-head,
+  .dealer-head {
+    align-items: stretch;
+  }
+
+  .crm-dashboard-hero,
+  .crm-dashboard-total-row {
+    grid-template-columns: 1fr;
+  }
+
+  .crm-dashboard-hero {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .crm-dashboard-total-row div + div {
+    border-left: 0;
+    border-top: 1px solid rgba(226, 242, 250, .25);
+  }
+
   .admin-lead-toolbar {
     grid-template-columns: 1fr;
   }
@@ -5446,7 +5584,7 @@ body.admin-drawer-open .admin-shell {
   }
 
   .dealer-head {
-    margin: 12px 16px 0;
+    margin: 0;
   }
 
   .dealer-actions {

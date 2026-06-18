@@ -1491,6 +1491,7 @@ function renderAdminToday(leads) {
   const soldCount = inventoryCache.filter((item) => String(item.status || "").toLowerCase() === "sold").length;
   const activeCount = leads.filter((lead) => !isClosedLead(lead)).length;
   const callNowCount = leads.filter((lead) => !isClosedLead(lead) && isAdminCallNowLead(lead)).length;
+  const dashboardStats = renderAdminDashboardStats(leads);
   const managerWatchItems = [
     ...duplicateItems.map((lead) => ({ order: 0, markup: renderAdminDuplicateButton(lead) })),
     ...ownerUnreadItems.map((lead) => ({ order: 1, markup: renderAdminDueButton(lead, "Owner") })),
@@ -1526,6 +1527,7 @@ function renderAdminToday(leads) {
     ` : "";
 
   adminTodayListEl.innerHTML = `
+    ${dashboardStats}
     <section class="admin-manager-brief" aria-label="Manager brief">
       <button type="button" class="admin-brief-card" data-admin-set-filter="active">
         <span>CRM active</span>
@@ -1622,6 +1624,154 @@ function renderAdminToday(leads) {
       </section>
     </div>
   `;
+}
+
+function renderAdminDashboardStats(leads) {
+  const stats = buildLeadDashboardStats(leads);
+  return renderLeadDashboardPanel({
+    title: "Account totals",
+    caption: "Up Sheet performance by time period.",
+    dealership: "AutoSwitch Canada",
+    stats,
+    columns: stats.columns,
+    rowGroups: [
+      { label: "Total Up Sheets", values: stats.created },
+      { label: "BUY E-Leads", values: stats.buyers },
+      { label: "SELL valuations", values: stats.sellers },
+      { label: "Sold / purchased", values: stats.sold },
+      { label: "Lost", values: stats.lost },
+      { label: "Closing %", values: stats.closing, suffix: "%" }
+    ]
+  });
+}
+
+function buildLeadDashboardStats(leads) {
+  const now = new Date();
+  const today = startOfLocalDay(now);
+  const tomorrow = addLocalDays(today, 1);
+  const yesterday = addLocalDays(today, -1);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const thisTimeLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, Math.min(now.getDate(), daysInMonth(lastMonthStart)), now.getHours(), now.getMinutes(), now.getSeconds());
+  const monthDaysElapsed = Math.max(1, now.getDate());
+  const ranges = [
+    { key: "today", label: "Today", start: today, end: tomorrow, averageDays: 1 },
+    { key: "yesterday", label: "Yesterday", start: yesterday, end: today, averageDays: 1 },
+    { key: "thisMonth", label: "This Month", start: monthStart, end: nextMonthStart, averageDays: monthDaysElapsed },
+    { key: "thisTimeLastMonth", label: "This Time Last Month", start: lastMonthStart, end: thisTimeLastMonth, averageDays: Math.max(1, thisTimeLastMonth.getDate()) },
+    { key: "lastMonth", label: "Last Month", start: lastMonthStart, end: monthStart, averageDays: daysInMonth(lastMonthStart) },
+    { key: "monthlyAverage", label: "Monthly Average", start: monthStart, end: nextMonthStart, averageDays: monthDaysElapsed, monthlyAverage: true }
+  ];
+  const metricForRange = (range, predicate = () => true, statusPredicate = null) => {
+    const count = leads.filter((lead) => {
+      const at = leadCreatedTimestamp(lead);
+      if (!at || at < range.start.getTime() || at >= range.end.getTime()) return false;
+      if (statusPredicate && !statusPredicate(lead)) return false;
+      return predicate(lead);
+    }).length;
+    return range.monthlyAverage ? Math.round(count / Math.max(1, range.averageDays) * 30) : count;
+  };
+  const created = ranges.map((range) => metricForRange(range));
+  const buyers = ranges.map((range) => metricForRange(range, isBuyerLead));
+  const sellers = ranges.map((range) => metricForRange(range, (lead) => !isBuyerLead(lead)));
+  const sold = ranges.map((range) => metricForRange(range, () => true, isDashboardSoldLead));
+  const lost = ranges.map((range) => metricForRange(range, () => true, isDashboardLostLead));
+  const closing = created.map((value, index) => value ? Math.round((sold[index] / value) * 100) : 0);
+  const thisMonthIndex = 2;
+  return {
+    columns: ranges.map((range) => range.label),
+    created,
+    buyers,
+    sellers,
+    sold,
+    lost,
+    closing,
+    monthCreated: created[thisMonthIndex],
+    monthSold: sold[thisMonthIndex],
+    monthClosing: closing[thisMonthIndex],
+    rangeLabel: `${formatShortDate(monthStart)} - ${formatShortDate(now)}`
+  };
+}
+
+function renderLeadDashboardPanel({ title, caption, dealership, stats, columns, rowGroups }) {
+  return `
+    <section class="crm-dashboard-panel" aria-label="${escapeHtml(title)}">
+      <header class="crm-dashboard-hero">
+        <div>
+          <span>${escapeHtml(title)}</span>
+          <h3>${escapeHtml(caption)}</h3>
+        </div>
+        <b>${escapeHtml(stats.rangeLabel)}</b>
+      </header>
+      <div class="crm-dashboard-total-row">
+        <div>
+          <span>Created</span>
+          <strong>${formatNumber(stats.monthCreated)}</strong>
+        </div>
+        <div>
+          <span>Sold</span>
+          <strong>${formatNumber(stats.monthSold)}</strong>
+        </div>
+        <div>
+          <span>Closing Percentage</span>
+          <strong>${formatNumber(stats.monthClosing)}%</strong>
+        </div>
+      </div>
+      <div class="crm-dashboard-table-wrap">
+        <table class="crm-dashboard-table">
+          <thead>
+            <tr>
+              <th>Dealership</th>
+              ${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="crm-dashboard-dealer-row">
+              <th>${escapeHtml(dealership)}</th>
+              ${columns.map((_, index) => `<td>${formatNumber(stats.created[index])}</td>`).join("")}
+            </tr>
+            ${rowGroups.map((row) => `
+              <tr>
+                <th>${escapeHtml(row.label)}</th>
+                ${row.values.map((value) => `<td>${formatNumber(value)}${row.suffix || ""}</td>`).join("")}
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function isDashboardSoldLead(lead) {
+  return ["won", "sold", "delivered"].includes(String(lead?.status || "").toLowerCase());
+}
+
+function isDashboardLostLead(lead) {
+  return ["lost", "failed"].includes(String(lead?.status || "").toLowerCase());
+}
+
+function startOfLocalDay(value) {
+  const date = new Date(value);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addLocalDays(value, days) {
+  const date = new Date(value);
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+function daysInMonth(value) {
+  const date = new Date(value);
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+function formatShortDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function renderAdminDueButton(lead, overrideType = "") {
