@@ -17,7 +17,9 @@ export default async function handler(req, res) {
       ? await markOwnerRead(req.body || {}, admin.user)
       : req.body?.action === "duplicate_review"
         ? await markDuplicateReview(req.body || {}, admin.user)
-        : await updateLead(req.body || {});
+        : req.body?.action === "assign_lead"
+          ? await assignLead(req.body || {}, admin.user)
+          : await updateLead(req.body || {});
     return res.status(result.ok ? 200 : 400).json(result);
   }
 
@@ -411,6 +413,56 @@ async function markDuplicateReview(body, user) {
   });
 }
 
+async function assignLead(body, user) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const id = String(body.id || body.leadId || "").trim();
+  if (!id) return { ok: false, error: "Lead id is required" };
+  if (!url || !key) return { ok: false, error: "Supabase is not configured" };
+
+  const previous = await fetchLeadById({ url, key }, id);
+  if (!previous) return { ok: false, status: 404, error: "Lead not found" };
+
+  const assignedTo = String(body.assignedTo || body.assigned_to || "").trim().toLowerCase();
+  if (!assignedTo) return { ok: false, status: 400, error: "Assigned rep is required" };
+
+  const currentStatus = String(previous.status || "new").trim().toLowerCase();
+  const patch = {
+    assigned_to: assignedTo,
+    status: String(body.status || (currentStatus === "new" ? "assigned" : currentStatus || "assigned")).trim(),
+    priority: normalizePriority(body.priority || previous.priority),
+    next_follow_up_at: dateOrNull(body.nextFollowUpAt || body.next_follow_up_at || previous.next_follow_up_at),
+    last_activity_at: new Date().toISOString()
+  };
+
+  const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(patch)
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+
+  const timeline = buildLeadAssignmentTimeline(previous, patch);
+  if (timeline) {
+    await createLeadTimelineNote({
+      url,
+      key,
+      leadId: id,
+      authorEmail: String(body.authorEmail || user?.email || "").trim().toLowerCase() || "admin",
+      note: timeline
+    });
+  }
+
+  return { ok: true, lead: data?.[0] || null };
+}
+
 async function fetchLeadById(client, id) {
   const response = await fetch(`${client.url}/rest/v1/valuation_leads?select=*&id=eq.${encodeURIComponent(id)}&limit=1`, {
     headers: authHeaders(client.key)
@@ -626,6 +678,24 @@ function buildLeadUpdateTimeline(previous = {}, patch = {}) {
 
   if (!changes.length) return "";
   return `Lead updated: ${changes.join("; ")}.`;
+}
+
+function buildLeadAssignmentTimeline(previous = {}, patch = {}) {
+  const changes = [];
+  const previousRep = String(previous.assigned_to || "").trim().toLowerCase();
+  if (previousRep !== patch.assigned_to) changes.push(`assigned rep ${previousRep || "unassigned"} -> ${patch.assigned_to || "unassigned"}`);
+
+  const previousStatus = String(previous.status || "").trim();
+  if (previousStatus !== patch.status) changes.push(`status ${previousStatus || "blank"} -> ${patch.status || "blank"}`);
+
+  const previousPriority = String(previous.priority || "normal").trim().toLowerCase();
+  if (previousPriority !== patch.priority) changes.push(`priority ${previousPriority} -> ${patch.priority}`);
+
+  const previousFollowUp = normalizeIsoForCompare(previous.next_follow_up_at);
+  const nextFollowUp = normalizeIsoForCompare(patch.next_follow_up_at);
+  if (previousFollowUp !== nextFollowUp) changes.push(`next follow-up ${previousFollowUp || "not set"} -> ${nextFollowUp || "not set"}`);
+
+  return changes.length ? `Lead assigned: ${changes.join("; ")}.` : "";
 }
 
 function buildVehiclePatch(body = {}, previous = {}) {

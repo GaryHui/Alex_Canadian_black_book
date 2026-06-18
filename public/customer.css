@@ -1935,8 +1935,8 @@ input::placeholder {
 
 .inventory-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
   align-items: start;
   margin-top: 30px;
 }
@@ -2012,14 +2012,16 @@ input::placeholder {
 
 .inventory-card {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 16px;
-  padding: 14px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid var(--line);
+  grid-template-columns: minmax(300px, 38%) minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  background: #fff;
+  border: 1px solid #cdd8e6;
+  border-bottom: 7px solid #08106d;
   border-radius: 8px;
   box-shadow: 0 10px 24px rgba(20, 32, 51, 0.06);
   align-items: stretch;
+  overflow: hidden;
 }
 
 .inventory-card-body {
@@ -2028,10 +2030,9 @@ input::placeholder {
 
 .inventory-image {
   position: relative;
-  min-height: 170px;
+  min-height: 260px;
   overflow: hidden;
   background: linear-gradient(145deg, #eef6ff, #fff);
-  border-radius: 8px;
 }
 
 .inventory-image span {
@@ -2058,30 +2059,33 @@ input::placeholder {
 }
 
 .inventory-photo {
-  min-height: 170px;
+  min-height: 260px;
   margin: 0;
   overflow: hidden;
   background: #eef6ff;
-  border-radius: 8px;
 }
 
 .inventory-photo img {
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 170px;
+  min-height: 260px;
   object-fit: cover;
 }
 
 .inventory-card-body {
   display: grid;
-  gap: 10px;
-  grid-template-rows: auto auto auto 1fr;
-  min-height: 170px;
+  gap: 14px;
+  grid-template-rows: auto auto 1fr;
+  min-height: 260px;
+  padding: 24px 24px 18px;
 }
 
 .inventory-card h3 {
   margin: 0 0 4px;
+  color: #07106d;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.05;
 }
 
 .inventory-card p {
@@ -2098,14 +2102,14 @@ input::placeholder {
 
 .inventory-deal-price {
   align-items: flex-start;
-  background: #f7fbff;
-  border: 1px solid #d7e7f6;
-  border-radius: 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   display: grid;
   gap: 3px;
   justify-items: end;
   margin-top: 2px;
-  padding: 12px;
+  padding: 0;
 }
 
 .inventory-card-price strong {
@@ -2126,7 +2130,7 @@ input::placeholder {
 }
 
 .inventory-deal-price strong {
-  color: var(--blue-dark);
+  color: #07106d;
   font-size: 30px;
   line-height: 1;
 }
@@ -2137,20 +2141,21 @@ input::placeholder {
 }
 
 .inventory-deal-terms {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .inventory-deal-terms span {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: #506176;
-  display: grid;
+  background: #eef1f5;
+  border: 0;
+  border-radius: 6px;
+  color: #334155;
+  display: inline-grid;
   font-size: 11px;
   font-weight: 900;
   gap: 2px;
+  min-width: 112px;
   padding: 8px 10px;
   text-transform: uppercase;
 }
@@ -2166,6 +2171,7 @@ input::placeholder {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+  justify-content: flex-end;
   margin-top: auto;
 }
 
@@ -2189,11 +2195,58 @@ input::placeholder {
 }
 
 .inventory-sidebar {
-  position: sticky;
-  top: 92px;
+  order: -1;
+  position: static;
   display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(320px, .8fr);
   gap: 16px;
   align-self: start;
+}
+
+.inventory-deal-copy {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.inventory-spec-row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.inventory-spec-row span {
+  border-left: 1px solid #d8e2ef;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-left: 12px;
+}
+
+.inventory-spec-row span:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.inventory-spec-row b {
+  color: #07106d;
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.inventory-spec-row small {
+  color: #617086;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.inventory-offer-row {
+  align-items: end;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
 .finance-panel h2 {
@@ -2411,7 +2464,8 @@ input::placeholder {
 
   .inventory-sidebar {
     position: static;
-    display: contents;
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .inventory-sidebar .inventory-filter {
@@ -2424,6 +2478,18 @@ input::placeholder {
 
   .inventory-sidebar .finance-panel {
     order: 0;
+  }
+
+  .inventory-card {
+    grid-template-columns: minmax(260px, 42%) minmax(0, 1fr);
+  }
+
+  .inventory-offer-row {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-card-actions {
+    justify-content: flex-start;
   }
 
   .hero-copy {
@@ -2465,6 +2531,8 @@ input::placeholder {
   .trust-grid,
   .home-action-grid,
   .inventory-card,
+  .inventory-deal-copy,
+  .inventory-spec-row,
   .mode-panel,
   .split-row,
   .value-cards,
@@ -2476,6 +2544,28 @@ input::placeholder {
   .contact-quick-fields,
   .tool-grid {
     grid-template-columns: 1fr;
+  }
+
+  .inventory-photo,
+  .inventory-photo img,
+  .inventory-image {
+    min-height: 220px;
+  }
+
+  .inventory-card-body {
+    min-height: 0;
+    padding: 18px;
+  }
+
+  .inventory-spec-row span {
+    border-left: 0;
+    border-top: 1px solid #d8e2ef;
+    padding: 10px 0 0;
+  }
+
+  .inventory-spec-row span:first-child {
+    border-top: 0;
+    padding-top: 0;
   }
 
   .card-heading,

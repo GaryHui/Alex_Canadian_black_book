@@ -250,31 +250,44 @@ function renderInventory() {
 
   inventoryList.innerHTML = filteredInventory.map((vehicle) => {
     const deal = vehicleDeal(vehicle);
+    const specs = vehicleSpecItems(vehicle);
     return `
     <article class="inventory-card inventory-deal-card">
       ${vehicleImageMarkup(vehicle)}
       <div class="inventory-card-body">
-        <div class="inventory-card-copy">
-          <h3>${escapeHtml(vehicle.title)}</h3>
-          <p>${escapeHtml(publicSummary(vehicle))}</p>
+        <div class="inventory-card-copy inventory-deal-copy">
+          <div>
+            <h3>${escapeHtml(vehicle.title)}</h3>
+            <p>${escapeHtml(publicSummary(vehicle))}</p>
+          </div>
+          <div class="inventory-tags">
+            ${vehicle.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
+          </div>
         </div>
-        <div class="inventory-card-price inventory-deal-price">
-          <span>${escapeHtml(text[language].dealMonthlyLabel)}</span>
-          <strong>${money(deal.monthly)} / mo</strong>
-          <small>${escapeHtml(money(vehicle.price))} vehicle price</small>
+        <div class="inventory-spec-row" aria-label="Vehicle specs">
+          ${specs.map((item) => `
+            <span>
+              <b>${escapeHtml(item.value)}</b>
+              <small>${escapeHtml(item.label)}</small>
+            </span>
+          `).join("")}
         </div>
-        <div class="inventory-deal-terms" aria-label="Estimated payment terms">
-          <span><b>${escapeHtml(money(deal.downPayment))}</b>${escapeHtml(text[language].dealDownLabel)}</span>
-          <span><b>${escapeHtml(String(deal.termMonths))}</b>${escapeHtml(text[language].dealTermLabel)}</span>
-          <span><b>${escapeHtml(String(deal.annualRate))}%</b>${escapeHtml(text[language].dealRateLabel)}</span>
-        </div>
-        <div class="inventory-tags">
-          ${vehicle.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
-        </div>
-        <div class="inventory-card-actions">
-          <button class="primary-button" type="button" data-contact-vehicle="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].contactDealer)}</button>
-          <button class="secondary-button" type="button" data-view-vehicle="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].viewDetails)}</button>
-          <button class="secondary-button compact" type="button" data-fill-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].detailUseCalculator)}</button>
+        <div class="inventory-offer-row">
+          <div class="inventory-deal-terms" aria-label="Estimated payment terms">
+            <span><b>${escapeHtml(money(deal.downPayment))}</b>${escapeHtml(text[language].dealDownLabel)}</span>
+            <span><b>${escapeHtml(String(deal.termMonths))} mo</b>${escapeHtml(text[language].dealTermLabel)}</span>
+            <span><b>${escapeHtml(String(deal.annualRate))}%</b>${escapeHtml(text[language].dealRateLabel)}</span>
+          </div>
+          <div class="inventory-card-price inventory-deal-price">
+            <span>${escapeHtml(text[language].dealMonthlyLabel)}</span>
+            <strong>${money(deal.monthly)} / mo</strong>
+            <small>${escapeHtml(money(vehicle.price))} CBB-based dealer price</small>
+          </div>
+          <div class="inventory-card-actions">
+            <button class="primary-button" type="button" data-contact-vehicle="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].contactDealer)}</button>
+            <button class="secondary-button" type="button" data-view-vehicle="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].viewDetails)}</button>
+            <button class="secondary-button compact" type="button" data-fill-finance="${escapeHtml(vehicle.id)}">${escapeHtml(text[language].detailUseCalculator)}</button>
+          </div>
         </div>
       </div>
     </article>
@@ -430,6 +443,15 @@ function vehicleDeal(vehicle) {
     taxRate,
     monthly: Math.round(monthly)
   };
+}
+
+function vehicleSpecItems(vehicle) {
+  return [
+    { label: "Year", value: vehicle.year || "CBB" },
+    { label: "KM", value: vehicle.kilometers ? vehicle.kilometers.toLocaleString("en-CA") : "-" },
+    { label: "Region", value: vehicle.region || "-" },
+    { label: "Style", value: vehicle.style || vehicle.series || "-" }
+  ];
 }
 
 function selectVehicleForFinance(vehicle) {

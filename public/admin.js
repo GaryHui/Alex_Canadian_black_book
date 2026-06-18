@@ -2320,6 +2320,10 @@ function renderAdminDrawer(leadId) {
   const input = lead.input || {};
   const valuation = lead.valuation || {};
   const adjustment = lead.owner_adjustment || {};
+  const cbbWholesale = marketAverageFromValuation(valuation, "wholesale");
+  const cbbRetail = marketAverageFromValuation(valuation, "retail");
+  const ownerWholesaleValue = adjustment.wholesale ?? cbbWholesale ?? "";
+  const ownerRetailValue = adjustment.retail ?? cbbRetail ?? "";
   const buyer = isBuyerLead(lead);
   const title = cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), buyer) || "Vehicle lead";
   const vehicleYear = input.year || valuation.year || "";
@@ -2370,15 +2374,15 @@ function renderAdminDrawer(leadId) {
   const sellerAdjustmentFields = buyer ? "" : `
                 <label>
                   <span>Approved wholesale</span>
-                  <input name="ownerWholesale" type="number" value="${adjustment.wholesale ?? ""}" placeholder="Manual wholesale" />
+                  <input name="ownerWholesale" type="number" value="${ownerWholesaleValue}" placeholder="Manual wholesale" />
                 </label>
                 <label>
                   <span>Approved retail</span>
-                  <input name="ownerRetail" type="number" value="${adjustment.retail ?? ""}" placeholder="Manual retail" />
+                  <input name="ownerRetail" type="number" value="${ownerRetailValue}" placeholder="Manual retail" />
                 </label>
                 <label>
                   <span>Reason</span>
-                  <input name="reason" value="${escapeHtml(adjustment.reason || "")}" placeholder="Why adjust this value?" />
+                  <input name="reason" value="${escapeHtml(adjustment.reason || (cbbWholesale || cbbRetail ? "Pre-filled from current CBB estimate" : ""))}" placeholder="Why adjust this value?" />
                 </label>`;
   const sellerPricingSection = buyer ? "" : `
             <section class="admin-drawer-section admin-drawer-pricing-card">
@@ -2408,8 +2412,8 @@ function renderAdminDrawer(leadId) {
                 <input type="hidden" name="priority" value="${escapeHtml(priority)}" />
                 <input type="hidden" name="nextFollowUpAt" value="${escapeHtml(datetimeLocalValue(followUp))}" />
                 <input type="hidden" name="notes" value="${escapeHtml(lead.notes || "")}" />
-                <input type="hidden" name="ownerWholesale" value="${adjustment.wholesale ?? ""}" />
-                <input type="hidden" name="ownerRetail" value="${adjustment.retail ?? ""}" />
+                <input type="hidden" name="ownerWholesale" value="${ownerWholesaleValue}" />
+                <input type="hidden" name="ownerRetail" value="${ownerRetailValue}" />
                 <input type="hidden" name="reason" value="${escapeHtml(adjustment.reason || "")}" />
                 <label class="admin-drawer-field-wide">
                   <span>Vehicle title</span>
@@ -2536,8 +2540,8 @@ function renderAdminDrawer(leadId) {
                 <span>Rep, priority, due time, and pipeline</span>
               </header>
               <form class="owner-review admin-drawer-owner-form admin-drawer-assign-form">
-                <input type="hidden" name="ownerWholesale" value="${adjustment.wholesale ?? ""}" />
-                <input type="hidden" name="ownerRetail" value="${adjustment.retail ?? ""}" />
+                <input type="hidden" name="ownerWholesale" value="${ownerWholesaleValue}" />
+                <input type="hidden" name="ownerRetail" value="${ownerRetailValue}" />
                 <input type="hidden" name="reason" value="${escapeHtml(adjustment.reason || "")}" />
                 <input type="hidden" name="notes" value="${escapeHtml(lead.notes || "")}" />
                 <label>
@@ -2563,6 +2567,7 @@ function renderAdminDrawer(leadId) {
                   </select>
                 </label>
                 <button type="submit">Save next step</button>
+                <small class="admin-drawer-form-status" data-assign-status></small>
               </form>
               <div class="admin-drawer-followup-presets" aria-label="Follow-up presets">
                 <span>Quick follow-up</span>
@@ -2632,8 +2637,8 @@ function renderAdminDrawer(leadId) {
                 <input type="hidden" name="assignedTo" value="${escapeHtml(assignedTo)}" />
                 <input type="hidden" name="priority" value="${escapeHtml(priority)}" />
                 <input type="hidden" name="nextFollowUpAt" value="${escapeHtml(datetimeLocalValue(followUp))}" />
-                <input type="hidden" name="ownerWholesale" value="${adjustment.wholesale ?? ""}" />
-                <input type="hidden" name="ownerRetail" value="${adjustment.retail ?? ""}" />
+                <input type="hidden" name="ownerWholesale" value="${ownerWholesaleValue}" />
+                <input type="hidden" name="ownerRetail" value="${ownerRetailValue}" />
                 <input type="hidden" name="reason" value="${escapeHtml(adjustment.reason || "")}" />
                 <label class="review-notes">
                   <span>Admin notes</span>
@@ -2715,16 +2720,13 @@ async function quickAssignDrawerLead(button) {
     method: "PATCH",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({
+      action: "assign_lead",
       id: activeAdminDrawerLeadId,
       authorEmail: authUser.email || "",
       status: nextStatus,
       assignedTo: email,
       priority: lead.priority || "normal",
-      nextFollowUpAt: lead.next_follow_up_at || "",
-      notes: lead.notes || "",
-      ownerWholesale: lead.owner_adjustment?.wholesale ?? "",
-      ownerRetail: lead.owner_adjustment?.retail ?? "",
-      reason: lead.owner_adjustment?.reason || ""
+      nextFollowUpAt: lead.next_follow_up_at || ""
     })
   });
   const data = await response.json();
@@ -2788,6 +2790,14 @@ function leadStatusOptions(buyer) {
 function leadStatusLabel(status, buyer) {
   const option = leadStatusOptions(buyer).find((item) => item.value === status);
   return option?.label || String(status || "new").replaceAll("_", " ");
+}
+
+function marketAverageFromValuation(valuation, market) {
+  const marketData = valuation?.values?.[market] || {};
+  const adjusted = Number(marketData.adjusted?.avg);
+  if (Number.isFinite(adjusted) && adjusted > 0) return Math.round(adjusted);
+  const base = Number(marketData.base?.avg);
+  return Number.isFinite(base) && base > 0 ? Math.round(base) : "";
 }
 
 function leadStatusActions(buyer, status) {
@@ -3427,12 +3437,16 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
   const ownerForm = event.target.closest(".admin-drawer-owner-form");
   if (ownerForm && activeAdminDrawerLeadId) {
     event.preventDefault();
-    if (ownerForm.classList.contains("admin-drawer-assign-form")) syncAssignmentStatus(ownerForm);
+    const isAssignForm = ownerForm.classList.contains("admin-drawer-assign-form");
+    if (isAssignForm) syncAssignmentStatus(ownerForm);
     const payload = {
       id: activeAdminDrawerLeadId,
       authorEmail: authUser.email || "",
       ...Object.fromEntries(new FormData(ownerForm).entries())
     };
+    if (isAssignForm) payload.action = "assign_lead";
+    const formStatus = isAssignForm ? ownerForm.querySelector("[data-assign-status]") : null;
+    if (formStatus) formStatus.textContent = "Saving...";
     const response = await fetch("/api/leads", {
       method: "PATCH",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
@@ -3447,6 +3461,7 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
           ? "Vehicle details saved."
         : "Lead tools saved.";
     statusEl.textContent = data.ok ? savedMessage : (data.error || "Unable to save lead.");
+    if (formStatus) formStatus.textContent = data.ok ? savedMessage : formatApiError(data, "Unable to save assignment.");
     if (data.ok) await loadLeads({ suppressAlerts: true, forceOpenActivity: true, refreshActiveDrawer: true });
     return;
   }
