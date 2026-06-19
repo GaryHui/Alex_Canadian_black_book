@@ -158,11 +158,6 @@ setLookupMode("free", { openModal: false });
 dealerLeadsList?.addEventListener("click", async (event) => {
   const clickedCard = event.target.closest(".dealer-lead-card");
   if (clickedCard?.dataset?.leadId) setActiveDealerLead(clickedCard.dataset.leadId);
-  const row = event.target.closest(".dealer-list-row");
-  if (row && !event.target.closest("button, a, input, select, textarea, summary")) {
-    await openDealerWorkspace(row.closest(".dealer-lead-card"), { forceActivity: false });
-    return;
-  }
   const openWorkspaceButton = event.target.closest("[data-dealer-open-workspace]");
   if (openWorkspaceButton) {
     await openDealerWorkspace(openWorkspaceButton.closest(".dealer-lead-card"), { forceActivity: true });
@@ -2886,6 +2881,8 @@ function dealerLeadUpdateToken(lead = {}) {
     lead.next_follow_up_at || "",
     JSON.stringify(lead.owner_adjustment || {}),
     JSON.stringify(lead.vehicle_signal || {}),
+    JSON.stringify(lead.vehicle_context || {}),
+    JSON.stringify(lead.activity_summary || {}),
     lead.notes || ""
   ].join("|");
 }
