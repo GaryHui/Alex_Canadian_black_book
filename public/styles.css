@@ -4856,6 +4856,47 @@ body.admin-drawer-open {
   color: #4b5563;
 }
 
+.admin-lead-photo-review {
+  display: grid;
+  gap: 12px;
+}
+
+.lead-photo-review-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+}
+
+.lead-photo-review-grid a {
+  background: #f8fbff;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  color: #1f3652;
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  text-decoration: none;
+}
+
+.lead-photo-review-grid a:hover {
+  border-color: #9bb8d8;
+  box-shadow: 0 8px 18px rgba(31, 54, 82, .08);
+}
+
+.lead-photo-review-grid img {
+  aspect-ratio: 4 / 3;
+  background: #eaf2fb;
+  border-radius: 6px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.lead-photo-review-grid span {
+  font-size: 12px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
 .inventory-publish-form {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

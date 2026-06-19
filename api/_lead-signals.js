@@ -8,6 +8,8 @@ export function isClosedLeadStatus(status) {
   return ["won", "lost", "closed", "deleted", "in_inventory"].includes(String(status || "").trim().toLowerCase());
 }
 
+const MAX_LEAD_PHOTOS = 20;
+
 export function leadVehicleKeys(lead) {
   const input = lead?.input || {};
   const valuation = lead?.valuation || {};
@@ -63,6 +65,7 @@ export async function attachLeadSignals(leads, client) {
   const ownerReviewMap = latestOwnerReviewStateByLead(snapshot.notes);
   const activitySummaryMap = buildLeadActivitySummaryMap(leads, snapshot);
   const taskSummaryMap = buildLeadTaskSummaryMap(snapshot.tasks);
+  const leadPhotoMap = buildLeadPhotoMap(snapshot.notes);
 
   return leads.map((lead) => {
     const id = String(lead.id || "").trim();
@@ -74,6 +77,7 @@ export async function attachLeadSignals(leads, client) {
       owner_review: lead.owner_review || ownerReviewMap.get(id) || null,
       activity_summary: activitySummaryMap.get(id) || null,
       task_summary: taskSummaryMap.get(id) || null,
+      lead_photos: leadPhotoMap.get(id) || [],
       merge_state: snapshot.relationMap.get(id) || null
     };
   });
@@ -315,6 +319,55 @@ function buildLeadTaskSummaryMap(tasks) {
     map.set(leadId, current);
   }
   return map;
+}
+
+function buildLeadPhotoMap(notes) {
+  const photosByLead = new Map();
+  const deletedUrls = new Set();
+
+  for (const note of Array.isArray(notes) ? notes : []) {
+    const leadId = String(note?.lead_id || "").trim();
+    const text = String(note?.note || "");
+    if (!leadId || !text) continue;
+
+    if (text.includes("Vehicle photo deleted:")) {
+      for (const line of text.split(/\n+/)) {
+        const url = line.trim();
+        if (/^https?:\/\//i.test(url)) deletedUrls.add(url);
+      }
+      continue;
+    }
+
+    if (!text.includes("Vehicle photo upload:")) continue;
+
+    for (const line of text.split(/\n+/)) {
+      const match = line.match(/^([^:]+):\s*(https?:\/\/\S+)/i);
+      if (!match) continue;
+      const photo = {
+        label: match[1].trim() || "Vehicle photo",
+        url: match[2].trim(),
+        created_at: note.created_at || "",
+        author_email: note.author_email || ""
+      };
+      if (!photo.url) continue;
+      const list = photosByLead.get(leadId) || [];
+      list.push(photo);
+      photosByLead.set(leadId, list);
+    }
+  }
+
+  for (const [leadId, photos] of photosByLead.entries()) {
+    const seen = new Set();
+    photosByLead.set(leadId, photos
+      .filter((photo) => {
+        if (deletedUrls.has(photo.url) || seen.has(photo.url)) return false;
+        seen.add(photo.url);
+        return true;
+      })
+      .slice(0, MAX_LEAD_PHOTOS));
+  }
+
+  return photosByLead;
 }
 
 async function fetchAllLeads(client) {

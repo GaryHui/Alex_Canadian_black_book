@@ -32,6 +32,7 @@ const dealerLeadAlertsEl = document.querySelector("#dealer-lead-alerts");
 const dealerTodayWorkEl = document.querySelector("#dealer-today-work");
 const dealerLeadFilterButtons = document.querySelectorAll("[data-dealer-filter]");
 const dealerLeadSortSelect = document.querySelector("#dealer-lead-sort");
+const MAX_LEAD_PHOTOS = 20;
 const dealerLeadDrawer = document.querySelector("#dealer-lead-drawer");
 const dealerLeadDrawerContent = document.querySelector("#dealer-lead-drawer-content");
 const dealerAdminLinks = document.querySelectorAll("[data-dealer-admin-link]");
@@ -2066,7 +2067,7 @@ function renderDealerPhotoSection(lead) {
           <input name="leadPhotos" type="file" accept="image/*" multiple />
         </label>
         <button type="button" data-dealer-upload-lead-photos="${escapeHtml(id)}">Upload photos</button>
-        <p class="lead-photo-status" aria-live="polite">Use this for appraisal, condition, repair, and listing photos.</p>
+        <p class="lead-photo-status" aria-live="polite">Upload up to ${MAX_LEAD_PHOTOS} appraisal, condition, repair, and listing photos for manager review.</p>
       </div>
     </section>
   `;
@@ -3119,6 +3120,12 @@ async function uploadDealerLeadPhotos(button) {
   const files = [...(fileInput?.files || [])];
   if (!leadId || !files.length) {
     if (status) status.textContent = "Choose at least one photo first.";
+    return;
+  }
+  if (files.length > MAX_LEAD_PHOTOS) {
+    const message = `Upload ${MAX_LEAD_PHOTOS} photos or fewer at a time.`;
+    if (status) status.textContent = message;
+    dealerLeadsStatus.textContent = message;
     return;
   }
 

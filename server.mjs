@@ -23,6 +23,7 @@ const BASE_URL = process.env.BLACKBOOK_BASE_URL || "https://service.canadianblac
 const API_PATH = process.env.BLACKBOOK_API_PATH || "/UsedCarWS/CanUsedAPI";
 const VALUATION_TEMPLATE = process.env.BLACKBOOK_TEMPLATE || "12";
 const LOG_FILE = path.join(__dirname, "server.log");
+const MAX_LEAD_PHOTOS = 20;
 
 process.on("uncaughtException", (error) => {
   log(`uncaughtException: ${error.stack || error.message}`);
@@ -1978,6 +1979,10 @@ function publicBuyerInquiryRow(row) {
 
 async function uploadLeadPhotos(body, user, role) {
   const leadId = String(body.leadId || "").trim();
+  const requestedFiles = Array.isArray(body.files) ? body.files : [];
+  if (requestedFiles.length > MAX_LEAD_PHOTOS) {
+    return { ok: false, status: 400, error: `Upload ${MAX_LEAD_PHOTOS} photos or fewer at a time.` };
+  }
   const files = sanitizePhotoFiles(body.files || []);
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1992,6 +1997,14 @@ async function uploadLeadPhotos(body, user, role) {
   if (!leadResult.ok) return leadResult;
   const lead = leadResult.data?.[0];
   if (!lead) return { ok: false, status: 404, error: "Lead not found" };
+  const existingPhotos = await findLeadPhotoLinks(leadId, { url, key });
+  if (existingPhotos.length + files.length > MAX_LEAD_PHOTOS) {
+    return {
+      ok: false,
+      status: 400,
+      error: `This lead can have up to ${MAX_LEAD_PHOTOS} photos. It already has ${existingPhotos.length}.`
+    };
+  }
 
   const webhook = await submitLeadPhotosToWebhook(lead, files, user);
   if (!webhook.submitted) {
@@ -2228,6 +2241,10 @@ async function findLeadPhotoLinks(leadId, supabase) {
 
 async function uploadInventoryPhotos(body, user) {
   const listingId = String(body.listingId || "").trim();
+  const requestedFiles = Array.isArray(body.files) ? body.files : [];
+  if (requestedFiles.length > MAX_LEAD_PHOTOS) {
+    return { ok: false, status: 400, error: `Upload ${MAX_LEAD_PHOTOS} photos or fewer at a time.` };
+  }
   const files = sanitizePhotoFiles(body.files || []);
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -3366,7 +3383,7 @@ function sanitizePhotoFiles(files) {
   if (!Array.isArray(files)) return [];
 
   return files
-    .slice(0, 9)
+    .slice(0, MAX_LEAD_PHOTOS)
     .map((file, index) => {
       const mimeType = String(file?.mimeType || file?.type || "image/jpeg").trim();
       const base64 = String(file?.base64 || "")

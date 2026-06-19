@@ -38,6 +38,7 @@ const adminTurnstileWrap = document.querySelector("#admin-turnstile-wrap");
 const adminTurnstile = document.querySelector("#admin-turnstile");
 const adminTurnstileStatus = document.querySelector("#admin-turnstile-status");
 const AUTO_REFRESH_MS = 30000;
+const MAX_LEAD_PHOTOS = 20;
 const ADMIN_LEAD_READ_TOKENS_KEY = "autoswitch-admin-lead-read-tokens";
 const ADMIN_DASHBOARD_RANGE_KEY = "autoswitch-admin-dashboard-range";
 const BUSINESS_DAYS = [
@@ -593,7 +594,7 @@ function renderInventoryListing(listing) {
   const photoManager = listing.sourceLeadId ? `
           <section class="inventory-photo-summary inventory-photo-manager">
             <h4>Vehicle photos</h4>
-            <p>Choose which Drive photos appear on the Buy page. Saving this listing replaces the public photo set with the checked photos.</p>
+            <p>Choose which Drive photos appear on the Buy page. Upload up to ${MAX_LEAD_PHOTOS} photos per vehicle, then check the public set.</p>
             <div class="inventory-photo-upload">
               <label>
                 <span>Photo type</span>
@@ -1578,6 +1579,30 @@ function renderAdminCommunicationStrip(lead) {
       <strong>${escapeHtml(adminNextBestAction(lead))}</strong>
     </section>
   `;
+}
+
+function renderAdminLeadPhotoReviewSection(lead) {
+  if (isBuyerLead(lead)) return "";
+  const photos = Array.isArray(lead?.lead_photos) ? lead.lead_photos.slice(0, MAX_LEAD_PHOTOS) : [];
+  return `
+            <section class="admin-drawer-section admin-lead-photo-review">
+              <header>
+                <h3>Vehicle photos</h3>
+                <span>${photos.length ? `${photos.length}/${MAX_LEAD_PHOTOS} uploaded for appraisal and publish review` : "No staff photos yet"}</span>
+              </header>
+              ${photos.length ? `
+                <div class="lead-photo-review-grid">
+                  ${photos.map((photo, index) => `
+                    <a href="${escapeHtml(photo.url)}" target="_blank" rel="noreferrer">
+                      <img src="${escapeHtml(adminPhotoPreviewUrl(photo.url))}" alt="${escapeHtml(photo.label || `Vehicle photo ${index + 1}`)}" loading="lazy" />
+                      <span>${escapeHtml(photo.label || `Photo ${index + 1}`)}</span>
+                    </a>
+                  `).join("")}
+                </div>
+              ` : `
+                <p class="admin-drawer-empty">Ask staff to upload exterior, interior, odometer, VIN, damage, recon, and listing photos before final price approval.</p>
+              `}
+            </section>`;
 }
 
 function isAdminReadyForWarehouse(lead) {
@@ -2727,6 +2752,7 @@ function renderAdminDrawer(leadId) {
           <div class="drawer-workspace-main">
             ${renderAdminCommunicationStrip(lead)}
             ${vehiclePriceSection}
+            ${renderAdminLeadPhotoReviewSection(lead)}
             ${renderAdminDealChecklistSection(lead)}
             <section class="admin-drawer-section admin-drawer-command-card">
               <header>
@@ -3359,6 +3385,12 @@ async function uploadInventoryPhotos(button) {
   const files = [...(fileInput?.files || [])];
   if (!leadId || !files.length) {
     if (status) status.textContent = "Choose at least one photo first.";
+    return;
+  }
+  if (files.length > MAX_LEAD_PHOTOS) {
+    const message = `Upload ${MAX_LEAD_PHOTOS} photos or fewer at a time.`;
+    if (status) status.textContent = message;
+    inventoryStatusEl.textContent = message;
     return;
   }
 
@@ -4304,6 +4336,12 @@ async function uploadLeadPhotos(button) {
   const files = [...(fileInput?.files || [])];
   if (!card?.dataset?.id || !files.length) {
     if (status) status.textContent = "Choose at least one photo first.";
+    return;
+  }
+  if (files.length > MAX_LEAD_PHOTOS) {
+    const message = `Upload ${MAX_LEAD_PHOTOS} photos or fewer at a time.`;
+    if (status) status.textContent = message;
+    statusEl.textContent = message;
     return;
   }
 
