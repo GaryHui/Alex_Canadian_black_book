@@ -3012,6 +3012,36 @@ body.admin-drawer-open {
   padding: 4px 7px;
 }
 
+.lead-primary-meta {
+  gap: 7px;
+}
+
+.lead-primary-meta .lead-time-chip,
+.lead-primary-meta .priority-pill,
+.lead-primary-meta .status-pill,
+.lead-primary-meta .dealer-status-badge {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 6px 9px;
+}
+
+.lead-primary-meta .lead-time-chip {
+  background: #111827;
+  border-color: #111827;
+  color: #fff;
+}
+
+.lead-primary-meta .priority-pill {
+  border: 1px solid rgba(15, 23, 42, .1);
+  text-transform: uppercase;
+}
+
+.lead-primary-meta .status-pill,
+.lead-primary-meta .dealer-status-badge {
+  text-transform: uppercase;
+}
+
 .lead-summary > div:first-child {
   display: grid;
   gap: 4px;
@@ -3361,6 +3391,17 @@ body.admin-drawer-open {
 .lead-queue-insight strong {
   color: #16243a;
   font-size: 13px;
+}
+
+.lead-queue-insight .lead-queue-insight-label {
+  color: #64748b;
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  line-height: 1;
+  margin-bottom: 4px;
+  text-transform: uppercase;
 }
 
 .lead-queue-insight span {
@@ -4401,6 +4442,13 @@ body.admin-drawer-open {
   color: #64748b;
   font-size: 12px;
   font-weight: 800;
+}
+
+.sop-progress-help {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: -4px 0 0;
 }
 
 .sop-progress-steps {

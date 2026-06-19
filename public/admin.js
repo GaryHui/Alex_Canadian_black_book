@@ -2377,10 +2377,10 @@ function renderLead(lead, index = 0) {
             ${unreadOwnerReview ? `<b class="lead-new-badge">NEW</b>` : ""}
             <strong>${escapeHtml(title)}</strong>
           </div>
-          <div class="lead-list-subline">
-            <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
-            <span>${escapeHtml(priority)}</span>
-            <span>${escapeHtml(statusLabel)}</span>
+          <div class="lead-list-subline lead-primary-meta">
+            <span class="lead-time-chip">${escapeHtml(formatDateTime(lead.created_at))}</span>
+            <span class="priority-pill priority-${escapeHtml(priority)}">${escapeHtml(priority)}</span>
+            <span class="status-pill ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</span>
           </div>
         </div>
         <div class="lead-list-col">
@@ -2422,17 +2422,16 @@ function renderLead(lead, index = 0) {
             <span class="lead-current-badge" aria-hidden="true">CURRENT</span>
             <button type="button" class="lead-quick-button lead-quick-button-primary" data-admin-open-workspace>Open workspace</button>
             <button type="button" class="lead-quick-button" data-admin-focus-followup>Follow-up</button>
-            <button type="button" class="lead-quick-button" data-admin-focus-note="call">Log call</button>
+            <button type="button" class="lead-quick-button" data-admin-focus-note="call">Call / log</button>
             <button type="button" class="lead-quick-button" data-admin-focus-task>Add task</button>
-          </div>
-          <div class="lead-summary-metrics">
-            <b class="priority-pill priority-${escapeHtml(priority)}">${escapeHtml(priority)}</b>
-            <b class="status-pill ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
           </div>
         </div>
       </section>
       <section class="lead-queue-insight">
-        <strong>${escapeHtml(nextAction)}</strong>
+        <div>
+          <span class="lead-queue-insight-label">Next action</span>
+          <strong>${escapeHtml(nextAction)}</strong>
+        </div>
         <span>${escapeHtml(queueSummary)} | ${escapeHtml(compactTouchSummary)}</span>
       </section>
       ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${escapeHtml(compactAlertLabel)}</button>` : ""}
@@ -2954,6 +2953,10 @@ async function quickAssignDrawerLead(button) {
 function setActiveAdminLead(id) {
   activeAdminLeadId = String(id || "").trim();
   syncActiveAdminLeadCard();
+}
+
+function isAdminCardControlClick(event) {
+  return Boolean(event.target.closest("button, a, input, select, textarea, summary, label"));
 }
 
 function syncActiveAdminLeadCard() {
@@ -3527,8 +3530,10 @@ leadsEl.addEventListener("click", async (event) => {
     return;
   }
 
-  const clickedCard = event.target.closest(".lead-card");
-  if (clickedCard?.dataset?.id) setActiveAdminLead(clickedCard.dataset.id);
+  if (!isAdminCardControlClick(event)) {
+    const clickedCard = event.target.closest(".lead-card");
+    if (clickedCard?.dataset?.id) setActiveAdminLead(clickedCard.dataset.id);
+  }
   return;
 });
 

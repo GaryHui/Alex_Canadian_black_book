@@ -209,8 +209,10 @@ dealerLeadsList?.addEventListener("click", async (event) => {
     return;
   }
 
-  const clickedCard = event.target.closest(".dealer-lead-card");
-  if (clickedCard?.dataset?.leadId) setActiveDealerLead(clickedCard.dataset.leadId);
+  if (!isDealerCardControlClick(event)) {
+    const clickedCard = event.target.closest(".dealer-lead-card");
+    if (clickedCard?.dataset?.leadId) setActiveDealerLead(clickedCard.dataset.leadId);
+  }
   return;
 });
 
@@ -1692,11 +1694,11 @@ function renderDealerLeads(leads, role) {
               <b class="lead-source-pill">${escapeHtml(sourceLabel)}</b>
               <strong>${escapeHtml(title)}</strong>
             </div>
-            <div class="lead-list-subline">
-              <span>${escapeHtml(formatDateTime(lead.created_at))}</span>
-              <span>${escapeHtml(lead.priority || "normal")}</span>
+            <div class="lead-list-subline lead-primary-meta">
+              <span class="lead-time-chip">${escapeHtml(formatDateTime(lead.created_at))}</span>
+              <span class="priority-pill priority-${escapeHtml(lead.priority || "normal")}">${escapeHtml(lead.priority || "normal")}</span>
               ${hasOpenTask ? `<span>${escapeHtml(`${taskSummary.open_count} open task${Number(taskSummary.open_count) === 1 ? "" : "s"}`)}</span>` : ""}
-              <span>${escapeHtml(statusLabel)}</span>
+              <span class="dealer-status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</span>
             </div>
           </div>
           <div class="lead-list-col">
@@ -1738,17 +1740,16 @@ function renderDealerLeads(leads, role) {
               <span class="lead-current-badge" aria-hidden="true">CURRENT</span>
               <button type="button" class="lead-quick-button lead-quick-button-primary" data-dealer-open-workspace>Open workspace</button>
               <button type="button" class="lead-quick-button" data-dealer-focus-followup>Follow-up</button>
-              <button type="button" class="lead-quick-button" data-dealer-focus-note="call">Log call</button>
+              <button type="button" class="lead-quick-button" data-dealer-focus-note="call">Call / log</button>
               <button type="button" class="lead-quick-button" data-dealer-focus-task>Add task</button>
-            </div>
-            <div class="lead-summary-metrics">
-              <b class="priority-pill priority-${escapeHtml(lead.priority || "normal")}">${escapeHtml(lead.priority || "normal")}</b>
-              <b class="dealer-status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</b>
             </div>
           </div>
         </section>
         <section class="lead-queue-insight">
-          <strong>${escapeHtml(nextAction)}</strong>
+          <div>
+            <span class="lead-queue-insight-label">Next action</span>
+            <strong>${escapeHtml(nextAction)}</strong>
+          </div>
           <span>${escapeHtml(nextStepSummary)} | ${escapeHtml(compactTouchSummary)}</span>
         </section>
         ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-dealer-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
@@ -2105,6 +2106,10 @@ async function loadDealerDrawerActivity(options = {}) {
 function setActiveDealerLead(id) {
   activeDealerLeadId = String(id || "").trim();
   syncActiveDealerLeadCard();
+}
+
+function isDealerCardControlClick(event) {
+  return Boolean(event.target.closest("button, a, input, select, textarea, summary, label"));
 }
 
 function syncActiveDealerLeadCard() {
@@ -2948,15 +2953,16 @@ function renderDealerSopProgress(lead) {
   return `
     <section class="sop-progress-panel" aria-label="SOP progress">
       <div>
-        <strong>SOP progress</strong>
-        <span>${escapeHtml(doneCount)} / ${escapeHtml(steps.length)} complete</span>
+        <strong>Lead checklist</strong>
+        <span>${escapeHtml(doneCount)} / ${escapeHtml(steps.length)} done from status, tasks, and timeline</span>
       </div>
+      <p class="sop-progress-help">Auto-checks whether this lead has contact logged, a next step, a real deal movement, and a close result.</p>
       <div class="sop-progress-steps">
         ${steps.map((step) => `<span class="${step.done ? "done" : ""}">${escapeHtml(step.label)}</span>`).join("")}
       </div>
       ${nextMissing ? `
         <div class="sop-next-step">
-          <span>Next missing</span>
+          <span>Next missing requirement</span>
           <strong>${escapeHtml(nextMissing.label)}</strong>
           <small>${escapeHtml(nextMissing.hint)}</small>
         </div>
