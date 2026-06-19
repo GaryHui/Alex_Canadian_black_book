@@ -3200,6 +3200,9 @@ async function openDealerLead(id, options = {}) {
     dealerLeadAlertMap.delete(id);
     renderDealerLeadAlerts();
     clearDealerLeadUpdateNotice(card);
+    renderDealerTodayWork(dealerLeadsCache);
+    renderDealerLeads(dealerLeadsCache, dealerLeadRole);
+    card = dealerLeadsList.querySelector(`.dealer-lead-card[data-lead-id="${cssEscape(id)}"]`) || card;
   }
   card.classList.add("lead-card-flash");
   window.setTimeout(() => card.classList.remove("lead-card-flash"), 1600);
