@@ -89,6 +89,22 @@ add column if not exists updated_at timestamptz not null default now();
 create index if not exists dealer_staff_active_idx
 on dealer_staff (active);
 
+create table if not exists dealer_settings (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_by text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+alter table dealer_settings
+add column if not exists value jsonb not null default '{}'::jsonb;
+
+alter table dealer_settings
+add column if not exists updated_by text not null default '';
+
+alter table dealer_settings
+add column if not exists updated_at timestamptz not null default now();
+
 create table if not exists lead_notes (
   id uuid primary key default gen_random_uuid(),
   lead_id uuid not null references valuation_leads(id) on delete cascade,

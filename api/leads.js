@@ -1,5 +1,6 @@
 import { requireAdmin } from "./_admin.js";
 import { attachLeadSignals, isBuyerLead, notifyDuplicateSellerLead, reviewDuplicateSellerLead } from "./_lead-signals.js";
+import { maybeSendAfterHoursAutoReply } from "./_operations-settings.js";
 
 export const config = {
   api: {
@@ -66,6 +67,10 @@ export default async function handler(req, res) {
           key: process.env.SUPABASE_SERVICE_ROLE_KEY
         }, savedLead);
       }
+      await maybeSendAfterHoursAutoReply({
+        url: process.env.SUPABASE_URL,
+        key: process.env.SUPABASE_SERVICE_ROLE_KEY
+      }, savedLead, { leadType: leadSourceLabel(savedLead.input?.leadSource) }).catch(() => null);
     }
     const webhook = await submitLeadToWebhook(savedLead, uploadFiles);
     if (saved.ok && savedLead.id) {

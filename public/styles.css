@@ -2508,18 +2508,83 @@ body.admin-drawer-open {
   margin: 14px 0;
 }
 
+.operations-settings-form {
+  display: grid;
+  gap: 18px;
+  margin: 14px 0 22px;
+}
+
+.business-hours-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.business-hours-row {
+  align-items: end;
+  background: #f8fafc;
+  border: 1px solid #dbe5f0;
+  border-radius: 10px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(150px, 1fr) 150px 150px;
+  padding: 12px;
+}
+
+.auto-reply-settings {
+  border: 1px solid #dbe5f0;
+  border-radius: 12px;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+}
+
+.auto-reply-settings legend {
+  color: #16243a;
+  font-weight: 900;
+  padding: 0 6px;
+}
+
+.checkbox-row {
+  align-items: center;
+  display: flex !important;
+  gap: 10px;
+}
+
+.checkbox-row input {
+  width: auto;
+}
+
+.settings-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .dealer-staff-form label,
+.operations-settings-form label,
 .user-limit-card label {
   display: grid;
   gap: 6px;
 }
 
 .dealer-staff-form input,
+.operations-settings-form input,
+.operations-settings-form select,
+.operations-settings-form textarea,
 .user-limit-card input {
   border: 1px solid #aaa;
   border-radius: 4px;
   min-height: 38px;
   padding: 0 10px;
+}
+
+.operations-settings-form textarea {
+  line-height: 1.45;
+  min-height: 140px;
+  padding: 10px;
+  resize: vertical;
 }
 
 .user-limit-card {
@@ -4058,6 +4123,53 @@ body.admin-drawer-open {
   background: #e11d48;
 }
 
+.sop-progress-panel {
+  background: #f8fafc;
+  border: 1px solid #dbe5f0;
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  margin: 8px 0;
+  padding: 12px;
+}
+
+.sop-progress-panel > div:first-child {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.sop-progress-panel strong {
+  color: #16243a;
+}
+
+.sop-progress-panel span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sop-progress-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sop-progress-steps span {
+  background: #fff;
+  border: 1px solid #dbe5f0;
+  border-radius: 999px;
+  color: #64748b;
+  padding: 7px 10px;
+}
+
+.sop-progress-steps span.done {
+  background: #e8f7ef;
+  border-color: #8fd3a4;
+  color: #1f6f35;
+}
+
 .lead-shared-meta {
   display: grid;
   gap: 8px;
@@ -5584,6 +5696,10 @@ body.admin-drawer-open {
   .dealer-lead-group > header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .business-hours-row {
+    grid-template-columns: 1fr;
   }
 }
 

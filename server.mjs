@@ -9,6 +9,11 @@ import {
   notifyDuplicateSellerLead,
   reviewDuplicateSellerLead
 } from "./api/_lead-signals.js";
+import {
+  getOperationsSettings,
+  maybeSendAfterHoursAutoReply,
+  saveOperationsSettings
+} from "./api/_operations-settings.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(path.join(__dirname, ".env.local"));
@@ -171,6 +176,21 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "DELETE") {
         const result = await deleteDealerStaff(url.searchParams.get("email") || "");
         return sendJson(res, result.ok ? 200 : 400, result);
+      }
+    }
+
+    if (url.pathname === "/api/operations-settings") {
+      const admin = await requireAdmin(req);
+      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+      const client = { url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_ROLE_KEY };
+      if (req.method === "GET") {
+        const result = await getOperationsSettings(client);
+        return sendJson(res, result.ok ? 200 : result.status || 500, result);
+      }
+      if (req.method === "PATCH") {
+        const body = await readJson(req);
+        const result = await saveOperationsSettings(client, body.settings || body || {}, admin.user);
+        return sendJson(res, result.ok ? 200 : result.status || 400, result);
       }
     }
 
@@ -786,6 +806,10 @@ async function saveLead(body) {
         key: process.env.SUPABASE_SERVICE_ROLE_KEY
       }, savedLead);
     }
+    await maybeSendAfterHoursAutoReply({
+      url: process.env.SUPABASE_URL,
+      key: process.env.SUPABASE_SERVICE_ROLE_KEY
+    }, savedLead, { leadType: leadSourceLabel(savedLead.input?.leadSource) }).catch(() => null);
   }
   const webhook = await submitLeadToWebhook(savedLead, uploadFiles);
   if (saved.ok && savedLead.id) {
@@ -1617,6 +1641,10 @@ async function createBuyerInquiry(body) {
       noteType: "call",
       note: buyerInquiryActivityNote({ name, email, phone, message, vehicle, finance, purchase })
     }, { email: "buy-page@autoswitch.local" }).catch(() => null);
+    await maybeSendAfterHoursAutoReply({ url, key }, {
+      ...lead,
+      id: savedLead.lead.id
+    }, { leadType: "Buyer inquiry" }).catch(() => null);
   }
 
   return {

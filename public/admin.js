@@ -20,6 +20,10 @@ const adminLeadSortSelect = document.querySelector("#admin-lead-sort");
 const adminLeadDrawer = document.querySelector("#admin-lead-drawer");
 const adminLeadDrawerContent = document.querySelector("#admin-lead-drawer-content");
 const dealerStaffForm = document.querySelector("#dealer-staff-form");
+const operationsSettingsForm = document.querySelector("#operations-settings-form");
+const operationsSettingsStatus = document.querySelector("#operations-settings-status");
+const businessHoursGrid = document.querySelector("#business-hours-grid");
+const reloadOperationsSettingsButton = document.querySelector("#reload-operations-settings");
 const reloadDealersButton = document.querySelector("#reload-dealers");
 const reloadUsersButton = document.querySelector("#reload-users");
 const reloadLeadsButton = document.querySelector("#reload-leads");
@@ -36,6 +40,15 @@ const adminTurnstileStatus = document.querySelector("#admin-turnstile-status");
 const AUTO_REFRESH_MS = 30000;
 const ADMIN_LEAD_READ_TOKENS_KEY = "autoswitch-admin-lead-read-tokens";
 const ADMIN_DASHBOARD_RANGE_KEY = "autoswitch-admin-dashboard-range";
+const BUSINESS_DAYS = [
+  ["1", "Monday"],
+  ["2", "Tuesday"],
+  ["3", "Wednesday"],
+  ["4", "Thursday"],
+  ["5", "Friday"],
+  ["6", "Saturday"],
+  ["0", "Sunday"]
+];
 
 let supabaseClient = null;
 let adminSession = null;
@@ -66,10 +79,12 @@ reloadLeadsButton.addEventListener("click", () => Promise.all([
   loadInventory()
 ]));
 reloadDealersButton.addEventListener("click", loadDealers);
+reloadOperationsSettingsButton?.addEventListener("click", loadOperationsSettings);
 reloadInventoryButton?.addEventListener("click", loadInventory);
 reloadInquiriesButton?.addEventListener("click", loadInquiries);
 clearLeadsButton?.addEventListener("click", clearAllLeads);
 dealerStaffForm.addEventListener("submit", addDealer);
+operationsSettingsForm?.addEventListener("submit", saveOperationsSettings);
 adminLoginButton.addEventListener("click", signInAdmin);
 adminLogoutButton.addEventListener("click", signOutAdmin);
 adminLeadFilterButtons.forEach((button) => {
@@ -243,6 +258,7 @@ async function setAdminSession(session) {
     statusEl.textContent = "";
     usersStatusEl.textContent = "";
     dealersStatusEl.textContent = "";
+    if (operationsSettingsStatus) operationsSettingsStatus.textContent = "";
     inventoryStatusEl.textContent = "";
     inquiriesStatusEl.textContent = "";
     leadsEl.innerHTML = "";
@@ -261,6 +277,7 @@ async function setAdminSession(session) {
     statusEl.textContent = "Ask the site owner to add this email to ADMIN_EMAILS in Vercel.";
     usersStatusEl.textContent = "";
     dealersStatusEl.textContent = "";
+    if (operationsSettingsStatus) operationsSettingsStatus.textContent = "";
     inventoryStatusEl.textContent = "";
     inquiriesStatusEl.textContent = "";
     leadsEl.innerHTML = "";
@@ -272,7 +289,7 @@ async function setAdminSession(session) {
   }
 
   adminAuthStatus.textContent = `Signed in as ${session.user.email}`;
-  await Promise.all([loadLeads(), loadUsers(), loadDealers(), loadInventory()]);
+  await Promise.all([loadLeads(), loadUsers(), loadDealers(), loadInventory(), loadOperationsSettings()]);
   startAdminAutoRefresh();
 }
 
@@ -283,6 +300,99 @@ async function checkAdminAccess() {
   } catch (error) {
     return { ok: false, error: error.message || "Unable to verify admin access." };
   }
+}
+
+function ensureBusinessHoursGrid() {
+  if (!businessHoursGrid || businessHoursGrid.children.length) return;
+  businessHoursGrid.innerHTML = BUSINESS_DAYS.map(([day, label]) => `
+    <div class="business-hours-row" data-day="${escapeHtml(day)}">
+      <label class="checkbox-row">
+        <input name="dayEnabled:${escapeHtml(day)}" type="checkbox" />
+        <span>${escapeHtml(label)}</span>
+      </label>
+      <label>
+        <span>Start</span>
+        <input name="dayStart:${escapeHtml(day)}" type="time" />
+      </label>
+      <label>
+        <span>End</span>
+        <input name="dayEnd:${escapeHtml(day)}" type="time" />
+      </label>
+    </div>
+  `).join("");
+}
+
+async function loadOperationsSettings() {
+  if (!adminSession || !operationsSettingsForm) return;
+  ensureBusinessHoursGrid();
+  operationsSettingsStatus.textContent = "Loading operations settings...";
+  const response = await fetch("/api/operations-settings", { headers: authHeaders() });
+  const data = await response.json().catch(() => ({}));
+  if (!data.ok) {
+    operationsSettingsStatus.textContent = formatApiError(data, "Unable to load operations settings.");
+    return;
+  }
+  renderOperationsSettings(data.settings || {});
+  operationsSettingsStatus.textContent = data.warning || "Operations settings loaded.";
+}
+
+function renderOperationsSettings(settings = {}) {
+  ensureBusinessHoursGrid();
+  const timezone = operationsSettingsForm.elements.timezone;
+  if (timezone) timezone.value = settings.timezone || "America/Toronto";
+  const byDay = new Map((settings.businessHours || []).map((item) => [String(item.day), item]));
+  for (const [day] of BUSINESS_DAYS) {
+    const item = byDay.get(day) || {};
+    const enabled = operationsSettingsForm.elements[`dayEnabled:${day}`];
+    const start = operationsSettingsForm.elements[`dayStart:${day}`];
+    const end = operationsSettingsForm.elements[`dayEnd:${day}`];
+    if (enabled) enabled.checked = item.enabled !== false;
+    if (start) start.value = item.start || (day === "0" ? "10:00" : "09:00");
+    if (end) end.value = item.end || (day === "0" ? "17:00" : "18:00");
+  }
+  const autoReply = settings.autoReply || {};
+  operationsSettingsForm.elements.autoReplyEnabled.checked = Boolean(autoReply.enabled);
+  operationsSettingsForm.elements.fromEmail.value = autoReply.fromEmail || "";
+  operationsSettingsForm.elements.subject.value = autoReply.subject || "";
+  operationsSettingsForm.elements.body.value = autoReply.body || "";
+}
+
+async function saveOperationsSettings(event) {
+  event.preventDefault();
+  if (!adminSession || !operationsSettingsForm) return;
+  const settings = operationsSettingsPayload();
+  operationsSettingsStatus.textContent = "Saving operations settings...";
+  const response = await fetch("/api/operations-settings", {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ settings })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!data.ok) {
+    operationsSettingsStatus.textContent = formatApiError(data, "Unable to save operations settings.");
+    return;
+  }
+  renderOperationsSettings(data.settings || settings);
+  operationsSettingsStatus.textContent = "Operations settings saved.";
+}
+
+function operationsSettingsPayload() {
+  ensureBusinessHoursGrid();
+  return {
+    timezone: operationsSettingsForm.elements.timezone.value,
+    businessHours: BUSINESS_DAYS.map(([day]) => ({
+      day: Number(day),
+      enabled: Boolean(operationsSettingsForm.elements[`dayEnabled:${day}`]?.checked),
+      start: operationsSettingsForm.elements[`dayStart:${day}`]?.value || "09:00",
+      end: operationsSettingsForm.elements[`dayEnd:${day}`]?.value || "18:00"
+    })),
+    autoReply: {
+      enabled: Boolean(operationsSettingsForm.elements.autoReplyEnabled.checked),
+      fromEmail: operationsSettingsForm.elements.fromEmail.value,
+      subject: operationsSettingsForm.elements.subject.value,
+      body: operationsSettingsForm.elements.body.value
+    }
+  };
 }
 
 async function loadUsers() {

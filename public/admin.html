@@ -129,6 +129,54 @@
       </section>
       <details id="operations-settings" class="admin-operations">
         <summary>Operations settings</summary>
+      <section class="admin-section admin-section-hours">
+        <div class="admin-section-head">
+          <div>
+            <h2>Business hours and auto reply</h2>
+            <p>Set working hours by weekday. Leads received outside these hours can receive an automatic email reply.</p>
+          </div>
+          <button id="reload-operations-settings" type="button">Reload settings</button>
+        </div>
+        <form id="operations-settings-form" class="operations-settings-form">
+          <label>
+            <span>Time zone</span>
+            <select name="timezone">
+              <option value="America/Toronto">Eastern - Toronto</option>
+              <option value="America/Vancouver">Pacific - Vancouver</option>
+              <option value="America/Edmonton">Mountain - Edmonton</option>
+              <option value="America/Winnipeg">Central - Winnipeg</option>
+              <option value="America/Halifax">Atlantic - Halifax</option>
+              <option value="America/St_Johns">Newfoundland - St. John's</option>
+              <option value="Asia/Shanghai">China - Shanghai</option>
+              <option value="UTC">UTC</option>
+            </select>
+          </label>
+          <div id="business-hours-grid" class="business-hours-grid" aria-label="Weekly business hours"></div>
+          <fieldset class="auto-reply-settings">
+            <legend>After-hours auto reply</legend>
+            <label class="checkbox-row">
+              <input name="autoReplyEnabled" type="checkbox" />
+              <span>Send auto reply outside business hours</span>
+            </label>
+            <label>
+              <span>From email</span>
+              <input name="fromEmail" type="email" placeholder="sales@yourdomain.com" />
+            </label>
+            <label>
+              <span>Email subject</span>
+              <input name="subject" placeholder="We received your vehicle request" />
+            </label>
+            <label>
+              <span>Email body</span>
+              <textarea name="body" rows="7" placeholder="Use {{name}}, {{vehicle}}, and {{leadType}} as placeholders."></textarea>
+            </label>
+          </fieldset>
+          <div class="settings-actions">
+            <button type="submit">Save operations settings</button>
+            <span id="operations-settings-status" class="status">Loading operations settings...</span>
+          </div>
+        </form>
+      </section>
       <section class="admin-section admin-section-access">
         <div class="admin-section-head">
           <div>

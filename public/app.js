@@ -1847,6 +1847,7 @@ function renderDealerDrawer(leadId) {
                 <small>${escapeHtml(followUp ? `Next follow-up ${formatDateTime(followUp)}` : "Set the next follow-up before leaving this workspace.")}</small>
               </div>
               ${renderDealerLeadProgress(buyerLead, status)}
+              ${renderDealerSopProgress(lead)}
               <div class="drawer-meta-grid">
                 <div class="drawer-meta-item">
                   <span>Customer</span>
@@ -2691,6 +2692,36 @@ function renderDealerLeadProgress(buyerLead, status) {
       }).join("")}
       ${closedLost ? `<li class="active closed"><span></span><b>${escapeHtml(current.replaceAll("_", " "))}</b></li>` : ""}
     </ol>
+  `;
+}
+
+function renderDealerSopProgress(lead) {
+  const status = String(lead?.status || "new").toLowerCase();
+  const buyer = isBuyerLead(lead);
+  const hasContact = Boolean(lead?.last_activity_at) || ["contacted", "waiting_for_customer", "inspection_booked", "appointment_booked", "finance_sent", "offer_sent", "in_inventory", "won", "lost", "closed"].includes(status);
+  const hasNextStep = Boolean(lead?.next_follow_up_at) || hasDealerOpenTask(lead) || ["inspection_booked", "appointment_booked", "in_inventory", "won", "lost", "closed"].includes(status);
+  const hasQuoteOrAppointment = buyer
+    ? ["appointment_booked", "finance_sent", "offer_sent", "won", "lost", "closed"].includes(status)
+    : ["inspection_booked", "offer_sent", "in_inventory", "won", "lost", "closed"].includes(status);
+  const isClosed = isDealerClosedLead(lead);
+  const steps = [
+    { label: "New lead", done: true },
+    { label: "Contact logged", done: hasContact },
+    { label: "Next step set", done: hasNextStep },
+    { label: buyer ? "Appointment / finance" : "Inspection / offer", done: hasQuoteOrAppointment },
+    { label: "Closed", done: isClosed }
+  ];
+  const doneCount = steps.filter((step) => step.done).length;
+  return `
+    <section class="sop-progress-panel" aria-label="SOP progress">
+      <div>
+        <strong>SOP progress</strong>
+        <span>${escapeHtml(doneCount)} / ${escapeHtml(steps.length)} complete</span>
+      </div>
+      <div class="sop-progress-steps">
+        ${steps.map((step) => `<span class="${step.done ? "done" : ""}">${escapeHtml(step.label)}</span>`).join("")}
+      </div>
+    </section>
   `;
 }
 
