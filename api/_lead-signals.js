@@ -573,6 +573,7 @@ function buildDealDeskSummary(lead, notes) {
 
 function dealChecklistTemplateItems(lead) {
   const status = String(lead?.status || "").trim().toLowerCase();
+  const inventoryStatus = String(lead?.vehicle_context?.primary_inventory_status || "").trim().toLowerCase();
   if (isBuyerLead(lead) && status === "won") {
     return [
       { key: "docs_ready", label: "Docs ready" },
@@ -581,10 +582,28 @@ function dealChecklistTemplateItems(lead) {
       { key: "vehicle_picked_up", label: "Vehicle picked up" }
     ];
   }
+  if (!isBuyerLead(lead) && inventoryStatus === "sold") {
+    return [
+      { key: "sold_deal_recorded", label: "Sold deal recorded" },
+      { key: "delivery_confirmed", label: "Delivery confirmed" },
+      { key: "gross_confirmed", label: "Gross confirmed" },
+      { key: "final_docs_complete", label: "Final docs complete" }
+    ];
+  }
+  if (!isBuyerLead(lead) && inventoryStatus === "published") {
+    return [
+      { key: "listing_live", label: "Listing live" },
+      { key: "photos_approved", label: "Photos approved" },
+      { key: "price_approved", label: "Price approved" },
+      { key: "sales_followup_ready", label: "Sales follow-up ready" }
+    ];
+  }
   if (!isBuyerLead(lead) && ["in_inventory", "won"].includes(status)) {
     return [
       { key: "intake_photos_complete", label: "Intake photos complete" },
       { key: "keys_collected", label: "Keys collected" },
+      { key: "recon_estimate_ready", label: "Recon estimate ready" },
+      { key: "repairs_complete", label: "Repairs complete" },
       { key: "pricing_approved", label: "Pricing approved" },
       { key: "publish_review_complete", label: "Publish review complete" }
     ];

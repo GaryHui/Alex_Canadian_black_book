@@ -1443,6 +1443,12 @@ async function updateInventoryListing(body, user) {
   if (!id) return { ok: false, status: 400, error: "Listing id is required" };
   if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
 
+  const previousResult = await fetchSupabaseJson(
+    `${url}/rest/v1/vehicle_listings?select=id,source_lead_id,status,title&id=eq.${encodeURIComponent(id)}&limit=1`,
+    key
+  );
+  if (!previousResult.ok) return previousResult;
+  const previousListing = previousResult.data?.[0] || null;
   const status = normalizeListingStatus(body.status);
   const patch = {
     status,
@@ -1471,7 +1477,16 @@ async function updateInventoryListing(body, user) {
   if (Array.isArray(body.selectedPhotoUrls)) {
     await syncSelectedListingPhotos({ url, key }, id, String(body.sourceLeadId || "").trim(), body.selectedPhotoUrls);
   }
-  return { ok: true, listing: publicInventoryRow(saveResult.data?.[0] || { ...saveResult.payload, id }) };
+  const savedListing = saveResult.data?.[0] || { ...saveResult.payload, id };
+  await recordInventoryLifecycleUpdate({
+    url,
+    key,
+    listing: savedListing,
+    previousStatus: previousListing?.status || "",
+    user,
+    isNew: false
+  });
+  return { ok: true, listing: publicInventoryRow(savedListing) };
 }
 
 async function deleteInventoryListing(id, user) {
@@ -1554,7 +1569,71 @@ async function publishLeadToInventory(body, user) {
   if (isPublicOptionEnabled(savedListing.public_options || listing.public_options, "showPhotos")) {
     await attachLeadPhotosToListing(leadId, savedListing.id || existingId, { url, key });
   }
+  await recordInventoryLifecycleUpdate({
+    url,
+    key,
+    listing: savedListing,
+    previousStatus: existing.data?.[0]?.status || "",
+    user,
+    isNew: !existingId
+  });
   return { ok: true, listing: publicInventoryRow(savedListing), updated: Boolean(existingId) };
+}
+
+async function recordInventoryLifecycleUpdate({ url, key, listing, previousStatus, user, isNew }) {
+  const leadId = String(listing?.source_lead_id || "").trim();
+  if (!url || !key || !leadId) return;
+  const status = normalizeListingStatus(listing.status);
+  const prior = normalizeListingStatus(previousStatus || "");
+  if (!isNew && prior === status) return;
+
+  const author = String(user?.email || listing.created_by || "inventory@autoswitch.local").trim().toLowerCase();
+  const title = String(listing.title || "Vehicle").trim();
+  const messages = {
+    draft: `Recon started for ${title}. Complete photos, keys, recon estimate, repairs, pricing, and publish review.`,
+    review: `Inventory review started for ${title}. Manager should approve price, photos, and listing readiness.`,
+    published: `${title} is now listed for sale. Sales team should monitor buyer activity and follow-up tasks.`,
+    sold: `${title} marked sold. Confirm delivery, gross, final documents, and close the CRM record.`,
+    archived: `${title} archived from active inventory. Confirm whether the CRM record needs follow-up.`
+  };
+  const note = messages[status] || `Inventory status changed to ${status} for ${title}.`;
+  await insertSupabaseJson(`${url}/rest/v1/lead_notes`, key, {
+    lead_id: leadId,
+    author_email: author,
+    note_type: "internal",
+    note: `[Inventory lifecycle:${status}] ${note}`
+  }).catch(() => null);
+
+  if (["draft", "review", "published", "sold"].includes(status)) {
+    await createOwnerReviewNote({
+      url,
+      key,
+      leadId,
+      authorEmail: author,
+      reason: status === "sold"
+        ? "Vehicle marked sold. Confirm final delivery, gross, and documents."
+        : status === "published"
+          ? "Vehicle published. Confirm listing, price, photos, and sales handoff."
+          : "Vehicle moved into recon/inventory review. Confirm intake, recon, pricing, and publish readiness."
+    });
+  }
+
+  if (["draft", "review", "published"].includes(status)) {
+    await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+      method: "PATCH",
+      headers: {
+        ...supabaseServiceHeaders(key),
+        "Content-Type": "application/json",
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify({
+        status: "in_inventory",
+        last_activity_at: new Date().toISOString()
+      })
+    }).catch(() => null);
+  } else {
+    await touchLeadActivity({ url, key, leadId });
+  }
 }
 
 async function saveVehicleListingWithRetry({ url, key, method, payload }) {

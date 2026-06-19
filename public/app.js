@@ -3373,8 +3373,18 @@ function dealerDealDeskItemLabel(key) {
     vehicle_picked_up: "Vehicle picked up",
     intake_photos_complete: "Intake photos complete",
     keys_collected: "Keys collected",
+    recon_estimate_ready: "Recon estimate ready",
+    repairs_complete: "Repairs complete",
     pricing_approved: "Pricing approved",
-    publish_review_complete: "Publish review complete"
+    publish_review_complete: "Publish review complete",
+    listing_live: "Listing live",
+    photos_approved: "Photos approved",
+    price_approved: "Price approved",
+    sales_followup_ready: "Sales follow-up ready",
+    sold_deal_recorded: "Sold deal recorded",
+    delivery_confirmed: "Delivery confirmed",
+    gross_confirmed: "Gross confirmed",
+    final_docs_complete: "Final docs complete"
   };
   return labels[String(key || "").trim().toLowerCase()] || "Deal desk item";
 }
