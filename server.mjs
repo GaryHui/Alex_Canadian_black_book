@@ -258,9 +258,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && url.pathname === "/api/lead-photos") {
-      const admin = await requireAdmin(req);
-      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
-      const result = await uploadLeadPhotos(await readJson(req), admin.user);
+      const dealer = await requireDealer(req);
+      if (!dealer.ok) return sendJson(res, dealer.status, { ok: false, error: dealer.error });
+      const body = await readJson(req);
+      const access = await canAccessLead(body.leadId, dealer);
+      if (!access.ok) return sendJson(res, access.status || 403, { ok: false, error: access.error });
+      const result = await uploadLeadPhotos(body, dealer.user);
       return sendJson(res, result.ok ? 200 : result.status || 400, result);
     }
 

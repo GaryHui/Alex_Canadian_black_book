@@ -4772,6 +4772,14 @@ body.admin-drawer-open {
   color: #555;
 }
 
+.dealer-photo-manager {
+  grid-template-columns: minmax(150px, 190px) minmax(220px, 1fr) auto;
+}
+
+.dealer-photo-manager .lead-photo-status {
+  color: #4b5563;
+}
+
 .inventory-publish-form {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

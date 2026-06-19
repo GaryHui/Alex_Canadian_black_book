@@ -2289,7 +2289,7 @@ function renderLead(lead, index = 0) {
         <div>
           <span>Warehouse</span>
           <strong>This seller vehicle is already in inventory.</strong>
-          <small>Photos, listing details, price, public visibility, sold/archive actions are managed in Warehouse.</small>
+          <small>Staff can keep uploading intake/recon photos from the lead; Warehouse is for manager approval, public photo selection, price, visibility, sold/archive.</small>
         </div>
         <button type="button" data-view-inventory="${escapeHtml(inventoryListing.id || "")}">Open warehouse listing</button>
       </section>` : `
@@ -2987,7 +2987,7 @@ function leadStatusOptions(buyer) {
         { value: "inspection_booked", label: "Inspection booked" },
         { value: "offer_sent", label: "Offer sent" },
         { value: "in_inventory", label: "In inventory" },
-        { value: "won", label: "Purchased" },
+        { value: "won", label: "Acquired / consigned" },
         { value: "lost", label: "Lost" },
         { value: "closed", label: "Closed" },
         { value: "deleted", label: "Deleted" }
@@ -3108,8 +3108,8 @@ function leadStatusActions(buyer, status) {
         ["waiting_for_customer", "Waiting"],
         ["inspection_booked", "Inspection"],
         ["offer_sent", "Offer sent"],
+        ["won", "Acquired / consigned"],
         ["in_inventory", "In inventory"],
-        ["won", "Purchased"],
         ["lost", "Lost"]
       ];
   return actions
@@ -3133,8 +3133,8 @@ function leadProgressSteps(buyer) {
         ["contacted", "Contacted"],
         ["inspection_booked", "Inspection"],
         ["offer_sent", "Offer"],
-        ["in_inventory", "Inventory"],
-        ["won", "Purchased"]
+        ["won", "Acquired"],
+        ["in_inventory", "Inventory"]
       ];
 }
 

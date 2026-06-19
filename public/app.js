@@ -252,6 +252,12 @@ dealerLeadDrawer?.addEventListener("click", async (event) => {
     return;
   }
 
+  const uploadPhotosButton = event.target.closest("[data-dealer-upload-lead-photos]");
+  if (uploadPhotosButton) {
+    await uploadDealerLeadPhotos(uploadPhotosButton);
+    return;
+  }
+
   const noteTypeButton = event.target.closest("[data-drawer-note-type]");
   if (noteTypeButton) {
     const type = noteTypeButton.dataset.drawerNoteType || "internal";
@@ -1938,6 +1944,7 @@ function renderDealerDrawer(leadId) {
             </section>
             ${renderDealerCommunicationStrip(lead)}
             ${renderDealerDealChecklistSection(lead)}
+            ${renderDealerPhotoSection(lead)}
             <section class="dealer-drawer-section">
               <header>
                 <h3>Log touch</h3>
@@ -2022,6 +2029,43 @@ function renderDealerDrawer(leadId) {
             </details>
           </div>
         </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderDealerPhotoSection(lead) {
+  if (isBuyerLead(lead)) return "";
+  const id = String(lead?.id || activeDealerDrawerLeadId || "").trim();
+  const options = [
+    "Exterior",
+    "Interior",
+    "Damage",
+    "Odometer",
+    "VIN",
+    "Keys / documents",
+    "Recon",
+    "Listing"
+  ];
+  return `
+    <section class="dealer-drawer-section dealer-photo-section">
+      <header>
+        <h3>Vehicle photos</h3>
+        <span>Staff uploads intake, recon, and listing photos. Manager approves public photos in Warehouse.</span>
+      </header>
+      <div class="lead-photo-manager dealer-photo-manager" data-lead-id="${escapeHtml(id)}">
+        <label>
+          <span>Photo type</span>
+          <select name="photoLabel">
+            ${options.map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join("")}
+          </select>
+        </label>
+        <label class="dealer-photo-file">
+          <span>Choose photos</span>
+          <input name="leadPhotos" type="file" accept="image/*" multiple />
+        </label>
+        <button type="button" data-dealer-upload-lead-photos="${escapeHtml(id)}">Upload photos</button>
+        <p class="lead-photo-status" aria-live="polite">Use this for appraisal, condition, repair, and listing photos.</p>
       </div>
     </section>
   `;
@@ -2847,8 +2891,8 @@ function dealerStatusActions(buyerLead, status) {
         ["waiting_for_customer", "Waiting"],
         ["inspection_booked", "Inspection booked"],
         ["offer_sent", "Offer sent"],
-        ["in_inventory", "Moved to inventory"],
-        ["won", "Purchased"],
+        ["won", "Acquired / consigned"],
+        ["in_inventory", "Move to inventory"],
         ["lost", "Lost"]
       ];
   return actions
@@ -2872,8 +2916,8 @@ function dealerLeadProgressSteps(buyerLead) {
         ["contacted", "Contacted"],
         ["inspection_booked", "Inspection"],
         ["offer_sent", "Offer"],
-        ["in_inventory", "Inventory"],
-        ["won", "Purchased"]
+        ["won", "Acquired"],
+        ["in_inventory", "Inventory"]
       ];
 }
 
@@ -2987,7 +3031,10 @@ function dealerTaskTemplates(buyerLead) {
     { key: "verify_vehicle", label: "Verify vehicle", hint: "VIN, km, lien, condition", title: "Verify seller vehicle details: VIN, kilometers, ownership/lien, accident history, and condition.", due: "today" },
     { key: "request_photos", label: "Request photos", hint: "Exterior/interior/VIN", title: "Request seller photos: exterior, interior, odometer, VIN, damage, and ownership documents.", due: "today" },
     { key: "book_inspection", label: "Book inspection", hint: "Appraisal appointment", title: "Book seller inspection/appraisal appointment and confirm location.", due: "tomorrow" },
-    { key: "send_offer", label: "Send offer", hint: "Purchase or consignment", title: "Prepare purchase or consignment offer with terms, commission, conditions, and expiry time.", due: "tomorrow" }
+    { key: "capture_intake_photos", label: "Upload intake photos", hint: "Staff photo package", title: "Upload intake photo package: exterior, interior, odometer, VIN, damage, keys/documents, and any recon concerns.", due: "today" },
+    { key: "recon_estimate", label: "Recon estimate", hint: "Repair cost/time", title: "Get recon estimate: mechanical, detailing, safety, tires/brakes, cost, timeline, and blockers.", due: "tomorrow" },
+    { key: "send_offer", label: "Send offer", hint: "Purchase or consignment", title: "Prepare purchase or consignment offer with terms, commission, conditions, and expiry time.", due: "tomorrow" },
+    { key: "manager_publish_review", label: "Manager publish review", hint: "Price/photos/listing", title: "Manager review needed: approve price, recon spend, public photos, and publish readiness.", due: "today" }
   ];
   return buyerLead ? [...shared, ...buyer] : [...shared, ...seller];
 }
@@ -3010,6 +3057,75 @@ function applyDealerTaskTemplate(key) {
 function applyDealerTaskDue(due) {
   const dueAt = dealerLeadDrawerContent?.querySelector('.dealer-drawer-task-form input[name="dueAt"]');
   if (dueAt) dueAt.value = dealerTaskDueValue(due);
+}
+
+async function uploadDealerLeadPhotos(button) {
+  const manager = button.closest(".lead-photo-manager");
+  const leadId = button.dataset.dealerUploadLeadPhotos || manager?.dataset.leadId || activeDealerDrawerLeadId || "";
+  const fileInput = manager?.querySelector("input[name='leadPhotos']");
+  const labelInput = manager?.querySelector("select[name='photoLabel']");
+  const status = manager?.querySelector(".lead-photo-status");
+  const files = [...(fileInput?.files || [])];
+  if (!leadId || !files.length) {
+    if (status) status.textContent = "Choose at least one photo first.";
+    return;
+  }
+
+  button.disabled = true;
+  if (status) status.textContent = "Preparing photos...";
+  dealerLeadsStatus.textContent = "Uploading vehicle photos...";
+  try {
+    const photoFiles = [];
+    for (const file of files) {
+      photoFiles.push(await dealerFileToBase64Payload(file, labelInput?.value || "Vehicle photo"));
+    }
+    if (status) status.textContent = "Uploading photos to the lead timeline...";
+    const response = await fetch("/api/lead-photos", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${authSession?.access_token || ""}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ leadId, files: photoFiles })
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || data.message || "Unable to upload photos.");
+    const message = `${data.photos?.length || photoFiles.length} photo(s) uploaded to the timeline.`;
+    if (status) status.textContent = message;
+    dealerLeadsStatus.textContent = message;
+    if (fileInput) fileInput.value = "";
+    dealerDrawerActivityLoaded = false;
+    await Promise.all([
+      loadDealerLeads({ forceActivity: true, suppressAlerts: true }),
+      loadDealerDrawerActivity({ force: true, highlightLatest: true })
+    ]);
+  } catch (error) {
+    const message = error.message || "Unable to upload photos.";
+    if (status) status.textContent = message;
+    dealerLeadsStatus.textContent = message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function dealerFileToBase64Payload(file, label) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      resolve({
+        name: file.name,
+        originalName: file.name,
+        role: label,
+        angle: label,
+        mimeType: file.type || "image/jpeg",
+        size: file.size,
+        base64: result.includes(",") ? result.split(",").pop() : result
+      });
+    };
+    reader.onerror = () => reject(new Error("Unable to read photo file."));
+    reader.readAsDataURL(file);
+  });
 }
 
 function dealerTaskDueValue(due) {
