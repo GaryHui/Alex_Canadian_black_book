@@ -2770,6 +2770,15 @@ body.admin-drawer-open {
   gap: 4px;
 }
 
+.lead-list-label {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .lead-list-col > strong {
   color: #16243a;
   font-size: 14px;

@@ -38,6 +38,7 @@ const dealerAdminLinks = document.querySelectorAll("[data-dealer-admin-link]");
 const saveValuationLeadButton = document.querySelector("#save-valuation-lead");
 const DEALER_REFRESH_MS = 30000;
 const DEALER_LEAD_READ_TOKENS_KEY = "autoswitch-dealer-lead-read-tokens";
+const ADMIN_LEAD_READ_TOKENS_KEY = "autoswitch-admin-lead-read-tokens";
 const DEALER_DASHBOARD_RANGE_KEY = "autoswitch-dealer-dashboard-range";
 const drilldownSuggestions = {
   Honda: {
@@ -1283,7 +1284,7 @@ async function setSession(session) {
     await loadDealerDirectory();
     loadUsage();
     loadHistory();
-    loadDealerLeads({ forceActivity: true, suppressAlerts: true });
+    loadDealerLeads({ forceActivity: true, suppressAlerts: dealer.role !== "admin" });
     startDealerAutoRefresh();
   } else {
     closeDealerDrawer();
@@ -1515,7 +1516,10 @@ function rememberDealerLeadTokens(leads) {
 
 function loadDealerLeadReadTokens() {
   try {
-    return JSON.parse(window.localStorage.getItem(dealerLeadReadTokensKey()) || "{}") || {};
+    const dealerTokens = JSON.parse(window.localStorage.getItem(dealerLeadReadTokensKey()) || "{}") || {};
+    if (dealerLeadRole !== "admin") return dealerTokens;
+    const adminTokens = JSON.parse(window.localStorage.getItem(ADMIN_LEAD_READ_TOKENS_KEY) || "{}") || {};
+    return { ...adminTokens, ...dealerTokens };
   } catch {
     return {};
   }
@@ -1621,6 +1625,7 @@ function renderDealerLeads(leads, role) {
       <article class="history-card dealer-lead-card dealer-lead-${leadKind} dealer-lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${String(lead.priority || "").toLowerCase() === "urgent" ? "dealer-lead-card-urgent" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "dealer-lead-updated" : ""}" data-lead-id="${escapeHtml(lead.id || "")}" data-update-token="${escapeHtml(updateToken)}">
         <section class="lead-list-row dealer-list-row">
           <div class="lead-list-col lead-list-col-main">
+            <span class="lead-list-label">Lead</span>
             <div class="dealer-lead-title">
               <b class="dealer-type-pill dealer-type-${leadKind}">${escapeHtml(leadTypeLabel)}</b>
               <b class="lead-source-pill">${escapeHtml(sourceLabel)}</b>
@@ -1634,6 +1639,7 @@ function renderDealerLeads(leads, role) {
             </div>
           </div>
           <div class="lead-list-col">
+            <span class="lead-list-label">Customer</span>
             <strong>${escapeHtml(customerSummary)}</strong>
             <div class="lead-list-subline">
               ${customerName && customerEmail !== "-" ? `<span>${escapeHtml(customerEmail)}</span>` : ""}
@@ -1642,6 +1648,7 @@ function renderDealerLeads(leads, role) {
             </div>
           </div>
           <div class="lead-list-col">
+            <span class="lead-list-label">Vehicle</span>
             <strong>${escapeHtml(vehicleSummary)}</strong>
             <div class="lead-list-subline">
               <span>${escapeHtml(vehicleContext.cluster_label || `VIN ${valuation.vin || input.vin || "-"}`)}</span>
@@ -1650,6 +1657,7 @@ function renderDealerLeads(leads, role) {
             </div>
           </div>
           <div class="lead-list-col">
+            <span class="lead-list-label">Next step</span>
             <strong>${escapeHtml(nextStepSummary)}</strong>
             <div class="lead-list-subline">
               <span>${escapeHtml(hasOpenTask ? "Task assigned" : overdue ? "Overdue" : followUp ? "Scheduled" : "Unscheduled")}</span>
@@ -1657,12 +1665,14 @@ function renderDealerLeads(leads, role) {
             </div>
           </div>
           <div class="lead-list-col">
+            <span class="lead-list-label">Pipeline</span>
             <strong>${escapeHtml(progressSummary)}</strong>
             <div class="lead-list-subline">
               <span>${escapeHtml(lastActivity ? `Last timeline update ${formatDateTime(lastActivity)}` : "No timeline yet")}</span>
             </div>
           </div>
           <div class="lead-list-col lead-list-col-actions">
+            <span class="lead-list-label">Quick actions</span>
             <div class="lead-quick-strip dealer-quick-strip" aria-label="Dealer quick actions">
               <span class="lead-current-badge" aria-hidden="true">CURRENT</span>
               <button type="button" class="lead-quick-button lead-quick-button-primary" data-dealer-open-workspace>Open workspace</button>

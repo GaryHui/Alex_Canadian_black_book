@@ -2214,6 +2214,7 @@ function renderLead(lead, index = 0) {
     <article class="lead-card lead-card-${leadType} lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${priority === "urgent" ? "lead-card-urgent" : ""} ${isClosedLead(lead) ? "lead-card-closed" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert && !unreadOwnerReview ? "lead-card-updated" : ""} ${mergeState.kind ? "lead-card-vehicle-child" : ""} ${needsDetailLayer ? "lead-card-has-detail-layer" : ""}" data-id="${escapeHtml(lead.id || "")}">
       <section class="lead-list-row">
         <div class="lead-list-col lead-list-col-main">
+          <span class="lead-list-label">Lead</span>
           <div class="lead-title-row">
             <b class="lead-type-pill lead-type-${leadType}">${escapeHtml(leadTypeLabel)}</b>
             <b class="lead-source-pill">${escapeHtml(sourceLabel)}</b>
@@ -2227,6 +2228,7 @@ function renderLead(lead, index = 0) {
           </div>
         </div>
         <div class="lead-list-col">
+          <span class="lead-list-label">Customer</span>
           <strong>${escapeHtml(customerDisplay)}</strong>
           <div class="lead-list-subline">
             ${customerName && customerEmail !== "-" ? `<span>${escapeHtml(customerEmail)}</span>` : ""}
@@ -2235,6 +2237,7 @@ function renderLead(lead, index = 0) {
           </div>
         </div>
         <div class="lead-list-col">
+          <span class="lead-list-label">Vehicle</span>
           <strong>${escapeHtml(vehicleContext.cluster_label || title)}</strong>
           <div class="lead-list-subline">
             <span>VIN ${escapeHtml(vin)}</span>
@@ -2243,6 +2246,7 @@ function renderLead(lead, index = 0) {
           </div>
         </div>
         <div class="lead-list-col">
+          <span class="lead-list-label">Next step</span>
           <strong>${escapeHtml(queueSummary)}</strong>
           <div class="lead-list-subline">
             <span>${escapeHtml(assignedTo ? `Rep ${shortEmail(assignedTo)}` : "Assign rep")}</span>
@@ -2250,12 +2254,14 @@ function renderLead(lead, index = 0) {
           </div>
         </div>
         <div class="lead-list-col">
+          <span class="lead-list-label">Pipeline</span>
           <strong>${escapeHtml(progressSummary)}</strong>
           <div class="lead-list-subline">
             <span>${escapeHtml(responseSummary)}</span>
           </div>
         </div>
         <div class="lead-list-col lead-list-col-actions">
+          <span class="lead-list-label">Quick actions</span>
           <div class="lead-quick-strip" aria-label="Lead quick actions">
             <span class="lead-current-badge" aria-hidden="true">CURRENT</span>
             <button type="button" class="lead-quick-button lead-quick-button-primary" data-admin-open-workspace>Open workspace</button>
