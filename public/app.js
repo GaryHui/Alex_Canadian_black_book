@@ -267,6 +267,12 @@ dealerLeadDrawer?.addEventListener("click", async (event) => {
     return;
   }
 
+  const taskDueButton = event.target.closest("[data-dealer-task-due]");
+  if (taskDueButton) {
+    applyDealerTaskDue(taskDueButton.dataset.dealerTaskDue || "today");
+    return;
+  }
+
   const checklistToggleButton = event.target.closest("[data-dealer-dealdesk-check]");
   if (checklistToggleButton && activeDealerDrawerLeadId) {
     const itemKey = checklistToggleButton.dataset.dealerDealdeskCheck || "";
@@ -519,6 +525,11 @@ dealerLeadDrawer?.addEventListener("submit", async (event) => {
       dealerLeadsStatus.textContent = error.message || "Unable to log email";
     }
   }
+});
+
+dealerLeadDrawer?.addEventListener("change", (event) => {
+  const preset = event.target.closest('.dealer-drawer-task-form select[name="taskPreset"]');
+  if (preset) applyDealerTaskTemplate(preset.value || "");
 });
 
 dealerLeadDrawer?.addEventListener("change", async (event) => {
@@ -1928,21 +1939,36 @@ function renderDealerDrawer(leadId) {
             <section class="dealer-drawer-section dealer-task-section">
               <header>
                 <h3>Task</h3>
-                <span>Use a SOP preset or write the next action manually.</span>
+                <span>Pick a common CRM task, adjust if needed, then add it.</span>
               </header>
-              <div class="task-template-grid">
-                ${dealerTaskTemplates(buyerLead).map((task) => `
-                  <button type="button" data-dealer-task-template="${escapeHtml(task.key)}">
-                    <strong>${escapeHtml(task.label)}</strong>
-                    <span>${escapeHtml(task.hint)}</span>
-                  </button>
-                `).join("")}
-              </div>
               <form class="dealer-task-form dealer-drawer-task-form">
-                <textarea name="title" placeholder="Next task: call customer, confirm appointment, request documents..."></textarea>
-                <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to dealer email" />
-                <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
-                <input name="dueAt" type="datetime-local" />
+                <label class="task-form-field">
+                  <span>Task type</span>
+                  <select name="taskPreset">
+                    <option value="">Custom task</option>
+                    ${dealerTaskTemplates(buyerLead).map((task) => `<option value="${escapeHtml(task.key)}">${escapeHtml(task.label)} - ${escapeHtml(task.hint)}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="task-form-field task-title-field">
+                  <span>Task</span>
+                  <textarea name="title" placeholder="Example: Call customer and confirm appointment time..."></textarea>
+                </label>
+                <div class="task-due-controls" aria-label="Task due date">
+                  <span>Due</span>
+                  <button type="button" data-dealer-task-due="soon">2 hours</button>
+                  <button type="button" data-dealer-task-due="today">Today</button>
+                  <button type="button" data-dealer-task-due="tomorrow">Tomorrow</button>
+                  <button type="button" data-dealer-task-due="next_week">Next week</button>
+                </div>
+                <label class="task-form-field task-time-field">
+                  <span>Due time</span>
+                  <input name="dueAt" type="datetime-local" />
+                </label>
+                <details class="task-advanced-options">
+                  <summary>Assign to someone else</summary>
+                  <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to dealer email" />
+                  <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
+                </details>
                 <button type="submit">Add task</button>
               </form>
             </section>
@@ -2793,19 +2819,29 @@ function applyDealerTaskTemplate(key) {
   const lead = dealerLeadsCache.find((item) => String(item.id || "") === String(activeDealerDrawerLeadId || ""));
   const template = dealerTaskTemplates(isBuyerLead(lead)).find((item) => item.key === key);
   if (!template) return;
+  const preset = dealerLeadDrawerContent?.querySelector('.dealer-drawer-task-form select[name="taskPreset"]');
   const title = dealerLeadDrawerContent?.querySelector('.dealer-drawer-task-form textarea[name="title"]');
   const assignedTo = dealerLeadDrawerContent?.querySelector('.dealer-drawer-task-form input[name="assignedTo"]');
   const dueAt = dealerLeadDrawerContent?.querySelector('.dealer-drawer-task-form input[name="dueAt"]');
+  if (preset && preset.value !== key) preset.value = key;
   if (title) title.value = template.title;
   if (assignedTo && !assignedTo.value) assignedTo.value = authSession?.user?.email || "";
   if (dueAt) dueAt.value = dealerTaskDueValue(template.due);
   title?.focus();
 }
 
+function applyDealerTaskDue(due) {
+  const dueAt = dealerLeadDrawerContent?.querySelector('.dealer-drawer-task-form input[name="dueAt"]');
+  if (dueAt) dueAt.value = dealerTaskDueValue(due);
+}
+
 function dealerTaskDueValue(due) {
   const date = new Date();
   if (due === "soon") {
     date.setHours(date.getHours() + 2, 0, 0, 0);
+  } else if (due === "next_week") {
+    date.setDate(date.getDate() + 7);
+    date.setHours(10, 0, 0, 0);
   } else if (due === "tomorrow") {
     date.setDate(date.getDate() + 1);
     date.setHours(10, 0, 0, 0);
