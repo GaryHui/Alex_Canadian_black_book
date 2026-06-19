@@ -157,22 +157,34 @@ dealerTodayWorkEl?.addEventListener("input", (event) => {
 setLookupMode("free", { openModal: false });
 
 dealerLeadsList?.addEventListener("click", async (event) => {
-  const clickedCard = event.target.closest(".dealer-lead-card");
-  if (clickedCard?.dataset?.leadId) setActiveDealerLead(clickedCard.dataset.leadId);
+  const alertButton = event.target.closest("[data-dealer-open-alert]");
+  if (alertButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    await openDealerLeadFromAlert(alertButton.dataset.dealerOpenAlert || "");
+    return;
+  }
+
   const openWorkspaceButton = event.target.closest("[data-dealer-open-workspace]");
   if (openWorkspaceButton) {
+    event.preventDefault();
+    event.stopPropagation();
     await openDealerWorkspace(openWorkspaceButton.closest(".dealer-lead-card"), { forceActivity: true });
     return;
   }
 
   const focusFollowUpButton = event.target.closest("[data-dealer-focus-followup]");
   if (focusFollowUpButton) {
+    event.preventDefault();
+    event.stopPropagation();
     await openDealerWorkspace(focusFollowUpButton.closest(".dealer-lead-card"), { forceActivity: true, focus: "followup" });
     return;
   }
 
   const focusNoteButton = event.target.closest("[data-dealer-focus-note]");
   if (focusNoteButton) {
+    event.preventDefault();
+    event.stopPropagation();
     await openDealerWorkspace(focusNoteButton.closest(".dealer-lead-card"), {
       forceActivity: true,
       focus: "note",
@@ -183,10 +195,14 @@ dealerLeadsList?.addEventListener("click", async (event) => {
 
   const focusTaskButton = event.target.closest("[data-dealer-focus-task]");
   if (focusTaskButton) {
+    event.preventDefault();
+    event.stopPropagation();
     await openDealerWorkspace(focusTaskButton.closest(".dealer-lead-card"), { forceActivity: true, focus: "task" });
     return;
   }
 
+  const clickedCard = event.target.closest(".dealer-lead-card");
+  if (clickedCard?.dataset?.leadId) setActiveDealerLead(clickedCard.dataset.leadId);
   return;
 });
 
@@ -2700,13 +2716,15 @@ async function openDealerWorkspace(card, options = {}) {
   if (!card) return;
   if (card.dataset.leadId) {
     const leadId = card.dataset.leadId;
+    const hadAlert = dealerLeadAlertMap.has(leadId);
     setActiveDealerLead(leadId);
-    if (dealerLeadAlertMap.has(leadId)) {
+    if (hadAlert) {
       clearDealerLeadUpdateNotice(card);
     }
     renderDealerDrawer(leadId);
     dealerDrawerActivityLoaded = false;
-    await loadDealerDrawerActivity({ force: true, highlightLatest: true });
+    await loadDealerDrawerActivity({ force: true, highlightLatest: Boolean(hadAlert || options.focus === "timeline") });
+    if (options.focus === "timeline") focusDealerTimelineUpdate();
   }
   const details = card.querySelector(".lead-queue-more");
   if (details && !details.open) details.open = true;
@@ -2845,7 +2863,7 @@ function renderDealerLeadAlerts() {
 }
 
 async function openDealerLeadFromAlert(id) {
-  await openDealerLead(id, { fromAlert: true });
+  await openDealerLead(id, { fromAlert: true, focus: "timeline" });
 }
 
 async function openDealerLead(id, options = {}) {
@@ -2879,6 +2897,7 @@ async function openDealerLead(id, options = {}) {
   if (details) details.open = true;
   if (options.fromAlert) highlightDealerLeadChangeAreas(card);
   await loadDealerDrawerActivity({ force: true, highlightLatest: Boolean(options.fromAlert) });
+  if (options.focus === "timeline") focusDealerTimelineUpdate();
 }
 
 function dealerLeadUpdateToken(lead = {}) {
@@ -2906,7 +2925,10 @@ function showDealerLeadUpdateNotice(card) {
 function clearDealerLeadUpdateNotice(card) {
   card.classList.remove("dealer-lead-updated");
   card.dataset.activityLoaded = "false";
-  if (card.dataset.leadId) dealerLeadAlertMap.delete(card.dataset.leadId);
+  if (card.dataset.leadId) {
+    dealerLeadAlertMap.delete(card.dataset.leadId);
+    markDealerLeadTokenRead(card.dataset.leadId);
+  }
   if (card.dataset.pendingUpdateToken) {
     card.dataset.updateToken = card.dataset.pendingUpdateToken;
     delete card.dataset.pendingUpdateToken;
@@ -2914,6 +2936,15 @@ function clearDealerLeadUpdateNotice(card) {
   const notice = card.querySelector(".dealer-update-notice");
   if (notice) notice.hidden = true;
   renderDealerLeadAlerts();
+}
+
+function focusDealerTimelineUpdate() {
+  const target = dealerLeadDrawerContent?.querySelector(".dealer-drawer-activity-list .activity-highlight")
+    || dealerLeadDrawerContent?.querySelector(".dealer-drawer-activity-list");
+  if (!target) return;
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
 }
 
 function renderDealerActivity(data, options = {}) {

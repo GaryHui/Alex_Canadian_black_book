@@ -4915,8 +4915,9 @@ body.admin-drawer-open {
 
 .activity-highlight {
   animation: changeFocus 2.1s ease-out;
+  background: #fffbeb;
   border-color: #f59e0b;
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, .18);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, .24), 0 10px 22px rgba(245, 158, 11, .12);
 }
 
 .change-focus {
