@@ -2259,16 +2259,44 @@ function renderDealerCommunicationStrip(lead) {
 function renderDealerTodayWork(leads) {
   if (!dealerTodayWorkEl) return;
   const activeLeads = leads.filter(isDealerActiveWorkLead);
+  const updateCount = activeLeads.filter((lead) => dealerLeadAlertMap.has(String(lead.id || ""))).length;
+  const taskCount = activeLeads.filter(hasDealerOpenTask).length;
   const callNowCount = activeLeads.filter((lead) => isDealerCallNowLead(lead)).length;
   const dueCount = activeLeads.filter((lead) => isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new")).length;
   const waitingReplyCount = activeLeads.filter((lead) => isDealerWaitingReply(lead)).length;
   const freshCount = activeLeads.filter((lead) => String(lead.status || "new").toLowerCase() === "new").length;
   const vehicleAlertCount = activeLeads.filter((lead) => lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market).length;
   const noResponseCount = activeLeads.filter((lead) => isDealerNoResponseLead(lead)).length;
+  const focus = dealerWorkFocus([
+    { count: updateCount, label: "Review new lead updates", detail: "Start with leads changed by another team member.", filter: "updates" },
+    { count: taskCount, label: "Work open tasks", detail: "Complete or update assigned tasks before adding new notes.", filter: "open-tasks" },
+    { count: dueCount, label: "Handle due follow-ups", detail: "Call or message the leads due now.", filter: "due" },
+    { count: waitingReplyCount, label: "Reply to waiting customers", detail: "Customers are waiting for a staff response.", filter: "waiting-reply" },
+    { count: freshCount, label: "Start fresh leads", detail: "New leads need the first touch and next step.", filter: "fresh" },
+    { count: activeLeads.length, label: "Keep the active queue moving", detail: "Open your queue and continue the next best lead.", filter: "active" }
+  ]);
   dealerTodayWorkEl.hidden = false;
   dealerTodayWorkEl.innerHTML = `
     ${renderDealerDashboardStats(leads)}
+    <section class="work-focus-panel dealer-work-focus" aria-label="Today focus">
+      <div>
+        <span>Today focus</span>
+        <strong>${escapeHtml(focus.label)}</strong>
+        <small>${escapeHtml(focus.detail)}</small>
+      </div>
+      <button type="button" data-dealer-filter-shortcut="${escapeHtml(focus.filter)}">Open work</button>
+    </section>
     <section class="dealer-manager-brief" aria-label="Dealer brief">
+      <button type="button" class="dealer-brief-card brief-card-hot" data-dealer-filter-shortcut="updates">
+        <span>New updates</span>
+        <strong>${updateCount}</strong>
+        <small>Lead changes to review</small>
+      </button>
+      <button type="button" class="dealer-brief-card brief-card-hot" data-dealer-filter-shortcut="open-tasks">
+        <span>Open tasks</span>
+        <strong>${taskCount}</strong>
+        <small>Assigned next actions</small>
+      </button>
       <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="active">
         <span>My queue</span>
         <strong>${activeLeads.length}</strong>
@@ -2306,6 +2334,14 @@ function renderDealerTodayWork(leads) {
       </button>
     </section>
   `;
+}
+
+function dealerWorkFocus(items) {
+  return items.find((item) => Number(item.count || 0) > 0) || {
+    label: "No urgent work right now",
+    detail: "Your queue is clear. Reload later or create a valuation if a customer arrives.",
+    filter: "active"
+  };
 }
 
 function renderDealerDashboardStats(leads) {
@@ -2566,6 +2602,8 @@ function filterDealerLeads(leads) {
   if (dealerLeadFilter === "aging-critical") return leads.filter(isDealerAgingCriticalLead);
   if (dealerLeadFilter === "priority") return leads.filter((lead) => !isDealerClosedLead(lead) && ["high", "urgent"].includes(String(lead.priority || "").toLowerCase()));
   if (dealerLeadFilter === "unassigned") return leads.filter((lead) => !isDealerClosedLead(lead) && !String(lead.assigned_to || "").trim());
+  if (dealerLeadFilter === "open-tasks") return leads.filter((lead) => !isDealerClosedLead(lead) && hasDealerOpenTask(lead));
+  if (dealerLeadFilter === "updates") return leads.filter((lead) => !isDealerClosedLead(lead) && dealerLeadAlertMap.has(String(lead.id || "")));
   if (dealerLeadFilter === "buyer") return leads.filter((lead) => !isDealerClosedLead(lead) && isBuyerLead(lead));
   if (dealerLeadFilter === "seller") return leads.filter((lead) => !isDealerClosedLead(lead) && !isBuyerLead(lead));
   if (dealerLeadFilter === "waiting-reply") return leads.filter(isDealerWaitingReply);

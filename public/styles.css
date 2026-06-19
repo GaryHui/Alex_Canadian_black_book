@@ -1216,6 +1216,53 @@ select {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
+.work-focus-panel {
+  align-items: center;
+  background: linear-gradient(135deg, #10233d 0%, #1f4f7a 100%);
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 10px;
+  color: #fff;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 16px;
+}
+
+.work-focus-panel div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.work-focus-panel span {
+  color: #bfdbfe;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.work-focus-panel strong {
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.work-focus-panel small {
+  color: #dbeafe;
+  font-size: 13px;
+}
+
+.work-focus-panel button {
+  background: #fff;
+  border: 0;
+  border-radius: 999px;
+  color: #0b4f9c;
+  cursor: pointer;
+  font-weight: 900;
+  min-height: 40px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
 .dealer-brief-card {
   background: #fff;
   border: 1px solid #d8e2ef;
@@ -1247,6 +1294,18 @@ select {
 .dealer-brief-card:nth-child(4) {
   background: linear-gradient(180deg, #f1f5ff 0%, #ffffff 100%);
   border-left-color: #2563eb;
+}
+
+.dealer-brief-card.brief-card-hot,
+.admin-brief-card.brief-card-hot {
+  background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
+  border-color: #fdba74;
+  border-left-color: #f97316;
+}
+
+.dealer-brief-card.brief-card-hot span,
+.admin-brief-card.brief-card-hot span {
+  color: #9a3412;
 }
 
 .dealer-brief-card:hover {
@@ -2118,6 +2177,16 @@ body.admin-drawer-open {
 
 .admin-brief-card small {
   color: #64748b;
+}
+
+.admin-brief-card.brief-card-hot {
+  background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
+  border-color: #fdba74;
+  border-left-color: #f97316;
+}
+
+.admin-brief-card.brief-card-hot span {
+  color: #9a3412;
 }
 
 .admin-control-board {
@@ -5795,6 +5864,7 @@ body.admin-drawer-open {
   }
 
   .lead-summary,
+  .work-focus-panel,
   .owner-review,
   .lead-workspace-grid,
   .drawer-workspace-grid,
@@ -5832,6 +5902,15 @@ body.admin-drawer-open {
 
   .lead-summary {
     display: grid;
+  }
+
+  .work-focus-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .work-focus-panel button {
+    width: 100%;
   }
 
   .admin-drawer-summary,

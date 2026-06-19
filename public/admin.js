@@ -1241,6 +1241,7 @@ function filterAdminLeads(leads) {
   if (adminLeadFilter === "buyer") filtered = leads.filter((lead) => !isClosedLead(lead) && isBuyerLead(lead));
   if (adminLeadFilter === "seller") filtered = leads.filter((lead) => !isClosedLead(lead) && !isBuyerLead(lead));
   if (adminLeadFilter === "unassigned") filtered = leads.filter((lead) => !isClosedLead(lead) && !String(lead.assigned_to || "").trim());
+  if (adminLeadFilter === "open-tasks") filtered = leads.filter((lead) => !isClosedLead(lead) && hasAdminOpenTask(lead));
   if (adminLeadFilter === "urgent") filtered = leads.filter((lead) => !isClosedLead(lead) && String(lead.priority || "").toLowerCase() === "urgent");
   if (adminLeadFilter === "stale") filtered = leads.filter((lead) => isAdminStaleLead(lead));
   if (adminLeadFilter === "appointments") filtered = leads.filter((lead) => isAdminAppointmentLead(lead));
@@ -1254,6 +1255,10 @@ function filterAdminLeads(leads) {
     const haystack = searchableLeadText(lead);
     return terms.every((term) => haystack.includes(term));
   });
+}
+
+function hasAdminOpenTask(lead) {
+  return Number(lead?.task_summary?.open_count || 0) > 0;
 }
 
 function renderDuplicateVehicleBlocks(leads) {
@@ -1618,6 +1623,7 @@ function renderAdminOverview(leads) {
 function renderAdminToday(leads) {
   if (!adminTodayListEl) return;
   const activeLeads = leads.filter((lead) => !isClosedLead(lead));
+  const taskCount = activeLeads.filter(hasAdminOpenTask).length;
   const freshCount = activeLeads.filter((lead) => String(lead.status || "new").toLowerCase() === "new").length;
   const waitingReplyCount = activeLeads.filter((lead) => isAdminWaitingReplyLead(lead)).length;
   const unassignedCount = activeLeads.filter((lead) => !String(lead.assigned_to || "").trim()).length;
@@ -1626,10 +1632,37 @@ function renderAdminToday(leads) {
   const ownerUnreadCount = leads.filter((lead) => lead.owner_review?.unread).length;
   const draftCount = inventoryCache.filter((item) => ["draft", "review"].includes(String(item.status || "").toLowerCase())).length;
   const dashboardStats = renderAdminDashboardStats(leads);
+  const focus = adminWorkFocus([
+    { count: ownerUnreadCount, label: "Review staff updates", detail: "Manager decisions are waiting on updated leads.", filter: "owner-unread" },
+    { count: unassignedCount, label: "Dispatch unassigned leads", detail: "Assign a staff rep before the lead gets cold.", filter: "unassigned" },
+    { count: dueCount, label: "Push due follow-ups", detail: "These leads need action today or are overdue.", filter: "needs-follow-up" },
+    { count: taskCount, label: "Check open tasks", detail: "See team tasks that still need completion.", filter: "open-tasks" },
+    { count: duplicateCount, label: "Clear vehicle conflicts", detail: "Review duplicate or same-vehicle warnings.", filter: "duplicate-review" },
+    { count: freshCount, label: "Start fresh leads", detail: "Make sure every new lead has an owner and next step.", filter: "fresh" },
+    { count: activeLeads.length, label: "Monitor active pipeline", detail: "Open the active queue and coach the next bottleneck.", filter: "active" }
+  ]);
 
   adminTodayListEl.innerHTML = `
     ${dashboardStats}
+    <section class="work-focus-panel admin-work-focus" aria-label="Manager focus">
+      <div>
+        <span>Manager focus</span>
+        <strong>${escapeHtml(focus.label)}</strong>
+        <small>${escapeHtml(focus.detail)}</small>
+      </div>
+      <button type="button" data-admin-set-filter="${escapeHtml(focus.filter)}">Open work</button>
+    </section>
     <section class="admin-manager-brief" aria-label="Manager brief">
+      <button type="button" class="admin-brief-card brief-card-hot" data-admin-set-filter="owner-unread">
+        <span>Staff updates</span>
+        <strong>${ownerUnreadCount}</strong>
+        <small>Needs manager review</small>
+      </button>
+      <button type="button" class="admin-brief-card brief-card-hot" data-admin-set-filter="open-tasks">
+        <span>Open tasks</span>
+        <strong>${taskCount}</strong>
+        <small>Team tasks not done</small>
+      </button>
       <button type="button" class="admin-brief-card" data-admin-set-filter="active">
         <span>Active</span>
         <strong>${activeLeads.length}</strong>
@@ -1655,11 +1688,6 @@ function renderAdminToday(leads) {
         <strong>${dueCount}</strong>
         <small>Follow-up due or overdue</small>
       </button>
-      <button type="button" class="admin-brief-card" data-admin-set-filter="owner-unread">
-        <span>Updates</span>
-        <strong>${ownerUnreadCount}</strong>
-        <small>Manager review items</small>
-      </button>
       <button type="button" class="admin-brief-card" data-admin-set-filter="duplicate-review">
         <span>Duplicate review</span>
         <strong>${duplicateCount}</strong>
@@ -1672,6 +1700,14 @@ function renderAdminToday(leads) {
       </button>
     </section>
   `;
+}
+
+function adminWorkFocus(items) {
+  return items.find((item) => Number(item.count || 0) > 0) || {
+    label: "No urgent manager work",
+    detail: "The team queue is clear. Review totals or inventory drafts when needed.",
+    filter: "active"
+  };
 }
 
 function renderAdminDashboardStats(leads) {
