@@ -2710,7 +2710,6 @@ function renderAdminDrawer(leadId) {
                 ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
               </div>
             </section>
-            ${vehicleDetailsSection}
             ${sellerPricingSection}
             ${renderAdminDealChecklistSection(lead)}
             <section class="admin-drawer-section admin-drawer-update-card">
@@ -2753,6 +2752,14 @@ function renderAdminDrawer(leadId) {
                 <button type="submit">Add task</button>
               </form>
             </section>
+            <section class="admin-drawer-section">
+              <header>
+                <h3>Team timeline</h3>
+                <button type="button" data-drawer-load-activity>Refresh</button>
+              </header>
+              <div class="lead-activity-list admin-drawer-activity-list">Activity not loaded yet.</div>
+            </section>
+            ${vehicleDetailsSection}
             <details class="admin-drawer-section admin-drawer-settings-details">
               <summary>
                 <span>
@@ -2781,13 +2788,6 @@ function renderAdminDrawer(leadId) {
                 <button type="submit">Log email</button>
               </form>
             </details>
-            <section class="admin-drawer-section">
-              <header>
-                <h3>Team timeline</h3>
-                <button type="button" data-drawer-load-activity>Refresh</button>
-              </header>
-              <div class="lead-activity-list admin-drawer-activity-list">Activity not loaded yet.</div>
-            </section>
           </div>
         </div>
       </div>

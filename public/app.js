@@ -1854,17 +1854,13 @@ function renderDealerDrawer(leadId) {
                 <small>${escapeHtml(dealerLastTouchLabel(lead))}</small>
               </div>
             </section>
-            <section class="dealer-drawer-section drawer-overview-panel">
-              <header>
-                <h3>Overview</h3>
-                <span>${escapeHtml(buyerLead ? "BUY lead" : "SELL lead")}</span>
-              </header>
-              <div class="drawer-spotlight">
-                <strong>${escapeHtml(nextAction)}</strong>
-                <small>${escapeHtml(followUp ? `Next follow-up ${formatDateTime(followUp)}` : "Set the next follow-up before leaving this workspace.")}</small>
-              </div>
-              ${renderDealerLeadProgress(buyerLead, status)}
-              ${renderDealerSopProgress(lead)}
+            <details class="dealer-drawer-section drawer-more-details">
+              <summary>
+                <span>
+                  <strong>Lead details</strong>
+                  <small>Customer, source, plan, and vehicle context</small>
+                </span>
+              </summary>
               <div class="drawer-meta-grid">
                 <div class="drawer-meta-item">
                   <span>Customer</span>
@@ -1892,17 +1888,24 @@ function renderDealerDrawer(leadId) {
                   <small>${escapeHtml(overdue ? "Follow-up overdue" : "Pipeline on track")}</small>
                 </div>
               </div>
-            </section>
-            ${dealerVehicleSignalInline(lead)}
-            ${dealerVehicleContextInline(lead)}
+              <div class="drawer-detail-stack">
+                ${dealerVehicleSignalInline(lead)}
+                ${dealerVehicleContextInline(lead)}
+              </div>
+            </details>
           </aside>
           <div class="drawer-workspace-main">
-            ${renderDealerCommunicationStrip(lead)}
-            <section class="dealer-drawer-section">
+            <section class="dealer-drawer-section drawer-next-action-panel">
               <header>
-                <h3>Quick follow-up</h3>
-                <span>Move the lead forward without opening the full CRM card</span>
+                <h3>Next action</h3>
+                <span>${escapeHtml(buyerLead ? "BUY lead" : "SELL lead")}</span>
               </header>
+              <div class="drawer-spotlight">
+                <strong>${escapeHtml(nextAction)}</strong>
+                <small>${escapeHtml(followUp ? `Next follow-up ${formatDateTime(followUp)}` : "Set the next follow-up before leaving this workspace.")}</small>
+              </div>
+              ${renderDealerLeadProgress(buyerLead, status)}
+              ${renderDealerSopProgress(lead)}
               <div class="dealer-lead-actions dealer-drawer-actions">
                 ${actionButtons}
               </div>
@@ -1910,6 +1913,7 @@ function renderDealerDrawer(leadId) {
                 ${followUpButtons}
               </div>
             </section>
+            ${renderDealerCommunicationStrip(lead)}
             ${renderDealerDealChecklistSection(lead)}
             <section class="dealer-drawer-section">
               <header>
@@ -1974,26 +1978,25 @@ function renderDealerDrawer(leadId) {
             </section>
             <section class="dealer-drawer-section">
               <header>
-                <h3>Email log</h3>
-                <span>Record an outbound email that was sent outside the system.</span>
-              </header>
-              <details class="drawer-secondary-forms">
-                <summary>Email tools</summary>
-                <form class="lead-email-form dealer-email-form dealer-drawer-email-form">
-                  <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
-                  <input name="subject" placeholder="Email subject" />
-                  <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
-                  <button type="submit">Log email</button>
-                </form>
-              </details>
-            </section>
-            <section class="dealer-drawer-section">
-              <header>
                 <h3>Timeline</h3>
                 <button type="button" data-drawer-load-dealer-activity>Refresh</button>
               </header>
               <div class="dealer-activity-list dealer-drawer-activity-list">Timeline not loaded yet.</div>
             </section>
+            <details class="dealer-drawer-section drawer-more-tools">
+              <summary>
+                <span>
+                  <strong>More tools</strong>
+                  <small>Email log and lower-frequency actions</small>
+                </span>
+              </summary>
+              <form class="lead-email-form dealer-email-form dealer-drawer-email-form">
+                <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
+                <input name="subject" placeholder="Email subject" />
+                <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
+                <button type="submit">Log email</button>
+              </form>
+            </details>
           </div>
         </div>
       </div>
@@ -2748,22 +2751,10 @@ function renderDealerLeadProgress(buyerLead, status) {
 }
 
 function renderDealerSopProgress(lead) {
-  const status = String(lead?.status || "new").toLowerCase();
-  const buyer = isBuyerLead(lead);
-  const hasContact = Boolean(lead?.last_activity_at) || ["contacted", "waiting_for_customer", "inspection_booked", "appointment_booked", "finance_sent", "offer_sent", "in_inventory", "won", "lost", "closed"].includes(status);
-  const hasNextStep = Boolean(lead?.next_follow_up_at) || hasDealerOpenTask(lead) || ["inspection_booked", "appointment_booked", "in_inventory", "won", "lost", "closed"].includes(status);
-  const hasQuoteOrAppointment = buyer
-    ? ["appointment_booked", "finance_sent", "offer_sent", "won", "lost", "closed"].includes(status)
-    : ["inspection_booked", "offer_sent", "in_inventory", "won", "lost", "closed"].includes(status);
-  const isClosed = isDealerClosedLead(lead);
-  const steps = [
-    { label: "New lead", done: true },
-    { label: "Contact logged", done: hasContact },
-    { label: "Next step set", done: hasNextStep },
-    { label: buyer ? "Appointment / finance" : "Inspection / offer", done: hasQuoteOrAppointment },
-    { label: "Closed", done: isClosed }
-  ];
+  const steps = dealerSopSteps(lead);
   const doneCount = steps.filter((step) => step.done).length;
+  const nextMissing = steps.find((step) => !step.done);
+  const missingSteps = steps.filter((step) => !step.done).slice(0, 2);
   return `
     <section class="sop-progress-panel" aria-label="SOP progress">
       <div>
@@ -2773,8 +2764,48 @@ function renderDealerSopProgress(lead) {
       <div class="sop-progress-steps">
         ${steps.map((step) => `<span class="${step.done ? "done" : ""}">${escapeHtml(step.label)}</span>`).join("")}
       </div>
+      ${nextMissing ? `
+        <div class="sop-next-step">
+          <span>Next missing</span>
+          <strong>${escapeHtml(nextMissing.label)}</strong>
+          <small>${escapeHtml(nextMissing.hint)}</small>
+        </div>
+      ` : `
+        <div class="sop-next-step sop-complete">
+          <span>SOP complete</span>
+          <strong>Ready for final review</strong>
+          <small>Timeline has the required contact, next step, deal movement, and close result.</small>
+        </div>
+      `}
+      ${missingSteps.length ? `
+        <div class="sop-missing-list">
+          ${missingSteps.map((step) => `<span>${escapeHtml(step.label)}</span>`).join("")}
+        </div>
+      ` : ""}
     </section>
   `;
+}
+
+function dealerSopSteps(lead) {
+  const status = String(lead?.status || "new").toLowerCase();
+  const buyer = isBuyerLead(lead);
+  const hasContact = Boolean(lead?.last_activity_at) || ["contacted", "waiting_for_customer", "inspection_booked", "appointment_booked", "finance_sent", "offer_sent", "in_inventory", "won", "lost", "closed"].includes(status);
+  const hasNextStep = Boolean(lead?.next_follow_up_at) || hasDealerOpenTask(lead) || ["inspection_booked", "appointment_booked", "in_inventory", "won", "lost", "closed"].includes(status);
+  const hasQuoteOrAppointment = buyer
+    ? ["appointment_booked", "finance_sent", "offer_sent", "won", "lost", "closed"].includes(status)
+    : ["inspection_booked", "offer_sent", "in_inventory", "won", "lost", "closed"].includes(status);
+  const isClosed = isDealerClosedLead(lead);
+  return [
+    { label: "New lead", done: true, hint: "Lead has entered the CRM." },
+    { label: "Contact logged", done: hasContact, hint: "Save a call, text, email, or internal update in Log touch." },
+    { label: "Next step set", done: hasNextStep, hint: "Add a task or schedule the next follow-up before leaving the lead." },
+    {
+      label: buyer ? "Appointment / finance" : "Inspection / offer",
+      done: hasQuoteOrAppointment,
+      hint: buyer ? "Book the visit/test drive or move the buyer into finance/offer." : "Book inspection or send the purchase offer."
+    },
+    { label: "Closed", done: isClosed, hint: "Mark the lead won, lost, purchased, inventory, or closed." }
+  ];
 }
 
 function dealerFollowUpActions() {

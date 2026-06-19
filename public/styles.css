@@ -176,6 +176,12 @@ body.dealer-drawer-open .dealer-app-shell {
   gap: 12px;
 }
 
+.drawer-next-action-panel {
+  border-color: #bfdbfe;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, .08);
+  gap: 12px;
+}
+
 .drawer-spotlight {
   background: linear-gradient(180deg, #eef6ff 0%, #f8fbff 100%);
   border: 1px solid #bfdbfe;
@@ -223,6 +229,12 @@ body.dealer-drawer-open .dealer-app-shell {
 
 .drawer-meta-item small {
   color: #64748b;
+}
+
+.drawer-detail-stack {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .drawer-inline-actions {
@@ -318,6 +330,53 @@ body.dealer-drawer-open .dealer-app-shell {
   border: 1px solid #d8e2ef;
   border-radius: 12px;
   padding: 12px;
+}
+
+.drawer-more-details,
+.drawer-more-tools {
+  display: grid;
+  gap: 10px;
+}
+
+.drawer-more-details > summary,
+.drawer-more-tools > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+}
+
+.drawer-more-details > summary::-webkit-details-marker,
+.drawer-more-tools > summary::-webkit-details-marker {
+  display: none;
+}
+
+.drawer-more-details > summary strong,
+.drawer-more-tools > summary strong {
+  color: #16243a;
+  display: block;
+  font-size: 14px;
+}
+
+.drawer-more-details > summary small,
+.drawer-more-tools > summary small {
+  color: #64748b;
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.drawer-more-details:not([open]),
+.drawer-more-tools:not([open]) {
+  gap: 0;
+}
+
+.drawer-more-details[open] > summary,
+.drawer-more-tools[open] > summary {
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
 }
 
 .dealer-drawer-stat {
@@ -4167,6 +4226,55 @@ body.admin-drawer-open {
   background: #e8f7ef;
   border-color: #8fd3a4;
   color: #1f6f35;
+}
+
+.sop-next-step {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+}
+
+.sop-next-step span {
+  color: #9a3412;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.sop-next-step strong {
+  color: #7c2d12;
+  font-size: 14px;
+}
+
+.sop-next-step small {
+  color: #8a4b1a;
+}
+
+.sop-next-step.sop-complete {
+  background: #ecfdf5;
+  border-color: #86efac;
+}
+
+.sop-next-step.sop-complete span,
+.sop-next-step.sop-complete strong,
+.sop-next-step.sop-complete small {
+  color: #166534;
+}
+
+.sop-missing-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sop-missing-list span {
+  background: #fff;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  color: #9a3412;
+  padding: 5px 8px;
 }
 
 .lead-shared-meta {
