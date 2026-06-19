@@ -4250,6 +4250,118 @@ body.admin-drawer-open {
   background: #e11d48;
 }
 
+.crm-workflow-panel {
+  background: #fff;
+  border: 1px solid #cfe0f3;
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.crm-workflow-panel header {
+  align-items: start;
+  display: flex;
+  justify-content: space-between;
+}
+
+.crm-workflow-panel header span,
+.crm-responsibility-grid span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.crm-workflow-panel header strong {
+  color: #0b4f9c;
+  display: block;
+  font-size: 16px;
+  margin-top: 2px;
+}
+
+.crm-workflow-panel header small,
+.crm-responsibility-grid small {
+  color: #64748b;
+}
+
+.crm-workflow-steps {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.crm-workflow-steps li {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #d8e2ef;
+  border-radius: 999px;
+  color: #64748b;
+  display: flex;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 9px;
+}
+
+.crm-workflow-steps li span {
+  background: #cbd5e1;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  height: 8px;
+  width: 8px;
+}
+
+.crm-workflow-steps li b {
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.crm-workflow-steps li.complete {
+  background: #ecfdf5;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.crm-workflow-steps li.complete span {
+  background: #22c55e;
+}
+
+.crm-workflow-steps li.active {
+  background: #eaf5ff;
+  border-color: #60a5fa;
+  color: #0b4f9c;
+  font-weight: 900;
+}
+
+.crm-workflow-steps li.active span {
+  background: #0b4f9c;
+}
+
+.crm-responsibility-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.crm-responsibility-grid div {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+}
+
+.crm-responsibility-grid strong {
+  color: #16243a;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 .sop-progress-panel {
   background: #f8fafc;
   border: 1px solid #dbe5f0;
@@ -5868,6 +5980,7 @@ body.admin-drawer-open {
   .owner-review,
   .lead-workspace-grid,
   .drawer-workspace-grid,
+  .crm-responsibility-grid,
   .duplicate-cluster-card,
   .drawer-meta-grid,
   .lead-shared-meta,

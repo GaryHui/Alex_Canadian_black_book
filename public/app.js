@@ -1918,6 +1918,7 @@ function renderDealerDrawer(leadId) {
                 <strong>${escapeHtml(nextAction)}</strong>
                 <small>${escapeHtml(followUp ? `Next follow-up ${formatDateTime(followUp)}` : "Set the next follow-up before leaving this workspace.")}</small>
               </div>
+              ${renderDealerCrmWorkflowPanel(lead)}
               ${renderDealerLeadProgress(buyerLead, status)}
               ${renderDealerSopProgress(lead)}
               <div class="dealer-lead-actions dealer-drawer-actions">
@@ -2726,6 +2727,90 @@ function dealerLeadStatusLabel(status, buyerLead) {
   if (current === "closed") return "Closed";
   if (current === "deleted") return "Deleted";
   return String(status || "new").replaceAll("_", " ");
+}
+
+function renderDealerCrmWorkflowPanel(lead) {
+  const current = dealerCrmStage(lead);
+  const steps = dealerCrmWorkflowSteps(lead);
+  const currentIndex = Math.max(0, steps.findIndex((step) => step.key === current.key));
+  const task = lead?.task_summary || {};
+  const managerReview = lead?.owner_review?.unread ? "Review needed" : current.needsManager ? "Manager checkpoint" : "No review needed";
+  return `
+    <section class="crm-workflow-panel" aria-label="CRM workflow">
+      <header>
+        <div>
+          <span>CRM stage</span>
+          <strong>${escapeHtml(current.label)}</strong>
+          <small>${escapeHtml(current.hint)}</small>
+        </div>
+      </header>
+      <ol class="crm-workflow-steps">
+        ${steps.map((step, index) => `
+          <li class="${index < currentIndex ? "complete" : ""} ${index === currentIndex ? "active" : ""}">
+            <span></span>
+            <b>${escapeHtml(step.label)}</b>
+          </li>
+        `).join("")}
+      </ol>
+      <div class="crm-responsibility-grid">
+        <div>
+          <span>Owner</span>
+          <strong>${escapeHtml(lead?.assigned_to || authSession?.user?.email || "Unassigned")}</strong>
+        </div>
+        <div>
+          <span>Current task</span>
+          <strong>${escapeHtml(task.latest_open_title || "No open task")}</strong>
+          <small>${escapeHtml(task.latest_open_due_at ? `Due ${formatDateTime(task.latest_open_due_at)}` : "Add one before handoff if follow-up is needed.")}</small>
+        </div>
+        <div>
+          <span>Manager</span>
+          <strong>${escapeHtml(managerReview)}</strong>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function dealerCrmWorkflowSteps(lead) {
+  if (isBuyerLead(lead)) {
+    return [
+      { key: "lead", label: "Lead" },
+      { key: "contact", label: "Contact" },
+      { key: "appointment", label: "Appointment" },
+      { key: "finance", label: "Finance / offer" },
+      { key: "sold", label: "Sold" }
+    ];
+  }
+  return [
+    { key: "lead", label: "Lead" },
+    { key: "contact", label: "Contact" },
+    { key: "appraisal", label: "Appraisal" },
+    { key: "offer", label: "Offer" },
+    { key: "purchase", label: "Purchased" },
+    { key: "recon", label: "Recon" },
+    { key: "inventory", label: "Inventory" },
+    { key: "sold", label: "Sold" }
+  ];
+}
+
+function dealerCrmStage(lead) {
+  const status = String(lead?.status || "new").toLowerCase();
+  const inventoryStatus = String(lead?.vehicle_context?.primary_inventory_status || "").toLowerCase();
+  if (isBuyerLead(lead)) {
+    if (["won", "sold", "delivered"].includes(status)) return { key: "sold", label: "Sold / delivery", hint: "Finish delivery, finance paperwork, and final handoff.", needsManager: true };
+    if (["finance_sent", "offer_sent"].includes(status)) return { key: "finance", label: "Finance / offer", hint: "Confirm approval, payment, trade, and close plan.", needsManager: true };
+    if (status === "appointment_booked") return { key: "appointment", label: "Appointment", hint: "Confirm visit, test drive, and vehicle availability." };
+    if (["contacted", "waiting_for_customer"].includes(status)) return { key: "contact", label: "Customer contact", hint: "Keep follow-up scheduled until buyer confirms next step." };
+    return { key: "lead", label: "New buyer lead", hint: "First touch, needs, budget, and timeline must be confirmed." };
+  }
+  if (inventoryStatus === "sold" || status === "sold") return { key: "sold", label: "Vehicle sold", hint: "Confirm delivery, documents, and final accounting.", needsManager: true };
+  if (inventoryStatus === "published") return { key: "inventory", label: "Listed inventory", hint: "Vehicle is live. Track buyer activity and sales handoff." };
+  if (["draft", "review"].includes(inventoryStatus) || status === "in_inventory") return { key: "recon", label: "Recon / intake", hint: "Photos, keys, repairs, pricing, and publish review must be completed.", needsManager: true };
+  if (status === "won") return { key: "purchase", label: "Purchased", hint: "Complete paperwork and move the vehicle into intake.", needsManager: true };
+  if (status === "offer_sent") return { key: "offer", label: "Offer sent", hint: "Confirm seller response, offer expiry, and manager approval.", needsManager: true };
+  if (status === "inspection_booked") return { key: "appraisal", label: "Inspection / appraisal", hint: "Inspect condition, photos, lien, keys, and title." };
+  if (["contacted", "waiting_for_customer"].includes(status)) return { key: "contact", label: "Seller contact", hint: "Confirm seller details and book appraisal." };
+  return { key: "lead", label: "New seller lead", hint: "First touch and vehicle verification are required." };
 }
 
 function cleanDealerLeadTitle(title, buyerLead) {

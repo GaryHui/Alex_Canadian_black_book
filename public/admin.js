@@ -2741,6 +2741,7 @@ function renderAdminDrawer(leadId) {
                 <button type="button" data-followup-preset="7d">Next week</button>
               </div>
               ${quickAssignButtons}
+              ${renderAdminCrmWorkflowPanel(lead)}
               ${renderLeadProgress(buyer, status)}
               <div class="lead-action-row admin-drawer-actions">
                 ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
@@ -2996,6 +2997,89 @@ function leadStatusOptions(buyer) {
 function leadStatusLabel(status, buyer) {
   const option = leadStatusOptions(buyer).find((item) => item.value === status);
   return option?.label || String(status || "new").replaceAll("_", " ");
+}
+
+function renderAdminCrmWorkflowPanel(lead) {
+  const current = adminCrmStage(lead);
+  const steps = adminCrmWorkflowSteps(lead);
+  const currentIndex = Math.max(0, steps.findIndex((step) => step.key === current.key));
+  const task = lead?.task_summary || {};
+  return `
+    <section class="crm-workflow-panel admin-crm-workflow" aria-label="CRM workflow">
+      <header>
+        <div>
+          <span>CRM stage</span>
+          <strong>${escapeHtml(current.label)}</strong>
+          <small>${escapeHtml(current.hint)}</small>
+        </div>
+      </header>
+      <ol class="crm-workflow-steps">
+        ${steps.map((step, index) => `
+          <li class="${index < currentIndex ? "complete" : ""} ${index === currentIndex ? "active" : ""}">
+            <span></span>
+            <b>${escapeHtml(step.label)}</b>
+          </li>
+        `).join("")}
+      </ol>
+      <div class="crm-responsibility-grid">
+        <div>
+          <span>Responsible</span>
+          <strong>${escapeHtml(lead?.assigned_to || "Unassigned")}</strong>
+        </div>
+        <div>
+          <span>Team task</span>
+          <strong>${escapeHtml(task.latest_open_title || "No open task")}</strong>
+          <small>${escapeHtml(task.latest_open_due_at ? `Due ${formatDateTime(task.latest_open_due_at)}` : "Add or assign a task when a handoff is needed.")}</small>
+        </div>
+        <div>
+          <span>Manager checkpoint</span>
+          <strong>${escapeHtml(lead?.owner_review?.unread ? "Staff update unread" : current.needsManager ? "Decision point" : "Not required")}</strong>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function adminCrmWorkflowSteps(lead) {
+  if (isBuyerLead(lead)) {
+    return [
+      { key: "lead", label: "Lead" },
+      { key: "contact", label: "Contact" },
+      { key: "appointment", label: "Appointment" },
+      { key: "finance", label: "Finance / offer" },
+      { key: "sold", label: "Sold" }
+    ];
+  }
+  return [
+    { key: "lead", label: "Lead" },
+    { key: "contact", label: "Contact" },
+    { key: "appraisal", label: "Appraisal" },
+    { key: "offer", label: "Offer" },
+    { key: "purchase", label: "Purchased" },
+    { key: "recon", label: "Recon" },
+    { key: "inventory", label: "Inventory" },
+    { key: "sold", label: "Sold" }
+  ];
+}
+
+function adminCrmStage(lead) {
+  const status = String(lead?.status || "new").toLowerCase();
+  const inventoryStatus = String(lead?.vehicle_context?.primary_inventory_status || "").toLowerCase();
+  if (isBuyerLead(lead)) {
+    if (["won", "sold", "delivered"].includes(status)) return { key: "sold", label: "Sold / delivery", hint: "Manager confirms delivery, paperwork, and final handoff.", needsManager: true };
+    if (["finance_sent", "offer_sent"].includes(status)) return { key: "finance", label: "Finance / offer", hint: "Decision point: approval, gross, trade, and close plan.", needsManager: true };
+    if (status === "appointment_booked") return { key: "appointment", label: "Appointment", hint: "Confirm appointment quality and vehicle availability." };
+    if (["contacted", "waiting_for_customer"].includes(status)) return { key: "contact", label: "Customer contact", hint: "Coach next follow-up and keep the lead warm." };
+    return { key: "lead", label: "New buyer lead", hint: "Assign owner and require first touch." };
+  }
+  if (inventoryStatus === "sold" || status === "sold") return { key: "sold", label: "Vehicle sold", hint: "Confirm delivery, accounting, and final CRM close.", needsManager: true };
+  if (inventoryStatus === "published") return { key: "inventory", label: "Listed inventory", hint: "Vehicle is live. Watch buyer activity and sales handoff." };
+  if (["draft", "review"].includes(inventoryStatus) || status === "in_inventory") return { key: "recon", label: "Recon / intake", hint: "Decision point: repairs, price, photos, and publish approval.", needsManager: true };
+  if (status === "won") return { key: "purchase", label: "Purchased", hint: "Confirm paperwork and move vehicle into intake.", needsManager: true };
+  if (status === "offer_sent") return { key: "offer", label: "Offer sent", hint: "Decision point: offer, expiry, and seller response.", needsManager: true };
+  if (status === "inspection_booked") return { key: "appraisal", label: "Inspection / appraisal", hint: "Confirm condition, title, lien, and appraisal path." };
+  if (["contacted", "waiting_for_customer"].includes(status)) return { key: "contact", label: "Seller contact", hint: "Make sure inspection or next task is assigned." };
+  return { key: "lead", label: "New seller lead", hint: "Assign owner and verify the vehicle." };
 }
 
 function marketAverageFromValuation(valuation, market) {
