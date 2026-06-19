@@ -600,6 +600,8 @@ function dealChecklistTemplateItems(lead) {
   }
   if (!isBuyerLead(lead) && ["in_inventory", "won"].includes(status)) {
     return [
+      { key: "purchase_or_consignment_agreement", label: "Purchase / consignment agreement" },
+      { key: "commission_terms_confirmed", label: "Commission terms confirmed" },
       { key: "intake_photos_complete", label: "Intake photos complete" },
       { key: "keys_collected", label: "Keys collected" },
       { key: "recon_estimate_ready", label: "Recon estimate ready" },

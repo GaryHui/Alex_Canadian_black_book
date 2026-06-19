@@ -169,7 +169,9 @@ dealerLeadsList?.addEventListener("click", async (event) => {
   if (openWorkspaceButton) {
     event.preventDefault();
     event.stopPropagation();
-    await openDealerWorkspace(openWorkspaceButton.closest(".dealer-lead-card"), { forceActivity: true });
+    const card = openWorkspaceButton.closest(".dealer-lead-card");
+    if (card?.dataset?.leadId) setActiveDealerLead(card.dataset.leadId);
+    await openDealerWorkspace(card, { forceActivity: true });
     return;
   }
 
@@ -177,7 +179,9 @@ dealerLeadsList?.addEventListener("click", async (event) => {
   if (focusFollowUpButton) {
     event.preventDefault();
     event.stopPropagation();
-    await openDealerWorkspace(focusFollowUpButton.closest(".dealer-lead-card"), { forceActivity: true, focus: "followup" });
+    const card = focusFollowUpButton.closest(".dealer-lead-card");
+    if (card?.dataset?.leadId) setActiveDealerLead(card.dataset.leadId);
+    await openDealerWorkspace(card, { forceActivity: true, focus: "followup" });
     return;
   }
 
@@ -185,7 +189,9 @@ dealerLeadsList?.addEventListener("click", async (event) => {
   if (focusNoteButton) {
     event.preventDefault();
     event.stopPropagation();
-    await openDealerWorkspace(focusNoteButton.closest(".dealer-lead-card"), {
+    const card = focusNoteButton.closest(".dealer-lead-card");
+    if (card?.dataset?.leadId) setActiveDealerLead(card.dataset.leadId);
+    await openDealerWorkspace(card, {
       forceActivity: true,
       focus: "note",
       noteType: focusNoteButton.dataset.dealerFocusNote || "internal"
@@ -197,7 +203,9 @@ dealerLeadsList?.addEventListener("click", async (event) => {
   if (focusTaskButton) {
     event.preventDefault();
     event.stopPropagation();
-    await openDealerWorkspace(focusTaskButton.closest(".dealer-lead-card"), { forceActivity: true, focus: "task" });
+    const card = focusTaskButton.closest(".dealer-lead-card");
+    if (card?.dataset?.leadId) setActiveDealerLead(card.dataset.leadId);
+    await openDealerWorkspace(card, { forceActivity: true, focus: "task" });
     return;
   }
 
@@ -1840,7 +1848,7 @@ function renderDealerDrawer(leadId) {
         </div>
         <div class="dealer-drawer-head-actions">
           <button type="button" data-dealer-drawer-open-card>Locate in queue</button>
-          <button type="button" data-dealer-drawer-close>Close</button>
+          <button class="drawer-close-strong" type="button" data-dealer-drawer-close aria-label="Close drawer">× Close</button>
         </div>
       </header>
       <div class="drawer-workspace-scroll">
@@ -2786,7 +2794,7 @@ function dealerCrmWorkflowSteps(lead) {
     { key: "contact", label: "Contact" },
     { key: "appraisal", label: "Appraisal" },
     { key: "offer", label: "Offer" },
-    { key: "purchase", label: "Purchased" },
+    { key: "purchase", label: "Acquired / consigned" },
     { key: "recon", label: "Recon" },
     { key: "inventory", label: "Inventory" },
     { key: "sold", label: "Sold" }
@@ -2806,7 +2814,7 @@ function dealerCrmStage(lead) {
   if (inventoryStatus === "sold" || status === "sold") return { key: "sold", label: "Vehicle sold", hint: "Confirm delivery, documents, and final accounting.", needsManager: true };
   if (inventoryStatus === "published") return { key: "inventory", label: "Listed inventory", hint: "Vehicle is live. Track buyer activity and sales handoff." };
   if (["draft", "review"].includes(inventoryStatus) || status === "in_inventory") return { key: "recon", label: "Recon / intake", hint: "Photos, keys, repairs, pricing, and publish review must be completed.", needsManager: true };
-  if (status === "won") return { key: "purchase", label: "Purchased", hint: "Complete paperwork and move the vehicle into intake.", needsManager: true };
+  if (status === "won") return { key: "purchase", label: "Acquired / consigned", hint: "Confirm purchase or consignment terms, then move the vehicle into intake.", needsManager: true };
   if (status === "offer_sent") return { key: "offer", label: "Offer sent", hint: "Confirm seller response, offer expiry, and manager approval.", needsManager: true };
   if (status === "inspection_booked") return { key: "appraisal", label: "Inspection / appraisal", hint: "Inspect condition, photos, lien, keys, and title." };
   if (["contacted", "waiting_for_customer"].includes(status)) return { key: "contact", label: "Seller contact", hint: "Confirm seller details and book appraisal." };
@@ -2942,7 +2950,7 @@ function dealerSopSteps(lead) {
       done: hasQuoteOrAppointment,
       hint: buyer ? "Book the visit/test drive or move the buyer into finance/offer." : "Book inspection or send the purchase offer."
     },
-    { label: "Closed", done: isClosed, hint: "Mark the lead won, lost, purchased, inventory, or closed." }
+    { label: "Closed", done: isClosed, hint: "Mark the lead won, lost, consigned, inventoried, or closed." }
   ];
 }
 
@@ -2979,7 +2987,7 @@ function dealerTaskTemplates(buyerLead) {
     { key: "verify_vehicle", label: "Verify vehicle", hint: "VIN, km, lien, condition", title: "Verify seller vehicle details: VIN, kilometers, ownership/lien, accident history, and condition.", due: "today" },
     { key: "request_photos", label: "Request photos", hint: "Exterior/interior/VIN", title: "Request seller photos: exterior, interior, odometer, VIN, damage, and ownership documents.", due: "today" },
     { key: "book_inspection", label: "Book inspection", hint: "Appraisal appointment", title: "Book seller inspection/appraisal appointment and confirm location.", due: "tomorrow" },
-    { key: "send_offer", label: "Send offer", hint: "Price and conditions", title: "Prepare and send purchase offer with conditions and expiry time.", due: "tomorrow" }
+    { key: "send_offer", label: "Send offer", hint: "Purchase or consignment", title: "Prepare purchase or consignment offer with terms, commission, conditions, and expiry time.", due: "tomorrow" }
   ];
   return buyerLead ? [...shared, ...buyer] : [...shared, ...seller];
 }
@@ -3371,6 +3379,8 @@ function dealerDealDeskItemLabel(key) {
     keys_ready: "Keys ready",
     delivery_booked: "Delivery booked",
     vehicle_picked_up: "Vehicle picked up",
+    purchase_or_consignment_agreement: "Purchase / consignment agreement",
+    commission_terms_confirmed: "Commission terms confirmed",
     intake_photos_complete: "Intake photos complete",
     keys_collected: "Keys collected",
     recon_estimate_ready: "Recon estimate ready",

@@ -2644,7 +2644,7 @@ function renderAdminDrawer(leadId) {
         <div class="admin-drawer-head-actions">
           <button type="button" data-drawer-open-card>Locate in queue</button>
           <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(id)}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
-          <button type="button" data-drawer-close>Close</button>
+          <button class="drawer-close-strong" type="button" data-drawer-close aria-label="Close drawer">× Close</button>
         </div>
       </header>
       <div class="drawer-workspace-scroll">
@@ -3055,7 +3055,7 @@ function adminCrmWorkflowSteps(lead) {
     { key: "contact", label: "Contact" },
     { key: "appraisal", label: "Appraisal" },
     { key: "offer", label: "Offer" },
-    { key: "purchase", label: "Purchased" },
+    { key: "purchase", label: "Acquired / consigned" },
     { key: "recon", label: "Recon" },
     { key: "inventory", label: "Inventory" },
     { key: "sold", label: "Sold" }
@@ -3075,8 +3075,8 @@ function adminCrmStage(lead) {
   if (inventoryStatus === "sold" || status === "sold") return { key: "sold", label: "Vehicle sold", hint: "Confirm delivery, accounting, and final CRM close.", needsManager: true };
   if (inventoryStatus === "published") return { key: "inventory", label: "Listed inventory", hint: "Vehicle is live. Watch buyer activity and sales handoff." };
   if (["draft", "review"].includes(inventoryStatus) || status === "in_inventory") return { key: "recon", label: "Recon / intake", hint: "Decision point: repairs, price, photos, and publish approval.", needsManager: true };
-  if (status === "won") return { key: "purchase", label: "Purchased", hint: "Confirm paperwork and move vehicle into intake.", needsManager: true };
-  if (status === "offer_sent") return { key: "offer", label: "Offer sent", hint: "Decision point: offer, expiry, and seller response.", needsManager: true };
+  if (status === "won") return { key: "purchase", label: "Acquired / consigned", hint: "Confirm purchase or consignment terms, then move vehicle into intake.", needsManager: true };
+  if (status === "offer_sent") return { key: "offer", label: "Offer sent", hint: "Decision point: purchase price or consignment commission, expiry, and seller response.", needsManager: true };
   if (status === "inspection_booked") return { key: "appraisal", label: "Inspection / appraisal", hint: "Confirm condition, title, lien, and appraisal path." };
   if (["contacted", "waiting_for_customer"].includes(status)) return { key: "contact", label: "Seller contact", hint: "Make sure inspection or next task is assigned." };
   return { key: "lead", label: "New seller lead", hint: "Assign owner and verify the vehicle." };
@@ -3441,9 +3441,6 @@ leadsEl.addEventListener("click", async (event) => {
     return;
   }
 
-  const clickedCard = event.target.closest(".lead-card");
-  if (clickedCard?.dataset?.id) setActiveAdminLead(clickedCard.dataset.id);
-
   const openUrlButton = event.target.closest("[data-admin-open-url]");
   if (openUrlButton) {
     window.location.href = openUrlButton.dataset.adminOpenUrl || "/admin-vehicles.html";
@@ -3472,19 +3469,25 @@ leadsEl.addEventListener("click", async (event) => {
 
   const openWorkspaceButton = event.target.closest("[data-admin-open-workspace]");
   if (openWorkspaceButton) {
-    await openAdminLeadWorkspace(openWorkspaceButton.closest(".lead-card"), { forceActivity: true });
+    const card = openWorkspaceButton.closest(".lead-card");
+    if (card?.dataset?.id) setActiveAdminLead(card.dataset.id);
+    await openAdminLeadWorkspace(card, { forceActivity: true });
     return;
   }
 
   const focusFollowUpButton = event.target.closest("[data-admin-focus-followup]");
   if (focusFollowUpButton) {
-    await openAdminLeadWorkspace(focusFollowUpButton.closest(".lead-card"), { forceActivity: true, focus: "followup" });
+    const card = focusFollowUpButton.closest(".lead-card");
+    if (card?.dataset?.id) setActiveAdminLead(card.dataset.id);
+    await openAdminLeadWorkspace(card, { forceActivity: true, focus: "followup" });
     return;
   }
 
   const focusNoteButton = event.target.closest("[data-admin-focus-note]");
   if (focusNoteButton) {
-    await openAdminLeadWorkspace(focusNoteButton.closest(".lead-card"), {
+    const card = focusNoteButton.closest(".lead-card");
+    if (card?.dataset?.id) setActiveAdminLead(card.dataset.id);
+    await openAdminLeadWorkspace(card, {
       forceActivity: true,
       focus: "note",
       noteType: focusNoteButton.dataset.adminFocusNote || "internal"
@@ -3494,7 +3497,9 @@ leadsEl.addEventListener("click", async (event) => {
 
   const focusTaskButton = event.target.closest("[data-admin-focus-task]");
   if (focusTaskButton) {
-    await openAdminLeadWorkspace(focusTaskButton.closest(".lead-card"), { forceActivity: true, focus: "task" });
+    const card = focusTaskButton.closest(".lead-card");
+    if (card?.dataset?.id) setActiveAdminLead(card.dataset.id);
+    await openAdminLeadWorkspace(card, { forceActivity: true, focus: "task" });
     return;
   }
 
@@ -3522,6 +3527,8 @@ leadsEl.addEventListener("click", async (event) => {
     return;
   }
 
+  const clickedCard = event.target.closest(".lead-card");
+  if (clickedCard?.dataset?.id) setActiveAdminLead(clickedCard.dataset.id);
   return;
 });
 
@@ -4383,6 +4390,8 @@ function dealDeskItemLabel(key) {
     keys_ready: "Keys ready",
     delivery_booked: "Delivery booked",
     vehicle_picked_up: "Vehicle picked up",
+    purchase_or_consignment_agreement: "Purchase / consignment agreement",
+    commission_terms_confirmed: "Commission terms confirmed",
     intake_photos_complete: "Intake photos complete",
     keys_collected: "Keys collected",
     recon_estimate_ready: "Recon estimate ready",
