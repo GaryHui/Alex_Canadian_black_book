@@ -1237,6 +1237,14 @@ function filterAdminLeads(leads) {
   if (adminLeadFilter === "deal-desk") filtered = leads.filter(isAdminDealDeskLead);
   if (adminLeadFilter === "aging-critical") filtered = leads.filter(isAdminAgingCriticalLead);
   if (adminLeadFilter === "owner-unread") filtered = leads.filter((lead) => Boolean(lead.owner_review?.unread));
+  if (adminLeadFilter === "manager-approval") {
+    filtered = leads.filter((lead) => {
+      if (lead.owner_review?.unread) return true;
+      if (isClosedLead(lead)) return false;
+      const status = String(lead.status || "").toLowerCase();
+      return !isBuyerLead(lead) && ["offer_sent", "won", "in_inventory"].includes(status);
+    });
+  }
   if (adminLeadFilter === "duplicate-review") filtered = leads.filter((lead) => !isClosedLead(lead) && Boolean(lead.duplicate_warning?.message) && !lead.duplicate_warning?.reviewed);
   if (adminLeadFilter === "buyer") filtered = leads.filter((lead) => !isClosedLead(lead) && isBuyerLead(lead));
   if (adminLeadFilter === "seller") filtered = leads.filter((lead) => !isClosedLead(lead) && !isBuyerLead(lead));
@@ -1638,7 +1646,7 @@ function renderAdminToday(leads) {
   const reconBlockerCount = activeLeads.filter((lead) => !isBuyerLead(lead) && Number(adminDealChecklistSummary(lead).pending || 0) > 0).length;
   const dashboardStats = renderAdminDashboardStats(leads);
   const focus = adminWorkFocus([
-    { count: managerApprovalCount, label: "Clear manager approvals", detail: "Price, recon, publish, or staff updates need your decision.", filter: "owner-unread" },
+    { count: managerApprovalCount, label: "Clear manager approvals", detail: "Price, recon, publish, or staff updates need your decision.", filter: "manager-approval" },
     { count: unassignedCount, label: "Dispatch unassigned leads", detail: "Assign a staff rep before the lead gets cold.", filter: "unassigned" },
     { count: reconBlockerCount, label: "Unblock recon / listing", detail: "Seller vehicles are waiting on photos, keys, recon, pricing, or publish review.", filter: "deal-desk" },
     { count: dueCount, label: "Push due follow-ups", detail: "These leads need action today or are overdue.", filter: "needs-follow-up" },
@@ -2550,6 +2558,7 @@ function renderAdminDrawer(leadId) {
                   <button type="button" data-drawer-assign-to="${escapeHtml(email)}">${escapeHtml(shortEmail(email))}</button>
                 `).join("")}
               </div>` : "";
+  const taskTemplates = adminTaskTemplates(buyer);
   const sellerAdjustmentFields = buyer ? "" : `
                 <label>
                   <span>Approved wholesale</span>
@@ -2771,7 +2780,7 @@ function renderAdminDrawer(leadId) {
             <section class="admin-drawer-section admin-drawer-update-card">
               <header>
                 <h3>Log update</h3>
-                <span>Share the latest customer touch with the team</span>
+                <span>LOG = what already happened. TASK = who does next. Timeline records both.</span>
               </header>
               <div class="drawer-spotlight">
                 <strong>${escapeHtml(nextAction)}</strong>
@@ -2799,12 +2808,26 @@ function renderAdminDrawer(leadId) {
             <section class="admin-drawer-section admin-drawer-task-card">
               <header>
                 <h3>Task</h3>
-                <span>Give the next action to the team</span>
+                <span>Assign the next owner, deadline, and expected action</span>
               </header>
               <form class="lead-task-form admin-drawer-task-form">
+                <label>
+                  <span>Task type</span>
+                  <select name="taskPreset">
+                    <option value="">Custom task</option>
+                    ${taskTemplates.map((task) => `<option value="${escapeHtml(task.key)}">${escapeHtml(task.label)} - ${escapeHtml(task.hint)}</option>`).join("")}
+                  </select>
+                </label>
                 <input name="title" placeholder="Next task, e.g. call customer back" />
                 <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
                 <input name="dueAt" type="datetime-local" />
+                <div class="task-due-controls" aria-label="Task due date">
+                  <span>Due</span>
+                  <button type="button" data-admin-task-due="soon">2 hours</button>
+                  <button type="button" data-admin-task-due="today">Today</button>
+                  <button type="button" data-admin-task-due="tomorrow">Tomorrow</button>
+                  <button type="button" data-admin-task-due="next_week">Next week</button>
+                </div>
                 <button type="submit">Add task</button>
               </form>
             </section>
@@ -3595,6 +3618,12 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
     return;
   }
 
+  const taskDueButton = event.target.closest("[data-admin-task-due]");
+  if (taskDueButton) {
+    applyAdminTaskDue(taskDueButton.dataset.adminTaskDue || "today");
+    return;
+  }
+
   const refreshButton = event.target.closest("[data-drawer-load-activity]");
   if (refreshButton) {
     adminDrawerActivityLoaded = false;
@@ -3893,6 +3922,12 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
 });
 
 adminLeadDrawer?.addEventListener("change", async (event) => {
+  const taskPreset = event.target.closest('.admin-drawer-task-form select[name="taskPreset"]');
+  if (taskPreset) {
+    applyAdminTaskTemplate(taskPreset.value || "");
+    return;
+  }
+
   const assignField = event.target.closest('.admin-drawer-assign-form [name="assignedTo"]');
   if (assignField) {
     const form = assignField.closest(".admin-drawer-assign-form");
@@ -3966,6 +4001,62 @@ function applyFollowUpPreset(preset) {
   }
   input.value = datetimeLocalValue(date.toISOString());
   input.focus();
+}
+
+function adminTaskTemplates(buyerLead) {
+  const shared = [
+    { key: "first_touch", label: "First touch", hint: "Call/text within 15 min", title: "First touch: call or text customer, confirm request and best callback time.", due: "soon" },
+    { key: "manager_review", label: "Manager review", hint: "Decision needed", title: "Manager review: confirm price, status, and next move before staff updates customer.", due: "today" },
+    { key: "assign_owner", label: "Assign owner", hint: "Dispatch work", title: "Assign owner and confirm the next required customer touch.", due: "today" }
+  ];
+  const buyer = [
+    { key: "buyer_followup", label: "Buyer follow-up", hint: "Buy page inquiry", title: "Call buyer inquiry, confirm vehicle interest, budget, trade, finance plan, and visit timeline.", due: "soon" },
+    { key: "test_drive", label: "Test drive", hint: "Appointment ready", title: "Book or confirm test drive; verify vehicle availability, keys, plate, and appointment time.", due: "today" },
+    { key: "finance_trade", label: "Finance / trade", hint: "Docs and approval", title: "Confirm trade-in, finance documents, credit application, deposit, and decision timeline.", due: "tomorrow" },
+    { key: "delivery", label: "Delivery", hint: "Final handoff", title: "Prepare delivery handoff: documents, insurance, plates, payment, keys, and pickup time.", due: "next_week" }
+  ];
+  const seller = [
+    { key: "inspection", label: "Inspection", hint: "Appraisal visit", title: "Book inspection/appraisal and verify VIN, kilometers, condition, lien, title, and seller intent.", due: "tomorrow" },
+    { key: "photo_package", label: "Photo package", hint: "Staff upload", title: "Upload full vehicle photo package: exterior, interior, odometer, VIN, damage, keys/documents, recon, and listing photos.", due: "today" },
+    { key: "keys_docs", label: "Keys / docs", hint: "Ownership ready", title: "Collect and verify keys, registration/title, lien payout, ownership documents, and seller ID.", due: "today" },
+    { key: "recon", label: "Recon", hint: "Repair blockers", title: "Get recon estimate and update repairs, detail, safety, tires/brakes, cost, timeline, and blockers.", due: "tomorrow" },
+    { key: "publish_review", label: "Publish review", hint: "Price/photos/listing", title: "Manager approval: price, recon spend, public photos, description, and publish readiness.", due: "today" }
+  ];
+  return buyerLead ? [...shared, ...buyer] : [...shared, ...seller];
+}
+
+function applyAdminTaskTemplate(key) {
+  const lead = adminLeadsCache.find((item) => String(item.id || "") === String(activeAdminDrawerLeadId || ""));
+  const template = adminTaskTemplates(isBuyerLead(lead)).find((item) => item.key === key);
+  if (!template) return;
+  const title = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form input[name="title"]');
+  const dueAt = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form input[name="dueAt"]');
+  const assignedTo = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form input[name="assignedTo"]');
+  if (title) title.value = template.title;
+  if (dueAt) dueAt.value = adminTaskDueValue(template.due);
+  if (assignedTo && !assignedTo.value) assignedTo.value = lead?.assigned_to || "";
+  title?.focus();
+}
+
+function applyAdminTaskDue(due) {
+  const dueAt = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form input[name="dueAt"]');
+  if (dueAt) dueAt.value = adminTaskDueValue(due);
+}
+
+function adminTaskDueValue(due) {
+  const date = new Date();
+  if (due === "soon") {
+    date.setHours(date.getHours() + 2, 0, 0, 0);
+  } else if (due === "tomorrow") {
+    date.setDate(date.getDate() + 1);
+    date.setHours(10, 0, 0, 0);
+  } else if (due === "next_week") {
+    date.setDate(date.getDate() + 7);
+    date.setHours(10, 0, 0, 0);
+  } else {
+    date.setHours(17, 0, 0, 0);
+  }
+  return datetimeLocalValue(date.toISOString());
 }
 
 async function maybeAdvanceStatusAfterCustomerTouch(noteType) {

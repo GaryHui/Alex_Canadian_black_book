@@ -263,7 +263,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const access = await canAccessLead(body.leadId, dealer);
       if (!access.ok) return sendJson(res, access.status || 403, { ok: false, error: access.error });
-      const result = await uploadLeadPhotos(body, dealer.user);
+      const result = await uploadLeadPhotos(body, dealer.user, dealer.role);
       return sendJson(res, result.ok ? 200 : result.status || 400, result);
     }
 
@@ -383,7 +383,7 @@ const server = http.createServer(async (req, res) => {
           ? await updateLeadStatusFromActivity(body, dealer.user, dealer.role)
           : body.action === "follow_up"
             ? await updateLeadFollowUpFromActivity(body, dealer.user)
-            : await updateLeadTask(body);
+            : await updateLeadTask(body, dealer.user, dealer.role);
         return sendJson(res, result.ok ? 200 : result.status || 400, result);
       }
     }
@@ -1976,7 +1976,7 @@ function publicBuyerInquiryRow(row) {
   };
 }
 
-async function uploadLeadPhotos(body, user) {
+async function uploadLeadPhotos(body, user, role) {
   const leadId = String(body.leadId || "").trim();
   const files = sanitizePhotoFiles(body.files || []);
   const url = process.env.SUPABASE_URL;
@@ -2013,6 +2013,15 @@ async function uploadLeadPhotos(body, user) {
     noteType: "inspection",
     note: `Vehicle photo upload:\n${lines.join("\n")}`
   }, user);
+  if (role !== "admin") {
+    await createOwnerReviewNote({
+      url,
+      key,
+      leadId,
+      authorEmail: user?.email || "",
+      reason: "Vehicle photos uploaded by staff. Review photo package, recon, and publish readiness."
+    });
+  }
 
   return { ok: true, photos: savedFiles, webhook };
 }
@@ -2607,13 +2616,17 @@ async function createLeadActivity(body, user, role) {
     note_type: noteType,
     note
   });
-  if (result.ok && role !== "admin" && ["offer", "correction"].includes(noteType)) {
+  if (result.ok && role !== "admin" && ["offer", "correction", "inspection"].includes(noteType)) {
     await createOwnerReviewNote({
       url,
       key,
       leadId,
       authorEmail: user?.email || "",
-      reason: noteType === "correction" ? "Vehicle detail correction requested by staff." : "Quote or offer added by staff."
+      reason: noteType === "correction"
+        ? "Vehicle detail correction requested by staff."
+        : noteType === "inspection"
+          ? "Inspection or recon update added by staff."
+          : "Quote or offer added by staff."
     });
   }
   if (result.ok) await touchLeadActivity({ url, key, leadId });
@@ -2640,7 +2653,7 @@ async function assignLeadForTask({ url, key, leadId, assignedTo }) {
   }).catch(() => null);
 }
 
-async function updateLeadTask(body) {
+async function updateLeadTask(body, user, role) {
   const taskId = String(body.taskId || "").trim();
   const leadId = String(body.leadId || "").trim();
   const url = process.env.SUPABASE_URL;
@@ -2666,6 +2679,15 @@ async function updateLeadTask(body) {
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
   if (leadId) await touchLeadActivity({ url, key, leadId });
+  if (leadId && body.completed && role !== "admin") {
+    await createOwnerReviewNote({
+      url,
+      key,
+      leadId,
+      authorEmail: user?.email || "",
+      reason: "Task completed by staff. Review the next CRM step."
+    });
+  }
   return { ok: true, task: data?.[0] || null };
 }
 
