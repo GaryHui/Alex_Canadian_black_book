@@ -16,6 +16,7 @@
         <a href="/buy.html" data-i18n="buyNav">Buy</a>
         <a href="/sell.html" data-i18n="sellNav">Sell</a>
         <a href="/dealer.html" data-i18n="dealerNav">Dealer portal</a>
+        <button id="home-logout" class="ghost-button nav-auth-button" type="button" hidden data-i18n="logoutButton">Sign out</button>
         <button id="language-toggle" class="ghost-button" type="button">FR</button>
       </nav>
     </header>
@@ -43,13 +44,7 @@
         </div>
 
         <div class="home-visual" aria-hidden="true">
-          <div class="home-road"></div>
-          <div class="home-car">
-            <div class="home-car-glass"></div>
-            <div class="home-car-body"></div>
-            <div class="home-wheel home-wheel-a"></div>
-            <div class="home-wheel home-wheel-b"></div>
-          </div>
+          <img class="home-hero-car-image" src="/assets/home-hero-car.png" alt="" loading="eager" />
         </div>
       </section>
 
@@ -76,6 +71,7 @@
       </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/home.js"></script>
   </body>
 </html>

@@ -4,6 +4,7 @@ const homeText = {
     buyNav: "Buy",
     sellNav: "Sell",
     dealerNav: "Dealer portal",
+    logoutButton: "Sign out",
     eyebrow: "Canada's modern vehicle marketplace",
     headline: "Buy Or Sell With Clarity.",
     subhead: "A cleaner way to compare inventory, understand market value, and move from interest to dealer follow-up with confidence.",
@@ -27,6 +28,7 @@ const homeText = {
     buyNav: "Acheter",
     sellNav: "Vendre",
     dealerNav: "Portail concessionnaire",
+    logoutButton: "Deconnexion",
     eyebrow: "Marche automobile moderne au Canada",
     headline: "Acheter Ou Vendre Avec Clarte.",
     subhead: "Une facon plus simple de comparer l'inventaire, comprendre la valeur du marche et passer au suivi concessionnaire.",
@@ -49,6 +51,8 @@ const homeText = {
 
 let homeLanguage = localStorage.getItem("customer-language") || "en";
 const languageToggle = document.querySelector("#language-toggle");
+const homeLogoutButton = document.querySelector("#home-logout");
+let homeSupabaseClient = null;
 
 function setHomeLanguage(nextLanguage) {
   homeLanguage = nextLanguage === "fr" ? "fr" : "en";
@@ -61,5 +65,35 @@ function setHomeLanguage(nextLanguage) {
   });
 }
 
+function setHomeSession(session) {
+  if (homeLogoutButton) homeLogoutButton.hidden = !session?.user;
+}
+
+async function initializeHomeAuth() {
+  const config = await fetch("/api/config").then((res) => res.json()).catch(() => ({}));
+  if (!config.supabaseUrl || !config.supabaseAnonKey || !window.supabase) {
+    setHomeSession(null);
+    return;
+  }
+
+  homeSupabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      flowType: "pkce",
+      detectSessionInUrl: true,
+      persistSession: true
+    }
+  });
+
+  const { data } = await homeSupabaseClient.auth.getSession();
+  setHomeSession(data.session);
+  homeSupabaseClient.auth.onAuthStateChange((_event, session) => setHomeSession(session));
+}
+
+homeLogoutButton?.addEventListener("click", async () => {
+  if (homeSupabaseClient) await homeSupabaseClient.auth.signOut();
+  setHomeSession(null);
+});
+
 languageToggle?.addEventListener("click", () => setHomeLanguage(homeLanguage === "en" ? "fr" : "en"));
 setHomeLanguage(homeLanguage);
+initializeHomeAuth();

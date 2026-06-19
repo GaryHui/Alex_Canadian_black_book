@@ -204,73 +204,38 @@ main {
 
 .home-visual {
   position: relative;
+  display: grid;
+  align-items: end;
   min-height: 430px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 76% 22%, rgba(244, 185, 66, 0.25), transparent 24%),
-    linear-gradient(180deg, #fff, #eaf5ff);
+    radial-gradient(circle at 78% 18%, rgba(47, 143, 131, 0.18), transparent 24%),
+    linear-gradient(180deg, #fbfdff, #eef6fb 72%, #dfeaf2);
   border: 1px solid rgba(217, 225, 236, 0.92);
   border-radius: 8px;
   box-shadow: var(--shadow);
 }
 
-.home-road {
+.home-visual::after {
   position: absolute;
-  right: 9%;
-  bottom: 64px;
-  left: 9%;
-  height: 10px;
-  background: rgba(47, 143, 131, 0.35);
-  border-radius: 999px;
-  transform: rotate(-2deg);
-}
-
-.home-car {
-  position: absolute;
-  right: 8%;
-  bottom: 98px;
-  left: 8%;
-  height: 190px;
-}
-
-.home-car-body {
-  position: absolute;
-  right: 2%;
+  right: 10%;
   bottom: 36px;
-  left: 2%;
-  height: 96px;
-  background: linear-gradient(135deg, #8bd5ff, #1677d2 52%, #0f4f9a);
-  border-radius: 90px 110px 36px 34px;
-  box-shadow: 0 20px 28px rgba(20, 32, 51, 0.18);
+  left: 10%;
+  height: 26px;
+  content: "";
+  background: rgba(30, 45, 64, 0.16);
+  border-radius: 999px;
+  filter: blur(18px);
 }
 
-.home-car-glass {
-  position: absolute;
-  right: 26%;
-  bottom: 106px;
-  width: 42%;
-  height: 82px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(69, 101, 125, 0.72));
-  border-radius: 110px 90px 12px 12px;
-  transform: skewX(-16deg);
-}
-
-.home-wheel {
-  position: absolute;
-  bottom: 2px;
-  width: 76px;
-  height: 76px;
-  background: #e8eef4;
-  border: 16px solid #101827;
-  border-radius: 50%;
-}
-
-.home-wheel-a {
-  left: 18%;
-}
-
-.home-wheel-b {
-  right: 16%;
+.home-hero-car-image {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: min(112%, 720px);
+  max-width: none;
+  margin: auto auto 26px;
+  object-fit: contain;
 }
 
 .hero {
@@ -2984,6 +2949,14 @@ input::placeholder {
     grid-template-columns: 1fr;
   }
 
+  .home-visual {
+    min-height: 360px;
+  }
+
+  .home-hero-car-image {
+    width: min(108%, 640px);
+  }
+
   .inventory-sidebar {
     position: static;
     display: grid;
@@ -3155,6 +3128,15 @@ input::placeholder {
 
   .home-action-card strong {
     font-size: 29px;
+  }
+
+  .home-visual {
+    min-height: 280px;
+  }
+
+  .home-hero-car-image {
+    width: min(116%, 520px);
+    margin-bottom: 18px;
   }
 
   .marketplace-filter-button {

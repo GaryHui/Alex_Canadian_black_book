@@ -88,6 +88,10 @@ const server = http.createServer(async (req, res) => {
       return sendFile(res, path.join(__dirname, "public", "turnstile.js"), "application/javascript; charset=utf-8");
     }
 
+    if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/assets/home-hero-car.png") {
+      return sendFile(res, path.join(__dirname, "public", "assets", "home-hero-car.png"), "image/png");
+    }
+
     if (req.method === "GET" && url.pathname === "/admin.js") {
       return sendFile(res, path.join(__dirname, "public", "admin.js"), "application/javascript; charset=utf-8");
     }

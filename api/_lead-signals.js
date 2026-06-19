@@ -721,6 +721,29 @@ function signalTone(code) {
   return "info";
 }
 
+function latestTimestamp(rows, fields) {
+  return (Array.isArray(rows) ? rows : [])
+    .flatMap((row) => fields.map((field) => row?.[field]).filter(Boolean))
+    .filter(Boolean)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || "";
+}
+
+function relatedLeadUpdateToken(leads) {
+  return (Array.isArray(leads) ? leads : [])
+    .map((lead) => [
+      String(lead?.id || "").trim(),
+      lead?.updated_at || "",
+      lead?.last_activity_at || "",
+      lead?.status || "",
+      lead?.assigned_to || "",
+      lead?.priority || "",
+      lead?.next_follow_up_at || ""
+    ].join(":"))
+    .filter((item) => item.trim())
+    .sort()
+    .join(",");
+}
+
 function buildVehicleContextMap(leads, snapshot) {
   const map = new Map();
   for (const lead of Array.isArray(leads) ? leads : []) {
@@ -743,6 +766,8 @@ function buildVehicleContextMap(leads, snapshot) {
       || matchingInventory.some((item) => String(item.status || "").toLowerCase() === "sold");
     const offMarket = matchingInventory.length > 0 && matchingInventory.every((item) => ["archived", "draft", "review"].includes(String(item.status || "").toLowerCase()));
     const primaryLead = pickPrimarySellerLead(lead, relatedLeads.filter((item) => !isBuyerLead(item)), matchingInventory, snapshot.relationMap);
+    const relatedUpdatedAt = latestTimestamp(relatedLeads, ["updated_at", "last_activity_at", "created_at"]);
+    const relatedInventoryUpdatedAt = latestTimestamp(matchingInventory, ["updated_at", "created_at"]);
 
     map.set(id, {
       related_lead_count: relatedLeads.length,
@@ -759,7 +784,10 @@ function buildVehicleContextMap(leads, snapshot) {
       primary_lead_id: String(primaryLead?.id || "").trim(),
       primary_lead_title: primaryLead ? leadDisplayTitle(primaryLead) : "",
       primary_listing_id: String(matchingInventory[0]?.id || "").trim(),
-      cluster_label: vehicleClusterLabel(lead)
+      cluster_label: vehicleClusterLabel(lead),
+      related_updated_at: relatedUpdatedAt,
+      related_inventory_updated_at: relatedInventoryUpdatedAt,
+      related_update_token: relatedLeadUpdateToken(relatedLeads)
     });
   }
   return map;
