@@ -1486,6 +1486,12 @@ function collectDealerLeadAlerts(leads) {
     const id = String(lead.id || "");
     if (!id) continue;
     const token = dealerLeadUpdateToken(lead);
+    if (isDealerOwnLatestActivity(lead)) {
+      readTokens[id] = token;
+      dealerLeadAlertMap.delete(id);
+      changed = true;
+      continue;
+    }
     if (lead.vehicle_signal?.message) {
       dealerLeadAlertMap.set(id, {
         id,
@@ -1572,11 +1578,19 @@ function dealerLeadReadTokensKey() {
 }
 
 function markDealerLeadTokenRead(id) {
-  const lead = dealerLeadsCache.find((item) => String(item.id || "") === String(id || ""));
+  const lead = arguments.length > 1
+    ? arguments[1]
+    : dealerLeadsCache.find((item) => String(item.id || "") === String(id || ""));
   if (!lead) return;
   const readTokens = loadDealerLeadReadTokens();
   readTokens[String(id)] = dealerLeadUpdateToken(lead);
   saveDealerLeadReadTokens(readTokens);
+}
+
+function isDealerOwnLatestActivity(lead) {
+  const actor = String(lead?.activity_summary?.latest_activity_by || "").trim().toLowerCase();
+  const current = String(authSession?.user?.email || "").trim().toLowerCase();
+  return Boolean(actor && current && actor === current);
 }
 
 function renderDealerLeads(leads, role) {
@@ -2625,13 +2639,14 @@ function sortDealerLeads(leads) {
 }
 
 function dealerLeadPinnedRank(lead) {
-  if (hasDealerOpenTask(lead)) return 0;
-  if (isDealerClosedLead(lead)) return 4;
+  if (isDealerClosedLead(lead)) return 8;
+  if (dealerLeadAlertMap.has(String(lead?.id || ""))) return 0;
+  if (hasDealerOpenTask(lead)) return 1;
   const status = lead.status || "new";
-  if (String(lead.priority || "").toLowerCase() === "urgent") return 0;
-  if (isDealerLeadOverdue(lead.next_follow_up_at || "", status)) return 1;
-  if (String(status).toLowerCase() === "new") return 2;
-  return 3;
+  if (String(lead.priority || "").toLowerCase() === "urgent") return 2;
+  if (isDealerLeadOverdue(lead.next_follow_up_at || "", status)) return 3;
+  if (String(status).toLowerCase() === "new") return 4;
+  return 5;
 }
 
 function leadCreatedTimestamp(lead) {
@@ -3020,6 +3035,11 @@ async function checkDealerLeadUpdates() {
       }
       const nextToken = dealerLeadUpdateToken(lead);
       if (nextToken && previousToken !== nextToken) {
+        if (isDealerOwnLatestActivity(lead)) {
+          markDealerLeadTokenRead(id, lead);
+          dealerLeadAlertMap.delete(id);
+          continue;
+        }
         if (card) card.dataset.pendingUpdateToken = nextToken;
         dealerLeadAlertMap.set(id, {
           id,

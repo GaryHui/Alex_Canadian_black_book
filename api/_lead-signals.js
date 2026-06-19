@@ -420,6 +420,7 @@ function buildLeadActivitySummaryMap(leads, snapshot) {
   const summaries = new Map();
   const notesByLead = groupByLeadId(snapshot?.notes || []);
   const emailsByLead = groupByLeadId(snapshot?.emails || []);
+  const tasksByLead = groupByLeadId(snapshot?.tasks || []);
   const now = Date.now();
   for (const lead of Array.isArray(leads) ? leads : []) {
     const id = String(lead?.id || "").trim();
@@ -428,6 +429,11 @@ function buildLeadActivitySummaryMap(leads, snapshot) {
     const createdMs = new Date(createdAt || 0).getTime();
     const ageDays = createdMs > 0 ? Math.max(0, Math.floor((now - createdMs) / (24 * 60 * 60 * 1000))) : 0;
     const outboundTouch = latestOutboundTouch(notesByLead.get(id) || [], emailsByLead.get(id) || []);
+    const latestActivity = latestLeadActivity(
+      notesByLead.get(id) || [],
+      emailsByLead.get(id) || [],
+      tasksByLead.get(id) || []
+    );
     const inboundLabel = isBuyerLead(lead) ? "Buyer inquiry" : "Seller inquiry";
     summaries.set(id, {
       last_inbound_at: createdAt,
@@ -435,6 +441,9 @@ function buildLeadActivitySummaryMap(leads, snapshot) {
       last_outbound_at: outboundTouch?.at || "",
       last_outbound_label: outboundTouch?.label || "",
       last_outbound_channel: outboundTouch?.channel || "",
+      latest_activity_at: latestActivity?.at || "",
+      latest_activity_type: latestActivity?.type || "",
+      latest_activity_by: latestActivity?.by || "",
       age_days: ageDays,
       age_bucket: leadAgeBucket(ageDays),
       age_label: leadAgeLabel(ageDays),
@@ -442,6 +451,28 @@ function buildLeadActivitySummaryMap(leads, snapshot) {
     });
   }
   return summaries;
+}
+
+function latestLeadActivity(notes, emails, tasks) {
+  const noteItems = (Array.isArray(notes) ? notes : []).map((note) => ({
+    at: note.created_at || "",
+    by: String(note.author_email || "").trim().toLowerCase(),
+    type: String(note.note_type || "note").trim().toLowerCase() || "note"
+  }));
+  const emailItems = (Array.isArray(emails) ? emails : []).map((email) => ({
+    at: email.created_at || "",
+    by: String(email.sent_by || "").trim().toLowerCase(),
+    type: "email"
+  }));
+  const taskItems = (Array.isArray(tasks) ? tasks : []).map((task) => ({
+    at: task.completed_at || task.created_at || task.due_at || "",
+    by: "",
+    type: task.completed_at ? "task_completed" : "task"
+  }));
+  return [...noteItems, ...emailItems, ...taskItems]
+    .map((item) => ({ ...item, time: new Date(item.at || 0).getTime() }))
+    .filter((item) => item.at && !Number.isNaN(item.time))
+    .sort((a, b) => b.time - a.time)[0] || null;
 }
 
 function groupByLeadId(rows) {
