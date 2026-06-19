@@ -1816,6 +1816,17 @@ body.admin-drawer-open {
   margin-top: 10px;
 }
 
+.admin-drawer-vehicle-price-grid {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(260px, .9fr);
+}
+
+.admin-drawer-vehicle-price-grid.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .admin-drawer-command-card,
 .admin-drawer-vehicle-card,
 .admin-drawer-pricing-card,
@@ -1964,6 +1975,23 @@ body.admin-drawer-open {
   border-top: 1px solid #d8e2ef;
   margin-top: 12px;
   padding-top: 12px;
+}
+
+.admin-drawer-danger-zone {
+  border-top: 1px solid #fecdd3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.admin-drawer-danger-zone span {
+  color: #b42332;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .admin-drawer-activity-list {
@@ -6099,6 +6127,7 @@ body.admin-drawer-open {
   .admin-drawer-summary,
   .dealer-drawer-summary,
   .lead-list-header,
+  .admin-drawer-vehicle-price-grid,
   .lead-list-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -6163,6 +6192,7 @@ body.admin-drawer-open {
 
   .admin-drawer-summary,
   .dealer-drawer-summary,
+  .admin-drawer-vehicle-price-grid,
   .lead-list-row {
     grid-template-columns: 1fr;
   }

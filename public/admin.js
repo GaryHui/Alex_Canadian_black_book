@@ -2550,8 +2550,8 @@ function renderAdminDrawer(leadId) {
   const sellerPricingSection = buyer ? "" : `
             <section class="admin-drawer-section admin-drawer-pricing-card">
               <header>
-                <h3>Owner pricing</h3>
-                <span>Manager-approved vehicle numbers</span>
+                <h3>Price decision</h3>
+                <span>${escapeHtml(cbbWholesale || cbbRetail ? `CBB W ${cbbWholesale ? formatNumber(cbbWholesale) : "-"} / R ${cbbRetail ? formatNumber(cbbRetail) : "-"}` : "Manager-approved vehicle numbers")}</span>
               </header>
               <form class="owner-review admin-drawer-owner-form admin-drawer-pricing-form">
                 <input type="hidden" name="status" value="${escapeHtml(status)}" />
@@ -2567,7 +2567,7 @@ function renderAdminDrawer(leadId) {
             <section class="admin-drawer-section admin-drawer-vehicle-card">
               <header>
                 <h3>Vehicle details</h3>
-                <span>Manager-editable vehicle record</span>
+                <span>VIN, trim, mileage, color, and market region</span>
               </header>
               <form class="owner-review admin-drawer-owner-form admin-drawer-vehicle-form">
                 <input type="hidden" name="status" value="${escapeHtml(status)}" />
@@ -2621,6 +2621,11 @@ function renderAdminDrawer(leadId) {
                 <button type="submit">Save vehicle</button>
               </form>
             </section>`;
+  const vehiclePriceSection = `
+            <div class="admin-drawer-vehicle-price-grid ${buyer ? "single" : ""}">
+              ${vehicleDetailsSection}
+              ${sellerPricingSection}
+            </div>`;
   const activityStatusButtons = leadStatusActions(buyer, status)
     .map((action) => `<button type="button" data-drawer-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
     .join("");
@@ -2642,7 +2647,6 @@ function renderAdminDrawer(leadId) {
         </div>
         <div class="admin-drawer-head-actions">
           <button type="button" data-drawer-open-card>Locate in queue</button>
-          <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(id)}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
           <button class="drawer-close-strong" type="button" data-drawer-close aria-label="Close drawer">× Close</button>
         </div>
       </header>
@@ -2697,6 +2701,8 @@ function renderAdminDrawer(leadId) {
           </aside>
           <div class="drawer-workspace-main">
             ${renderAdminCommunicationStrip(lead)}
+            ${vehiclePriceSection}
+            ${renderAdminDealChecklistSection(lead)}
             <section class="admin-drawer-section admin-drawer-command-card">
               <header>
                 <h3>Assign & next step</h3>
@@ -2746,8 +2752,6 @@ function renderAdminDrawer(leadId) {
                 ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
               </div>
             </section>
-            ${sellerPricingSection}
-            ${renderAdminDealChecklistSection(lead)}
             <section class="admin-drawer-section admin-drawer-update-card">
               <header>
                 <h3>Log update</h3>
@@ -2795,7 +2799,6 @@ function renderAdminDrawer(leadId) {
               </header>
               <div class="lead-activity-list admin-drawer-activity-list">Activity not loaded yet.</div>
             </section>
-            ${vehicleDetailsSection}
             <details class="admin-drawer-section admin-drawer-settings-details">
               <summary>
                 <span>
@@ -2823,6 +2826,10 @@ function renderAdminDrawer(leadId) {
                 <textarea name="body" placeholder="Log the outbound email summary or draft text..."></textarea>
                 <button type="submit">Log email</button>
               </form>
+              <div class="admin-drawer-danger-zone">
+                <span>Danger zone</span>
+                <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(id)}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
+              </div>
             </details>
           </div>
         </div>
