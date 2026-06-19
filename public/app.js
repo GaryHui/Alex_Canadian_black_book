@@ -1693,6 +1693,7 @@ function renderDealerLeads(leads, role) {
             <div class="dealer-lead-title">
               <b class="dealer-type-pill dealer-type-${leadKind}">${escapeHtml(leadTypeLabel)}</b>
               <b class="lead-source-pill">${escapeHtml(sourceLabel)}</b>
+              <span class="lead-current-badge" aria-hidden="true">CURRENT</span>
               <strong>${escapeHtml(title)}</strong>
             </div>
             <div class="lead-list-subline lead-primary-meta">
@@ -1738,7 +1739,6 @@ function renderDealerLeads(leads, role) {
           <div class="lead-list-col lead-list-col-actions">
             <span class="lead-list-label">Quick actions</span>
             <div class="lead-quick-strip dealer-quick-strip" aria-label="Dealer quick actions">
-              <span class="lead-current-badge" aria-hidden="true">CURRENT</span>
               <button type="button" class="lead-quick-button lead-quick-button-primary" data-dealer-open-workspace>Open workspace</button>
               <button type="button" class="lead-quick-button" data-dealer-focus-followup>Follow-up</button>
               <button type="button" class="lead-quick-button" data-dealer-focus-note="call">Call / log</button>
@@ -1855,8 +1855,8 @@ function renderDealerDrawer(leadId) {
           <small>${escapeHtml(sourceLabel)} | ${escapeHtml(customerDisplay)} | ${escapeHtml(customerPhone)}</small>
         </div>
         <div class="dealer-drawer-head-actions">
-          <button type="button" data-dealer-drawer-open-card>Locate in queue</button>
-          <button class="drawer-close-strong" type="button" data-dealer-drawer-close aria-label="Close drawer">× Close</button>
+          <button class="drawer-locate-button" type="button" data-dealer-drawer-open-card>Locate lead</button>
+          <button class="drawer-close-strong" type="button" data-dealer-drawer-close aria-label="Close drawer">Close</button>
         </div>
       </header>
       <div class="drawer-workspace-scroll">
@@ -2047,7 +2047,8 @@ function renderDealerPhotoSection(lead) {
     "VIN",
     "Keys / documents",
     "Recon",
-    "Listing"
+    "Listing",
+    "Other / any angle"
   ];
   return `
     <section class="dealer-drawer-section dealer-photo-section">

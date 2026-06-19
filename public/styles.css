@@ -297,11 +297,18 @@ body.dealer-drawer-open .dealer-app-shell {
   padding: 18px;
 }
 
+.dealer-drawer-head > div:first-child {
+  flex: 1 1 auto;
+}
+
 .dealer-drawer-head-actions,
 .dealer-drawer-comm-shortcuts {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-end;
+  margin-left: auto;
 }
 
 .dealer-drawer-head-actions button,
@@ -2014,6 +2021,15 @@ body.admin-drawer-open {
   margin-top: 10px;
 }
 
+.admin-drawer-task-form,
+.dealer-drawer-task-form {
+  background: #f8fbff;
+  border: 1px solid #d8e8f8;
+  border-radius: 10px;
+  gap: 14px;
+  padding: 14px;
+}
+
 .admin-drawer-note-form,
 .admin-drawer-task-form,
 .admin-drawer-email-form,
@@ -2038,6 +2054,10 @@ body.admin-drawer-open {
 .admin-drawer-email-form button,
 .admin-drawer-owner-form button {
   justify-self: start;
+}
+
+.admin-drawer-task-form .task-title-field textarea {
+  min-height: 104px;
 }
 
 .admin-drawer-settings-details .lead-task-form,
@@ -2945,6 +2965,8 @@ body.admin-drawer-open {
   letter-spacing: .08em;
   line-height: 1;
   padding: 6px 9px;
+  position: static;
+  white-space: nowrap;
 }
 
 .lead-card-current .lead-current-badge,
@@ -5498,6 +5520,7 @@ body.admin-drawer-open {
 
 .lead-note-form textarea,
 .lead-task-form input,
+.lead-task-form textarea,
 .lead-note-form select,
 .lead-email-form input,
 .lead-email-form textarea {
@@ -5962,10 +5985,7 @@ body.admin-drawer-open {
 }
 
 .dealer-drawer-task-form {
-  background: #f8fbff;
-  border: 1px solid #d8e8f8;
-  border-radius: 10px;
-  padding: 12px;
+  padding: 14px;
 }
 
 .task-form-field {
@@ -5983,6 +6003,11 @@ body.admin-drawer-open {
 
 .task-title-field textarea {
   min-height: 96px;
+}
+
+.admin-drawer-task-form .task-title-field textarea,
+.dealer-drawer-task-form .task-title-field textarea {
+  width: 100%;
 }
 
 .task-due-controls {

@@ -2441,6 +2441,7 @@ function renderLead(lead, index = 0) {
             <b class="lead-type-pill lead-type-${leadType}">${escapeHtml(leadTypeLabel)}</b>
             <b class="lead-source-pill">${escapeHtml(sourceLabel)}</b>
             ${unreadOwnerReview ? `<b class="lead-new-badge">NEW</b>` : ""}
+            <span class="lead-current-badge" aria-hidden="true">CURRENT</span>
             <strong>${escapeHtml(title)}</strong>
           </div>
           <div class="lead-list-subline lead-primary-meta">
@@ -2485,7 +2486,6 @@ function renderLead(lead, index = 0) {
         <div class="lead-list-col lead-list-col-actions">
           <span class="lead-list-label">Quick actions</span>
           <div class="lead-quick-strip" aria-label="Lead quick actions">
-            <span class="lead-current-badge" aria-hidden="true">CURRENT</span>
             <button type="button" class="lead-quick-button lead-quick-button-primary" data-admin-open-workspace>Open workspace</button>
             <button type="button" class="lead-quick-button" data-admin-focus-followup>Follow-up</button>
             <button type="button" class="lead-quick-button" data-admin-focus-note="call">Call / log</button>
@@ -2860,16 +2860,17 @@ function renderAdminDrawer(leadId) {
                 <span>Assign the next owner, deadline, and expected action</span>
               </header>
               <form class="lead-task-form admin-drawer-task-form">
-                <label>
+                <label class="task-form-field">
                   <span>Task type</span>
                   <select name="taskPreset">
                     <option value="">Custom task</option>
                     ${taskTemplates.map((task) => `<option value="${escapeHtml(task.key)}">${escapeHtml(task.label)} - ${escapeHtml(task.hint)}</option>`).join("")}
                   </select>
                 </label>
-                <input name="title" placeholder="Next task, e.g. call customer back" />
-                <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
-                <input name="dueAt" type="datetime-local" />
+                <label class="task-form-field task-title-field">
+                  <span>Task</span>
+                  <textarea name="title" placeholder="Next task, e.g. call customer back"></textarea>
+                </label>
                 <div class="task-due-controls" aria-label="Task due date">
                   <span>Due</span>
                   <button type="button" data-admin-task-due="soon">2 hours</button>
@@ -2877,6 +2878,14 @@ function renderAdminDrawer(leadId) {
                   <button type="button" data-admin-task-due="tomorrow">Tomorrow</button>
                   <button type="button" data-admin-task-due="next_week">Next week</button>
                 </div>
+                <label class="task-form-field task-time-field">
+                  <span>Due time</span>
+                  <input name="dueAt" type="datetime-local" />
+                </label>
+                <details class="task-advanced-options">
+                  <summary>Assign to someone else</summary>
+                  <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+                </details>
                 <button type="submit">Add task</button>
               </form>
             </section>
@@ -4147,7 +4156,7 @@ function applyAdminTaskTemplate(key) {
   const lead = adminLeadsCache.find((item) => String(item.id || "") === String(activeAdminDrawerLeadId || ""));
   const template = adminTaskTemplates(isBuyerLead(lead)).find((item) => item.key === key);
   if (!template) return;
-  const title = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form input[name="title"]');
+  const title = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form textarea[name="title"], .admin-drawer-task-form input[name="title"]');
   const dueAt = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form input[name="dueAt"]');
   const assignedTo = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form input[name="assignedTo"]');
   if (title) title.value = template.title;
@@ -4258,7 +4267,7 @@ async function openAdminLeadWorkspace(card, options = {}) {
   }
 
   if (options.focus === "task") {
-    const taskInput = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form input[name="title"]');
+    const taskInput = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form textarea[name="title"], .admin-drawer-task-form input[name="title"]');
     taskInput?.focus();
     return;
   }
