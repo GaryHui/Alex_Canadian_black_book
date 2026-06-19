@@ -1104,7 +1104,7 @@ function duplicateWarningInline(lead) {
     ? `<button type="button" data-duplicate-review="link_inventory" data-target-lead-id="${escapeHtml(safeMergeTargetId)}" data-listing-id="${escapeHtml(listingId)}">Link warehouse</button>`
     : "";
   return `
-    <section class="owner-review-required duplicate-vehicle-warning">
+    <section class="owner-review-required duplicate-vehicle-warning" data-drawer-section="duplicate">
       <div>
         <span>Same vehicle review</span>
         <strong>Possible same vehicle. Review before warehouse.</strong>
@@ -1475,7 +1475,7 @@ function renderAdminDealChecklistSection(lead) {
     : adminDealChecklistTemplate(lead).map((item) => ({ ...item, completed: false, completed_at: "" }));
   const missingCount = items.filter((item) => !item.completed).length;
   return `
-    <section class="admin-drawer-section">
+    <section class="admin-drawer-section" data-drawer-section="dealdesk">
       <header>
         <h3>Deal desk checklist</h3>
         <span>${escapeHtml(summary.progress_label || "Checklist 0/0")}</span>
@@ -1557,6 +1557,20 @@ function adminNextBestAction(lead) {
   return buyer ? "Work the buyer plan and move toward appointment" : "Work the seller plan and move toward inspection or handoff";
 }
 
+function adminNextActionTarget(lead) {
+  const buyer = isBuyerLead(lead);
+  const status = String(lead?.status || "new").toLowerCase();
+  if (lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed) return "duplicate";
+  if (lead?.owner_review?.unread) return "review";
+  if (isAdminDealDeskLead(lead) && adminDealChecklistSummary(lead).pending > 0) return "dealdesk";
+  if (!String(lead?.assigned_to || "").trim()) return "assign";
+  if (isOverdue(lead?.next_follow_up_at || "", status)) return "update";
+  if (!buyer && ["inspection_booked", "offer_sent", "won", "in_inventory"].includes(status)) return "pricing";
+  if (!buyer && !(Array.isArray(lead?.lead_photos) && lead.lead_photos.length)) return "photos";
+  if (!lead?.next_follow_up_at) return "assign";
+  return "update";
+}
+
 function renderAdminCommunicationStrip(lead) {
   const chips = [];
   chips.push(isAdminStaleLead(lead) ? "No response 48h+" : (adminOutboundLabel(lead) || adminLastTouchLabel(lead)));
@@ -1576,7 +1590,10 @@ function renderAdminCommunicationStrip(lead) {
       <div class="lead-communication-chips">
         ${chips.slice(0, 4).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
       </div>
-      <strong>${escapeHtml(adminNextBestAction(lead))}</strong>
+      <button type="button" class="lead-next-action-jump" data-drawer-jump-next="${escapeHtml(adminNextActionTarget(lead))}">
+        <span>Next action</span>
+        <strong>${escapeHtml(adminNextBestAction(lead))}</strong>
+      </button>
     </section>
   `;
 }
@@ -1585,7 +1602,7 @@ function renderAdminLeadPhotoReviewSection(lead) {
   if (isBuyerLead(lead)) return "";
   const photos = Array.isArray(lead?.lead_photos) ? lead.lead_photos.slice(0, MAX_LEAD_PHOTOS) : [];
   return `
-            <section class="admin-drawer-section admin-lead-photo-review">
+            <section class="admin-drawer-section admin-lead-photo-review" data-drawer-section="photos">
               <header>
                 <h3>Vehicle photos</h3>
                 <span>${photos.length ? `${photos.length}/${MAX_LEAD_PHOTOS} uploaded for appraisal and publish review` : "No staff photos yet"}</span>
@@ -2593,17 +2610,20 @@ function renderAdminDrawer(leadId) {
                   <span>Approved retail</span>
                   <input name="ownerRetail" type="number" value="${ownerRetailValue}" placeholder="Manual retail" />
                 </label>
-                <label>
+                <label class="admin-price-reason-field">
                   <span>Reason</span>
-                  <input name="reason" value="${escapeHtml(adjustment.reason || (cbbWholesale || cbbRetail ? "Pre-filled from current CBB estimate" : ""))}" placeholder="Why adjust this value?" />
+                  <textarea name="reason" placeholder="Why adjust this value?">${escapeHtml(adjustment.reason || (cbbWholesale || cbbRetail ? "Pre-filled from current CBB estimate" : ""))}</textarea>
                 </label>`;
   const sellerPricingSection = buyer ? "" : `
-            <section class="admin-drawer-section admin-drawer-pricing-card">
+            <section class="admin-drawer-section admin-drawer-pricing-card" data-drawer-section="pricing">
               <header>
-                <h3>Price decision</h3>
-                <span>${escapeHtml(cbbWholesale || cbbRetail ? `CBB W ${cbbWholesale ? formatNumber(cbbWholesale) : "-"} / R ${cbbRetail ? formatNumber(cbbRetail) : "-"}` : "Manager-approved vehicle numbers")}</span>
+                <div>
+                  <h3>Price decision</h3>
+                  <span>${escapeHtml(cbbWholesale || cbbRetail ? `CBB W ${cbbWholesale ? formatNumber(cbbWholesale) : "-"} / R ${cbbRetail ? formatNumber(cbbRetail) : "-"}` : "Manager-approved vehicle numbers")}</span>
+                </div>
+                <button type="button" class="drawer-edit-lock" data-drawer-toggle-lock=".admin-drawer-pricing-form" aria-pressed="true">Locked</button>
               </header>
-              <form class="owner-review admin-drawer-owner-form admin-drawer-pricing-form">
+              <form class="owner-review admin-drawer-owner-form admin-drawer-pricing-form admin-locked-form" data-edit-locked="true">
                 <input type="hidden" name="status" value="${escapeHtml(status)}" />
                 <input type="hidden" name="assignedTo" value="${escapeHtml(assignedTo)}" />
                 <input type="hidden" name="priority" value="${escapeHtml(priority)}" />
@@ -2614,12 +2634,15 @@ function renderAdminDrawer(leadId) {
               </form>
             </section>`;
   const vehicleDetailsSection = `
-            <section class="admin-drawer-section admin-drawer-vehicle-card">
+            <section class="admin-drawer-section admin-drawer-vehicle-card" data-drawer-section="vehicle">
               <header>
-                <h3>Vehicle details</h3>
-                <span>VIN, trim, mileage, color, and market region</span>
+                <div>
+                  <h3>Vehicle details</h3>
+                  <span>VIN, trim, mileage, color, and market region</span>
+                </div>
+                <button type="button" class="drawer-edit-lock" data-drawer-toggle-lock=".admin-drawer-vehicle-form" aria-pressed="true">Locked</button>
               </header>
-              <form class="owner-review admin-drawer-owner-form admin-drawer-vehicle-form">
+              <form class="owner-review admin-drawer-owner-form admin-drawer-vehicle-form admin-locked-form" data-edit-locked="true">
                 <input type="hidden" name="status" value="${escapeHtml(status)}" />
                 <input type="hidden" name="assignedTo" value="${escapeHtml(assignedTo)}" />
                 <input type="hidden" name="priority" value="${escapeHtml(priority)}" />
@@ -2632,7 +2655,7 @@ function renderAdminDrawer(leadId) {
                   <span>Vehicle title</span>
                   <input name="vehicleTitle" value="${escapeHtml(title)}" placeholder="2019 Toyota Mirai Base 4D Sedan" />
                 </label>
-                <label>
+                <label class="admin-vin-field">
                   <span>VIN</span>
                   <input name="vehicleVin" value="${escapeHtml(vin === "-" ? "" : vin)}" placeholder="VIN" />
                 </label>
@@ -2696,8 +2719,8 @@ function renderAdminDrawer(leadId) {
           <small>${escapeHtml(sourceLabel)} | ${escapeHtml(customerDisplay)} | ${escapeHtml(customerPhone)} | VIN ${escapeHtml(vin)}</small>
         </div>
         <div class="admin-drawer-head-actions">
-          <button type="button" data-drawer-open-card>Locate in queue</button>
-          <button class="drawer-close-strong" type="button" data-drawer-close aria-label="Close drawer">× Close</button>
+          <button class="drawer-locate-button" type="button" data-drawer-open-card>Locate lead</button>
+          <button class="drawer-close-strong" type="button" data-drawer-close aria-label="Close drawer">Close</button>
         </div>
       </header>
       <div class="drawer-workspace-scroll">
@@ -2736,7 +2759,7 @@ function renderAdminDrawer(leadId) {
               </div>
             </section>
             ${ownerReview.unread ? `
-              <section class="owner-review-required admin-drawer-owner-review">
+              <section class="owner-review-required admin-drawer-owner-review" data-drawer-section="review">
                 <div>
                   <span>Manager review required</span>
                   <strong>${escapeHtml(ownerReview.reason || "Important staff update needs review.")}</strong>
@@ -2754,7 +2777,7 @@ function renderAdminDrawer(leadId) {
             ${vehiclePriceSection}
             ${renderAdminLeadPhotoReviewSection(lead)}
             ${renderAdminDealChecklistSection(lead)}
-            <section class="admin-drawer-section admin-drawer-command-card">
+            <section class="admin-drawer-section admin-drawer-command-card" data-drawer-section="assign">
               <header>
                 <h3>Assign & next step</h3>
                 <span>Rep, priority, due time, and pipeline</span>
@@ -2803,7 +2826,7 @@ function renderAdminDrawer(leadId) {
                 ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
               </div>
             </section>
-            <section class="admin-drawer-section admin-drawer-update-card">
+            <section class="admin-drawer-section admin-drawer-update-card" data-drawer-section="update">
               <header>
                 <h3>Log update</h3>
                 <span>LOG = what already happened. TASK = who does next. Timeline records both.</span>
@@ -2831,7 +2854,7 @@ function renderAdminDrawer(leadId) {
                 <button type="submit">Post update</button>
               </form>
             </section>
-            <section class="admin-drawer-section admin-drawer-task-card">
+            <section class="admin-drawer-section admin-drawer-task-card" data-drawer-section="task">
               <header>
                 <h3>Task</h3>
                 <span>Assign the next owner, deadline, and expected action</span>
@@ -2901,6 +2924,49 @@ function renderAdminDrawer(leadId) {
       </div>
     </section>
   `;
+  initializeAdminDrawerEditableLocks();
+}
+
+function initializeAdminDrawerEditableLocks() {
+  adminLeadDrawerContent?.querySelectorAll(".admin-locked-form").forEach((form) => {
+    setAdminDrawerFormLocked(form, true);
+  });
+}
+
+function setAdminDrawerFormLocked(form, locked) {
+  if (!form) return;
+  form.dataset.editLocked = locked ? "true" : "false";
+  form.classList.toggle("is-locked", locked);
+  form.querySelectorAll("input, select, textarea, button").forEach((field) => {
+    if (field.type === "hidden") return;
+    field.disabled = locked;
+  });
+  const selector = form.classList.contains("admin-drawer-pricing-form")
+    ? ".admin-drawer-pricing-form"
+    : form.classList.contains("admin-drawer-vehicle-form")
+      ? ".admin-drawer-vehicle-form"
+      : "";
+  if (!selector) return;
+  const toggle = adminLeadDrawerContent?.querySelector(`[data-drawer-toggle-lock="${selector}"]`);
+  if (toggle) {
+    toggle.textContent = locked ? "Locked" : "Editing";
+    toggle.setAttribute("aria-pressed", locked ? "true" : "false");
+    toggle.classList.toggle("unlocked", !locked);
+  }
+}
+
+function scrollAdminDrawerToSection(target) {
+  if (!adminLeadDrawerContent) return;
+  const safeTarget = String(target || "update").trim().replace(/[^a-z0-9_-]/gi, "");
+  const section = adminLeadDrawerContent.querySelector(`[data-drawer-section="${safeTarget}"]`)
+    || adminLeadDrawerContent.querySelector('[data-drawer-section="update"]');
+  if (!section) return;
+  section.scrollIntoView({ behavior: "smooth", block: "start" });
+  section.classList.remove("drawer-section-pulse");
+  window.setTimeout(() => section.classList.add("drawer-section-pulse"), 10);
+  window.setTimeout(() => section.classList.remove("drawer-section-pulse"), 1800);
+  const firstField = section.querySelector("button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)");
+  window.setTimeout(() => firstField?.focus?.({ preventScroll: true }), 320);
 }
 
 function closeAdminDrawer() {
@@ -3632,6 +3698,20 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
     return;
   }
 
+  const nextJumpButton = event.target.closest("[data-drawer-jump-next]");
+  if (nextJumpButton) {
+    scrollAdminDrawerToSection(nextJumpButton.dataset.drawerJumpNext || "update");
+    return;
+  }
+
+  const lockToggleButton = event.target.closest("[data-drawer-toggle-lock]");
+  if (lockToggleButton) {
+    const form = adminLeadDrawerContent?.querySelector(lockToggleButton.dataset.drawerToggleLock || "");
+    const locked = form?.dataset.editLocked !== "false";
+    setAdminDrawerFormLocked(form, !locked);
+    return;
+  }
+
   const deleteButton = event.target.closest("[data-delete-lead]");
   if (deleteButton) {
     await deleteSingleLead(deleteButton);
@@ -3826,6 +3906,12 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
   const ownerForm = event.target.closest(".admin-drawer-owner-form");
   if (ownerForm && activeAdminDrawerLeadId) {
     event.preventDefault();
+    if (ownerForm.dataset.editLocked === "true") {
+      statusEl.textContent = "Unlock this section before editing.";
+      ownerForm.closest(".admin-drawer-section")?.classList.add("drawer-section-pulse");
+      window.setTimeout(() => ownerForm.closest(".admin-drawer-section")?.classList.remove("drawer-section-pulse"), 1800);
+      return;
+    }
     const isAssignForm = ownerForm.classList.contains("admin-drawer-assign-form");
     if (isAssignForm) syncAssignmentStatus(ownerForm);
     const payload = {
