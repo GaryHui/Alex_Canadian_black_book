@@ -261,6 +261,12 @@ dealerLeadDrawer?.addEventListener("click", async (event) => {
     return;
   }
 
+  const taskTemplateButton = event.target.closest("[data-dealer-task-template]");
+  if (taskTemplateButton) {
+    applyDealerTaskTemplate(taskTemplateButton.dataset.dealerTaskTemplate || "");
+    return;
+  }
+
   const checklistToggleButton = event.target.closest("[data-dealer-dealdesk-check]");
   if (checklistToggleButton && activeDealerDrawerLeadId) {
     const itemKey = checklistToggleButton.dataset.dealerDealdeskCheck || "";
@@ -1918,15 +1924,35 @@ function renderDealerDrawer(leadId) {
                 <textarea name="note" placeholder="Record the latest customer touch, inspection result, correction, or quote update..."></textarea>
                 <button type="submit">Save note</button>
               </form>
+            </section>
+            <section class="dealer-drawer-section dealer-task-section">
+              <header>
+                <h3>Task</h3>
+                <span>Use a SOP preset or write the next action manually.</span>
+              </header>
+              <div class="task-template-grid">
+                ${dealerTaskTemplates(buyerLead).map((task) => `
+                  <button type="button" data-dealer-task-template="${escapeHtml(task.key)}">
+                    <strong>${escapeHtml(task.label)}</strong>
+                    <span>${escapeHtml(task.hint)}</span>
+                  </button>
+                `).join("")}
+              </div>
+              <form class="dealer-task-form dealer-drawer-task-form">
+                <textarea name="title" placeholder="Next task: call customer, confirm appointment, request documents..."></textarea>
+                <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to dealer email" />
+                <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
+                <input name="dueAt" type="datetime-local" />
+                <button type="submit">Add task</button>
+              </form>
+            </section>
+            <section class="dealer-drawer-section">
+              <header>
+                <h3>Email log</h3>
+                <span>Record an outbound email that was sent outside the system.</span>
+              </header>
               <details class="drawer-secondary-forms">
-                <summary>Task and email tools</summary>
-                <form class="dealer-task-form dealer-drawer-task-form">
-                  <input name="title" placeholder="Next task" />
-                  <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to dealer email" />
-                  <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
-                  <input name="dueAt" type="datetime-local" />
-                  <button type="submit">Add task</button>
-                </form>
+                <summary>Email tools</summary>
                 <form class="lead-email-form dealer-email-form dealer-drawer-email-form">
                   <input name="sentTo" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@example.com" />
                   <input name="subject" placeholder="Email subject" />
@@ -2743,6 +2769,52 @@ function dealerFollowUpDate(key) {
   return date.toISOString();
 }
 
+function dealerTaskTemplates(buyerLead) {
+  const shared = [
+    { key: "first_touch", label: "First touch", hint: "Call/text within 15 min", title: "First touch: call or text customer, confirm request and best callback time.", due: "soon" },
+    { key: "no_answer", label: "No answer follow-up", hint: "Try again today", title: "No answer: send text/email and call again later today.", due: "today" },
+    { key: "manager_review", label: "Manager review", hint: "Escalate price/status", title: "Manager review: confirm price, status, and next move before updating customer.", due: "today" }
+  ];
+  const buyer = [
+    { key: "confirm_vehicle", label: "Confirm vehicle", hint: "Budget, trade, finance", title: "Confirm buyer needs: vehicle interest, budget, trade-in, finance plan, and purchase timeline.", due: "today" },
+    { key: "book_appointment", label: "Book appointment", hint: "Viewing or test drive", title: "Book buyer appointment or test drive and confirm arrival time.", due: "tomorrow" },
+    { key: "finance_docs", label: "Finance docs", hint: "Collect documents", title: "Collect finance documents and confirm pre-approval next step.", due: "tomorrow" }
+  ];
+  const seller = [
+    { key: "verify_vehicle", label: "Verify vehicle", hint: "VIN, km, lien, condition", title: "Verify seller vehicle details: VIN, kilometers, ownership/lien, accident history, and condition.", due: "today" },
+    { key: "request_photos", label: "Request photos", hint: "Exterior/interior/VIN", title: "Request seller photos: exterior, interior, odometer, VIN, damage, and ownership documents.", due: "today" },
+    { key: "book_inspection", label: "Book inspection", hint: "Appraisal appointment", title: "Book seller inspection/appraisal appointment and confirm location.", due: "tomorrow" },
+    { key: "send_offer", label: "Send offer", hint: "Price and conditions", title: "Prepare and send purchase offer with conditions and expiry time.", due: "tomorrow" }
+  ];
+  return buyerLead ? [...shared, ...buyer] : [...shared, ...seller];
+}
+
+function applyDealerTaskTemplate(key) {
+  const lead = dealerLeadsCache.find((item) => String(item.id || "") === String(activeDealerDrawerLeadId || ""));
+  const template = dealerTaskTemplates(isBuyerLead(lead)).find((item) => item.key === key);
+  if (!template) return;
+  const title = dealerLeadDrawerContent?.querySelector('.dealer-drawer-task-form textarea[name="title"]');
+  const assignedTo = dealerLeadDrawerContent?.querySelector('.dealer-drawer-task-form input[name="assignedTo"]');
+  const dueAt = dealerLeadDrawerContent?.querySelector('.dealer-drawer-task-form input[name="dueAt"]');
+  if (title) title.value = template.title;
+  if (assignedTo && !assignedTo.value) assignedTo.value = authSession?.user?.email || "";
+  if (dueAt) dueAt.value = dealerTaskDueValue(template.due);
+  title?.focus();
+}
+
+function dealerTaskDueValue(due) {
+  const date = new Date();
+  if (due === "soon") {
+    date.setHours(date.getHours() + 2, 0, 0, 0);
+  } else if (due === "tomorrow") {
+    date.setDate(date.getDate() + 1);
+    date.setHours(10, 0, 0, 0);
+  } else {
+    date.setHours(17, 0, 0, 0);
+  }
+  return dealerDateTimeValue(date.toISOString());
+}
+
 async function openDealerWorkspace(card, options = {}) {
   if (!card) return;
   if (card.dataset.leadId) {
@@ -2767,7 +2839,7 @@ async function openDealerWorkspace(card, options = {}) {
   }
 
   if (options.focus === "task") {
-    const taskInput = dealerLeadDrawerContent?.querySelector('.dealer-drawer-task-form input[name="title"]');
+    const taskInput = dealerLeadDrawerContent?.querySelector('.dealer-drawer-task-form textarea[name="title"]');
     taskInput?.focus();
     return;
   }

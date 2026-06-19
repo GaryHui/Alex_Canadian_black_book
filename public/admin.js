@@ -1155,8 +1155,13 @@ async function openAdminLeadFromAlert(id) {
   setActiveAdminLead(visibleId);
   clearAdminVisibleAlertGroup(id);
   const lead = adminLeadsCache.find((item) => String(item.id || "") === visibleId) || adminLeadsCache.find((item) => String(item.id || "") === id);
+  if (lead?.owner_review?.unread) {
+    await markManagerReviewedByLeadId(String(lead.id || id), { silent: true, reload: false }).catch(() => null);
+    lead.owner_review.unread = false;
+  }
   renderAdminLeadAlerts();
-  if (!lead?.owner_review?.unread) card.classList.remove("lead-card-updated");
+  removeAdminInlineAlertButtons(card, id);
+  card.classList.remove("lead-card-updated");
   card.classList.add("lead-card-flash");
   window.setTimeout(() => card.classList.remove("lead-card-flash"), 1600);
   card.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1166,9 +1171,14 @@ async function openAdminLeadFromAlert(id) {
   renderAdminDrawer(id);
   adminDrawerActivityLoaded = false;
   await loadAdminDrawerActivity({ force: true, highlightLatest: true });
-  if (lead?.owner_review?.unread) {
-    await markManagerReviewedByLeadId(String(lead.id || id), { silent: true });
-  }
+}
+
+function removeAdminInlineAlertButtons(card, id) {
+  const visibleId = adminAlertVisibleId(id);
+  card?.querySelectorAll("[data-admin-open-alert], [data-admin-open-lead]").forEach((button) => {
+    const target = button.dataset.adminOpenAlert || button.dataset.adminOpenLead || "";
+    if (!visibleId || adminAlertVisibleId(target) === visibleId) button.remove();
+  });
 }
 
 function renderLeadWorkbench(leads, options = {}) {
@@ -3303,13 +3313,16 @@ leadsEl.addEventListener("submit", async (event) => {
 });
 
 leadsEl.addEventListener("click", async (event) => {
-  const clickedCard = event.target.closest(".lead-card");
-  if (clickedCard?.dataset?.id) setActiveAdminLead(clickedCard.dataset.id);
   const alertButton = event.target.closest("[data-admin-open-alert]");
   if (alertButton) {
+    event.preventDefault();
+    event.stopPropagation();
     await openAdminLeadFromAlert(alertButton.dataset.adminOpenAlert || "");
     return;
   }
+
+  const clickedCard = event.target.closest(".lead-card");
+  if (clickedCard?.dataset?.id) setActiveAdminLead(clickedCard.dataset.id);
 
   const openUrlButton = event.target.closest("[data-admin-open-url]");
   if (openUrlButton) {

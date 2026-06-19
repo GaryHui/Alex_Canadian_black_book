@@ -352,7 +352,6 @@ body.dealer-drawer-open .dealer-app-shell {
 }
 
 .dealer-drawer-note-form,
-.dealer-drawer-task-form,
 .dealer-drawer-email-form {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -5419,12 +5418,47 @@ body.admin-drawer-open {
 }
 
 .dealer-task-form {
-  grid-template-columns: 1fr 220px 220px auto;
+  grid-template-columns: minmax(280px, 1.4fr) minmax(220px, .8fr) 220px auto;
+}
+
+.task-template-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  margin-top: 10px;
+}
+
+.task-template-grid button {
+  background: #f8fbff;
+  border: 1px solid #b9d4f2;
+  border-radius: 8px;
+  color: #0f315f;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  min-height: 64px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.task-template-grid button:hover {
+  border-color: #2f7ec8;
+  box-shadow: 0 4px 14px rgba(47, 126, 200, .12);
+}
+
+.task-template-grid strong {
+  font-size: 13px;
+}
+
+.task-template-grid span {
+  color: #5d6f85;
+  font-size: 12px;
 }
 
 .dealer-note-form select,
 .dealer-note-form textarea,
 .dealer-task-form input,
+.dealer-task-form textarea,
 .dealer-email-form input,
 .dealer-email-form textarea {
   border: 1px solid #b9c7d8;
@@ -5435,6 +5469,11 @@ body.admin-drawer-open {
 
 .dealer-note-form textarea {
   min-height: 72px;
+  resize: vertical;
+}
+
+.dealer-task-form textarea {
+  min-height: 82px;
   resize: vertical;
 }
 
@@ -5699,6 +5738,10 @@ body.admin-drawer-open {
   }
 
   .business-hours-row {
+    grid-template-columns: 1fr;
+  }
+
+  .dealer-task-form {
     grid-template-columns: 1fr;
   }
 }
