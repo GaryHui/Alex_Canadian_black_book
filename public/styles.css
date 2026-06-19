@@ -4895,6 +4895,33 @@ body.admin-drawer-open {
   margin: 0;
 }
 
+.activity-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.activity-type-pill {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  line-height: 1;
+  padding: 5px 8px;
+}
+
+.activity-type-log {
+  background: #e8f2ff;
+  color: #175aa8;
+}
+
+.activity-type-task {
+  background: #fff4d6;
+  color: #8a4b0b;
+}
+
 .activity-item span {
   color: #777;
   font-size: 12px;

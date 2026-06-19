@@ -1896,7 +1896,7 @@ function renderDealerDrawer(leadId) {
             <section class="dealer-drawer-section">
               <header>
                 <h3>Log touch</h3>
-                <span>Record the latest customer touch, then review the timeline below</span>
+                <span>LOG records what already happened. TASK assigns the next action.</span>
               </header>
               <div class="dealer-drawer-comm-shortcuts">
                 <button type="button" data-drawer-note-type="call">Call</button>
@@ -2961,8 +2961,11 @@ function renderDealerActivity(data, options = {}) {
         render: `
           <article class="activity-item ${task.completed_at ? "activity-done" : ""} ${latestKey === `task:${task.id}` ? "activity-highlight" : ""}">
             <div>
-              <strong>${escapeHtml(task.title || "Task")}</strong>
-              <span>Assigned to ${escapeHtml(task.assigned_to || "unassigned")}${dueText}</span>
+              <div class="activity-heading">
+                <span class="activity-type-pill activity-type-task">TASK</span>
+                <strong>${escapeHtml(task.title || "Task")}</strong>
+              </div>
+              <span>Next action assigned to ${escapeHtml(task.assigned_to || "unassigned")}${dueText}</span>
             </div>
             ${action}
           </article>
@@ -2975,7 +2978,10 @@ function renderDealerActivity(data, options = {}) {
       render: `
         <article class="activity-item ${latestKey === `note:${note.id}` ? "activity-highlight" : ""}">
           <div>
-            <strong>${escapeHtml(dealerActivityNoteLabel(note.note_type))} by ${escapeHtml(note.author_email || "-")}</strong>
+            <div class="activity-heading">
+              <span class="activity-type-pill activity-type-log">LOG</span>
+              <strong>${escapeHtml(dealerActivityNoteLabel(note.note_type))} by ${escapeHtml(note.author_email || "-")}</strong>
+            </div>
             <span>${escapeHtml(formatDateTime(note.created_at))}</span>
             <p>${escapeHtml(formatDealerActivityNoteText(note.note || ""))}</p>
           </div>
@@ -2988,7 +2994,10 @@ function renderDealerActivity(data, options = {}) {
       render: `
         <article class="activity-item ${latestKey === `email:${email.id}` ? "activity-highlight" : ""}">
           <div>
-            <strong>Email to ${escapeHtml(email.sent_to || "-")}</strong>
+            <div class="activity-heading">
+              <span class="activity-type-pill activity-type-log">LOG</span>
+              <strong>Email to ${escapeHtml(email.sent_to || "-")}</strong>
+            </div>
             <span>${escapeHtml(email.subject || "")} - ${escapeHtml(formatDateTime(email.created_at))}</span>
             <p>${escapeHtml(email.body || "")}</p>
           </div>
