@@ -750,7 +750,7 @@ function collectAdminLeadAlerts(leads) {
           id,
           type: "updated",
           title: leadAlertTitle(lead),
-          message: "Lead changed since you last opened it"
+          message: "Timeline changed since you last opened it"
         });
       } else if (!readTokens[id]) {
         readTokens[id] = token;
@@ -796,7 +796,7 @@ function collectAdminLeadAlerts(leads) {
         id,
         type: "updated",
         title: leadAlertTitle(lead),
-        message: "Lead changed since you last opened it"
+        message: "Timeline changed since you last opened it"
       });
     } else {
       adminLeadAlertMap.delete(id);
@@ -917,6 +917,8 @@ function leadUpdateToken(lead = {}) {
     JSON.stringify(lead.owner_adjustment || {}),
     JSON.stringify(lead.owner_review || {}),
     JSON.stringify(lead.vehicle_signal || {}),
+    JSON.stringify(lead.vehicle_context || {}),
+    JSON.stringify(lead.activity_summary || {}),
     JSON.stringify(lead.duplicate_warning || {}),
     lead.notes || ""
   ].join("|");
