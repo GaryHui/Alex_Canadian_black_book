@@ -346,11 +346,6 @@ body.dealer-drawer-open .dealer-app-shell {
   border-color: #0f172a !important;
 }
 
-.drawer-locate-button {
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
 .dealer-drawer-summary {
   display: grid;
   gap: 10px;
@@ -3085,15 +3080,25 @@ body.admin-drawer-open {
 
 .lead-list-row {
   align-items: start;
-  column-gap: 12px;
+  column-gap: 10px;
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1.1fr 1fr .9fr 1fr;
+  grid-template-columns: minmax(220px, 1.35fr) minmax(150px, .95fr) minmax(180px, 1.1fr) minmax(190px, 1.15fr) minmax(140px, .8fr) minmax(170px, .9fr);
 }
 
 .lead-list-col {
-  min-width: 0;
+  align-content: start;
+  background: rgba(248, 251, 255, .78);
+  border: 1px solid rgba(216, 226, 239, .74);
+  border-radius: 8px;
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  min-height: 88px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.lead-list-col-main {
+  background: rgba(255, 255, 255, .9);
 }
 
 .lead-list-label {
@@ -3113,7 +3118,10 @@ body.admin-drawer-open {
 }
 
 .lead-list-col-actions {
+  background: transparent;
+  border-color: transparent;
   justify-items: end;
+  padding-right: 0;
 }
 
 .lead-list-subline {

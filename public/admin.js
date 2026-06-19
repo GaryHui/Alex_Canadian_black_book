@@ -2719,7 +2719,6 @@ function renderAdminDrawer(leadId) {
           <small>${escapeHtml(sourceLabel)} | ${escapeHtml(customerDisplay)} | ${escapeHtml(customerPhone)} | VIN ${escapeHtml(vin)}</small>
         </div>
         <div class="admin-drawer-head-actions">
-          <button class="drawer-locate-button" type="button" data-drawer-open-card>Locate lead</button>
           <button class="drawer-close-strong" type="button" data-drawer-close aria-label="Close drawer">Close</button>
         </div>
       </header>
@@ -2774,9 +2773,6 @@ function renderAdminDrawer(leadId) {
           </aside>
           <div class="drawer-workspace-main">
             ${renderAdminCommunicationStrip(lead)}
-            ${vehiclePriceSection}
-            ${renderAdminLeadPhotoReviewSection(lead)}
-            ${renderAdminDealChecklistSection(lead)}
             <section class="admin-drawer-section admin-drawer-command-card" data-drawer-section="assign">
               <header>
                 <h3>Assign & next step</h3>
@@ -2826,34 +2822,9 @@ function renderAdminDrawer(leadId) {
                 ${activityStatusButtons || `<span class="admin-drawer-empty">No quick status actions</span>`}
               </div>
             </section>
-            <section class="admin-drawer-section admin-drawer-update-card" data-drawer-section="update">
-              <header>
-                <h3>Log update</h3>
-                <span>LOG = what already happened. TASK = who does next. Timeline records both.</span>
-              </header>
-              <div class="drawer-spotlight">
-                <strong>${escapeHtml(nextAction)}</strong>
-                <small>${escapeHtml(followUp ? `Next follow-up ${formatDateTime(followUp)}` : "No follow-up scheduled yet.")}</small>
-              </div>
-              <div class="admin-drawer-comm-shortcuts">
-                <button type="button" data-drawer-note-type="call">Call</button>
-                <button type="button" data-drawer-note-type="sms">Text</button>
-                <button type="button" data-drawer-focus-email>Email</button>
-                <button type="button" data-drawer-note-type="internal">Internal note</button>
-              </div>
-              <form class="lead-note-form admin-drawer-note-form">
-                <select name="noteType">
-                  <option value="internal">Internal note</option>
-                  <option value="call">Call</option>
-                  <option value="email">Email</option>
-                  <option value="sms">SMS</option>
-                  <option value="inspection">Inspection</option>
-                  <option value="offer">Offer</option>
-                </select>
-                <textarea name="note" placeholder="What changed? What should the next person know?"></textarea>
-                <button type="submit">Post update</button>
-              </form>
-            </section>
+            ${vehiclePriceSection}
+            ${renderAdminLeadPhotoReviewSection(lead)}
+            ${renderAdminDealChecklistSection(lead)}
             <section class="admin-drawer-section admin-drawer-task-card" data-drawer-section="task">
               <header>
                 <h3>Task</h3>
@@ -2887,6 +2858,34 @@ function renderAdminDrawer(leadId) {
                   <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
                 </details>
                 <button type="submit">Add task</button>
+              </form>
+            </section>
+            <section class="admin-drawer-section admin-drawer-update-card" data-drawer-section="update">
+              <header>
+                <h3>Log update</h3>
+                <span>LOG = what already happened. TASK = who does next. Timeline records both.</span>
+              </header>
+              <div class="drawer-spotlight">
+                <strong>${escapeHtml(nextAction)}</strong>
+                <small>${escapeHtml(followUp ? `Next follow-up ${formatDateTime(followUp)}` : "No follow-up scheduled yet.")}</small>
+              </div>
+              <div class="admin-drawer-comm-shortcuts">
+                <button type="button" data-drawer-note-type="call">Call</button>
+                <button type="button" data-drawer-note-type="sms">Text</button>
+                <button type="button" data-drawer-focus-email>Email</button>
+                <button type="button" data-drawer-note-type="internal">Internal note</button>
+              </div>
+              <form class="lead-note-form admin-drawer-note-form">
+                <select name="noteType">
+                  <option value="internal">Internal note</option>
+                  <option value="call">Call</option>
+                  <option value="email">Email</option>
+                  <option value="sms">SMS</option>
+                  <option value="inspection">Inspection</option>
+                  <option value="offer">Offer</option>
+                </select>
+                <textarea name="note" placeholder="What changed? What should the next person know?"></textarea>
+                <button type="submit">Post update</button>
               </form>
             </section>
             <section class="admin-drawer-section">
@@ -3160,7 +3159,7 @@ function renderAdminCrmWorkflowPanel(lead) {
         <div>
           <span>CRM stage</span>
           <strong>${escapeHtml(current.label)}</strong>
-          <small>${escapeHtml(current.hint)}</small>
+          <small>${escapeHtml(`Workflow position: ${current.hint}`)}</small>
         </div>
       </header>
       <ol class="crm-workflow-steps">
@@ -3206,7 +3205,7 @@ function adminCrmWorkflowSteps(lead) {
     { key: "appraisal", label: "Appraisal" },
     { key: "offer", label: "Offer" },
     { key: "purchase", label: "Acquired / consigned" },
-    { key: "recon", label: "Recon" },
+    { key: "recon", label: "Intake / recon" },
     { key: "inventory", label: "Inventory" },
     { key: "sold", label: "Sold" }
   ];
@@ -3224,7 +3223,7 @@ function adminCrmStage(lead) {
   }
   if (inventoryStatus === "sold" || status === "sold") return { key: "sold", label: "Vehicle sold", hint: "Confirm delivery, accounting, and final CRM close.", needsManager: true };
   if (inventoryStatus === "published") return { key: "inventory", label: "Listed inventory", hint: "Vehicle is live. Watch buyer activity and sales handoff." };
-  if (["draft", "review"].includes(inventoryStatus) || status === "in_inventory") return { key: "recon", label: "Recon / intake", hint: "Decision point: repairs, price, photos, and publish approval.", needsManager: true };
+  if (["draft", "review"].includes(inventoryStatus) || status === "in_inventory") return { key: "recon", label: "Intake / recon", hint: "Vehicle is being prepared: repairs, price, photos, and publish approval.", needsManager: true };
   if (status === "won") return { key: "purchase", label: "Acquired / consigned", hint: "Confirm purchase or consignment terms, then move vehicle into intake.", needsManager: true };
   if (status === "offer_sent") return { key: "offer", label: "Offer sent", hint: "Decision point: purchase price or consignment commission, expiry, and seller response.", needsManager: true };
   if (status === "inspection_booked") return { key: "appraisal", label: "Inspection / appraisal", hint: "Confirm condition, title, lien, and appraisal path." };
@@ -3698,12 +3697,6 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
   const closeButton = event.target.closest("[data-drawer-close]");
   if (closeButton) {
     closeAdminDrawer();
-    return;
-  }
-
-  const openCardButton = event.target.closest("[data-drawer-open-card]");
-  if (openCardButton) {
-    await openFullLeadFromDrawer();
     return;
   }
 
@@ -4278,15 +4271,6 @@ async function openAdminLeadWorkspace(card, options = {}) {
     if (noteType && options.noteType) noteType.value = options.noteType;
     noteField?.focus();
   }
-}
-
-async function openFullLeadFromDrawer() {
-  if (!activeAdminDrawerLeadId) return;
-  const target = leadsEl.querySelector(`.lead-card[data-id="${CSS.escape(activeAdminDrawerLeadId)}"]`);
-  if (!target) return;
-  closeAdminDrawer();
-  target.scrollIntoView({ behavior: "smooth", block: "center" });
-  setActiveAdminLead(activeAdminDrawerLeadId);
 }
 
 async function quickAddDraftInventory(button) {

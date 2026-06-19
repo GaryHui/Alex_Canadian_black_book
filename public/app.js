@@ -242,12 +242,6 @@ dealerLeadDrawer?.addEventListener("click", async (event) => {
     return;
   }
 
-  const openCardButton = event.target.closest("[data-dealer-drawer-open-card]");
-  if (openCardButton) {
-    await openFullDealerLeadFromDrawer();
-    return;
-  }
-
   const refreshButton = event.target.closest("[data-drawer-load-dealer-activity]");
   if (refreshButton) {
     dealerDrawerActivityLoaded = false;
@@ -1855,7 +1849,6 @@ function renderDealerDrawer(leadId) {
           <small>${escapeHtml(sourceLabel)} | ${escapeHtml(customerDisplay)} | ${escapeHtml(customerPhone)}</small>
         </div>
         <div class="dealer-drawer-head-actions">
-          <button class="drawer-locate-button" type="button" data-dealer-drawer-open-card>Locate lead</button>
           <button class="drawer-close-strong" type="button" data-dealer-drawer-close aria-label="Close drawer">Close</button>
         </div>
       </header>
@@ -1947,31 +1940,6 @@ function renderDealerDrawer(leadId) {
             ${renderDealerCommunicationStrip(lead)}
             ${renderDealerDealChecklistSection(lead)}
             ${renderDealerPhotoSection(lead)}
-            <section class="dealer-drawer-section">
-              <header>
-                <h3>Log touch</h3>
-                <span>LOG records what already happened. TASK assigns the next action.</span>
-              </header>
-              <div class="dealer-drawer-comm-shortcuts">
-                <button type="button" data-drawer-note-type="call">Call</button>
-                <button type="button" data-drawer-note-type="sms">Text</button>
-                <button type="button" data-drawer-focus-email>Email</button>
-                <button type="button" data-drawer-note-type="internal">Note</button>
-              </div>
-              <form class="dealer-note-form dealer-drawer-note-form">
-                <select name="noteType">
-                  <option value="call">Call</option>
-                  <option value="email">Email</option>
-                  <option value="sms">SMS</option>
-                  <option value="inspection">Inspection</option>
-                  <option value="correction">Correction request</option>
-                  <option value="offer">Offer</option>
-                  <option value="internal">Internal note</option>
-                </select>
-                <textarea name="note" placeholder="Record the latest customer touch, inspection result, correction, or quote update..."></textarea>
-                <button type="submit">Save note</button>
-              </form>
-            </section>
             <section class="dealer-drawer-section dealer-task-section">
               <header>
                 <h3>Task</h3>
@@ -2006,6 +1974,31 @@ function renderDealerDrawer(leadId) {
                   <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
                 </details>
                 <button type="submit">Add task</button>
+              </form>
+            </section>
+            <section class="dealer-drawer-section">
+              <header>
+                <h3>Log touch</h3>
+                <span>LOG records what already happened. TASK assigns the next action.</span>
+              </header>
+              <div class="dealer-drawer-comm-shortcuts">
+                <button type="button" data-drawer-note-type="call">Call</button>
+                <button type="button" data-drawer-note-type="sms">Text</button>
+                <button type="button" data-drawer-focus-email>Email</button>
+                <button type="button" data-drawer-note-type="internal">Note</button>
+              </div>
+              <form class="dealer-note-form dealer-drawer-note-form">
+                <select name="noteType">
+                  <option value="call">Call</option>
+                  <option value="email">Email</option>
+                  <option value="sms">SMS</option>
+                  <option value="inspection">Inspection</option>
+                  <option value="correction">Correction request</option>
+                  <option value="offer">Offer</option>
+                  <option value="internal">Internal note</option>
+                </select>
+                <textarea name="note" placeholder="Record the latest customer touch, inspection result, correction, or quote update..."></textarea>
+                <button type="submit">Save note</button>
               </form>
             </section>
             <section class="dealer-drawer-section">
@@ -2829,7 +2822,7 @@ function renderDealerCrmWorkflowPanel(lead) {
         <div>
           <span>CRM stage</span>
           <strong>${escapeHtml(current.label)}</strong>
-          <small>${escapeHtml(current.hint)}</small>
+          <small>${escapeHtml(`Workflow position: ${current.hint}`)}</small>
         </div>
       </header>
       <ol class="crm-workflow-steps">
@@ -2875,7 +2868,7 @@ function dealerCrmWorkflowSteps(lead) {
     { key: "appraisal", label: "Appraisal" },
     { key: "offer", label: "Offer" },
     { key: "purchase", label: "Acquired / consigned" },
-    { key: "recon", label: "Recon" },
+    { key: "recon", label: "Intake / recon" },
     { key: "inventory", label: "Inventory" },
     { key: "sold", label: "Sold" }
   ];
@@ -2893,7 +2886,7 @@ function dealerCrmStage(lead) {
   }
   if (inventoryStatus === "sold" || status === "sold") return { key: "sold", label: "Vehicle sold", hint: "Confirm delivery, documents, and final accounting.", needsManager: true };
   if (inventoryStatus === "published") return { key: "inventory", label: "Listed inventory", hint: "Vehicle is live. Track buyer activity and sales handoff." };
-  if (["draft", "review"].includes(inventoryStatus) || status === "in_inventory") return { key: "recon", label: "Recon / intake", hint: "Photos, keys, repairs, pricing, and publish review must be completed.", needsManager: true };
+  if (["draft", "review"].includes(inventoryStatus) || status === "in_inventory") return { key: "recon", label: "Intake / recon", hint: "Photos, keys, repairs, pricing, and publish review must be completed.", needsManager: true };
   if (status === "won") return { key: "purchase", label: "Acquired / consigned", hint: "Confirm purchase or consignment terms, then move the vehicle into intake.", needsManager: true };
   if (status === "offer_sent") return { key: "offer", label: "Offer sent", hint: "Confirm seller response, offer expiry, and manager approval.", needsManager: true };
   if (status === "inspection_booked") return { key: "appraisal", label: "Inspection / appraisal", hint: "Inspect condition, photos, lien, keys, and title." };
@@ -3238,15 +3231,6 @@ async function openDealerWorkspace(card, options = {}) {
     if (noteType && options.noteType) noteType.value = options.noteType;
     noteField?.focus();
   }
-}
-
-async function openFullDealerLeadFromDrawer() {
-  if (!activeDealerDrawerLeadId) return;
-  const target = dealerLeadsList.querySelector(`.dealer-lead-card[data-lead-id="${cssEscape(activeDealerDrawerLeadId)}"]`);
-  if (!target) return;
-  closeDealerDrawer();
-  target.scrollIntoView({ behavior: "smooth", block: "center" });
-  setActiveDealerLead(activeDealerDrawerLeadId);
 }
 
 function startDealerAutoRefresh() {
