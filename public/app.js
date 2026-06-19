@@ -2339,9 +2339,14 @@ function renderDealerTodayWork(leads) {
   const freshCount = activeLeads.filter((lead) => String(lead.status || "new").toLowerCase() === "new").length;
   const vehicleAlertCount = activeLeads.filter((lead) => lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market).length;
   const noResponseCount = activeLeads.filter((lead) => isDealerNoResponseLead(lead)).length;
+  const photoTaskCount = activeLeads.filter((lead) => dealerTaskText(lead).includes("photo") || dealerTaskText(lead).includes("picture")).length;
+  const reconTaskCount = activeLeads.filter((lead) => dealerTaskText(lead).includes("recon") || dealerTaskText(lead).includes("repair") || dealerTaskText(lead).includes("keys") || dealerTaskText(lead).includes("documents")).length;
+  const buyerTaskCount = activeLeads.filter((lead) => isBuyerLead(lead) && (hasDealerOpenTask(lead) || ["new", "contacted", "appointment_booked", "finance_sent"].includes(String(lead.status || "").toLowerCase()))).length;
   const focus = dealerWorkFocus([
     { count: updateCount, label: "Review new lead updates", detail: "Start with leads changed by another team member.", filter: "updates" },
     { count: taskCount, label: "Work open tasks", detail: "Complete or update assigned tasks before adding new notes.", filter: "open-tasks" },
+    { count: photoTaskCount, label: "Upload missing photos", detail: "Finish intake, damage, odometer, VIN, recon, or listing photos.", filter: "open-tasks" },
+    { count: reconTaskCount, label: "Move recon work forward", detail: "Handle keys, documents, repair estimates, or recon blockers.", filter: "open-tasks" },
     { count: dueCount, label: "Handle due follow-ups", detail: "Call or message the leads due now.", filter: "due" },
     { count: waitingReplyCount, label: "Reply to waiting customers", detail: "Customers are waiting for a staff response.", filter: "waiting-reply" },
     { count: freshCount, label: "Start fresh leads", detail: "New leads need the first touch and next step.", filter: "fresh" },
@@ -2373,6 +2378,21 @@ function renderDealerTodayWork(leads) {
         <span>My queue</span>
         <strong>${activeLeads.length}</strong>
         <small>All assigned active work</small>
+      </button>
+      <button type="button" class="dealer-brief-card brief-card-hot" data-dealer-filter-shortcut="open-tasks">
+        <span>Photo tasks</span>
+        <strong>${photoTaskCount}</strong>
+        <small>Intake/recon/listing photos</small>
+      </button>
+      <button type="button" class="dealer-brief-card brief-card-hot" data-dealer-filter-shortcut="open-tasks">
+        <span>Recon work</span>
+        <strong>${reconTaskCount}</strong>
+        <small>Keys, docs, repairs</small>
+      </button>
+      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="buyer">
+        <span>Buyer follow-up</span>
+        <strong>${buyerTaskCount}</strong>
+        <small>Buy page sales leads</small>
       </button>
       <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="fresh">
         <span>Fresh</span>
@@ -2414,6 +2434,15 @@ function dealerWorkFocus(items) {
     detail: "Your queue is clear. Reload later or create a valuation if a customer arrives.",
     filter: "active"
   };
+}
+
+function dealerTaskText(lead) {
+  const task = lead?.task_summary || {};
+  return [
+    task.latest_open_title,
+    task.latest_open_due_at,
+    JSON.stringify(task || {})
+  ].filter(Boolean).join(" ").toLowerCase();
 }
 
 function renderDealerDashboardStats(leads) {
@@ -2956,7 +2985,7 @@ function renderDealerSopProgress(lead) {
         <strong>Lead checklist</strong>
         <span>${escapeHtml(doneCount)} / ${escapeHtml(steps.length)} done from status, tasks, and timeline</span>
       </div>
-      <p class="sop-progress-help">Auto-checks whether this lead has contact logged, a next step, a real deal movement, and a close result.</p>
+      <p class="sop-progress-help">${escapeHtml(isBuyerLead(lead) ? "BUY flow: contact, qualify, appointment/finance, then delivery." : "SELL flow: contact, inspect, collect media/docs, recon, manager approval, then inventory.")}</p>
       <div class="sop-progress-steps">
         ${steps.map((step) => `<span class="${step.done ? "done" : ""}">${escapeHtml(step.label)}</span>`).join("")}
       </div>
@@ -2987,20 +3016,30 @@ function dealerSopSteps(lead) {
   const buyer = isBuyerLead(lead);
   const hasContact = Boolean(lead?.last_activity_at) || ["contacted", "waiting_for_customer", "inspection_booked", "appointment_booked", "finance_sent", "offer_sent", "in_inventory", "won", "lost", "closed"].includes(status);
   const hasNextStep = Boolean(lead?.next_follow_up_at) || hasDealerOpenTask(lead) || ["inspection_booked", "appointment_booked", "in_inventory", "won", "lost", "closed"].includes(status);
-  const hasQuoteOrAppointment = buyer
-    ? ["appointment_booked", "finance_sent", "offer_sent", "won", "lost", "closed"].includes(status)
-    : ["inspection_booked", "offer_sent", "in_inventory", "won", "lost", "closed"].includes(status);
   const isClosed = isDealerClosedLead(lead);
+  const taskText = dealerTaskText(lead);
+  const dealDesk = dealerDealChecklistSummary(lead);
+  if (buyer) {
+    return [
+      { label: "Buyer lead", done: true, hint: "Buyer inquiry or showroom lead entered the CRM." },
+      { label: "Contact logged", done: hasContact, hint: "Log the first call, text, or email." },
+      { label: "Needs confirmed", done: hasNextStep || taskText.includes("confirm buyer"), hint: "Confirm vehicle interest, budget, trade, finance plan, and timeline." },
+      { label: "Appointment / finance", done: ["appointment_booked", "finance_sent", "offer_sent", "won", "lost", "closed"].includes(status), hint: "Book test drive or move the buyer into finance/offer." },
+      { label: "Delivery / close", done: isClosed, hint: "Close as won/lost, or complete delivery handoff." }
+    ];
+  }
+  const hasInspectionOrOffer = ["inspection_booked", "offer_sent", "won", "in_inventory", "lost", "closed"].includes(status);
+  const hasPhotos = taskText.includes("photo") || (dealDesk.items || []).some((item) => item.key === "intake_photos_complete" && item.completed);
+  const hasReconDocs = taskText.includes("recon") || taskText.includes("keys") || taskText.includes("documents") || (dealDesk.items || []).some((item) => ["keys_collected", "recon_estimate_ready", "repairs_complete"].includes(item.key) && item.completed);
+  const hasManagerApproval = ["won", "in_inventory", "closed", "lost"].includes(status) || (dealDesk.items || []).some((item) => ["pricing_approved", "publish_review_complete"].includes(item.key) && item.completed);
   return [
-    { label: "New lead", done: true, hint: "Lead has entered the CRM." },
-    { label: "Contact logged", done: hasContact, hint: "Save a call, text, email, or internal update in Log touch." },
-    { label: "Next step set", done: hasNextStep, hint: "Add a task or schedule the next follow-up before leaving the lead." },
-    {
-      label: buyer ? "Appointment / finance" : "Inspection / offer",
-      done: hasQuoteOrAppointment,
-      hint: buyer ? "Book the visit/test drive or move the buyer into finance/offer." : "Book inspection or send the purchase offer."
-    },
-    { label: "Closed", done: isClosed, hint: "Mark the lead won, lost, consigned, inventoried, or closed." }
+    { label: "Seller lead", done: true, hint: "Seller appraisal entered the CRM." },
+    { label: "Contact logged", done: hasContact, hint: "Log first touch and confirm seller intent." },
+    { label: "Inspection / offer", done: hasInspectionOrOffer, hint: "Book inspection, verify condition, and send offer or consignment terms." },
+    { label: "Photos uploaded", done: hasPhotos, hint: "Upload exterior, interior, odometer, VIN, damage, recon, and listing photos." },
+    { label: "Keys / recon", done: hasReconDocs, hint: "Collect keys/documents and record recon estimate or repair blockers." },
+    { label: "Manager approval", done: hasManagerApproval, hint: "Manager approves price, recon spend, photos, and publish readiness." },
+    { label: "Inventory / close", done: isClosed, hint: "Move to inventory, mark lost, or close after sale." }
   ];
 }
 
@@ -3031,16 +3070,22 @@ function dealerTaskTemplates(buyerLead) {
   const buyer = [
     { key: "confirm_vehicle", label: "Confirm vehicle", hint: "Budget, trade, finance", title: "Confirm buyer needs: vehicle interest, budget, trade-in, finance plan, and purchase timeline.", due: "today" },
     { key: "book_appointment", label: "Book appointment", hint: "Viewing or test drive", title: "Book buyer appointment or test drive and confirm arrival time.", due: "tomorrow" },
-    { key: "finance_docs", label: "Finance docs", hint: "Collect documents", title: "Collect finance documents and confirm pre-approval next step.", due: "tomorrow" }
+    { key: "test_drive_ready", label: "Prep test drive", hint: "Vehicle ready", title: "Prep test drive: confirm vehicle availability, plate/keys, route, and appointment time.", due: "today" },
+    { key: "trade_finance", label: "Trade / finance", hint: "Trade, credit, deposit", title: "Confirm trade-in, finance documents, credit application status, deposit, and decision timeline.", due: "tomorrow" },
+    { key: "finance_docs", label: "Finance docs", hint: "Collect documents", title: "Collect finance documents and confirm pre-approval next step.", due: "tomorrow" },
+    { key: "delivery_handoff", label: "Delivery handoff", hint: "Docs, insurance, pickup", title: "Prepare delivery handoff: final documents, insurance, plates, keys, payment, and pickup time.", due: "next_week" }
   ];
   const seller = [
     { key: "verify_vehicle", label: "Verify vehicle", hint: "VIN, km, lien, condition", title: "Verify seller vehicle details: VIN, kilometers, ownership/lien, accident history, and condition.", due: "today" },
     { key: "request_photos", label: "Request photos", hint: "Exterior/interior/VIN", title: "Request seller photos: exterior, interior, odometer, VIN, damage, and ownership documents.", due: "today" },
     { key: "book_inspection", label: "Book inspection", hint: "Appraisal appointment", title: "Book seller inspection/appraisal appointment and confirm location.", due: "tomorrow" },
     { key: "capture_intake_photos", label: "Upload intake photos", hint: "Staff photo package", title: "Upload intake photo package: exterior, interior, odometer, VIN, damage, keys/documents, and any recon concerns.", due: "today" },
+    { key: "collect_keys_docs", label: "Keys / docs", hint: "Title, lien, keys", title: "Collect and verify keys, registration/title, lien payout status, ownership documents, and seller ID.", due: "today" },
     { key: "recon_estimate", label: "Recon estimate", hint: "Repair cost/time", title: "Get recon estimate: mechanical, detailing, safety, tires/brakes, cost, timeline, and blockers.", due: "tomorrow" },
+    { key: "recon_complete", label: "Recon complete", hint: "Ready for listing", title: "Confirm recon complete: repairs, detail, safety, photos, keys, documents, and listing blockers cleared.", due: "next_week" },
     { key: "send_offer", label: "Send offer", hint: "Purchase or consignment", title: "Prepare purchase or consignment offer with terms, commission, conditions, and expiry time.", due: "tomorrow" },
-    { key: "manager_publish_review", label: "Manager publish review", hint: "Price/photos/listing", title: "Manager review needed: approve price, recon spend, public photos, and publish readiness.", due: "today" }
+    { key: "manager_publish_review", label: "Manager publish review", hint: "Price/photos/listing", title: "Manager review needed: approve price, recon spend, public photos, and publish readiness.", due: "today" },
+    { key: "publish_listing", label: "Publish listing", hint: "Public page ready", title: "Publish-ready check: price approved, public photos selected, description complete, and buy page listing ready.", due: "today" }
   ];
   return buyerLead ? [...shared, ...buyer] : [...shared, ...seller];
 }

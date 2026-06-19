@@ -1631,10 +1631,16 @@ function renderAdminToday(leads) {
   const duplicateCount = activeLeads.filter((lead) => lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed).length;
   const ownerUnreadCount = leads.filter((lead) => lead.owner_review?.unread).length;
   const draftCount = inventoryCache.filter((item) => ["draft", "review"].includes(String(item.status || "").toLowerCase())).length;
+  const buyerInquiryCount = activeLeads.filter((lead) => isBuyerLead(lead)).length;
+  const managerApprovalCount = ownerUnreadCount
+    + activeLeads.filter((lead) => !isBuyerLead(lead) && ["offer_sent", "won", "in_inventory"].includes(String(lead.status || "").toLowerCase())).length
+    + draftCount;
+  const reconBlockerCount = activeLeads.filter((lead) => !isBuyerLead(lead) && Number(adminDealChecklistSummary(lead).pending || 0) > 0).length;
   const dashboardStats = renderAdminDashboardStats(leads);
   const focus = adminWorkFocus([
-    { count: ownerUnreadCount, label: "Review staff updates", detail: "Manager decisions are waiting on updated leads.", filter: "owner-unread" },
+    { count: managerApprovalCount, label: "Clear manager approvals", detail: "Price, recon, publish, or staff updates need your decision.", filter: "owner-unread" },
     { count: unassignedCount, label: "Dispatch unassigned leads", detail: "Assign a staff rep before the lead gets cold.", filter: "unassigned" },
+    { count: reconBlockerCount, label: "Unblock recon / listing", detail: "Seller vehicles are waiting on photos, keys, recon, pricing, or publish review.", filter: "deal-desk" },
     { count: dueCount, label: "Push due follow-ups", detail: "These leads need action today or are overdue.", filter: "needs-follow-up" },
     { count: taskCount, label: "Check open tasks", detail: "See team tasks that still need completion.", filter: "open-tasks" },
     { count: duplicateCount, label: "Clear vehicle conflicts", detail: "Review duplicate or same-vehicle warnings.", filter: "duplicate-review" },
@@ -1658,10 +1664,20 @@ function renderAdminToday(leads) {
         <strong>${ownerUnreadCount}</strong>
         <small>Needs manager review</small>
       </button>
+      <button type="button" class="admin-brief-card brief-card-hot" data-admin-set-filter="deal-desk">
+        <span>Recon blockers</span>
+        <strong>${reconBlockerCount}</strong>
+        <small>Photos, keys, recon, price, publish</small>
+      </button>
       <button type="button" class="admin-brief-card brief-card-hot" data-admin-set-filter="open-tasks">
         <span>Open tasks</span>
         <strong>${taskCount}</strong>
         <small>Team tasks not done</small>
+      </button>
+      <button type="button" class="admin-brief-card" data-admin-set-filter="buyer">
+        <span>Buyer leads</span>
+        <strong>${buyerInquiryCount}</strong>
+        <small>Buy page and sales follow-up</small>
       </button>
       <button type="button" class="admin-brief-card" data-admin-set-filter="active">
         <span>Active</span>

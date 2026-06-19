@@ -1723,6 +1723,14 @@ async function createBuyerInquiry(body) {
       noteType: "call",
       note: buyerInquiryActivityNote({ name, email, phone, message, vehicle, finance, purchase })
     }, { email: "buy-page@autoswitch.local" }).catch(() => null);
+    await createBuyerInquiryFollowUpTask({ url, key }, {
+      leadId: savedLead.lead.id,
+      sourceLeadId: vehicle.sourceLeadId,
+      vehicleTitle: vehicle.title,
+      buyerName: name,
+      buyerPhone: phone,
+      buyerEmail: email
+    }).catch(() => null);
     await maybeSendAfterHoursAutoReply({ url, key }, {
       ...lead,
       id: savedLead.lead.id
@@ -1736,6 +1744,31 @@ async function createBuyerInquiry(body) {
     leadCreated: Boolean(savedLead.ok && savedLead.lead?.id),
     leadStorage: savedLead.storage || ""
   };
+}
+
+async function createBuyerInquiryFollowUpTask(supabase, context = {}) {
+  const leadId = String(context.leadId || "").trim();
+  if (!supabase?.url || !supabase?.key || !leadId) return;
+  let assignedTo = "";
+  const sourceLeadId = String(context.sourceLeadId || "").trim();
+  if (sourceLeadId) {
+    const sourceLead = await fetchSupabaseJson(
+      `${supabase.url}/rest/v1/valuation_leads?select=assigned_to&id=eq.${encodeURIComponent(sourceLeadId)}&limit=1`,
+      supabase.key
+    );
+    assignedTo = String(sourceLead.data?.[0]?.assigned_to || "").trim().toLowerCase();
+  }
+  const dueAt = new Date(Date.now() + (2 * 60 * 60 * 1000)).toISOString();
+  const contact = context.buyerPhone || context.buyerEmail || "buyer";
+  const title = `Call buyer inquiry${context.vehicleTitle ? ` for ${context.vehicleTitle}` : ""} - ${contact}`;
+  const result = await insertSupabaseJson(`${supabase.url}/rest/v1/lead_tasks`, supabase.key, {
+    lead_id: leadId,
+    assigned_to: assignedTo || null,
+    title,
+    due_at: dueAt
+  });
+  if (result.ok && assignedTo) await assignLeadForTask({ url: supabase.url, key: supabase.key, leadId, assignedTo });
+  if (result.ok) await touchLeadActivity({ url: supabase.url, key: supabase.key, leadId });
 }
 
 async function findInventoryListingForInquiry(listingId, supabase) {
