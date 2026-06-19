@@ -16,7 +16,7 @@
         <div class="dealer-actions">
           <span>Assigned leads, valuation, and quote history</span>
           <a href="/">Customer home</a>
-          <a href="/admin.html">Admin backend</a>
+          <a href="/admin.html" data-dealer-admin-link hidden>Admin backend</a>
         </div>
       </header>
       <section id="dealer-workbench" class="dealer-app-shell" hidden>
@@ -58,7 +58,7 @@
           <div>
             <p class="eyebrow">CRM queue</p>
             <h2>Up Sheets</h2>
-            <p>Use the core work filters first. Open a lead only when details, notes, or activity are needed.</p>
+            <p>Use the core work filters first. Open a lead only when details, notes, or timeline are needed.</p>
           </div>
         </div>
         <div class="lead-filter-shell">
@@ -223,7 +223,7 @@
           <p id="status" class="status">Ready.</p>
           <button id="save-valuation-lead" class="save-valuation-lead" type="button" hidden>Save valuation to leads</button>
           <div id="inline-choice-list" class="choice-list inline-choice-list" hidden></div>
-          <p class="admin-link"><a href="/admin.html" target="_blank" rel="noreferrer">View captured leads</a></p>
+          <p class="admin-link" data-dealer-admin-link hidden><a href="/admin.html" target="_blank" rel="noreferrer">View captured leads</a></p>
         </details>
         </section>
 

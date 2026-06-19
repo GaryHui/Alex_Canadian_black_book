@@ -137,7 +137,7 @@ main {
 }
 
 .buy-page-main {
-  width: min(1540px, calc(100% - 36px));
+  width: min(1720px, calc(100% - 24px));
 }
 
 .home-hero {
@@ -1842,6 +1842,7 @@ input::placeholder {
 
 .buy-page-main .inventory-layout {
   width: 100%;
+  max-width: none;
 }
 
 .inventory-hero {
@@ -2586,7 +2587,7 @@ input::placeholder {
 
 .marketplace-search-bar {
   display: grid;
-  grid-template-columns: repeat(5, minmax(132px, 1fr)) minmax(190px, auto);
+  grid-template-columns: repeat(5, minmax(160px, 1fr)) minmax(210px, auto);
   width: 100%;
   overflow: hidden;
   margin-top: 10px;
@@ -3071,7 +3072,7 @@ input::placeholder {
   }
 
   .buy-page-main {
-    width: min(100% - 24px, 1540px);
+    width: min(100% - 18px, 1720px);
   }
 
   h1 {

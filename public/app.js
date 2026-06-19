@@ -34,6 +34,7 @@ const dealerLeadFilterButtons = document.querySelectorAll("[data-dealer-filter]"
 const dealerLeadSortSelect = document.querySelector("#dealer-lead-sort");
 const dealerLeadDrawer = document.querySelector("#dealer-lead-drawer");
 const dealerLeadDrawerContent = document.querySelector("#dealer-lead-drawer-content");
+const dealerAdminLinks = document.querySelectorAll("[data-dealer-admin-link]");
 const saveValuationLeadButton = document.querySelector("#save-valuation-lead");
 const DEALER_REFRESH_MS = 30000;
 const DEALER_LEAD_READ_TOKENS_KEY = "autoswitch-dealer-lead-read-tokens";
@@ -165,6 +166,12 @@ dealerLeadsList?.addEventListener("click", async (event) => {
   const openWorkspaceButton = event.target.closest("[data-dealer-open-workspace]");
   if (openWorkspaceButton) {
     await openDealerWorkspace(openWorkspaceButton.closest(".dealer-lead-card"), { forceActivity: true });
+    return;
+  }
+
+  const focusFollowUpButton = event.target.closest("[data-dealer-focus-followup]");
+  if (focusFollowUpButton) {
+    await openDealerWorkspace(focusFollowUpButton.closest(".dealer-lead-card"), { forceActivity: true, focus: "followup" });
     return;
   }
 
@@ -1252,6 +1259,7 @@ async function setSession(session) {
   authSession = session;
   const emailField = form.elements.email;
   dealerAdminAllowed = false;
+  setDealerAdminLinksVisible(false);
   stopDealerAutoRefresh();
 
   if (session?.user) {
@@ -1267,12 +1275,14 @@ async function setSession(session) {
       disableDealerTools(true);
       quotaPanel.hidden = true;
       historyPanel.hidden = true;
-      if (dealerLeadsList) dealerLeadsList.innerHTML = "";
+    if (dealerLeadsList) dealerLeadsList.innerHTML = "";
       if (dealerLeadsStatus) dealerLeadsStatus.textContent = dealer.error || "Dealer access denied.";
       statusEl.textContent = "Ask the site owner to add this email in Admin > Dealer portal access.";
+      setDealerAdminLinksVisible(false);
       return;
     }
     dealerAdminAllowed = true;
+    setDealerAdminLinksVisible(dealer.role === "admin");
     authSubtitle.textContent = "Dealer access confirmed. Dealer tools are available.";
     disableDealerTools(false);
     await loadDealerDirectory();
@@ -1286,6 +1296,7 @@ async function setSession(session) {
       window.location.replace("/login.html?next=/dealer.html");
       return;
     }
+    setDealerAdminLinksVisible(false);
     authTitle.textContent = "Login not configured";
     authSubtitle.textContent = "Add Supabase environment variables to enable Google login.";
     logoutButton.hidden = true;
@@ -1298,6 +1309,12 @@ async function setSession(session) {
     emailField.value = "";
     disableDealerTools(true);
   }
+}
+
+function setDealerAdminLinksVisible(visible) {
+  dealerAdminLinks.forEach((element) => {
+    element.hidden = !visible;
+  });
 }
 
 function requireLogin() {
@@ -1452,7 +1469,7 @@ function collectDealerLeadAlerts(leads) {
         id,
         type: "updated",
         title: dealerLeadAlertTitle(lead),
-        message: "Lead changed since you last opened it"
+        message: "Timeline changed since you last opened it"
       });
     } else if (!readTokens[id]) {
       readTokens[id] = token;
@@ -1647,14 +1664,15 @@ function renderDealerLeads(leads, role) {
           <div class="lead-list-col">
             <strong>${escapeHtml(progressSummary)}</strong>
             <div class="lead-list-subline">
-              <span>${escapeHtml(lastActivity ? `Last activity ${formatDateTime(lastActivity)}` : "No recent activity")}</span>
+              <span>${escapeHtml(lastActivity ? `Last timeline update ${formatDateTime(lastActivity)}` : "No timeline yet")}</span>
             </div>
           </div>
           <div class="lead-list-col lead-list-col-actions">
             <div class="lead-quick-strip dealer-quick-strip" aria-label="Dealer quick actions">
+              <span class="lead-current-badge" aria-hidden="true">CURRENT</span>
               <button type="button" class="lead-quick-button lead-quick-button-primary" data-dealer-open-workspace>Open workspace</button>
+              <button type="button" class="lead-quick-button" data-dealer-focus-followup>Follow-up</button>
               <button type="button" class="lead-quick-button" data-dealer-focus-note="call">Log call</button>
-              <button type="button" class="lead-quick-button" data-dealer-focus-note="sms">Text</button>
               <button type="button" class="lead-quick-button" data-dealer-focus-task>Add task</button>
             </div>
             <div class="lead-summary-metrics">
@@ -1672,7 +1690,7 @@ function renderDealerLeads(leads, role) {
           <summary>More details and alerts</summary>
           ${dealerVehicleSignalInline(lead)}
           ${dealerVehicleContextInline(lead)}
-          <p class="dealer-update-notice" ${pendingAlert ? "" : "hidden"}>Task or follow-up activity changed. Open this lead to review the latest update.</p>
+          <p class="dealer-update-notice" ${pendingAlert ? "" : "hidden"}>Timeline changed. Open this lead to review the latest update.</p>
         </details>
       </article>
     `;
@@ -1707,7 +1725,7 @@ function renderDealerSharedLeadMeta({
       <div><dt>Owner</dt><dd>${escapeHtml(assignedTo || "Unassigned")}</dd></div>
       <div><dt>Priority</dt><dd>${escapeHtml(priority || "normal")}</dd></div>
       <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "Not set")}</dd></div>
-      <div><dt>Last activity</dt><dd>${escapeHtml(lastActivity ? formatDateTime(lastActivity) : "No recent activity")}</dd></div>
+      <div><dt>Last timeline</dt><dd>${escapeHtml(lastActivity ? formatDateTime(lastActivity) : "No timeline yet")}</dd></div>
     </dl>
   `;
 }
@@ -1785,7 +1803,7 @@ function renderDealerDrawer(leadId) {
               <div class="dealer-drawer-stat">
                 <span>Priority</span>
                 <strong>${escapeHtml(priority)}</strong>
-                <small>${escapeHtml(lastActivity ? `Last touch ${formatDateTime(lastActivity)}` : "No recent activity")}</small>
+                <small>${escapeHtml(lastActivity ? `Last timeline update ${formatDateTime(lastActivity)}` : "No timeline yet")}</small>
               </div>
               <div class="dealer-drawer-stat">
                 <span>Vehicle</span>
@@ -1857,7 +1875,7 @@ function renderDealerDrawer(leadId) {
             <section class="dealer-drawer-section">
               <header>
                 <h3>Log touch</h3>
-                <span>Record the latest customer touch, then review recent activity below</span>
+                <span>Record the latest customer touch, then review the timeline below</span>
               </header>
               <div class="dealer-drawer-comm-shortcuts">
                 <button type="button" data-drawer-note-type="call">Call</button>
@@ -1897,10 +1915,10 @@ function renderDealerDrawer(leadId) {
             </section>
             <section class="dealer-drawer-section">
               <header>
-                <h3>Recent activity</h3>
+                <h3>Timeline</h3>
                 <button type="button" data-drawer-load-dealer-activity>Refresh</button>
               </header>
-              <div class="dealer-activity-list dealer-drawer-activity-list">Activity not loaded yet.</div>
+              <div class="dealer-activity-list dealer-drawer-activity-list">Timeline not loaded yet.</div>
             </section>
           </div>
         </div>
@@ -1924,7 +1942,7 @@ async function loadDealerDrawerActivity(options = {}) {
   const list = dealerLeadDrawerContent.querySelector(".dealer-drawer-activity-list");
   if (!list) return;
   if (dealerDrawerActivityLoaded && !options.force) return;
-  list.textContent = "Loading activity...";
+  list.textContent = "Loading timeline...";
   try {
     const response = await fetch(`/api/lead-activity?leadId=${encodeURIComponent(activeDealerDrawerLeadId)}`, {
       headers: {
@@ -1932,11 +1950,11 @@ async function loadDealerDrawerActivity(options = {}) {
       }
     });
     const data = await response.json();
-    if (!data.ok) throw new Error(data.error || "Unable to load activity");
+    if (!data.ok) throw new Error(data.error || "Unable to load timeline");
     dealerDrawerActivityLoaded = true;
     list.innerHTML = renderDealerActivity(data, { highlightLatest: Boolean(options.highlightLatest), limit: 12 });
   } catch (error) {
-    list.textContent = error.message || "Unable to load activity";
+    list.textContent = error.message || "Unable to load timeline";
   }
 }
 
@@ -2676,12 +2694,23 @@ function dealerFollowUpDate(key) {
 async function openDealerWorkspace(card, options = {}) {
   if (!card) return;
   if (card.dataset.leadId) {
-    renderDealerDrawer(card.dataset.leadId);
+    const leadId = card.dataset.leadId;
+    setActiveDealerLead(leadId);
+    if (dealerLeadAlertMap.has(leadId)) {
+      clearDealerLeadUpdateNotice(card);
+    }
+    renderDealerDrawer(leadId);
     dealerDrawerActivityLoaded = false;
     await loadDealerDrawerActivity({ force: true, highlightLatest: true });
   }
   const details = card.querySelector(".lead-queue-more");
   if (details && !details.open) details.open = true;
+
+  if (options.focus === "followup") {
+    const followUpButton = dealerLeadDrawerContent?.querySelector("[data-drawer-dealer-follow-up]");
+    followUpButton?.focus();
+    return;
+  }
 
   if (options.focus === "task") {
     const taskInput = dealerLeadDrawerContent?.querySelector('.dealer-drawer-task-form input[name="title"]');
@@ -2765,7 +2794,7 @@ async function checkDealerLeadUpdates() {
           id,
           type: "updated",
           title: dealerLeadAlertTitle(lead),
-          message: "Lead changed"
+          message: "Timeline changed"
         });
         if (card) showDealerLeadUpdateNotice(card);
         updatedCount += 1;
@@ -2777,7 +2806,7 @@ async function checkDealerLeadUpdates() {
     if (newCount) {
       dealerLeadsStatus.textContent = `${newCount} new assigned lead${newCount === 1 ? "" : "s"}. Click the update above to open.`;
     } else if (updatedCount) {
-      dealerLeadsStatus.textContent = `${updatedCount} lead${updatedCount === 1 ? "" : "s"} updated. Open highlighted leads to review task or follow-up changes.`;
+      dealerLeadsStatus.textContent = `${updatedCount} lead${updatedCount === 1 ? "" : "s"} updated. Open highlighted leads to review timeline changes.`;
     }
   } catch {
     // Background checks should not interrupt active follow-up work.
@@ -2932,7 +2961,7 @@ function renderDealerActivity(data, options = {}) {
     .filter((item) => !Number.isNaN(item.time))
     .sort((a, b) => b.time - a.time);
   const limited = Number(options.limit || 0) > 0 ? items.slice(0, Number(options.limit)) : items;
-  return limited.map((item) => item.render).join("") || "<p>No activity yet.</p>";
+  return limited.map((item) => item.render).join("") || "<p>No timeline yet.</p>";
 }
 
 function latestDealerActivityKey(data) {
