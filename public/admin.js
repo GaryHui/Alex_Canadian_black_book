@@ -2805,31 +2805,20 @@ function renderAdminDrawer(leadId) {
             <section class="admin-drawer-section admin-drawer-task-card" data-drawer-section="task">
               <header>
                 <h3>Task</h3>
-                <span>Choose a standard task, confirm owner and deadline, then add it</span>
+                <span>Pick a common CRM task, adjust if needed, then add it.</span>
               </header>
-              <div class="admin-task-template-grid" aria-label="Common CRM tasks">
-                ${taskTemplates.slice(0, 6).map((task) => `
-                  <button type="button" data-admin-task-template="${escapeHtml(task.key)}">
-                    <strong>${escapeHtml(task.label)}</strong>
-                    <span>${escapeHtml(task.hint)}</span>
-                  </button>
-                `).join("")}
-              </div>
               <form class="lead-task-form admin-drawer-task-form">
+                <label class="task-form-field">
+                  <span>Task type</span>
+                  <select name="taskPreset">
+                    <option value="">Custom task</option>
+                    ${taskTemplates.map((task) => `<option value="${escapeHtml(task.key)}">${escapeHtml(task.label)} - ${escapeHtml(task.hint)}</option>`).join("")}
+                  </select>
+                </label>
                 <label class="task-form-field task-title-field">
                   <span>Task</span>
-                  <textarea name="title" placeholder="Pick a task above, or type the exact next action..."></textarea>
+                  <textarea name="title" placeholder="Example: Call customer and confirm appointment time..."></textarea>
                 </label>
-                <div class="admin-task-meta-row">
-                  <label class="task-form-field">
-                    <span>Owner</span>
-                    <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
-                  </label>
-                  <label class="task-form-field task-time-field">
-                    <span>Due time</span>
-                    <input name="dueAt" type="datetime-local" />
-                  </label>
-                </div>
                 <div class="task-due-controls" aria-label="Task due date">
                   <span>Due</span>
                   <button type="button" data-admin-task-due="soon">2 hours</button>
@@ -2837,12 +2826,13 @@ function renderAdminDrawer(leadId) {
                   <button type="button" data-admin-task-due="tomorrow">Tomorrow</button>
                   <button type="button" data-admin-task-due="next_week">Next week</button>
                 </div>
+                <label class="task-form-field task-time-field">
+                  <span>Due time</span>
+                  <input name="dueAt" type="datetime-local" />
+                </label>
                 <details class="task-advanced-options">
-                  <summary>More task templates</summary>
-                  <select name="taskPreset">
-                    <option value="">Custom task</option>
-                    ${taskTemplates.map((task) => `<option value="${escapeHtml(task.key)}">${escapeHtml(task.label)} - ${escapeHtml(task.hint)}</option>`).join("")}
-                  </select>
+                  <summary>Assign to someone else</summary>
+                  <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
                 </details>
                 <button type="submit">Add task</button>
               </form>
@@ -3722,12 +3712,6 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
   const taskDueButton = event.target.closest("[data-admin-task-due]");
   if (taskDueButton) {
     applyAdminTaskDue(taskDueButton.dataset.adminTaskDue || "today");
-    return;
-  }
-
-  const taskTemplateButton = event.target.closest("[data-admin-task-template]");
-  if (taskTemplateButton) {
-    applyAdminTaskTemplate(taskTemplateButton.dataset.adminTaskTemplate || "");
     return;
   }
 

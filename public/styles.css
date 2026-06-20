@@ -2025,46 +2025,6 @@ body.admin-drawer-open {
   padding: 14px;
 }
 
-.admin-task-template-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-}
-
-.admin-task-template-grid button {
-  background: #fff;
-  border: 1px solid #cdd8e6;
-  border-radius: 10px;
-  color: #16243a;
-  cursor: pointer;
-  display: grid;
-  gap: 5px;
-  min-height: 74px;
-  padding: 10px;
-  text-align: left;
-}
-
-.admin-task-template-grid button:hover {
-  border-color: #7db5ed;
-  box-shadow: 0 8px 18px rgba(31, 54, 82, .08);
-}
-
-.admin-task-template-grid strong {
-  font-size: 13px;
-}
-
-.admin-task-template-grid span {
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.admin-task-meta-row {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, .8fr);
-}
-
 .admin-drawer-note-form,
 .admin-drawer-task-form,
 .admin-drawer-email-form,
@@ -6404,9 +6364,6 @@ body.admin-drawer-open {
     grid-column: 1 / -1;
   }
 
-  .admin-task-meta-row {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 760px) {
