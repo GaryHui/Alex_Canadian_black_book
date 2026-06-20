@@ -842,28 +842,7 @@ function collectAdminLeadAlerts(leads) {
           title: leadAlertTitle(lead),
           message: lead.owner_review.reason || "Manager review required"
         });
-      } else if (lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed && shouldShowAdminPassiveAlert(readTokens, id, token)) {
-        adminLeadAlertMap.set(id, {
-          id,
-          type: "owner",
-          title: leadAlertTitle(lead),
-          message: lead.duplicate_warning.message
-        });
-      } else if (lead.vehicle_signal?.message && shouldShowAdminPassiveAlert(readTokens, id, token)) {
-        adminLeadAlertMap.set(id, {
-          id,
-          type: lead.vehicle_signal.tone === "danger" ? "owner" : "updated",
-          title: leadAlertTitle(lead),
-          message: lead.vehicle_signal.message
-        });
-      } else if (readTokens[id] && readTokens[id] !== token) {
-        adminLeadAlertMap.set(id, {
-          id,
-          type: "updated",
-          title: leadAlertTitle(lead),
-          message: "Timeline changed since you last opened it"
-        });
-      } else if (!readTokens[id]) {
+      } else if (readTokens[id] !== token) {
         readTokens[id] = token;
         readTokensChanged = true;
       }
@@ -1018,20 +997,18 @@ function shouldShowAdminPassiveAlert(readTokens, id, token) {
 }
 
 function leadUpdateToken(lead = {}) {
+  const summary = lead.activity_summary || {};
+  const signal = lead.vehicle_signal || {};
+  const duplicate = lead.duplicate_warning || {};
   return [
-    lead.updated_at || "",
     lead.last_activity_at || "",
-    lead.status || "",
-    lead.assigned_to || "",
-    lead.priority || "",
-    lead.next_follow_up_at || "",
-    JSON.stringify(lead.owner_adjustment || {}),
-    JSON.stringify(lead.owner_review || {}),
-    JSON.stringify(lead.vehicle_signal || {}),
-    JSON.stringify(lead.vehicle_context || {}),
-    JSON.stringify(lead.activity_summary || {}),
-    JSON.stringify(lead.duplicate_warning || {}),
-    lead.notes || ""
+    summary.latest_activity_at || "",
+    summary.latest_activity_type || "",
+    summary.latest_activity_by || "",
+    signal.code || "",
+    signal.at || "",
+    duplicate.message || "",
+    duplicate.reviewed ? "reviewed" : ""
   ].join("|");
 }
 
@@ -2828,20 +2805,31 @@ function renderAdminDrawer(leadId) {
             <section class="admin-drawer-section admin-drawer-task-card" data-drawer-section="task">
               <header>
                 <h3>Task</h3>
-                <span>Assign the next owner, deadline, and expected action</span>
+                <span>Choose a standard task, confirm owner and deadline, then add it</span>
               </header>
+              <div class="admin-task-template-grid" aria-label="Common CRM tasks">
+                ${taskTemplates.slice(0, 6).map((task) => `
+                  <button type="button" data-admin-task-template="${escapeHtml(task.key)}">
+                    <strong>${escapeHtml(task.label)}</strong>
+                    <span>${escapeHtml(task.hint)}</span>
+                  </button>
+                `).join("")}
+              </div>
               <form class="lead-task-form admin-drawer-task-form">
-                <label class="task-form-field">
-                  <span>Task type</span>
-                  <select name="taskPreset">
-                    <option value="">Custom task</option>
-                    ${taskTemplates.map((task) => `<option value="${escapeHtml(task.key)}">${escapeHtml(task.label)} - ${escapeHtml(task.hint)}</option>`).join("")}
-                  </select>
-                </label>
                 <label class="task-form-field task-title-field">
                   <span>Task</span>
-                  <textarea name="title" placeholder="Next task, e.g. call customer back"></textarea>
+                  <textarea name="title" placeholder="Pick a task above, or type the exact next action..."></textarea>
                 </label>
+                <div class="admin-task-meta-row">
+                  <label class="task-form-field">
+                    <span>Owner</span>
+                    <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+                  </label>
+                  <label class="task-form-field task-time-field">
+                    <span>Due time</span>
+                    <input name="dueAt" type="datetime-local" />
+                  </label>
+                </div>
                 <div class="task-due-controls" aria-label="Task due date">
                   <span>Due</span>
                   <button type="button" data-admin-task-due="soon">2 hours</button>
@@ -2849,13 +2837,12 @@ function renderAdminDrawer(leadId) {
                   <button type="button" data-admin-task-due="tomorrow">Tomorrow</button>
                   <button type="button" data-admin-task-due="next_week">Next week</button>
                 </div>
-                <label class="task-form-field task-time-field">
-                  <span>Due time</span>
-                  <input name="dueAt" type="datetime-local" />
-                </label>
                 <details class="task-advanced-options">
-                  <summary>Assign to someone else</summary>
-                  <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+                  <summary>More task templates</summary>
+                  <select name="taskPreset">
+                    <option value="">Custom task</option>
+                    ${taskTemplates.map((task) => `<option value="${escapeHtml(task.key)}">${escapeHtml(task.label)} - ${escapeHtml(task.hint)}</option>`).join("")}
+                  </select>
                 </details>
                 <button type="submit">Add task</button>
               </form>
@@ -3735,6 +3722,12 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
   const taskDueButton = event.target.closest("[data-admin-task-due]");
   if (taskDueButton) {
     applyAdminTaskDue(taskDueButton.dataset.adminTaskDue || "today");
+    return;
+  }
+
+  const taskTemplateButton = event.target.closest("[data-admin-task-template]");
+  if (taskTemplateButton) {
+    applyAdminTaskTemplate(taskTemplateButton.dataset.adminTaskTemplate || "");
     return;
   }
 
