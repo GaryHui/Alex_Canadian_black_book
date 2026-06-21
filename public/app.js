@@ -1766,10 +1766,7 @@ function renderDealerLeads(leads, role) {
   });
   syncActiveDealerLeadCard();
   if (activeDealerDrawerLeadId) {
-    if (dealerLeadsCache.some((lead) => String(lead.id || "") === activeDealerDrawerLeadId)) {
-      renderDealerDrawer(activeDealerDrawerLeadId);
-      loadDealerDrawerActivity({ force: true }).catch(() => null);
-    } else {
+    if (!dealerLeadsCache.some((lead) => String(lead.id || "") === activeDealerDrawerLeadId)) {
       closeDealerDrawer();
     }
   }
@@ -3216,13 +3213,19 @@ async function openDealerWorkspace(card, options = {}) {
   if (card.dataset.leadId) {
     const leadId = card.dataset.leadId;
     const hadAlert = dealerLeadAlertMap.has(leadId);
+    const switchingDrawer = activeDealerDrawerLeadId !== String(leadId) || dealerLeadDrawer.hidden;
     setActiveDealerLead(leadId);
     if (hadAlert) {
       clearDealerLeadUpdateNotice(card);
     }
-    renderDealerDrawer(leadId);
-    dealerDrawerActivityLoaded = false;
-    await loadDealerDrawerActivity({ force: true, highlightLatest: Boolean(hadAlert || options.focus === "timeline") });
+    if (switchingDrawer) {
+      renderDealerDrawer(leadId);
+      dealerDrawerActivityLoaded = false;
+    }
+    await loadDealerDrawerActivity({
+      force: Boolean(switchingDrawer || hadAlert || options.focus === "timeline"),
+      highlightLatest: Boolean(hadAlert || options.focus === "timeline")
+    });
     if (options.focus === "timeline") focusDealerTimelineUpdate();
   }
   const details = card.querySelector(".lead-queue-more");
@@ -3389,12 +3392,18 @@ async function openDealerLead(id, options = {}) {
   card.classList.add("lead-card-flash");
   window.setTimeout(() => card.classList.remove("lead-card-flash"), 1600);
   card.scrollIntoView({ behavior: "smooth", block: "center" });
-  renderDealerDrawer(id);
-  dealerDrawerActivityLoaded = false;
+  const switchingDrawer = activeDealerDrawerLeadId !== String(id) || dealerLeadDrawer.hidden;
+  if (switchingDrawer) {
+    renderDealerDrawer(id);
+    dealerDrawerActivityLoaded = false;
+  }
   const details = card.querySelector(".lead-queue-more");
   if (details) details.open = true;
   if (options.fromAlert) highlightDealerLeadChangeAreas(card);
-  await loadDealerDrawerActivity({ force: true, highlightLatest: Boolean(options.fromAlert) });
+  await loadDealerDrawerActivity({
+    force: Boolean(switchingDrawer || options.fromAlert || options.focus === "timeline"),
+    highlightLatest: Boolean(options.fromAlert || options.focus === "timeline")
+  });
   if (options.focus === "timeline") focusDealerTimelineUpdate();
 }
 

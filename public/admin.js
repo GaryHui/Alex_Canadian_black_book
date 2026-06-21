@@ -1177,9 +1177,8 @@ function renderLeadWorkbench(leads, options = {}) {
   syncActiveAdminLeadCard();
   if (activeAdminDrawerLeadId) {
     if (adminLeadsCache.some((lead) => String(lead.id || "") === activeAdminDrawerLeadId)) {
-      if (options.refreshActiveDrawer || !isEditingAdminDrawer()) {
+      if (options.refreshActiveDrawer && !isEditingAdminDrawer()) {
         renderAdminDrawer(activeAdminDrawerLeadId);
-        loadAdminDrawerActivity({ force: true }).catch(() => null);
       }
     } else {
       closeAdminDrawer();
@@ -4225,16 +4224,23 @@ async function openAdminLeadWorkspace(card, options = {}) {
   if (card.dataset.id) {
     const leadId = card.dataset.id;
     const lead = adminLeadsCache.find((item) => String(item.id || "") === String(leadId));
+    const hadAlert = hasAdminVisibleAlert(leadId);
+    const switchingDrawer = activeAdminDrawerLeadId !== String(leadId) || adminLeadDrawer.hidden;
     setActiveAdminLead(leadId);
-    if (hasAdminVisibleAlert(leadId)) {
+    if (hadAlert) {
       clearAdminVisibleAlertGroup(leadId);
       renderAdminLeadAlerts();
       card.classList.remove("lead-card-updated");
       renderLeadWorkbench(adminLeadsCache);
     }
-    renderAdminDrawer(leadId);
-    adminDrawerActivityLoaded = false;
-    await loadAdminDrawerActivity({ force: true, highlightLatest: true });
+    if (switchingDrawer) {
+      renderAdminDrawer(leadId);
+      adminDrawerActivityLoaded = false;
+    }
+    await loadAdminDrawerActivity({
+      force: Boolean(switchingDrawer || hadAlert || options.focus === "timeline"),
+      highlightLatest: Boolean(hadAlert || options.focus === "timeline")
+    });
     if (lead?.owner_review?.unread) {
       await markManagerReviewedByLeadId(leadId, { silent: true });
     }
