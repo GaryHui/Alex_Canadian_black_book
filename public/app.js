@@ -1297,7 +1297,7 @@ async function initializeAuth() {
 
 async function setSession(session) {
   authSession = session;
-  const emailField = form.elements.email;
+  const emailField = form.elements.email || form.elements.authEmail || null;
   dealerAdminAllowed = false;
   setDealerAdminLinksVisible(false);
   stopDealerAutoRefresh();
@@ -1307,7 +1307,7 @@ async function setSession(session) {
     if (dealerWorkbench) dealerWorkbench.hidden = false;
     authTitle.textContent = `Signed in as ${email}`;
     logoutButton.hidden = false;
-    emailField.value = email;
+    if (emailField) emailField.value = email;
     const dealer = await checkDealerAccess();
     if (!dealer.ok) {
       authTitle.textContent = "Dealer access denied";
@@ -1346,7 +1346,7 @@ async function setSession(session) {
     historyList.innerHTML = "";
     if (dealerLeadsList) dealerLeadsList.innerHTML = "";
     historyLeads = [];
-    emailField.value = "";
+    if (emailField) emailField.value = "";
     disableDealerTools(true);
   }
 }
