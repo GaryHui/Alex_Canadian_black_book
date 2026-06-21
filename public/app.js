@@ -3773,3 +3773,9 @@ function cssEscape(value) {
   if (window.CSS?.escape) return window.CSS.escape(String(value));
   return String(value).replace(/["\\]/g, "\\$&");
 }
+
+function shortEmail(email) {
+  const [name, domain] = String(email || "").split("@");
+  if (!domain) return String(email || "");
+  return `${name.slice(0, 12)}@${domain.split(".")[0]}`;
+}
