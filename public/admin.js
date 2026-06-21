@@ -2308,8 +2308,11 @@ function renderLead(lead, index = 0) {
   const customerName = input.ownerName || input.name || "";
   const sourceLabel = leadSourceLabel(lead);
   const dealerCreated = sourceLabel === "Dealer appraisal";
-  const customerEmail = input.email || (dealerCreated ? "" : lead.auth_email || currentAdminEmail()) || "-";
+  const customerEmail = input.ownerEmail || input.email || (dealerCreated ? "" : lead.auth_email || currentAdminEmail()) || "-";
   const customerDisplay = customerName || customerEmail;
+  const customerPhone = input.ownerPhone || input.phone || "No phone";
+  const submitterEmail = input.submitterEmail || input.dealerEmail || lead.auth_email || lead.auth_user?.email || "";
+  const submitterLabel = submitterEmail && submitterEmail !== customerEmail ? `Submitted by ${shortEmail(submitterEmail)}` : (input.submitterRelationship || "");
   const vin = input.vin || valuation.vin || "-";
   const status = lead.status || "new";
   const assignedTo = lead.assigned_to || "";
@@ -2428,12 +2431,13 @@ function renderLead(lead, index = 0) {
           </div>
         </div>
         <div class="lead-list-col">
-          <span class="lead-list-label">Customer</span>
+          <span class="lead-list-label">${buyer ? "Customer" : "Vehicle owner"}</span>
           <strong>${escapeHtml(customerDisplay)}</strong>
           <div class="lead-list-subline">
             ${customerName && customerEmail !== "-" ? `<span>${escapeHtml(customerEmail)}</span>` : ""}
-            <span>${escapeHtml(input.phone || "No phone")}</span>
+            <span>${escapeHtml(customerPhone)}</span>
             <span>${escapeHtml(assignedTo ? `Rep ${shortEmail(assignedTo)}` : "No rep")}</span>
+            ${!buyer && submitterLabel ? `<span>${escapeHtml(submitterLabel)}</span>` : ""}
           </div>
         </div>
         <div class="lead-list-col">
@@ -2543,9 +2547,11 @@ function renderAdminDrawer(leadId) {
   const customerName = input.ownerName || input.name || "";
   const sourceLabel = leadSourceLabel(lead);
   const dealerCreated = sourceLabel === "Dealer appraisal";
-  const customerEmail = input.email || (dealerCreated ? "" : lead.auth_user?.email || lead.auth_email) || "-";
+  const customerEmail = input.ownerEmail || input.email || (dealerCreated ? "" : lead.auth_user?.email || lead.auth_email) || "-";
   const customerDisplay = customerName || customerEmail;
-  const customerPhone = input.phone || "No phone";
+  const customerPhone = input.ownerPhone || input.phone || "No phone";
+  const submitterEmail = input.submitterEmail || input.dealerEmail || lead.auth_email || lead.auth_user?.email || "";
+  const submitterLabel = submitterEmail ? `${shortEmail(submitterEmail)}${input.submitterRelationship ? ` · ${input.submitterRelationship}` : ""}` : (input.submitterRelationship || "");
   const vin = input.vin || valuation.vin || "-";
   const status = lead.status || "new";
   const priority = lead.priority || "normal";
@@ -2693,7 +2699,7 @@ function renderAdminDrawer(leadId) {
         <div>
           <span>Lead workspace</span>
           <strong>${escapeHtml(title)}</strong>
-          <small>${escapeHtml(sourceLabel)} | ${escapeHtml(customerDisplay)} | ${escapeHtml(customerPhone)} | VIN ${escapeHtml(vin)}</small>
+          <small>${escapeHtml(sourceLabel)} | ${buyer ? "Customer" : "Vehicle owner"} ${escapeHtml(customerDisplay)} | ${escapeHtml(customerPhone)} | VIN ${escapeHtml(vin)}</small>
         </div>
         <div class="admin-drawer-head-actions">
           <button class="drawer-close-strong" type="button" data-drawer-close aria-label="Close drawer">Close</button>
@@ -2709,10 +2715,16 @@ function renderAdminDrawer(leadId) {
                 <small>${escapeHtml(overdue ? "Overdue follow-up" : followUp ? formatDateTime(followUp) : "No follow-up scheduled")}</small>
               </div>
               <div class="admin-drawer-stat">
-                <span>Customer / seller</span>
+                <span>${buyer ? "Customer" : "Vehicle owner / seller"}</span>
                 <strong>${escapeHtml(customerDisplay)}</strong>
                 <small>${escapeHtml([customerEmail !== customerDisplay ? customerEmail : "", customerPhone].filter(Boolean).join(" | "))}</small>
               </div>
+              ${!buyer ? `
+              <div class="admin-drawer-stat">
+                <span>Submitted by</span>
+                <strong>${escapeHtml(submitterLabel || "Unknown")}</strong>
+                <small>${escapeHtml(input.submitterEmail || input.dealerEmail || "Lead creator / authorized contact")}</small>
+              </div>` : ""}
               <div class="admin-drawer-stat">
                 <span>Source</span>
                 <strong>${escapeHtml(sourceLabel)}</strong>

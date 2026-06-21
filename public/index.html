@@ -166,17 +166,19 @@
 
             <form id="valuation-form" class="form-grid">
               <input name="leadSource" type="hidden" value="dealer_appraisal" />
+              <input name="authEmail" type="hidden" />
+              <input name="submitterRelationship" type="hidden" value="Dealer staff" />
               <label>
-                <span>Owner name (optional)</span>
-                <input name="ownerName" autocomplete="name" placeholder="Customer / seller name" />
+                <span>Vehicle owner / legal seller</span>
+                <input name="ownerName" autocomplete="name" placeholder="Owner or authorized seller" />
               </label>
               <label>
                 <span>Owner email (optional)</span>
-                <input name="email" type="email" autocomplete="email" placeholder="owner@example.com" />
+                <input name="ownerEmail" type="email" autocomplete="email" placeholder="owner@example.com" />
               </label>
               <label>
                 <span>Owner phone (optional)</span>
-                <input name="phone" type="tel" placeholder="604-000-0000" />
+                <input name="ownerPhone" type="tel" placeholder="604-000-0000" />
               </label>
               <label>
                 <span>VIN</span>

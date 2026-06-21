@@ -693,6 +693,11 @@ async function runValuation(extra = {}, options = {}) {
     payload.leadSource = payload.leadSource || "dealer_appraisal";
     payload.createdByDealer = true;
     payload.dealerEmail = authSession?.user?.email || "";
+    payload.submitterEmail = authSession?.user?.email || "";
+    payload.submitterName = authSession?.user?.user_metadata?.full_name || authSession?.user?.user_metadata?.name || "";
+    payload.submitterRelationship = payload.submitterRelationship || "Dealer staff";
+    payload.email = payload.ownerEmail || payload.email || "";
+    payload.phone = payload.ownerPhone || payload.phone || "";
   }
 
   if (!payload.vin && !payload.uvc && payload.year && payload.make && (!payload.model || payload.model === unknownOption)) {
@@ -1635,8 +1640,10 @@ function renderDealerLeads(leads, role) {
     const title = cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || "Vehicle lead", buyerLead);
     const customerName = input.ownerName || input.name || "";
     const dealerCreated = sourceLabel === "Dealer appraisal";
-    const customerEmail = input.email || (dealerCreated ? "" : lead.auth_email || lead.auth_user?.email) || "-";
-    const customerPhone = input.phone || "No phone";
+    const customerEmail = input.ownerEmail || input.email || (dealerCreated ? "" : lead.auth_email || lead.auth_user?.email) || "-";
+    const customerPhone = input.ownerPhone || input.phone || "No phone";
+    const submitterEmail = input.submitterEmail || input.dealerEmail || lead.auth_email || lead.auth_user?.email || "";
+    const submitterLabel = submitterEmail && submitterEmail !== customerEmail ? `Submitted by ${shortEmail(submitterEmail)}` : (input.submitterRelationship || "");
     const followUp = lead.next_follow_up_at || "";
     const lastActivity = lead.last_activity_at || "";
     const status = lead.status || "new";
@@ -1674,7 +1681,7 @@ function renderDealerLeads(leads, role) {
           : buyerLead
             ? "Buyer opportunity"
             : "Seller appraisal";
-    const customerSummary = customerName || input.phone || customerEmail;
+    const customerSummary = customerName || customerPhone || customerEmail;
     const progressSummary = dealerLeadStatusLabel(status, buyerLead);
     const nextAction = dealerNextBestAction(lead);
     const compactTouchSummary = isDealerNoResponseLead(lead) ? "No response 48h+" : (dealerOutboundLabel(lead) || dealerLastTouchLabel(lead));
@@ -1698,12 +1705,12 @@ function renderDealerLeads(leads, role) {
             </div>
           </div>
           <div class="lead-list-col">
-            <span class="lead-list-label">Customer</span>
+            <span class="lead-list-label">${buyerLead ? "Customer" : "Vehicle owner"}</span>
             <strong>${escapeHtml(customerSummary)}</strong>
             <div class="lead-list-subline">
               ${customerName && customerEmail !== "-" ? `<span>${escapeHtml(customerEmail)}</span>` : ""}
               <span>${escapeHtml(customerPhone)}</span>
-              <span>${escapeHtml(lead.assigned_to || "Assigned lead")}</span>
+              <span>${escapeHtml(submitterLabel || lead.assigned_to || "Assigned lead")}</span>
             </div>
           </div>
           <div class="lead-list-col">
@@ -1784,7 +1791,7 @@ function renderDealerSharedLeadMeta({
       <div><dt>Phone</dt><dd>${escapeHtml(phone || "-")}</dd></div>
       <div><dt>VIN</dt><dd>${escapeHtml(vin || "-")}</dd></div>
       <div><dt>Lead type</dt><dd>${escapeHtml(leadTypeLabel || "-")}</dd></div>
-      <div><dt>Owner</dt><dd>${escapeHtml(assignedTo || "Unassigned")}</dd></div>
+      <div><dt>Assigned rep</dt><dd>${escapeHtml(assignedTo || "Unassigned")}</dd></div>
       <div><dt>Priority</dt><dd>${escapeHtml(priority || "normal")}</dd></div>
       <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "Not set")}</dd></div>
       <div><dt>Last timeline</dt><dd>${escapeHtml(lastActivity ? formatDateTime(lastActivity) : "No timeline yet")}</dd></div>
@@ -1814,9 +1821,11 @@ function renderDealerDrawer(leadId) {
   const customerName = input.ownerName || input.name || "";
   const sourceLabel = dealerLeadSourceLabel(lead);
   const dealerCreated = sourceLabel === "Dealer appraisal";
-  const customerEmail = input.email || (dealerCreated ? "" : lead.auth_user?.email || lead.auth_email) || "-";
+  const customerEmail = input.ownerEmail || input.email || (dealerCreated ? "" : lead.auth_user?.email || lead.auth_email) || "-";
   const customerDisplay = customerName || customerEmail;
-  const customerPhone = input.phone || "No phone";
+  const customerPhone = input.ownerPhone || input.phone || "No phone";
+  const submitterEmail = input.submitterEmail || input.dealerEmail || lead.auth_email || lead.auth_user?.email || "";
+  const submitterLabel = submitterEmail ? `${shortEmail(submitterEmail)}${input.submitterRelationship ? ` · ${input.submitterRelationship}` : ""}` : (input.submitterRelationship || "");
   const vehicleContext = lead.vehicle_context || {};
   const pipelineLabel = dealerLeadStatusLabel(status, buyerLead);
   const nextAction = dealerNextBestAction(lead);
@@ -1846,7 +1855,7 @@ function renderDealerDrawer(leadId) {
         <div>
           <span>Dealer workspace</span>
           <strong>${escapeHtml(title)}</strong>
-          <small>${escapeHtml(sourceLabel)} | ${escapeHtml(customerDisplay)} | ${escapeHtml(customerPhone)}</small>
+          <small>${escapeHtml(sourceLabel)} | ${buyerLead ? "Customer" : "Vehicle owner"} ${escapeHtml(customerDisplay)} | ${escapeHtml(customerPhone)}</small>
         </div>
         <div class="dealer-drawer-head-actions">
           <button class="drawer-close-strong" type="button" data-dealer-drawer-close aria-label="Close drawer">Close</button>
@@ -1886,10 +1895,16 @@ function renderDealerDrawer(leadId) {
               </summary>
               <div class="drawer-meta-grid">
                 <div class="drawer-meta-item">
-                  <span>Customer</span>
+                  <span>${buyerLead ? "Customer" : "Vehicle owner / seller"}</span>
                   <strong>${escapeHtml(customerDisplay)}</strong>
                   <small>${escapeHtml([customerEmail !== customerDisplay ? customerEmail : "", customerPhone].filter(Boolean).join(" | "))}</small>
                 </div>
+                ${!buyerLead ? `
+                <div class="drawer-meta-item">
+                  <span>Submitted by</span>
+                  <strong>${escapeHtml(submitterLabel || "Unknown")}</strong>
+                  <small>${escapeHtml(input.submitterEmail || input.dealerEmail || "Lead creator / authorized contact")}</small>
+                </div>` : ""}
                 <div class="drawer-meta-item">
                   <span>Source</span>
                   <strong>${escapeHtml(sourceLabel)}</strong>
@@ -2835,7 +2850,7 @@ function renderDealerCrmWorkflowPanel(lead) {
       </ol>
       <div class="crm-responsibility-grid">
         <div>
-          <span>Owner</span>
+          <span>Assigned rep</span>
           <strong>${escapeHtml(lead?.assigned_to || authSession?.user?.email || "Unassigned")}</strong>
         </div>
         <div>
