@@ -258,6 +258,13 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, result.ok ? 200 : result.status || 400, result);
     }
 
+    if (req.method === "POST" && url.pathname === "/api/inventory-photo-sync") {
+      const admin = await requireAdmin(req);
+      if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
+      const result = await syncInventoryDrivePhotos(await readJson(req), admin.user);
+      return sendJson(res, result.ok ? 200 : result.status || 400, result);
+    }
+
     if (req.method === "POST" && url.pathname === "/api/lead-photos") {
       const dealer = await requireDealer(req);
       if (!dealer.ok) return sendJson(res, dealer.status, { ok: false, error: dealer.error });
@@ -2015,11 +2022,13 @@ async function uploadLeadPhotos(body, user, role) {
   const savedFiles = Array.isArray(parsed.savedFiles) ? parsed.savedFiles : [];
   if (!savedFiles.length) return { ok: false, status: 502, error: "Google Drive did not return saved file URLs" };
 
-  const lines = savedFiles.map((file, index) => {
+  const lines = [];
+  if (parsed.leadFolderUrl) lines.push(`Vehicle Drive folder: ${parsed.leadFolderUrl}`);
+  lines.push(...savedFiles.map((file, index) => {
     const label = files[index]?.role || files[index]?.angle || file.name || `Photo ${index + 1}`;
     const url = file.url || file.webViewLink || "";
     return `${label}: ${url}`;
-  });
+  }));
   await createLeadActivity({
     leadId,
     type: "note",
@@ -2220,6 +2229,7 @@ async function findLeadPhotoLinks(leadId, supabase) {
   );
   if (!result.ok) return [];
   const photos = [];
+  const seenUrls = new Set();
   const deletedUrls = new Set();
   for (const row of result.data || []) {
     const note = String(row.note || "");
@@ -2233,10 +2243,20 @@ async function findLeadPhotoLinks(leadId, supabase) {
     if (!note.includes("Vehicle photo upload:")) continue;
     for (const line of note.split(/\r?\n/)) {
       const match = line.match(/^([^:]+):\s*(https?:\/\/\S+)/);
-      if (match) photos.push({ label: match[1].trim(), url: match[2].trim() });
+      if (match) {
+        const label = match[1].trim();
+        const url = match[2].trim();
+        if (!url || isDriveFolderUrl(url) || seenUrls.has(url)) continue;
+        photos.push({ label, url });
+        seenUrls.add(url);
+      }
     }
   }
   return photos.filter((photo) => !deletedUrls.has(photo.url));
+}
+
+function isDriveFolderUrl(url) {
+  return /drive\.google\.com\/(?:drive\/)?folders\//i.test(String(url || ""));
 }
 
 async function uploadInventoryPhotos(body, user) {
@@ -2321,6 +2341,125 @@ async function deleteInventoryPhoto(body, user) {
   }, user);
 
   return { ok: true, deleted: true, fileId, url: photoUrl };
+}
+
+async function syncInventoryDrivePhotos(body, user) {
+  const listingId = String(body.listingId || "").trim();
+  const leadId = String(body.leadId || "").trim();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!listingId || !leadId) return { ok: false, status: 400, error: "Listing id and lead id are required" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const folderUrl = String(body.folderUrl || await findLeadDriveFolderUrl({ url, key }, leadId) || "").trim();
+  if (!folderUrl) {
+    return {
+      ok: false,
+      status: 404,
+      error: "No Google Drive vehicle folder is recorded for this lead yet. Upload one photo through this vehicle first, then sync the folder."
+    };
+  }
+
+  const webhook = await submitDriveFolderListToWebhook({ listingId, leadId, folderUrl }, user);
+  if (!webhook.submitted) {
+    return { ok: false, status: 502, error: webhook.error || webhook.reason || "Google Drive folder sync webhook is not configured" };
+  }
+
+  const parsed = webhook.data || parseJson(webhook.response) || {};
+  if (parsed.pdfUrl && !Array.isArray(parsed.files) && !Array.isArray(parsed.photos)) {
+    return {
+      ok: false,
+      status: 502,
+      error: "Apps Script treated the sync request as a normal upload. Update GOOGLE_DRIVE_UPLOADS.md script with list-drive-folder-files and redeploy it."
+    };
+  }
+  const files = normalizeDriveFolderFiles(parsed);
+  await createLeadActivity({
+    leadId,
+    type: "note",
+    noteType: "inspection",
+    note: `Vehicle photo upload:\n${[`Vehicle Drive folder: ${folderUrl}`, ...files.map((file, index) => `${file.name || `Vehicle photo ${index + 1}`}: ${file.url}`)].join("\n")}`
+  }, user);
+  return { ok: true, folderUrl, photos: files, count: files.length };
+}
+
+async function findLeadDriveFolderUrl(client, leadId) {
+  const result = await fetchSupabaseJson(
+    `${client.url}/rest/v1/lead_notes?select=note&lead_id=eq.${encodeURIComponent(leadId)}&order=created_at.desc&limit=100`,
+    client.key
+  );
+  if (!result.ok) return "";
+  for (const row of result.data || []) {
+    const note = String(row.note || "");
+    const labelled = note.match(/Vehicle Drive folder:\s*(https?:\/\/\S+)/i);
+    if (labelled) return labelled[1].trim();
+    const generic = note.match(/leadFolderUrl["'\s:]+(https?:\/\/[^"'\s]+)/i);
+    if (generic) return generic[1].trim();
+  }
+  return "";
+}
+
+async function submitDriveFolderListToWebhook(payload, user) {
+  const webhookUrl = String(process.env.LEAD_WEBHOOK_URL || "").trim();
+  if (!webhookUrl) return { submitted: false, skipped: true, reason: "LEAD_WEBHOOK_URL is not configured" };
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "list-drive-folder-files",
+        status: "list-drive-folder-files",
+        listingId: payload.listingId,
+        id: payload.leadId,
+        leadId: payload.leadId,
+        folderUrl: payload.folderUrl,
+        folderId: driveFolderIdFromUrl(payload.folderUrl),
+        authEmail: String(user?.email || "").trim()
+      })
+    });
+    const text = await response.text().catch(() => "");
+    const data = parseJson(text) || {};
+    return {
+      submitted: response.ok,
+      status: response.status,
+      data,
+      response: text.slice(0, 1000),
+      error: response.ok ? "" : data.error || `Drive folder sync webhook rejected the request (${response.status})`
+    };
+  } catch (error) {
+    return { submitted: false, error: error.message || "Drive folder sync failed" };
+  }
+}
+
+function normalizeDriveFolderFiles(parsed) {
+  const rows = [
+    ...(Array.isArray(parsed.savedFiles) ? parsed.savedFiles : []),
+    ...(Array.isArray(parsed.files) ? parsed.files : []),
+    ...(Array.isArray(parsed.photos) ? parsed.photos : [])
+  ];
+  const seen = new Set();
+  return rows
+    .map((file, index) => ({
+      id: String(file.id || file.fileId || "").trim(),
+      name: String(file.name || file.title || `Vehicle photo ${index + 1}`).trim(),
+      url: String(file.url || file.webViewLink || file.webUrl || "").trim(),
+      mimeType: String(file.mimeType || "").trim()
+    }))
+    .filter((file) => file.url && !isDriveFolderUrl(file.url))
+    .filter((file) => !file.mimeType || file.mimeType.startsWith("image/") || /\.(png|jpe?g|webp|gif|heic)$/i.test(file.name))
+    .filter((file) => {
+      const key = file.url || file.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function driveFolderIdFromUrl(url) {
+  const value = String(url || "");
+  const folderMatch = value.match(/\/folders\/([^/?#]+)/);
+  const idMatch = value.match(/[?&]id=([^&]+)/);
+  return folderMatch?.[1] || idMatch?.[1] || "";
 }
 
 async function submitDriveDeleteToWebhook(payload, user) {
@@ -2813,11 +2952,13 @@ async function recordWebhookPhotosAsLeadNote({ url, key, leadId, uploadFiles = [
   const parsed = webhook.data || parseJson(webhook.response) || {};
   const savedFiles = Array.isArray(parsed.savedFiles) ? parsed.savedFiles : [];
   if (!savedFiles.length) return;
-  const lines = savedFiles.map((file, index) => {
+  const lines = [];
+  if (parsed.leadFolderUrl) lines.push(`Vehicle Drive folder: ${parsed.leadFolderUrl}`);
+  lines.push(...savedFiles.map((file, index) => {
     const label = uploadFiles[index]?.role || uploadFiles[index]?.angle || uploadFiles[index]?.name || file.name || `Photo ${index + 1}`;
     const photoUrl = file.url || file.webViewLink || "";
     return photoUrl ? `${label}: ${photoUrl}` : "";
-  }).filter(Boolean);
+  }).filter(Boolean));
   if (!lines.length) return;
   await insertSupabaseJson(`${url}/rest/v1/lead_notes`, key, {
     lead_id: leadId,

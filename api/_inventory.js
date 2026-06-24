@@ -400,6 +400,7 @@ async function findLeadPhotoLinks(leadId, client) {
   );
   if (!result.ok) return [];
   const photos = [];
+  const seenUrls = new Set();
   const deletedUrls = new Set();
   for (const row of result.data || []) {
     const note = String(row.note || "");
@@ -413,10 +414,20 @@ async function findLeadPhotoLinks(leadId, client) {
     if (!note.includes("Vehicle photo upload:")) continue;
     for (const line of note.split(/\r?\n/)) {
       const match = line.match(/^([^:]+):\s*(https?:\/\/\S+)/);
-      if (match) photos.push({ label: match[1].trim(), url: match[2].trim() });
+      if (match) {
+        const label = match[1].trim();
+        const url = match[2].trim();
+        if (!url || isDriveFolderUrl(url) || seenUrls.has(url)) continue;
+        photos.push({ label, url });
+        seenUrls.add(url);
+      }
     }
   }
   return photos.filter((photo) => !deletedUrls.has(photo.url));
+}
+
+function isDriveFolderUrl(url) {
+  return /drive\.google\.com\/(?:drive\/)?folders\//i.test(String(url || ""));
 }
 
 async function createLeadNote(client, leadId, user, note) {

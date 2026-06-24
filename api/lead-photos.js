@@ -48,11 +48,13 @@ async function uploadLeadPhotos(body, user) {
   const savedFiles = Array.isArray(parsed.savedFiles) ? parsed.savedFiles : [];
   if (!savedFiles.length) return { ok: false, status: 502, error: "Google Drive did not return saved file URLs" };
 
-  const lines = savedFiles.map((file, index) => {
+  const lines = [];
+  if (parsed.leadFolderUrl) lines.push(`Vehicle Drive folder: ${parsed.leadFolderUrl}`);
+  lines.push(...savedFiles.map((file, index) => {
     const label = files[index]?.role || files[index]?.angle || file.name || `Photo ${index + 1}`;
     const url = file.url || file.webViewLink || "";
     return `${label}: ${url}`;
-  });
+  }));
 
   await insertJson(`${client.url}/rest/v1/lead_notes`, client.key, {
     lead_id: leadId,

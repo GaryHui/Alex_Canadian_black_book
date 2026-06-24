@@ -339,6 +339,9 @@ function doPost(e) {
   if (data.action === "delete-drive-file" || data.status === "delete-drive-file") {
     return deleteDriveFile_(data);
   }
+  if (data.action === "list-drive-folder-files" || data.status === "list-drive-folder-files") {
+    return listDriveFolderFiles_(data);
+  }
 
   const receivedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -427,6 +430,58 @@ function deleteDriveFile_(data) {
       }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+function listDriveFolderFiles_(data) {
+  const folderId = String(data.folderId || folderIdFromUrl_(data.folderUrl || "") || "").trim();
+  if (!folderId) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        ok: false,
+        error: "folderId or folderUrl is required"
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    const folder = DriveApp.getFolderById(folderId);
+    const files = [];
+    const iterator = folder.getFiles();
+    while (iterator.hasNext()) {
+      const file = iterator.next();
+      const mimeType = file.getMimeType() || "";
+      if (mimeType.indexOf("image/") !== 0) continue;
+      files.push({
+        id: file.getId(),
+        name: file.getName(),
+        mimeType: mimeType,
+        url: file.getUrl()
+      });
+    }
+
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        ok: true,
+        folderId: folderId,
+        folderUrl: folder.getUrl(),
+        files: files
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        ok: false,
+        error: error && error.message ? error.message : String(error)
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function folderIdFromUrl_(url) {
+  const value = String(url || "");
+  const folderMatch = value.match(/\/folders\/([^/?#]+)/);
+  const idMatch = value.match(/[?&]id=([^&]+)/);
+  return folderMatch ? folderMatch[1] : (idMatch ? idMatch[1] : "");
 }
 
 function saveDriveFilesAndPdf_(data, receivedAt) {

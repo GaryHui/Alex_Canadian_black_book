@@ -616,6 +616,7 @@ function renderInventoryListing(listing) {
                 <input name="inventoryPhotos" type="file" accept="image/*" multiple />
               </label>
               <button type="button" data-upload-inventory-photos="${escapeHtml(listing.id || "")}">Upload photos</button>
+              <button type="button" data-sync-inventory-photos="${escapeHtml(listing.id || "")}">Sync vehicle folder</button>
             </div>
             <p class="inventory-photo-status" aria-live="polite"></p>
             ${selectablePhotos}
@@ -3308,6 +3309,12 @@ inventoryEl?.addEventListener("click", async (event) => {
     return;
   }
 
+  const syncPhotosButton = event.target.closest("[data-sync-inventory-photos]");
+  if (syncPhotosButton) {
+    await syncInventoryDrivePhotos(syncPhotosButton);
+    return;
+  }
+
   const removePhotoButton = event.target.closest("[data-remove-inventory-photo]");
   if (removePhotoButton) {
     event.preventDefault();
@@ -3493,6 +3500,44 @@ async function uploadInventoryPhotos(button) {
     await loadInventory();
   } catch (error) {
     const message = error.message || "Unable to upload inventory photos.";
+    if (status) status.textContent = message;
+    inventoryStatusEl.textContent = message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function syncInventoryDrivePhotos(button) {
+  const form = button.closest(".inventory-card-admin");
+  const listingId = form?.dataset?.id || "";
+  const leadId = form?.dataset?.sourceLeadId || "";
+  const status = form?.querySelector(".inventory-photo-status");
+  if (!listingId || !leadId) {
+    const message = "This listing is not connected to a vehicle lead folder.";
+    if (status) status.textContent = message;
+    inventoryStatusEl.textContent = message;
+    return;
+  }
+
+  button.disabled = true;
+  inventoryStatusEl.textContent = "Syncing this vehicle Drive folder...";
+  if (status) status.textContent = "Checking this vehicle folder in Google Drive...";
+  try {
+    const response = await fetch("/api/inventory-photo-sync", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ listingId, leadId })
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(formatApiError(data, "Unable to sync this vehicle folder."));
+    const message = data.count
+      ? `${data.count} Drive photo(s) synced. Check the photos you want shoppers to see, then save.`
+      : "Vehicle folder synced. No image files were found in this folder.";
+    if (status) status.textContent = message;
+    inventoryStatusEl.textContent = message;
+    await loadInventory();
+  } catch (error) {
+    const message = error.message || "Unable to sync this vehicle folder.";
     if (status) status.textContent = message;
     inventoryStatusEl.textContent = message;
   } finally {

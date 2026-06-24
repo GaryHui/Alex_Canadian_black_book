@@ -510,11 +510,13 @@ async function recordWebhookPhotosAsLeadNote({ url, key, leadId, uploadFiles = [
   const parsed = webhook.data || parseJson(webhook.response) || {};
   const savedFiles = Array.isArray(parsed.savedFiles) ? parsed.savedFiles : [];
   if (!savedFiles.length) return;
-  const lines = savedFiles.map((file, index) => {
+  const lines = [];
+  if (parsed.leadFolderUrl) lines.push(`Vehicle Drive folder: ${parsed.leadFolderUrl}`);
+  lines.push(...savedFiles.map((file, index) => {
     const label = uploadFiles[index]?.role || uploadFiles[index]?.angle || uploadFiles[index]?.name || file.name || `Photo ${index + 1}`;
     const photoUrl = file.url || file.webViewLink || "";
     return photoUrl ? `${label}: ${photoUrl}` : "";
-  }).filter(Boolean);
+  }).filter(Boolean));
   if (!lines.length) return;
   await insertJson(`${url}/rest/v1/lead_notes`, key, {
     lead_id: leadId,
