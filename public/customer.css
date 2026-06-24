@@ -2027,7 +2027,7 @@ input::placeholder {
 
 .inventory-card {
   display: grid;
-  grid-template-columns: minmax(280px, 36%) minmax(0, 1fr);
+  grid-template-columns: minmax(320px, 38%) minmax(0, 1fr);
   gap: 0;
   padding: 0;
   background: #fff;
@@ -2040,7 +2040,7 @@ input::placeholder {
 }
 
 .inventory-card-body {
-  align-content: start;
+  align-content: stretch;
 }
 
 .inventory-image {
@@ -2090,17 +2090,19 @@ input::placeholder {
 
 .inventory-card-body {
   display: grid;
-  gap: 16px;
-  grid-template-rows: auto 1fr;
+  gap: 18px 22px;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, .78fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 260px;
-  padding: 24px 26px 18px;
+  padding: 26px 28px 22px;
 }
 
 .inventory-card h3 {
   margin: 0 0 4px;
   color: #07106d;
-  font-size: clamp(24px, 3vw, 34px);
-  line-height: 1.05;
+  font-size: clamp(24px, 2.55vw, 34px);
+  line-height: 1.08;
+  max-width: 920px;
 }
 
 .inventory-card p {
@@ -2126,6 +2128,7 @@ input::placeholder {
   margin: 0;
   min-width: 0;
   padding: 14px;
+  align-self: end;
 }
 
 .inventory-card-price strong {
@@ -2223,13 +2226,17 @@ input::placeholder {
   display: grid;
   gap: 12px;
   grid-template-columns: minmax(0, 1fr);
+  grid-column: 1 / 2;
+  grid-row: 1 / 3;
 }
 
 .inventory-spec-row {
-  align-content: center;
+  align-content: start;
   display: grid;
   gap: 12px 18px;
   grid-template-columns: repeat(2, minmax(132px, 1fr));
+  grid-column: 2;
+  grid-row: 1 / 3;
   min-width: 0;
 }
 
@@ -2269,13 +2276,12 @@ input::placeholder {
 
 .inventory-spec-row b {
   color: #07106d;
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.1;
   min-width: 0;
   overflow: hidden;
-  overflow-wrap: normal;
+  overflow-wrap: anywhere;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .inventory-spec-row small {
@@ -2293,6 +2299,12 @@ input::placeholder {
   grid-template-rows: 1fr auto;
 }
 
+.inventory-card-body > .inventory-deal-price {
+  grid-column: 1;
+  grid-row: 3;
+  max-width: 310px;
+}
+
 .inventory-order-button {
   align-items: center;
   display: inline-flex;
@@ -2306,6 +2318,14 @@ input::placeholder {
   grid-column: 2;
   margin-top: 4px;
   justify-self: end;
+}
+
+.inventory-card-body > .inventory-card-actions {
+  align-self: end;
+  grid-column: 2;
+  grid-row: 3;
+  justify-self: end;
+  margin: 0;
 }
 
 .finance-mode-toggle {
@@ -2755,6 +2775,10 @@ input::placeholder {
   scroll-snap-align: start;
 }
 
+.vehicle-detail-thumb {
+  cursor: pointer;
+}
+
 .vehicle-detail-thumb img {
   display: block;
   width: 100%;
@@ -3017,6 +3041,19 @@ input::placeholder {
     grid-template-columns: minmax(260px, 42%) minmax(0, 1fr);
   }
 
+  .inventory-card-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+  }
+
+  .inventory-deal-copy,
+  .inventory-spec-row,
+  .inventory-card-body > .inventory-deal-price,
+  .inventory-card-body > .inventory-card-actions {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
   .inventory-offer-row {
     grid-template-columns: 1fr;
   }
@@ -3027,6 +3064,10 @@ input::placeholder {
 
   .inventory-deal-price {
     max-width: 100%;
+  }
+
+  .inventory-card-body > .inventory-card-actions {
+    justify-self: start;
   }
 
   .hero-copy {
@@ -3098,6 +3139,15 @@ input::placeholder {
   .inventory-card-body {
     min-height: 0;
     padding: 18px;
+  }
+
+  .inventory-card-body > .inventory-deal-price {
+    max-width: none;
+    width: 100%;
+  }
+
+  .inventory-order-button {
+    width: 100%;
   }
 
   .inventory-spec-row span {

@@ -48,8 +48,8 @@ const text = {
     makeAny: "Any Make",
     modelLabel: "Model",
     modelAny: "Any Model",
-    priceRangeLabel: "Price",
-    priceAny: "Any Price",
+    priceRangeLabel: "Monthly",
+    priceAny: "Any Monthly",
     typeLabel: "Type",
     typeAny: "Any Type",
     filtersLabel: "Filters",
@@ -59,7 +59,10 @@ const text = {
     sortLabel: "Sort",
     sortMonthlyAsc: "Monthly low to high",
     sortMonthlyDesc: "Monthly high to low",
+    sortPriceAsc: "Price low to high",
+    sortPriceDesc: "Price high to low",
     sortYearDesc: "Newest year",
+    sortKmAsc: "Lowest KM",
     sortRecent: "Recently added",
     budgetLabel: "Max price",
     monthlyBudgetLabel: "Max monthly payment",
@@ -158,8 +161,8 @@ const text = {
     makeAny: "Toute marque",
     modelLabel: "Modele",
     modelAny: "Tout modele",
-    priceRangeLabel: "Prix",
-    priceAny: "Tout prix",
+    priceRangeLabel: "Mensuel",
+    priceAny: "Tout mensuel",
     typeLabel: "Type",
     typeAny: "Tout type",
     filtersLabel: "Filtres",
@@ -169,7 +172,10 @@ const text = {
     sortLabel: "Trier",
     sortMonthlyAsc: "Mensuel croissant",
     sortMonthlyDesc: "Mensuel decroissant",
+    sortPriceAsc: "Prix croissant",
+    sortPriceDesc: "Prix decroissant",
     sortYearDesc: "Annee recente",
+    sortKmAsc: "KM le plus bas",
     sortRecent: "Ajouts recents",
     budgetLabel: "Prix maximum",
     monthlyBudgetLabel: "Paiement mensuel max.",
@@ -290,6 +296,7 @@ const filterChipButtons = document.querySelectorAll("[data-filter-chip]");
 const clearFilterButton = document.querySelector("[data-clear-filters]");
 let currentContactVehicle = null;
 let selectedFinanceVehicle = null;
+let filterInputTimer = null;
 
 function money(value) {
   return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -311,39 +318,35 @@ function renderInventory() {
     <article class="inventory-card inventory-deal-card">
       ${vehicleImageMarkup(vehicle)}
       <div class="inventory-card-body">
-        <div class="inventory-card-copy inventory-deal-copy">
-          <div>
-            <h3>${escapeHtml(vehicle.title)}</h3>
-            <p>${escapeHtml(vehicle.description || `${money(vehicle.price)} CBB-based dealer price`)}</p>
-          </div>
+        <header class="inventory-card-copy inventory-deal-copy">
+          <h3>${escapeHtml(vehicle.title)}</h3>
+          <p>${escapeHtml(money(vehicle.price))} CBB-based dealer price</p>
           ${tags.length ? `<div class="inventory-tags">${tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+        </header>
+        <div class="inventory-spec-row" aria-label="Vehicle specs">
+          ${specs.map((item) => `
+            <span>
+              ${specIcon(item.icon)}
+              <b>${escapeHtml(item.value)}</b>
+              <small>${escapeHtml(item.label)}</small>
+            </span>
+          `).join("")}
         </div>
-        <div class="inventory-offer-row">
-          <div class="inventory-card-price inventory-deal-price">
-            <span>${escapeHtml(text[language].dealMonthlyLabel)}</span>
-            <strong>${money(deal.monthly)} / mo</strong>
-            <small>${escapeHtml(money(vehicle.price))} CBB-based dealer price</small>
-            <div class="inventory-deal-terms" aria-label="Estimated payment terms">
-              <span><b>${escapeHtml(money(deal.downPayment))}</b>${escapeHtml(text[language].dealDownLabel)}</span>
-              <span><b>${escapeHtml(String(deal.termMonths))} mo</b>${escapeHtml(text[language].dealTermLabel)}</span>
-              <span><b>${escapeHtml(String(deal.annualRate))}%</b>${escapeHtml(text[language].dealRateLabel)}</span>
-            </div>
+        <div class="inventory-card-price inventory-deal-price">
+          <span>${escapeHtml(text[language].dealMonthlyLabel)}</span>
+          <strong>${money(deal.monthly)} / mo</strong>
+          <small>${escapeHtml(money(vehicle.price))} CBB-based dealer price</small>
+          <div class="inventory-deal-terms" aria-label="Estimated payment terms">
+            <span><b>${escapeHtml(money(deal.downPayment))}</b>${escapeHtml(text[language].dealDownLabel)}</span>
+            <span><b>${escapeHtml(String(deal.termMonths))} mo</b>${escapeHtml(text[language].dealTermLabel)}</span>
+            <span><b>${escapeHtml(String(deal.annualRate))}%</b>${escapeHtml(text[language].dealRateLabel)}</span>
           </div>
-          <div class="inventory-spec-row" aria-label="Vehicle specs">
-            ${specs.map((item) => `
-              <span>
-                ${specIcon(item.icon)}
-                <b>${escapeHtml(item.value)}</b>
-                <small>${escapeHtml(item.label)}</small>
-              </span>
-            `).join("")}
-          </div>
-          <div class="inventory-card-actions">
-            <button class="primary-button inventory-order-button" type="button" data-view-vehicle="${escapeHtml(vehicle.id)}">
-              <span>${escapeHtml(text[language].detailsOrder)}</span>
-              ${specIcon("arrow")}
-            </button>
-          </div>
+        </div>
+        <div class="inventory-card-actions">
+          <button class="primary-button inventory-order-button" type="button" data-view-vehicle="${escapeHtml(vehicle.id)}">
+            <span>${escapeHtml(text[language].detailsOrder)}</span>
+            ${specIcon("arrow")}
+          </button>
         </div>
       </div>
     </article>
@@ -521,6 +524,11 @@ function calculatePayment() {
   const monthlyText = `${money(payment)} / mo`;
   paymentOutput.textContent = monthlyText;
   if (detailOrderPayment) detailOrderPayment.textContent = monthlyText;
+  if (detailOrderFees) {
+    const modeLabel = mode === "lease" ? text[language].paymentModeLease : text[language].paymentModeFinance;
+    const residual = mode === "lease" ? ` | ${residualPercent}% residual` : "";
+    detailOrderFees.textContent = `${modeLabel} | ${money(downPayment)} down | ${termMonths} months | ${annualRate}%${residual}`;
+  }
   financeForm?.classList.toggle("lease-mode", mode === "lease");
 }
 
@@ -641,7 +649,10 @@ function compareVehicles(a, b, sortBy) {
   const comparisons = {
     "monthly-asc": vehicleDeal(a).monthly - vehicleDeal(b).monthly,
     "monthly-desc": vehicleDeal(b).monthly - vehicleDeal(a).monthly,
+    "price-asc": Number(a.price || 0) - Number(b.price || 0),
+    "price-desc": Number(b.price || 0) - Number(a.price || 0),
     "year-desc": Number(b.year || 0) - Number(a.year || 0),
+    "km-asc": Number(a.kilometers || 0) - Number(b.kilometers || 0),
     recent: String(b.id || "").localeCompare(String(a.id || ""))
   };
   const result = comparisons[sortBy] ?? comparisons["monthly-asc"];
@@ -758,7 +769,7 @@ function showVehicleDetails(vehicle) {
     ${vehicleDetailPhotoStrip(vehicle)}
     <div class="vehicle-detail-content">
       <section class="vehicle-detail-gallery">
-        ${vehicle.photos?.length ? `<figure class="vehicle-detail-photo"><img src="${escapeHtml(photoDisplayUrl(vehicle.photos[0].url))}" alt="${escapeHtml(vehicle.title)}" /><figcaption>${escapeHtml(vehicle.photos[0].label || "Vehicle photo")}</figcaption></figure>` : vehicleImageMarkup(vehicle)}
+        ${vehicle.photos?.length ? `<figure class="vehicle-detail-photo" data-detail-main-photo><img src="${escapeHtml(photoDisplayUrl(vehicle.photos[0].url))}" alt="${escapeHtml(vehicle.title)}" /><figcaption>${escapeHtml(vehicle.photos[0].label || "Vehicle photo")}</figcaption></figure>` : vehicleImageMarkup(vehicle)}
       </section>
       <section class="vehicle-detail-main">
         <h3>Your vehicle details</h3>
@@ -798,7 +809,7 @@ function vehicleDetailPhotoStrip(vehicle) {
   return `
     <div class="vehicle-detail-photo-strip" aria-label="Vehicle photos">
       ${photos.map((photo, index) => `
-        <figure class="vehicle-detail-thumb">
+        <figure class="vehicle-detail-thumb" data-detail-photo-index="${index}">
           <img src="${escapeHtml(photoDisplayUrl(photo.url))}" alt="${escapeHtml(photo.label || `${vehicle.title} photo ${index + 1}`)}" loading="lazy" />
           <figcaption>${escapeHtml(photo.label || `Photo ${index + 1}`)}</figcaption>
         </figure>
@@ -1019,9 +1030,13 @@ inventoryFilter?.addEventListener("change", (event) => {
     if (inventoryFilter.elements.model) inventoryFilter.elements.model.value = "";
     populateInventoryFilters();
   }
-  updateMarketplaceFilterCount();
+  applyFilters();
 });
-inventoryFilter?.addEventListener("input", updateMarketplaceFilterCount);
+inventoryFilter?.addEventListener("input", () => {
+  updateMarketplaceFilterCount();
+  window.clearTimeout(filterInputTimer);
+  filterInputTimer = window.setTimeout(() => applyFilters(), 220);
+});
 inventorySort?.addEventListener("change", applyFilters);
 moreFiltersToggle?.addEventListener("click", toggleMoreFilters);
 filterChipButtons.forEach((button) => button.addEventListener("click", () => applyFilterChip(button)));
@@ -1065,6 +1080,16 @@ vehicleDetailModal?.addEventListener("click", (event) => {
     if (selectedFinanceVehicle) {
       closeVehicleDetails();
       openContactDealer(selectedFinanceVehicle);
+    }
+    return;
+  }
+  const thumb = event.target.closest("[data-detail-photo-index]");
+  if (thumb && selectedFinanceVehicle) {
+    const photos = Array.isArray(selectedFinanceVehicle.photos) ? selectedFinanceVehicle.photos : [];
+    const photo = photos[Number(thumb.dataset.detailPhotoIndex || 0)];
+    const mainPhoto = vehicleDetailModal.querySelector("[data-detail-main-photo]");
+    if (photo?.url && mainPhoto) {
+      mainPhoto.innerHTML = `<img src="${escapeHtml(photoDisplayUrl(photo.url))}" alt="${escapeHtml(photo.label || selectedFinanceVehicle.title)}" /><figcaption>${escapeHtml(photo.label || "Vehicle photo")}</figcaption>`;
     }
     return;
   }
