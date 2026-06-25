@@ -2347,6 +2347,13 @@ function leadSourceLabel(lead = {}) {
   return "Owner appraisal";
 }
 
+function leadSourceDetailLabel(lead = {}) {
+  const label = leadSourceLabel(lead);
+  if (label === "Buyer inquiry") return "Buy page buyer inquiry";
+  if (label === "Dealer appraisal") return "Dealer staff appraisal";
+  return "Sell page owner appraisal";
+}
+
 function renderLead(lead, index = 0) {
   const input = lead.input || {};
   const valuation = lead.valuation || {};
@@ -2356,14 +2363,18 @@ function renderLead(lead, index = 0) {
   const wholesale = valuation.values?.wholesale?.adjusted?.avg;
   const retail = valuation.values?.retail?.adjusted?.avg;
   const title = cleanLeadTitle(valuation.title || [input.year, input.make, input.model, input.series, input.style].filter(Boolean).join(" "), buyer) || "Vehicle lead";
-  const customerName = input.ownerName || input.name || "";
   const sourceLabel = leadSourceLabel(lead);
+  const sourceDetailLabel = leadSourceDetailLabel(lead);
   const dealerCreated = sourceLabel === "Dealer appraisal";
-  const customerEmail = input.ownerEmail || input.email || (dealerCreated ? "" : lead.auth_email || currentAdminEmail()) || "-";
-  const customerDisplay = customerName || customerEmail;
-  const customerPhone = input.ownerPhone || input.phone || "No phone";
+  const customerName = buyer ? (input.name || input.ownerName || "") : (input.ownerName || "");
+  const customerEmail = buyer
+    ? (input.email || input.ownerEmail || (dealerCreated ? "" : lead.auth_email || currentAdminEmail()) || "")
+    : (input.ownerEmail || "");
+  const customerDisplay = customerName || customerEmail || (buyer ? "Customer not recorded" : "Owner not recorded");
+  const customerPhone = buyer ? (input.phone || input.ownerPhone || "No phone") : (input.ownerPhone || "No phone");
   const submitterEmail = input.submitterEmail || input.dealerEmail || lead.auth_email || lead.auth_user?.email || "";
-  const submitterLabel = submitterEmail && submitterEmail !== customerEmail ? `Submitted by ${shortEmail(submitterEmail)}` : (input.submitterRelationship || "");
+  const submitterLabel = submitterEmail ? `Submitted by ${shortEmail(submitterEmail)}` : (input.submitterRelationship || "");
+  const sourceAuditLabel = submitterLabel ? `${sourceDetailLabel} / ${submitterLabel}` : sourceDetailLabel;
   const vin = input.vin || valuation.vin || "-";
   const status = lead.status || "new";
   const assignedTo = lead.assigned_to || "";
@@ -2489,9 +2500,8 @@ function renderLead(lead, index = 0) {
           <span class="lead-list-label">${buyer ? "Customer" : "Owner"}</span>
           <strong>${escapeHtml(customerDisplay)}</strong>
           <div class="lead-list-subline">
-            ${customerName && customerEmail !== "-" ? `<span>${escapeHtml(customerEmail)}</span>` : ""}
+            ${customerName && customerEmail ? `<span>${escapeHtml(customerEmail)}</span>` : ""}
             <span>${escapeHtml(customerPhone)}</span>
-            ${!buyer && submitterLabel ? `<span>${escapeHtml(submitterLabel)}</span>` : ""}
           </div>
         </div>
         <div class="lead-list-col">
@@ -2507,7 +2517,7 @@ function renderLead(lead, index = 0) {
           <strong class="lead-vin-value">VIN ${escapeHtml(vin)}</strong>
           <div class="lead-list-subline">
             <span>${escapeHtml(vehicleContext.cluster_label || title)}</span>
-            <span>${escapeHtml(vehicleSummary)}</span>
+            <span>${escapeHtml(sourceAuditLabel)}</span>
             <span>${escapeHtml(buyer ? (purchase.intent || input.purchaseIntent || "Buyer") : (wholesale ? `W ${formatNumber(wholesale)}` : "Seller"))}</span>
             <span>${escapeHtml(!buyer && retail ? `R ${formatNumber(retail)}` : buyer && (purchase.monthlyPayment || retail) ? `Budget ${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)}/mo` : formatNumber(retail)}` : "-")}</span>
           </div>

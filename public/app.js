@@ -1982,14 +1982,18 @@ function renderDealerLeads(leads, role) {
     const leadKind = buyerLead ? "buyer" : "seller";
     const leadTypeLabel = buyerLead ? "BUY lead" : "SELL lead";
     const sourceLabel = dealerLeadSourceLabel(lead);
+    const sourceDetailLabel = dealerLeadSourceDetailLabel(lead);
     const purchase = input.buyerPlan || valuation.buyerPlan || {};
     const title = cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || "Vehicle lead", buyerLead);
-    const customerName = input.ownerName || input.name || "";
     const dealerCreated = sourceLabel === "Dealer appraisal";
-    const customerEmail = input.ownerEmail || input.email || (dealerCreated ? "" : lead.auth_email || lead.auth_user?.email) || "-";
-    const customerPhone = input.ownerPhone || input.phone || "No phone";
+    const customerName = buyerLead ? (input.name || input.ownerName || "") : (input.ownerName || "");
+    const customerEmail = buyerLead
+      ? (input.email || input.ownerEmail || (dealerCreated ? "" : lead.auth_email || lead.auth_user?.email) || "")
+      : (input.ownerEmail || "");
+    const customerPhone = buyerLead ? (input.phone || input.ownerPhone || "No phone") : (input.ownerPhone || "No phone");
     const submitterEmail = input.submitterEmail || input.dealerEmail || lead.auth_email || lead.auth_user?.email || "";
-    const submitterLabel = submitterEmail && submitterEmail !== customerEmail ? `Submitted by ${shortEmail(submitterEmail)}` : (input.submitterRelationship || "");
+    const submitterLabel = submitterEmail ? `Submitted by ${shortEmail(submitterEmail)}` : (input.submitterRelationship || "");
+    const sourceAuditLabel = submitterLabel ? `${sourceDetailLabel} / ${submitterLabel}` : sourceDetailLabel;
     const followUp = lead.next_follow_up_at || "";
     const lastActivity = lead.last_activity_at || "";
     const status = lead.status || "new";
@@ -2029,7 +2033,7 @@ function renderDealerLeads(leads, role) {
           : buyerLead
             ? "Buyer opportunity"
             : "Seller appraisal";
-    const customerSummary = customerName || customerPhone || customerEmail;
+    const customerSummary = customerName || customerEmail || (buyerLead ? "Customer not recorded" : "Owner not recorded");
     const repSummary = lead.assigned_to || "Unassigned";
     const progressSummary = dealerLeadStatusLabel(status, buyerLead);
     const nextAction = dealerNextBestAction(lead);
@@ -2058,9 +2062,8 @@ function renderDealerLeads(leads, role) {
             <span class="lead-list-label">${buyerLead ? "Customer" : "Owner"}</span>
             <strong>${escapeHtml(customerSummary)}</strong>
             <div class="lead-list-subline">
-              ${customerName && customerEmail !== "-" ? `<span>${escapeHtml(customerEmail)}</span>` : ""}
+              ${customerName && customerEmail ? `<span>${escapeHtml(customerEmail)}</span>` : ""}
               <span>${escapeHtml(customerPhone)}</span>
-              ${submitterLabel ? `<span>${escapeHtml(submitterLabel)}</span>` : ""}
             </div>
           </div>
           <div class="lead-list-col">
@@ -2076,7 +2079,7 @@ function renderDealerLeads(leads, role) {
             <strong class="lead-vin-value">VIN ${escapeHtml(vehicleVin)}</strong>
             <div class="lead-list-subline">
               <span>${escapeHtml(vehicleContext.cluster_label || title)}</span>
-              <span>${escapeHtml(vehicleSummary)}</span>
+              <span>${escapeHtml(sourceAuditLabel)}</span>
               <span>${escapeHtml(buyerLead ? (purchase.intent || input.purchaseIntent || "Buyer") : (wholesaleAvg ? `W ${formatNumber(wholesaleAvg)}` : "Seller"))}</span>
               <span>${escapeHtml(!buyerLead && retailAvg ? `R ${formatNumber(retailAvg)}` : buyerLead && (purchase.monthlyPayment || retailAvg) ? `Budget ${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)}/mo` : formatNumber(retailAvg)}` : "-")}</span>
             </div>
@@ -3241,6 +3244,13 @@ function dealerLeadSourceLabel(lead = {}) {
   if (input.leadType === "buyer_inquiry" || source === "buyer_inquiry") return "Buyer inquiry";
   if (source.includes("dealer")) return "Dealer appraisal";
   return "Owner appraisal";
+}
+
+function dealerLeadSourceDetailLabel(lead = {}) {
+  const label = dealerLeadSourceLabel(lead);
+  if (label === "Buyer inquiry") return "Buy page buyer inquiry";
+  if (label === "Dealer appraisal") return "Dealer staff appraisal";
+  return "Sell page owner appraisal";
 }
 
 function isDealerClosedLead(lead) {
