@@ -778,22 +778,18 @@ async function runValuation(extra = {}, options = {}) {
     currentMarket = firstAvailableMarket(data) || "wholesale";
     renderResult(data);
     closeSearchModal();
-    if (dealerAdminAllowed) {
-      pendingDealerLeadCapture = { payload, valuation: data };
-      if (saveValuationLeadButton) saveValuationLeadButton.hidden = false;
-      statusEl.textContent = "Valuation rendered. Click Save valuation to leads if this should be kept for follow-up.";
-      return;
-    }
-
     const capture = await captureLead(payload, data);
     await loadUsage();
     if (capture?.captured) {
-      statusEl.textContent = data.source === "mock"
-        ? "Rendered with mock data and lead captured."
-        : "Rendered from Black Book API and lead captured.";
+      statusEl.textContent = leadCaptureStatusMessage(capture, data.source === "mock");
       await loadHistory();
+      if (dealerAdminAllowed) await loadDealerLeads();
     } else {
       statusEl.textContent = capture?.message || "Rendered, but lead storage is not configured yet.";
+      if (dealerAdminAllowed) {
+        pendingDealerLeadCapture = { payload, valuation: data };
+        if (saveValuationLeadButton) saveValuationLeadButton.hidden = false;
+      }
     }
   } catch (error) {
     statusEl.textContent = error.message || "Unexpected error.";
@@ -812,7 +808,7 @@ async function savePendingDealerLead() {
     const capture = await captureLead(pendingDealerLeadCapture.payload, pendingDealerLeadCapture.valuation);
     await loadUsage();
     if (capture?.captured) {
-      statusEl.textContent = "Valuation saved to captured leads.";
+      statusEl.textContent = leadCaptureStatusMessage(capture, pendingDealerLeadCapture.valuation?.source === "mock");
       pendingDealerLeadCapture = null;
       if (saveValuationLeadButton) saveValuationLeadButton.hidden = true;
       await loadHistory();
@@ -1312,6 +1308,14 @@ async function captureLead(input, valuation) {
     console.warn("Lead capture failed", error);
     return { ok: false, captured: false, message: error.message || "Lead capture failed." };
   }
+}
+
+function leadCaptureStatusMessage(capture = {}, usedMock = false) {
+  const source = usedMock ? "Rendered with mock data" : "Rendered from Black Book API";
+  if (capture.webhook?.submitted) return `${source}. CRM lead saved and Google Sheet synced.`;
+  if (capture.webhook?.skipped) return `${source}. CRM lead saved, but Google Sheet sync is not configured.`;
+  if (capture.webhook?.error) return `${source}. CRM lead saved, but Google Sheet sync failed: ${capture.webhook.error}`;
+  return `${source}. CRM lead saved.`;
 }
 
 async function initializeAuth() {
