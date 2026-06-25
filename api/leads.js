@@ -22,6 +22,8 @@ export default async function handler(req, res) {
           ? await assignLead(req.body || {}, admin.user)
           : req.body?.action === "recover_drive_folder"
             ? await recoverLeadByDriveFolder(req.body || {}, admin.user)
+            : req.body?.action === "recover_vehicle_search"
+              ? await recoverLeadByVehicleSearch(req.body || {}, admin.user)
           : await updateLead(req.body || {});
     return res.status(result.ok ? 200 : result.status || 400).json(result);
   }
@@ -341,7 +343,8 @@ async function listFromSupabase() {
     if (repairedResponse.ok) leads = repairedLeads;
   }
   const withReview = await attachOwnerReviewState(leads, { url, key });
-  return { ok: true, storage: "supabase", leads: await attachLeadSignals(withReview, { url, key }) };
+  const withRestore = await attachWarehouseRestoreState(withReview, { url, key });
+  return { ok: true, storage: "supabase", leads: await attachLeadSignals(withRestore, { url, key }) };
 }
 
 async function repairOrphanInventoryLeads(client) {
@@ -486,6 +489,186 @@ async function recoverLeadByDriveFolder(body, user) {
   } catch (error) {
     return { ok: false, status: 500, error: error?.message || "Unable to recover lead by Drive folder" };
   }
+}
+
+async function recoverLeadByVehicleSearch(body, user) {
+  try {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+    const query = String(body.vehicleQuery || body.query || body.search || "").trim();
+    if (query.length < 2) return { ok: false, status: 400, error: "Vehicle, VIN, email, or phone search text is required" };
+
+    const leadsResult = await fetch(`${url}/rest/v1/valuation_leads?select=*&order=last_activity_at.desc.nullslast,created_at.desc&limit=1000`, {
+      headers: authHeaders(key)
+    }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] }));
+    if (!leadsResult.ok) return { ok: false, status: 400, error: "Unable to search CRM leads" };
+
+    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+    const matches = (leadsResult.data || [])
+      .filter((lead) => !isBuyerLead(lead))
+      .filter((lead) => {
+        const haystack = leadRecoverySearchText(lead);
+        return terms.every((term) => haystack.includes(term));
+      });
+    if (!matches.length) return { ok: false, status: 404, error: `No SELL lead matched "${query}". Try VIN, make/model, customer email, or phone.` };
+
+    const ids = matches.map((lead) => String(lead.id || "").trim()).filter(Boolean);
+    const listingResult = await fetch(`${url}/rest/v1/vehicle_listings?select=id,title,source_lead_id&source_lead_id=in.(${ids.map(encodeURIComponent).join(",")})&limit=1000`, {
+      headers: authHeaders(key)
+    }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] }));
+    const inventoryLeadIds = new Set((listingResult.data || []).map((row) => String(row.source_lead_id || "").trim()).filter(Boolean));
+
+    const recovered = [];
+    const found = [];
+    const stillInInventory = [];
+    for (const lead of matches) {
+      const leadId = String(lead.id || "").trim();
+      if (!leadId) continue;
+      if (inventoryLeadIds.has(leadId)) {
+        stillInInventory.push(lead);
+        continue;
+      }
+      if (!leadRecoveryNeedsRestore(lead)) {
+        found.push(lead);
+        continue;
+      }
+      const restored = await restoreHiddenLeadRecord({
+        url,
+        key,
+        lead,
+        user,
+        note: `Lead recovered from hidden search "${query}".`
+      });
+      if (!restored.ok) return restored;
+      recovered.push(restored.lead);
+    }
+
+    if (!recovered.length && !found.length) {
+      return {
+        ok: false,
+        status: 409,
+        error: stillInInventory.length
+          ? "Matched SELL lead is still linked to an inventory listing. Open Inventory or move it out first."
+          : "Matched SELL lead was not recoverable."
+      };
+    }
+
+    return {
+      ok: true,
+      query,
+      recovered,
+      found,
+      stillInInventory,
+      recoveredCount: recovered.length,
+      foundCount: found.length,
+      inventoryCount: stillInInventory.length
+    };
+  } catch (error) {
+    return { ok: false, status: 500, error: error?.message || "Unable to recover lead by vehicle search" };
+  }
+}
+
+function leadRecoverySearchText(lead = {}) {
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+  return [
+    lead.id,
+    lead.auth_email,
+    lead.status,
+    lead.assigned_to,
+    input.name,
+    input.ownerName,
+    input.email,
+    input.ownerEmail,
+    input.phone,
+    input.ownerPhone,
+    input.year,
+    input.make,
+    input.model,
+    input.series,
+    input.style,
+    input.vin,
+    input.uvc,
+    input.driveFolderUrl,
+    valuation.title,
+    valuation.vin,
+    valuation.uvc,
+    valuation.make,
+    valuation.model,
+    valuation.series,
+    valuation.style,
+    lead.notes
+  ].filter(Boolean).join(" ").toLowerCase();
+}
+
+function leadRecoveryNeedsRestore(lead = {}) {
+  const status = String(lead.status || "").toLowerCase();
+  return ["in_inventory", "closed", "lost", "won", "deleted", "archived"].includes(status);
+}
+
+async function restoreHiddenLeadRecord({ url, key, lead, user, note }) {
+  const leadId = String(lead.id || "").trim();
+  const restoredAt = new Date().toISOString();
+  const status = String(lead.assigned_to || "").trim() ? "assigned" : "new";
+  const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: {
+      ...authHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify({
+      status,
+      last_activity_at: restoredAt
+    })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data || "Unable to recover lead" };
+  await createLeadTimelineNote({
+    url,
+    key,
+    leadId,
+    authorEmail: String(user?.email || "admin").trim().toLowerCase(),
+    note
+  });
+  return { ok: true, lead: data?.[0] || { ...lead, status, last_activity_at: restoredAt } };
+}
+
+async function attachWarehouseRestoreState(leads, client) {
+  if (!Array.isArray(leads) || !leads.length) return [];
+  const ids = leads.map((lead) => String(lead.id || "").trim()).filter(Boolean);
+  if (!ids.length) return leads;
+  const result = await fetch(`${client.url}/rest/v1/lead_notes?select=id,lead_id,created_at,author_email,note&lead_id=in.(${ids.map(encodeURIComponent).join(",")})&note_type=eq.internal&order=created_at.desc&limit=1000`, {
+    headers: authHeaders(client.key)
+  }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] }));
+  if (!result.ok) return leads;
+
+  const latestRestore = new Map();
+  for (const note of result.data || []) {
+    const text = String(note.note || "");
+    if (!/Inventory listing removed|Lead recovered from Google Drive folder|Lead recovered from hidden search|restored to the active CRM queue/i.test(text)) continue;
+    const leadId = String(note.lead_id || "").trim();
+    const current = latestRestore.get(leadId);
+    if (!current || new Date(note.created_at || 0).getTime() > new Date(current.created_at || 0).getTime()) {
+      latestRestore.set(leadId, note);
+    }
+  }
+
+  return leads.map((lead) => {
+    const note = latestRestore.get(String(lead.id || "").trim());
+    if (!note) return lead;
+    return {
+      ...lead,
+      warehouse_restore: {
+        restored: true,
+        at: note.created_at || "",
+        by: note.author_email || "",
+        note: note.note || ""
+      }
+    };
+  });
 }
 
 async function attachOwnerReviewState(leads, client) {

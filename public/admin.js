@@ -791,15 +791,26 @@ async function recoverHiddenLead(event) {
   event.preventDefault();
   if (!adminSession || !leadRecoveryForm) return;
 
-  const driveFolderUrl = String(new FormData(leadRecoveryForm).get("driveFolderUrl") || "").trim();
-  if (!driveFolderUrl) return;
-  if (leadRecoveryStatus) leadRecoveryStatus.textContent = "Searching CRM records for this Drive folder...";
+  const formData = new FormData(leadRecoveryForm);
+  const driveFolderUrl = String(formData.get("driveFolderUrl") || "").trim();
+  const vehicleQuery = String(formData.get("vehicleQuery") || "").trim();
+  if (!driveFolderUrl && !vehicleQuery) {
+    if (leadRecoveryStatus) leadRecoveryStatus.textContent = "Enter a Drive folder URL, vehicle, VIN, email, or phone first.";
+    return;
+  }
+  const action = driveFolderUrl ? "recover_drive_folder" : "recover_vehicle_search";
+  if (leadRecoveryStatus) {
+    leadRecoveryStatus.textContent = driveFolderUrl
+      ? "Searching CRM records for this Drive folder..."
+      : `Searching hidden and active SELL leads for "${vehicleQuery}"...`;
+  }
   const response = await fetch("/api/leads", {
     method: "PATCH",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({
-      action: "recover_drive_folder",
-      driveFolderUrl
+      action,
+      driveFolderUrl,
+      vehicleQuery
     })
   });
   const data = await response.json().catch(() => ({}));
@@ -807,12 +818,20 @@ async function recoverHiddenLead(event) {
     if (leadRecoveryStatus) leadRecoveryStatus.textContent = formatApiError(data, "Unable to recover this Drive folder.");
     return;
   }
-  const lead = data.recovered?.[0] || null;
+  const lead = data.recovered?.[0] || data.found?.[0] || null;
   if (leadRecoveryStatus) {
-    leadRecoveryStatus.textContent = `Recovered ${data.recoveredCount || 1} SELL lead(s). Reloading Up Sheets...`;
+    const recoveredCount = Number(data.recoveredCount || data.recovered?.length || 0);
+    const foundCount = Number(data.foundCount || data.found?.length || 0);
+    const inventoryCount = Number(data.inventoryCount || data.stillInInventory?.length || 0);
+    leadRecoveryStatus.textContent = [
+      recoveredCount ? `Recovered ${recoveredCount}` : "",
+      foundCount ? `Already active ${foundCount}` : "",
+      inventoryCount ? `Still in inventory ${inventoryCount}` : "",
+      "Reloading Up Sheets..."
+    ].filter(Boolean).join(". ");
   }
   leadRecoveryForm.reset();
-  setAdminLeadFilter("active");
+  setAdminLeadFilter(data.recovered?.length ? "restored" : "active");
   await Promise.all([loadLeads({ suppressAlerts: true, forceOpenActivity: true }), loadInventory()]);
   if (lead?.id) {
     await openAdminLeadFromAlert(lead.id);
@@ -1256,6 +1275,7 @@ function setInventoryFilter(filter) {
 function filterAdminLeads(leads) {
   let filtered = leads;
   if (adminLeadFilter === "active") filtered = leads.filter((lead) => !isClosedLead(lead));
+  if (adminLeadFilter === "restored") filtered = leads.filter((lead) => !isClosedLead(lead) && Boolean(lead.warehouse_restore?.restored));
   if (adminLeadFilter === "closed") filtered = leads.filter(isClosedLead);
   if (adminLeadFilter === "fresh") filtered = leads.filter((lead) => !isClosedLead(lead) && String(lead.status || "new").toLowerCase() === "new");
   if (adminLeadFilter === "delivered") filtered = leads.filter((lead) => ["delivered", "sold", "won"].includes(String(lead.status || "").toLowerCase()));
@@ -1396,6 +1416,7 @@ function adminLeadPinnedRank(lead) {
   if (lead?.owner_review?.unread || hasAdminVisibleAlert(lead?.id)) return 0;
   if (lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed) return 1;
   if (lead?.vehicle_signal?.message) return 2;
+  if (lead?.warehouse_restore?.restored) return 2.5;
   const status = lead.status || "new";
   if (String(lead.priority || "").toLowerCase() === "urgent") return 3;
   if (isOverdue(lead.next_follow_up_at || "", status)) return 4;
@@ -2444,6 +2465,9 @@ function renderLead(lead, index = 0) {
       : pendingAlert
         ? "New update on this lead"
         : "";
+  const restoredBadge = lead?.warehouse_restore?.restored
+    ? `<b class="lead-restored-badge" title="${escapeHtml(lead.warehouse_restore.note || "Recovered from warehouse move-out")}">RESTORED</b>`
+    : "";
   const needsDetailLayer = String(activeAdminLeadId || "") === String(lead.id || "")
     || Boolean(pendingAlert)
     || Boolean(unreadOwnerReview)
@@ -2473,6 +2497,7 @@ function renderLead(lead, index = 0) {
             <b class="lead-type-pill lead-type-${leadType}">${escapeHtml(leadTypeLabel)}</b>
             <b class="lead-source-pill">${escapeHtml(sourceLabel)}</b>
             ${unreadOwnerReview ? `<b class="lead-new-badge">NEW</b>` : ""}
+            ${restoredBadge}
             <span class="lead-current-badge" aria-hidden="true">CURRENT</span>
             <strong>${escapeHtml(title)}</strong>
           </div>

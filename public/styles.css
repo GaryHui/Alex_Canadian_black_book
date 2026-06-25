@@ -4810,6 +4810,7 @@ body.admin-drawer-open {
 }
 
 .lead-new-badge,
+.lead-restored-badge,
 .vehicle-cluster-new-badge {
   align-items: center;
   background: #fff7ed;
@@ -4821,6 +4822,12 @@ body.admin-drawer-open {
   font-weight: 900;
   line-height: 1;
   padding: 4px 7px;
+}
+
+.lead-restored-badge {
+  background: #ecfdf5;
+  border-color: #34d399;
+  color: #047857;
 }
 
 .admin-workspace-main .lead-type-pill {

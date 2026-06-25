@@ -76,6 +76,7 @@
           <div class="admin-lead-filters" aria-label="Lead filters">
             <button type="button" data-admin-lead-filter="all">All</button>
             <button class="active" type="button" data-admin-lead-filter="active">Active</button>
+            <button type="button" data-admin-lead-filter="restored">Restored</button>
             <button type="button" data-admin-lead-filter="delivered">Delivered</button>
             <button type="button" data-admin-lead-filter="lost">Lost</button>
             <button type="button" data-admin-lead-filter="inactive">Inactive</button>
@@ -179,15 +180,19 @@
         <div class="admin-section-head">
           <div>
             <h2>Recover hidden SELL lead</h2>
-            <p>Use this only when a Drive vehicle folder still exists but the SELL lead is missing from Up Sheets.</p>
+            <p>Use this when a SELL lead is missing after warehouse move-out. Search by Drive folder, VIN, vehicle, email, or phone.</p>
           </div>
         </div>
         <form id="lead-recovery-form" class="dealer-staff-form">
           <label>
             <span>Google Drive folder URL</span>
-            <input name="driveFolderUrl" placeholder="https://drive.google.com/drive/folders/..." required />
+            <input name="driveFolderUrl" placeholder="https://drive.google.com/drive/folders/..." />
           </label>
-          <button type="submit">Recover lead</button>
+          <label>
+            <span>Vehicle / VIN / email / phone</span>
+            <input name="vehicleQuery" placeholder="Tesla, Mercedes, VIN, customer email..." />
+          </label>
+          <button type="submit">Find / recover lead</button>
         </form>
         <p id="lead-recovery-status" class="status"></p>
       </section>
@@ -243,6 +248,6 @@
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/turnstile.js"></script>
-    <script src="/admin.js?v=warehouse-moveout-restore-first-20260625"></script>
+    <script src="/admin.js?v=lead-recovery-search-20260625"></script>
   </body>
 </html>
