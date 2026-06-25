@@ -398,6 +398,8 @@ const server = http.createServer(async (req, res) => {
           ? await updateLeadStatusFromActivity(body, dealer.user, dealer.role)
           : body.action === "follow_up"
             ? await updateLeadFollowUpFromActivity(body, dealer.user)
+            : body.action === "owner_info"
+              ? await updateLeadOwnerInfoFromActivity(body, dealer.user, dealer.role)
             : await updateLeadTask(body, dealer.user, dealer.role);
         return sendJson(res, result.ok ? 200 : result.status || 400, result);
       }
@@ -1487,6 +1489,8 @@ async function updateLead(body) {
   if (!id) return { ok: false, error: "Lead id is required" };
   if (!url || !key) return { ok: false, error: "Supabase is not configured" };
 
+  const previousResult = await fetchSupabaseJson(`${url}/rest/v1/valuation_leads?select=*&id=eq.${encodeURIComponent(id)}&limit=1`, key);
+  const previous = previousResult.ok ? previousResult.data?.[0] || {} : {};
   const patch = {
     status: String(body.status || "reviewing").trim(),
     assigned_to: String(body.assignedTo || body.assigned_to || "").trim().toLowerCase(),
@@ -1501,6 +1505,14 @@ async function updateLead(body) {
       updated_at: new Date().toISOString()
     }
   };
+  if (["ownerName", "ownerEmail", "ownerPhone"].some((field) => Object.prototype.hasOwnProperty.call(body || {}, field))) {
+    patch.input = {
+      ...(previous.input || {}),
+      ownerName: String(body.ownerName || "").trim(),
+      ownerEmail: String(body.ownerEmail || "").trim().toLowerCase(),
+      ownerPhone: String(body.ownerPhone || "").trim()
+    };
+  }
 
   const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -3151,6 +3163,66 @@ async function updateLeadTask(body, user, role) {
     });
   }
   return { ok: true, task: data?.[0] || null };
+}
+
+async function updateLeadOwnerInfoFromActivity(body, user, role) {
+  const leadId = String(body.leadId || "").trim();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!leadId) return { ok: false, status: 400, error: "Lead id is required" };
+  if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+  const previousResult = await fetchSupabaseJson(`${url}/rest/v1/valuation_leads?select=*&id=eq.${encodeURIComponent(leadId)}&limit=1`, key);
+  if (!previousResult.ok) return previousResult;
+  const previous = previousResult.data?.[0];
+  if (!previous) return { ok: false, status: 404, error: "Lead not found" };
+  if (isBuyerLead(previous)) return { ok: false, status: 400, error: "Owner info is only used for seller vehicle leads" };
+
+  const previousInput = previous.input || {};
+  const nextInput = {
+    ...previousInput,
+    ownerName: String(body.ownerName || "").trim(),
+    ownerEmail: String(body.ownerEmail || "").trim().toLowerCase(),
+    ownerPhone: String(body.ownerPhone || "").trim()
+  };
+  const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: {
+      ...supabaseServiceHeaders(key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify({
+      input: nextInput,
+      last_activity_at: new Date().toISOString()
+    })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+
+  const changes = [];
+  if (String(previousInput.ownerName || "") !== nextInput.ownerName) changes.push("owner name");
+  if (String(previousInput.ownerEmail || "") !== nextInput.ownerEmail) changes.push("owner email");
+  if (String(previousInput.ownerPhone || "") !== nextInput.ownerPhone) changes.push("owner phone");
+  if (changes.length) {
+    await insertSupabaseJson(`${url}/rest/v1/lead_notes`, key, {
+      lead_id: leadId,
+      author_email: String(user?.email || "").trim().toLowerCase(),
+      note_type: "internal",
+      note: `Owner info updated: ${changes.join(", ")}.`
+    }).catch(() => null);
+  }
+  if (role !== "admin") {
+    await createOwnerReviewNote({
+      url,
+      key,
+      leadId,
+      authorEmail: user?.email || "",
+      reason: "Owner info updated by staff. Review before pricing or warehouse work."
+    });
+  }
+
+  return { ok: true, lead: data?.[0] || null };
 }
 
 async function updateLeadStatusFromActivity(body, user, role) {

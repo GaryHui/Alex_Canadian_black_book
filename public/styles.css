@@ -1870,6 +1870,7 @@ body.admin-drawer-open {
 .admin-drawer-command-card,
 .admin-drawer-vehicle-card,
 .admin-drawer-pricing-card,
+.admin-drawer-owner-info-card,
 .admin-drawer-update-card,
 .admin-drawer-task-card {
   display: grid;
@@ -1903,6 +1904,13 @@ body.admin-drawer-open {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(3, minmax(140px, 1fr));
+}
+
+.admin-drawer-owner-info-form {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(140px, 1fr)) auto;
 }
 
 .admin-drawer-field-wide {
@@ -6348,7 +6356,8 @@ body.admin-drawer-open {
 
 .dealer-note-form,
 .dealer-task-form,
-.dealer-email-form {
+.dealer-email-form,
+.dealer-owner-info-form {
   display: grid;
   gap: 10px;
   grid-template-columns: 160px 1fr auto;
@@ -6426,6 +6435,7 @@ body.admin-drawer-open {
 
 .dealer-note-form select,
 .dealer-note-form textarea,
+.dealer-owner-info-form input,
 .dealer-task-form input,
 .dealer-task-form select,
 .dealer-task-form textarea,
@@ -6440,6 +6450,10 @@ body.admin-drawer-open {
 .dealer-note-form textarea {
   min-height: 72px;
   resize: vertical;
+}
+
+.dealer-owner-info-form {
+  grid-template-columns: repeat(3, minmax(150px, 1fr)) auto;
 }
 
 .dealer-email-form {
@@ -6664,9 +6678,11 @@ body.admin-drawer-open {
   .admin-drawer-assign-form,
   .admin-drawer-vehicle-form,
   .admin-drawer-pricing-form,
+  .admin-drawer-owner-info-form,
   .dealer-note-form,
   .dealer-task-form,
-  .dealer-email-form {
+  .dealer-email-form,
+  .dealer-owner-info-form {
     grid-template-columns: 1fr;
   }
 

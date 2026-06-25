@@ -29,6 +29,8 @@ export default async function handler(req, res) {
       ? await updateLeadStatus(body, dealer.user, dealer.role)
       : body.action === "follow_up"
         ? await updateLeadFollowUp(body, dealer.user)
+        : body.action === "owner_info"
+          ? await updateLeadOwnerInfo(body, dealer.user, dealer.role)
         : await updateTask(body, dealer.user);
     return res.status(result.ok ? 200 : result.status || 400).json(result);
   }
@@ -255,6 +257,59 @@ async function updateTask(body, user) {
   if (!response.ok) return { ok: false, status: response.status, error: data };
   if (leadId) await touchLead(client, leadId, user);
   return { ok: true, task: data?.[0] || null };
+}
+
+async function updateLeadOwnerInfo(body, user, role) {
+  const client = supabaseClient();
+  if (!client.ok) return client;
+
+  const leadId = String(body.leadId || "").trim();
+  if (!leadId) return { ok: false, status: 400, error: "Lead id is required" };
+
+  const lead = await fetchLeadRow(client, leadId);
+  if (!lead) return { ok: false, status: 404, error: "Lead not found" };
+  if (isBuyerLead(lead)) return { ok: false, status: 400, error: "Owner info is only used for seller vehicle leads" };
+
+  const previousInput = lead.input || {};
+  const nextInput = {
+    ...previousInput,
+    ownerName: String(body.ownerName || "").trim(),
+    ownerEmail: String(body.ownerEmail || "").trim().toLowerCase(),
+    ownerPhone: String(body.ownerPhone || "").trim()
+  };
+
+  const response = await fetch(`${client.url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: {
+      ...authHeaders(client.key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify({
+      input: nextInput,
+      last_activity_at: new Date().toISOString()
+    })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data };
+
+  const changes = [];
+  if (String(previousInput.ownerName || "") !== nextInput.ownerName) changes.push("owner name");
+  if (String(previousInput.ownerEmail || "") !== nextInput.ownerEmail) changes.push("owner email");
+  if (String(previousInput.ownerPhone || "") !== nextInput.ownerPhone) changes.push("owner phone");
+  if (changes.length) {
+    await insertJson(`${client.url}/rest/v1/lead_notes`, client.key, {
+      lead_id: leadId,
+      author_email: String(user?.email || "").trim().toLowerCase(),
+      note_type: "internal",
+      note: `Owner info updated: ${changes.join(", ")}.`
+    }).catch(() => null);
+  }
+  if (role !== "admin") {
+    await createOwnerReview(client, leadId, user, "Owner info updated by staff. Review before pricing or warehouse work.");
+  }
+
+  return { ok: true, lead: data?.[0] || null };
 }
 
 async function updateLeadStatus(body, user, role) {

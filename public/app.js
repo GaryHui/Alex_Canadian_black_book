@@ -478,6 +478,42 @@ dealerLeadDrawer?.addEventListener("click", async (event) => {
 });
 
 dealerLeadDrawer?.addEventListener("submit", async (event) => {
+  const ownerInfoForm = event.target.closest(".dealer-owner-info-form");
+  if (ownerInfoForm && activeDealerDrawerLeadId) {
+    event.preventDefault();
+    const payload = {
+      leadId: activeDealerDrawerLeadId,
+      action: "owner_info",
+      ...Object.fromEntries(new FormData(ownerInfoForm).entries())
+    };
+    const submitButton = ownerInfoForm.querySelector('button[type="submit"]');
+    if (submitButton) submitButton.disabled = true;
+    dealerLeadsStatus.textContent = "Saving owner info...";
+    try {
+      const response = await fetch("/api/lead-activity", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || "Unable to save owner info");
+      dealerLeadsStatus.textContent = "Owner info saved.";
+      dealerDrawerActivityLoaded = false;
+      await Promise.all([
+        loadDealerDrawerActivity({ force: true, highlightLatest: true }),
+        loadDealerLeads({ forceActivity: true, suppressAlerts: true })
+      ]);
+    } catch (error) {
+      dealerLeadsStatus.textContent = error.message || "Unable to save owner info";
+    } finally {
+      if (submitButton) submitButton.disabled = false;
+    }
+    return;
+  }
+
   const noteForm = event.target.closest(".dealer-drawer-note-form");
   if (noteForm && activeDealerDrawerLeadId) {
     event.preventDefault();
@@ -2015,7 +2051,10 @@ function renderDealerLeads(leads, role) {
     const taskSummaryText = hasOpenTask
       ? `${taskSummary.latest_open_title || "Open task"}${taskDue ? ` due ${formatDateTime(taskDue)}` : ""}`
       : "";
-    const nextStepSummary = hasOpenTask
+    const needsOwnerInfo = dealerSellerOwnerNeedsInfo(lead);
+    const nextStepSummary = needsOwnerInfo
+      ? "Confirm vehicle owner name and contact"
+      : hasOpenTask
       ? taskSummaryText
       : overdue
       ? "Follow-up overdue"
@@ -2182,8 +2221,8 @@ function renderDealerDrawer(leadId) {
   const customerName = input.ownerName || input.name || "";
   const sourceLabel = dealerLeadSourceLabel(lead);
   const dealerCreated = sourceLabel === "Dealer appraisal";
-  const customerEmail = input.ownerEmail || input.email || (dealerCreated ? "" : lead.auth_user?.email || lead.auth_email) || "-";
-  const customerDisplay = customerName || customerEmail;
+  const customerEmail = input.ownerEmail || input.email || (dealerCreated ? "" : lead.auth_user?.email || lead.auth_email) || "";
+  const customerDisplay = customerName || customerEmail || (buyerLead ? "Customer not recorded" : "Owner not recorded");
   const customerPhone = input.ownerPhone || input.phone || "No phone";
   const submitterEmail = input.submitterEmail || input.dealerEmail || lead.auth_email || lead.auth_user?.email || "";
   const submitterLabel = submitterEmail ? `${shortEmail(submitterEmail)}${input.submitterRelationship ? ` · ${input.submitterRelationship}` : ""}` : (input.submitterRelationship || "");
@@ -2311,6 +2350,28 @@ function renderDealerDrawer(leadId) {
               </div>
             </section>
             ${renderDealerCommunicationStrip(lead)}
+            ${buyerLead ? "" : `
+            <section class="dealer-drawer-section dealer-owner-info-section" data-drawer-section="owner">
+              <header>
+                <h3>Owner info</h3>
+                <span>Confirm the legal seller before appraisal, pricing, or warehouse work.</span>
+              </header>
+              <form class="dealer-owner-info-form">
+                <label>
+                  <span>Owner name</span>
+                  <input name="ownerName" value="${escapeHtml(input.ownerName || "")}" placeholder="Legal seller name" />
+                </label>
+                <label>
+                  <span>Owner phone</span>
+                  <input name="ownerPhone" value="${escapeHtml(input.ownerPhone || "")}" placeholder="Best phone number" />
+                </label>
+                <label>
+                  <span>Owner email</span>
+                  <input name="ownerEmail" type="email" value="${escapeHtml(input.ownerEmail || "")}" placeholder="owner@example.com" />
+                </label>
+                <button type="submit">Save owner info</button>
+              </form>
+            </section>`}
             <details class="dealer-drawer-section drawer-more-details">
               <summary>
                 <span>
@@ -2671,6 +2732,7 @@ function dealerLastTouchLabel(lead) {
 function dealerNextBestAction(lead) {
   const buyer = isBuyerLead(lead);
   const status = String(lead?.status || "new").toLowerCase();
+  if (dealerSellerOwnerNeedsInfo(lead)) return "Confirm vehicle owner name and best contact";
   if (hasDealerOpenTask(lead)) {
     const summary = lead.task_summary || {};
     return summary.latest_open_title ? `Complete task: ${summary.latest_open_title}` : "Complete the assigned task";
@@ -2688,6 +2750,15 @@ function dealerNextBestAction(lead) {
   if (isDealerWaitingReply(lead)) return "Follow up on the pending reply before this goes cold";
   if (!lead?.next_follow_up_at) return "Schedule the next follow-up before leaving the lead";
   return buyer ? "Keep the buyer plan moving toward appointment or finance" : "Keep the seller plan moving toward inspection or inventory";
+}
+
+function dealerSellerOwnerNeedsInfo(lead) {
+  if (isBuyerLead(lead)) return false;
+  const input = lead?.input || {};
+  const ownerName = String(input.ownerName || "").trim();
+  const ownerPhone = String(input.ownerPhone || "").trim();
+  const ownerEmail = String(input.ownerEmail || "").trim();
+  return !ownerName || (!ownerPhone && !ownerEmail);
 }
 
 function renderDealerCommunicationStrip(lead) {

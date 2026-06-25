@@ -1025,7 +1025,17 @@ async function updateLead(body) {
     }
   };
   const vehiclePatch = buildVehiclePatch(body, previous || {});
-  if (vehiclePatch.input) patch.input = vehiclePatch.input;
+  const ownerInfoPatch = buildOwnerInfoPatch(body, previous || {});
+  const mergedInput = {
+    ...(vehiclePatch.input || {}),
+    ...(ownerInfoPatch.input || {})
+  };
+  if (Object.keys(mergedInput).length) {
+    patch.input = {
+      ...(previous?.input || {}),
+      ...mergedInput
+    };
+  }
   if (vehiclePatch.valuation) patch.valuation = vehiclePatch.valuation;
 
   const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(id)}`, {
@@ -1177,6 +1187,16 @@ function buildVehiclePatch(body = {}, previous = {}) {
   return { input, valuation };
 }
 
+function buildOwnerInfoPatch(body = {}) {
+  const hasOwnerField = ["ownerName", "ownerEmail", "ownerPhone"].some((key) => hasBodyField(body, key));
+  if (!hasOwnerField) return {};
+  const input = {};
+  if (hasBodyField(body, "ownerName")) input.ownerName = String(body.ownerName || "").trim();
+  if (hasBodyField(body, "ownerEmail")) input.ownerEmail = String(body.ownerEmail || "").trim().toLowerCase();
+  if (hasBodyField(body, "ownerPhone")) input.ownerPhone = String(body.ownerPhone || "").trim();
+  return { input };
+}
+
 function buildVehicleChangeSummary(previous = {}, patch = {}) {
   if (!patch.input && !patch.valuation) return "";
   const beforeInput = previous.input || {};
@@ -1194,6 +1214,9 @@ function buildVehicleChangeSummary(previous = {}, patch = {}) {
   if (numberOrNull(beforeInput.kilometers) !== numberOrNull(afterInput.kilometers)) changes.push("kilometers");
   if (String(beforeInput.color || "") !== String(afterInput.color || "")) changes.push("color");
   if (String(beforeInput.region || beforeValuation.region || "") !== String(afterInput.region || afterValuation.region || "")) changes.push("region");
+  if (String(beforeInput.ownerName || "") !== String(afterInput.ownerName || "")) changes.push("owner name");
+  if (String(beforeInput.ownerEmail || "") !== String(afterInput.ownerEmail || "")) changes.push("owner email");
+  if (String(beforeInput.ownerPhone || "") !== String(afterInput.ownerPhone || "")) changes.push("owner phone");
   return changes.length ? `vehicle details updated (${changes.join(", ")})` : "";
 }
 

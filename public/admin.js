@@ -1593,6 +1593,7 @@ function adminNextBestAction(lead) {
   const status = String(lead?.status || "new").toLowerCase();
   if (lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed) return "Review duplicate vehicle before warehouse work";
   if (lead?.owner_review?.unread) return "Read dealer update and confirm next manager step";
+  if (adminSellerOwnerNeedsInfo(lead)) return "Confirm vehicle owner name and best contact";
   if (isAdminDealDeskLead(lead) && adminDealChecklistSummary(lead).pending > 0) return `Finish ${adminDealChecklistProgressLabel(lead)} before closing the handoff`;
   if (buyer && status === "won") return "Start delivery checklist, docs, and final customer handoff";
   if (!buyer && status === "in_inventory") return "Confirm warehouse intake, pricing, and publish plan";
@@ -1614,6 +1615,7 @@ function adminNextActionTarget(lead) {
   const status = String(lead?.status || "new").toLowerCase();
   if (lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed) return "duplicate";
   if (lead?.owner_review?.unread) return "review";
+  if (adminSellerOwnerNeedsInfo(lead)) return "owner";
   if (isAdminDealDeskLead(lead) && adminDealChecklistSummary(lead).pending > 0) return "dealdesk";
   if (!String(lead?.assigned_to || "").trim()) return "assign";
   if (isOverdue(lead?.next_follow_up_at || "", status)) return "update";
@@ -1621,6 +1623,15 @@ function adminNextActionTarget(lead) {
   if (!buyer && !(Array.isArray(lead?.lead_photos) && lead.lead_photos.length)) return "photos";
   if (!lead?.next_follow_up_at) return "assign";
   return "update";
+}
+
+function adminSellerOwnerNeedsInfo(lead) {
+  if (isBuyerLead(lead)) return false;
+  const input = lead?.input || {};
+  const ownerName = String(input.ownerName || "").trim();
+  const ownerPhone = String(input.ownerPhone || "").trim();
+  const ownerEmail = String(input.ownerEmail || "").trim();
+  return !ownerName || (!ownerPhone && !ownerEmail);
 }
 
 function renderAdminCommunicationStrip(lead) {
@@ -2427,7 +2438,10 @@ function renderLead(lead, index = 0) {
   const collapsedMembersBanner = hasOpenDuplicateReview ? "" : renderCollapsedSellerMembersInline(lead);
   const mergeBanner = mergeStateInline(lead);
   const duplicateBanner = duplicateWarningInline(lead);
-  const queueSummary = overdue
+  const needsOwnerInfo = adminSellerOwnerNeedsInfo(lead);
+  const queueSummary = needsOwnerInfo
+    ? "Confirm vehicle owner name and contact"
+    : overdue
     ? "Rep follow-up is overdue"
     : followUp
       ? `Next follow-up ${formatDateTime(followUp)}`
@@ -2621,8 +2635,8 @@ function renderAdminDrawer(leadId) {
   const customerName = input.ownerName || input.name || "";
   const sourceLabel = leadSourceLabel(lead);
   const dealerCreated = sourceLabel === "Dealer appraisal";
-  const customerEmail = input.ownerEmail || input.email || (dealerCreated ? "" : lead.auth_user?.email || lead.auth_email) || "-";
-  const customerDisplay = customerName || customerEmail;
+  const customerEmail = input.ownerEmail || input.email || (dealerCreated ? "" : lead.auth_user?.email || lead.auth_email) || "";
+  const customerDisplay = customerName || customerEmail || (buyer ? "Customer not recorded" : "Owner not recorded");
   const customerPhone = input.ownerPhone || input.phone || "No phone";
   const submitterEmail = input.submitterEmail || input.dealerEmail || lead.auth_email || lead.auth_user?.email || "";
   const submitterLabel = submitterEmail ? `${shortEmail(submitterEmail)}${input.submitterRelationship ? ` · ${input.submitterRelationship}` : ""}` : (input.submitterRelationship || "");
@@ -2757,6 +2771,38 @@ function renderAdminDrawer(leadId) {
               ${vehicleDetailsSection}
               ${sellerPricingSection}
             </div>`;
+  const ownerInfoSection = buyer ? "" : `
+            <section class="admin-drawer-section admin-drawer-owner-info-card" data-drawer-section="owner">
+              <header>
+                <div>
+                  <h3>Owner info</h3>
+                  <span>Confirm the legal seller before appraisal, pricing, or warehouse work.</span>
+                </div>
+              </header>
+              <form class="owner-review admin-drawer-owner-form admin-drawer-owner-info-form">
+                <input type="hidden" name="status" value="${escapeHtml(status)}" />
+                <input type="hidden" name="assignedTo" value="${escapeHtml(assignedTo)}" />
+                <input type="hidden" name="priority" value="${escapeHtml(priority)}" />
+                <input type="hidden" name="nextFollowUpAt" value="${escapeHtml(datetimeLocalValue(followUp))}" />
+                <input type="hidden" name="ownerWholesale" value="${ownerWholesaleValue}" />
+                <input type="hidden" name="ownerRetail" value="${ownerRetailValue}" />
+                <input type="hidden" name="reason" value="${escapeHtml(adjustment.reason || "")}" />
+                <input type="hidden" name="notes" value="${escapeHtml(lead.notes || "")}" />
+                <label>
+                  <span>Owner name</span>
+                  <input name="ownerName" value="${escapeHtml(input.ownerName || "")}" placeholder="Legal seller name" />
+                </label>
+                <label>
+                  <span>Owner phone</span>
+                  <input name="ownerPhone" value="${escapeHtml(input.ownerPhone || "")}" placeholder="Best phone number" />
+                </label>
+                <label>
+                  <span>Owner email</span>
+                  <input name="ownerEmail" type="email" value="${escapeHtml(input.ownerEmail || "")}" placeholder="owner@example.com" />
+                </label>
+                <button type="submit">Save owner info</button>
+              </form>
+            </section>`;
   const activityStatusButtons = leadStatusActions(buyer, status)
     .map((action) => `<button type="button" data-drawer-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
     .join("");
@@ -2860,6 +2906,7 @@ function renderAdminDrawer(leadId) {
           <div class="drawer-workspace-main">
             ${drawerDuplicateWarning}
             ${renderAdminCommunicationStrip(lead)}
+            ${ownerInfoSection}
             <section class="admin-drawer-section admin-drawer-command-card" data-drawer-section="assign">
               <header>
                 <h3>Assign & next step</h3>
@@ -4145,7 +4192,9 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
         ? "Owner pricing saved."
         : ownerForm.classList.contains("admin-drawer-vehicle-form")
           ? "Vehicle details saved."
-        : "Lead tools saved.";
+          : ownerForm.classList.contains("admin-drawer-owner-info-form")
+            ? "Owner info saved."
+            : "Lead tools saved.";
     try {
       const data = await fetchApiJson("/api/leads", {
         method: "PATCH",
