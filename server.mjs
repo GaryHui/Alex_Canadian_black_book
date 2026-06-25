@@ -2100,8 +2100,24 @@ function driveUploadFileUrl(file, id = "") {
 
 function driveWebhookSummary(parsed = {}, webhook = {}) {
   const keys = Object.keys(parsed || {}).slice(0, 12).join(", ") || "none";
-  const response = String(webhook.response || "").replace(/\s+/g, " ").slice(0, 240);
+  const response = readableWebhookResponse(webhook.response);
   return `Webhook keys: ${keys}.${response ? ` Response: ${response}` : ""}`;
+}
+
+function readableWebhookResponse(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const title = text.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "";
+  const body = text
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+  return [title, body].filter(Boolean).join(" | ").slice(0, 900);
 }
 
 async function submitLeadPhotosToWebhook(lead, files, user) {
