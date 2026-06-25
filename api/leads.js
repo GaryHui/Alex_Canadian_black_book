@@ -321,7 +321,7 @@ async function listFromSupabase() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return { ok: true, storage: "not_configured", leads: [] };
 
-  const response = await fetch(`${url}/rest/v1/valuation_leads?select=*&order=created_at.desc&limit=100`, {
+  const response = await fetch(`${url}/rest/v1/valuation_leads?select=*&order=last_activity_at.desc.nullslast,created_at.desc&limit=500`, {
     headers: {
       apikey: key,
       Authorization: `Bearer ${key}`
@@ -330,8 +330,67 @@ async function listFromSupabase() {
 
   const leads = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: leads, leads: [] };
-  const withReview = await attachOwnerReviewState(leads, { url, key });
+  const repairedLeads = await repairOrphanInventoryLeads(leads, { url, key });
+  const withReview = await attachOwnerReviewState(repairedLeads, { url, key });
   return { ok: true, storage: "supabase", leads: await attachLeadSignals(withReview, { url, key }) };
+}
+
+async function repairOrphanInventoryLeads(leads, client) {
+  if (!Array.isArray(leads) || !leads.length) return [];
+  const candidates = leads.filter((lead) => (
+    !isBuyerLead(lead)
+    && String(lead.status || "").trim().toLowerCase() === "in_inventory"
+    && String(lead.id || "").trim()
+  ));
+  if (!candidates.length) return leads;
+
+  const ids = candidates.map((lead) => String(lead.id || "").trim());
+  const listingResult = await fetch(`${client.url}/rest/v1/vehicle_listings?select=id,source_lead_id&source_lead_id=in.(${ids.map(encodeURIComponent).join(",")})&limit=500`, {
+    headers: authHeaders(client.key)
+  }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] }));
+  if (!listingResult.ok) return leads;
+
+  const inventoryLeadIds = new Set((listingResult.data || []).map((row) => String(row.source_lead_id || "").trim()).filter(Boolean));
+  const orphanLeads = candidates.filter((lead) => !inventoryLeadIds.has(String(lead.id || "").trim()));
+  if (!orphanLeads.length) return leads;
+
+  const repairedAt = new Date().toISOString();
+  const repairedIds = new Set();
+  await Promise.all(orphanLeads.map(async (lead) => {
+    const leadId = String(lead.id || "").trim();
+    const status = String(lead.assigned_to || "").trim() ? "assigned" : "new";
+    const response = await fetch(`${client.url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+      method: "PATCH",
+      headers: {
+        ...authHeaders(client.key),
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        status,
+        last_activity_at: repairedAt
+      })
+    }).catch(() => null);
+    if (!response?.ok) return;
+    repairedIds.add(leadId);
+    await createLeadTimelineNote({
+      url: client.url,
+      key: client.key,
+      leadId,
+      authorEmail: "system",
+      note: "Inventory listing was removed, so this SELL lead was restored to the active CRM queue."
+    });
+  }));
+
+  if (!repairedIds.size) return leads;
+  return leads.map((lead) => {
+    const id = String(lead.id || "").trim();
+    if (!repairedIds.has(id)) return lead;
+    return {
+      ...lead,
+      status: String(lead.assigned_to || "").trim() ? "assigned" : "new",
+      last_activity_at: repairedAt
+    };
+  });
 }
 
 async function attachOwnerReviewState(leads, client) {
@@ -899,4 +958,11 @@ function numberOrNull(value) {
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+function authHeaders(key) {
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`
+  };
 }
