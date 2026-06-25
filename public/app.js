@@ -102,6 +102,7 @@ let dealerLeadRole = "dealer";
 let dealerLeadFilter = "active";
 let dealerLeadSort = "newest";
 let dealerLeadAlertMap = new Map();
+let dealerLeadDuplicateMap = new Map();
 let activeDealerLeadId = "";
 let activeDealerDrawerLeadId = "";
 let dealerDrawerActivityLoaded = false;
@@ -1960,7 +1961,8 @@ function renderDealerLeads(leads, role) {
   }
 
   const visibleLeads = sortDealerLeads(filterDealerLeads(queueLeads));
-  if (!visibleLeads.length) {
+  const groupedLeads = groupDealerVisibleLeads(visibleLeads);
+  if (!groupedLeads.length) {
     dealerLeadsStatus.textContent = `No ${dealerLeadFilter.replace("-", " ")} leads in this view.`;
     dealerLeadsList.innerHTML = "";
     return;
@@ -1970,8 +1972,10 @@ function renderDealerLeads(leads, role) {
   const closedCount = queueLeads.length - activeCount;
   const sortLabel = dealerLeadSort === "oldest" ? "Oldest first" : "Newest first";
   const stockNote = stockLeadCount ? ` ${stockLeadCount} stock vehicle${stockLeadCount === 1 ? "" : "s"} moved to Inventory Follow-up.` : "";
-  dealerLeadsStatus.textContent = `${visibleLeads.length} shown. ${activeCount} active / ${closedCount} closed assigned Up Sheet${queueLeads.length === 1 ? "" : "s"}.${stockNote} Sort: ${sortLabel}, with urgent, overdue, and new pinned first.`;
-  dealerLeadsList.innerHTML = renderDealerLeadGroups(visibleLeads, (lead, index) => {
+  const foldedCount = visibleLeads.length - groupedLeads.length;
+  const foldedNote = foldedCount ? ` ${foldedCount} same-vehicle duplicate${foldedCount === 1 ? "" : "s"} folded into primary vehicle files.` : "";
+  dealerLeadsStatus.textContent = `${groupedLeads.length} vehicle file${groupedLeads.length === 1 ? "" : "s"} shown from ${visibleLeads.length} lead${visibleLeads.length === 1 ? "" : "s"}. ${activeCount} active / ${closedCount} closed assigned Up Sheet${queueLeads.length === 1 ? "" : "s"}.${foldedNote}${stockNote} Sort: ${sortLabel}, with urgent, overdue, and new pinned first.`;
+  dealerLeadsList.innerHTML = renderDealerLeadGroups(groupedLeads, (lead, index) => {
     const input = lead.input || {};
     const valuation = lead.valuation || {};
     const buyerLead = isBuyerLead(lead);
@@ -1994,7 +1998,8 @@ function renderDealerLeads(leads, role) {
     const overdue = isDealerLeadOverdue(followUp, status);
     const statusLabel = overdue ? "Overdue" : dueNow ? "Due today" : status.replaceAll("_", " ");
     const statusClass = overdue ? "status-overdue" : dueNow ? "status-due" : `status-${cssToken(status)}`;
-    const pendingAlert = dealerLeadAlertMap.has(String(lead.id || ""));
+    const duplicateGroup = dealerLeadDuplicateMap.get(String(lead.id || "")) || [];
+    const pendingAlert = dealerLeadAlertMap.has(String(lead.id || "")) || duplicateGroup.some((item) => dealerLeadAlertMap.has(String(item.id || "")));
     const wholesaleAvg = historyMarketAverage(valuation, "wholesale");
     const retailAvg = historyMarketAverage(valuation, "retail");
     const updateToken = dealerLeadUpdateToken(lead);
@@ -2036,6 +2041,7 @@ function renderDealerLeads(leads, role) {
             <div class="dealer-lead-title">
               <b class="dealer-type-pill dealer-type-${leadKind}">${escapeHtml(leadTypeLabel)}</b>
               <b class="lead-source-pill">${escapeHtml(sourceLabel)}</b>
+              ${duplicateGroup.length ? `<b class="dealer-same-vehicle-pill">Same vehicle · ${duplicateGroup.length + 1}</b>` : ""}
               <span class="lead-current-badge" aria-hidden="true">CURRENT</span>
               <strong>${escapeHtml(title)}</strong>
             </div>
@@ -2099,6 +2105,7 @@ function renderDealerLeads(leads, role) {
         ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-dealer-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
         <details class="lead-queue-more dealer-queue-more">
           <summary>More details and alerts</summary>
+          ${renderDealerSameVehicleFold(lead, duplicateGroup)}
           ${dealerVehicleSignalInline(lead)}
           ${dealerVehicleContextInline(lead)}
           <p class="dealer-update-notice" ${pendingAlert ? "" : "hidden"}>Timeline changed. Open this lead to review the latest update.</p>
@@ -3102,6 +3109,94 @@ function leadCreatedTimestamp(lead) {
   const value = lead?.created_at || lead?.last_activity_at || lead?.next_follow_up_at || 0;
   const timestamp = new Date(value).getTime();
   return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function groupDealerVisibleLeads(leads = []) {
+  dealerLeadDuplicateMap = new Map();
+  const display = [];
+  const sellerGroups = new Map();
+
+  for (const lead of leads) {
+    if (isBuyerLead(lead)) {
+      display.push(lead);
+      continue;
+    }
+    const key = dealerSameVehicleKey(lead);
+    if (!key) {
+      display.push(lead);
+      continue;
+    }
+    const group = sellerGroups.get(key);
+    if (!group) {
+      sellerGroups.set(key, { primary: lead, duplicates: [] });
+      display.push(lead);
+      continue;
+    }
+    group.duplicates.push(lead);
+  }
+
+  for (const group of sellerGroups.values()) {
+    if (group.duplicates.length) {
+      dealerLeadDuplicateMap.set(String(group.primary.id || ""), group.duplicates);
+    }
+  }
+
+  return display;
+}
+
+function dealerSameVehicleKey(lead = {}) {
+  const input = lead.input || {};
+  const valuation = lead.valuation || {};
+  const vin = cleanVin(input.vin || valuation.vin);
+  if (vin) return `vin:${vin}`;
+  const uvc = String(input.uvc || valuation.uvc || "").trim();
+  if (uvc) return `uvc:${uvc}`;
+  const year = input.year || valuation.year || "";
+  const make = input.make || valuation.make || "";
+  const model = input.model || valuation.model || "";
+  const series = input.series || valuation.series || "";
+  const style = input.style || valuation.style || "";
+  const signature = [year, make, model, series, style]
+    .map((part) => String(part || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " "))
+    .filter(Boolean)
+    .join("|");
+  return signature.split("|").length >= 3 ? `vehicle:${signature}` : "";
+}
+
+function renderDealerSameVehicleFold(primaryLead, duplicates = []) {
+  if (!duplicates.length) return "";
+  const primaryTitle = cleanDealerLeadTitle(primaryLead?.valuation?.title || historyVehicleTitle(primaryLead?.input || {}) || "Vehicle lead", false);
+  const preview = duplicates.slice(0, 4).map((lead) => {
+    const input = lead.input || {};
+    const valuation = lead.valuation || {};
+    const title = cleanDealerLeadTitle(valuation.title || historyVehicleTitle(input) || primaryTitle, false);
+    const source = dealerLeadSourceLabel(lead);
+    const customer = input.ownerName || input.ownerEmail || input.email || input.ownerPhone || input.phone || input.dealerEmail || "No owner recorded";
+    const hasAlert = dealerLeadAlertMap.has(String(lead.id || ""));
+    return `
+      <li>
+        <span>${hasAlert ? `<b class="dealer-fold-new">Update</b>` : ""}${escapeHtml(formatDateTime(lead.created_at))}</span>
+        <strong>${escapeHtml(title)}</strong>
+        <small>${escapeHtml(source)} · ${escapeHtml(customer)}</small>
+      </li>
+    `;
+  }).join("");
+  const moreCount = duplicates.length > 4 ? duplicates.length - 4 : 0;
+  return `
+    <section class="dealer-same-vehicle-fold">
+      <header>
+        <div>
+          <b>Same vehicle group</b>
+          <p>${escapeHtml(primaryTitle)} has ${duplicates.length + 1} related SELL lead${duplicates.length ? "s" : ""}. Work the primary file here; manager can merge, keep separate, or delete test duplicates.</p>
+        </div>
+        <span>${duplicates.length + 1}</span>
+      </header>
+      <ul>
+        ${preview}
+        ${moreCount ? `<li><small>+ ${moreCount} more related lead${moreCount === 1 ? "" : "s"} folded here.</small></li>` : ""}
+      </ul>
+    </section>
+  `;
 }
 
 function renderDealerLeadGroups(leads, cardRenderer) {
