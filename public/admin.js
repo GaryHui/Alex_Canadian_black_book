@@ -3549,7 +3549,7 @@ async function removeInventoryListing(button) {
   if (data.ok) {
     inventoryCache = inventoryCache.filter((item) => item.id !== id && (!sourceLeadId || item.sourceLeadId !== sourceLeadId));
     renderInventoryWarehouse(inventoryCache);
-    setAdminLeadFilter("active");
+    setAdminLeadFilter("restored");
     await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
     const leadId = data.sourceLeadId || sourceLeadId;
     if (leadId) await openAdminLeadFromAlert(leadId);
