@@ -2163,7 +2163,60 @@ input::placeholder {
 
 .inventory-list {
   display: grid;
+  gap: 22px;
+}
+
+.inventory-carousel-page {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.inventory-carousel-controls {
+  display: flex;
   gap: 14px;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+}
+
+.inventory-carousel-controls > button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: #07106d;
+  background: #fff;
+  border: 1px solid #cdd8e6;
+  border-radius: 999px;
+  font-size: 24px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.inventory-carousel-controls > button:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.inventory-carousel-dots {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.inventory-carousel-dots button {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  background: #868b94;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.inventory-carousel-dots button.active {
+  background: #07106d;
 }
 
 .inventory-empty {
@@ -2237,35 +2290,6 @@ input::placeholder {
   background: #2f8f83;
 }
 
-.inventory-photo-gallery {
-  position: relative;
-  min-height: 260px;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  background: #dfe7f1;
-}
-
-.inventory-photo-track {
-  display: grid;
-  grid-template-columns: repeat(var(--photo-count, 1), minmax(0, 1fr));
-  width: 100%;
-  height: 100%;
-  min-height: 260px;
-}
-
-.inventory-photo-gallery.is-scrollable .inventory-photo-track {
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(150px, 33.333%);
-  grid-template-columns: none;
-  overflow-x: auto;
-  scroll-snap-type: x proximity;
-  scrollbar-color: #07106d #dbe4ee;
-}
-
-.inventory-photo-gallery.is-scrollable .inventory-photo {
-  scroll-snap-align: start;
-}
-
 .inventory-photo-count {
   position: absolute;
   top: 14px;
@@ -2295,7 +2319,9 @@ input::placeholder {
 }
 
 .inventory-photo {
+  position: relative;
   min-height: 260px;
+  aspect-ratio: 16 / 9;
   margin: 0;
   overflow: hidden;
   background: #eef6ff;
@@ -2416,6 +2442,78 @@ input::placeholder {
 
 .inventory-card-actions .primary-button {
   flex: 0 1 auto;
+}
+
+.inventory-carousel-page .inventory-card {
+  grid-template-columns: 1fr;
+  align-content: start;
+  min-height: 100%;
+}
+
+.inventory-carousel-page .inventory-card-body {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto auto 1fr;
+  gap: 18px;
+  min-height: 520px;
+  padding: 24px 24px 14px;
+  text-align: center;
+}
+
+.inventory-carousel-page .inventory-deal-copy,
+.inventory-carousel-page .inventory-spec-row,
+.inventory-carousel-page .inventory-card-body > .inventory-deal-price,
+.inventory-carousel-page .inventory-card-body > .inventory-card-actions {
+  grid-column: 1;
+  grid-row: auto;
+}
+
+.inventory-carousel-page .inventory-card h3 {
+  font-size: clamp(22px, 2vw, 26px);
+  line-height: 1.12;
+}
+
+.inventory-carousel-page .inventory-tags {
+  justify-content: center;
+}
+
+.inventory-carousel-page .inventory-spec-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.inventory-carousel-page .inventory-spec-row span {
+  justify-items: center;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto auto;
+}
+
+.inventory-carousel-page .inventory-spec-row svg {
+  grid-row: auto;
+  margin: 0;
+}
+
+.inventory-carousel-page .inventory-card-body > .inventory-deal-price {
+  justify-self: center;
+  max-width: 100%;
+  text-align: center;
+}
+
+.inventory-carousel-page .inventory-card-price strong {
+  font-size: clamp(30px, 3.2vw, 40px);
+}
+
+.inventory-carousel-page .inventory-deal-terms {
+  justify-content: center;
+}
+
+.inventory-carousel-page .inventory-card-body > .inventory-card-actions {
+  align-self: end;
+  justify-self: stretch;
+  justify-content: flex-end;
+}
+
+.inventory-carousel-page .inventory-order-button {
+  min-width: 104px;
 }
 
 .inventory-tags {
@@ -3325,6 +3423,10 @@ input::placeholder {
     grid-template-columns: minmax(260px, 42%) minmax(0, 1fr);
   }
 
+  .inventory-carousel-page {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .inventory-card-body {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto auto;
@@ -3415,15 +3517,22 @@ input::placeholder {
   }
 
   .inventory-photo,
-  .inventory-photo-gallery,
-  .inventory-photo-track,
   .inventory-photo img,
   .inventory-image {
     min-height: 220px;
   }
 
-  .inventory-photo-gallery.is-scrollable .inventory-photo-track {
-    grid-auto-columns: minmax(132px, 58%);
+  .inventory-carousel-page {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .inventory-carousel-page .inventory-card-body {
+    min-height: 0;
+  }
+
+  .inventory-carousel-page .inventory-spec-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .inventory-card-body {

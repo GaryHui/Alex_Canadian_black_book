@@ -307,6 +307,8 @@ let selectedFinanceVehicle = null;
 let activePhotoVehicle = null;
 let activePhotoList = [];
 let activePhotoIndex = 0;
+const INVENTORY_PAGE_SIZE = 3;
+let inventoryPageIndex = 0;
 let filterInputTimer = null;
 
 function money(value) {
@@ -321,11 +323,23 @@ function renderInventory() {
     return;
   }
 
-  inventoryList.innerHTML = filteredInventory.map((vehicle) => {
-    const deal = vehicleDeal(vehicle);
-    const specs = vehicleSpecItems(vehicle);
-    const tags = vehicle.tags.filter((tag) => tag && !specs.some((item) => String(item.value).toLowerCase() === String(tag).toLowerCase())).slice(0, 2);
-    return `
+  const pageCount = Math.max(1, Math.ceil(filteredInventory.length / INVENTORY_PAGE_SIZE));
+  inventoryPageIndex = Math.min(Math.max(inventoryPageIndex, 0), pageCount - 1);
+  const start = inventoryPageIndex * INVENTORY_PAGE_SIZE;
+  const pageVehicles = filteredInventory.slice(start, start + INVENTORY_PAGE_SIZE);
+  inventoryList.innerHTML = `
+    <div class="inventory-carousel-page">
+      ${pageVehicles.map(renderInventoryCard).join("")}
+    </div>
+    ${renderInventoryPager(pageCount)}
+  `;
+}
+
+function renderInventoryCard(vehicle) {
+  const deal = vehicleDeal(vehicle);
+  const specs = vehicleSpecItems(vehicle);
+  const tags = vehicle.tags.filter((tag) => tag && !specs.some((item) => String(item.value).toLowerCase() === String(tag).toLowerCase())).slice(0, 2);
+  return `
     <article class="inventory-card inventory-deal-card">
       ${vehicleImageMarkup(vehicle)}
       <div class="inventory-card-body">
@@ -362,7 +376,21 @@ function renderInventory() {
       </div>
     </article>
   `;
-  }).join("");
+}
+
+function renderInventoryPager(pageCount) {
+  if (pageCount <= 1) return "";
+  return `
+    <nav class="inventory-carousel-controls" aria-label="Vehicle pages">
+      <button type="button" data-inventory-page="prev" ${inventoryPageIndex === 0 ? "disabled" : ""} aria-label="Previous vehicles">‹</button>
+      <div class="inventory-carousel-dots">
+        ${Array.from({ length: pageCount }, (_, index) => `
+          <button class="${index === inventoryPageIndex ? "active" : ""}" type="button" data-inventory-page="${index}" aria-label="Show vehicle page ${index + 1}"></button>
+        `).join("")}
+      </div>
+      <button type="button" data-inventory-page="next" ${inventoryPageIndex >= pageCount - 1 ? "disabled" : ""} aria-label="Next vehicles">›</button>
+    </nav>
+  `;
 }
 
 async function loadInventory() {
@@ -652,6 +680,7 @@ function applyFilters(event) {
     return matchesQuery && matchesMake && matchesModel && matchesType && matchesRegion && matchesKm && matchesPrice;
   });
   filteredInventory.sort((a, b) => compareVehicles(a, b, sortBy));
+  inventoryPageIndex = 0;
   updateSearchUrl(data);
   renderInventory();
   syncFilterChipState();
@@ -845,18 +874,12 @@ function vehicleDetailPhotoStrip(vehicle, preparedPhotos) {
 function vehicleImageMarkup(vehicle) {
   const photos = Array.isArray(vehicle.photos) ? vehicle.photos.filter((photo) => photo?.url) : [];
   if (photos.length) {
-    const visiblePhotoCount = Math.min(photos.length, 3);
+    const photo = photos[0];
     return `
-      <section class="inventory-photo-gallery ${photos.length > 3 ? "is-scrollable" : ""}" style="--photo-count: ${visiblePhotoCount};" aria-label="${escapeHtml(vehicle.title)} photos">
+      <figure class="inventory-photo">
         <span class="inventory-photo-count" aria-label="${escapeHtml(`${photos.length} photos`)}">${specIcon("camera")}${escapeHtml(String(photos.length))}</span>
-        <div class="inventory-photo-track">
-          ${photos.map((photo, index) => `
-            <figure class="inventory-photo">
-              <img src="${escapeHtml(photoDisplayUrl(photo.url))}" alt="${escapeHtml(photo.label || `${vehicle.title} photo ${index + 1}`)}" loading="lazy" />
-            </figure>
-          `).join("")}
-        </div>
-      </section>
+        <img src="${escapeHtml(photoDisplayUrl(photo.url))}" alt="${escapeHtml(photo.label || vehicle.title)}" loading="lazy" />
+      </figure>
     `;
   }
   return `
@@ -1127,6 +1150,19 @@ sendEstimateButton?.addEventListener("click", () => {
   if (selectedFinanceVehicle) openContactDealer(selectedFinanceVehicle);
 });
 inventoryList?.addEventListener("click", (event) => {
+  const pageButton = event.target.closest("[data-inventory-page]");
+  if (pageButton) {
+    const pageCount = Math.max(1, Math.ceil(filteredInventory.length / INVENTORY_PAGE_SIZE));
+    const target = pageButton.dataset.inventoryPage;
+    if (target === "prev") inventoryPageIndex -= 1;
+    else if (target === "next") inventoryPageIndex += 1;
+    else inventoryPageIndex = Number(target || 0);
+    inventoryPageIndex = Math.min(Math.max(inventoryPageIndex, 0), pageCount - 1);
+    renderInventory();
+    inventoryList.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    return;
+  }
+
   const detailButton = event.target.closest("[data-view-vehicle]");
   if (detailButton) {
     const vehicle = inventory.find((item) => item.id === detailButton.dataset.viewVehicle);
