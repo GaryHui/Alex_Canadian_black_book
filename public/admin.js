@@ -2638,6 +2638,7 @@ function renderAdminDrawer(leadId) {
   const overdue = isOverdue(followUp, status);
   const ownerReview = lead.owner_review || {};
   const vehicleContext = lead.vehicle_context || {};
+  const inventoryListing = inventoryCache.find((item) => item.sourceLeadId && item.sourceLeadId === id);
   const pipelineLabel = leadStatusLabel(status, buyer);
   const nextAction = adminNextBestAction(lead);
   const clusterLabel = vehicleContext.cluster_label || title;
@@ -2763,6 +2764,29 @@ function renderAdminDrawer(leadId) {
     .map((action) => `<button type="button" data-drawer-status="${escapeHtml(action.status)}">${escapeHtml(action.label)}</button>`)
     .join("");
   const hasOpenDuplicateReview = Boolean(lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed);
+  const drawerWarehouseSection = buyer ? "" : `
+            <section class="admin-drawer-section admin-drawer-warehouse-card" data-drawer-section="warehouse">
+              <header>
+                <div>
+                  <h3>Warehouse handoff</h3>
+                  <span>${escapeHtml(inventoryListing ? "This lead is already linked to Inventory" : "Create a draft listing when this vehicle is ready for stock work")}</span>
+                </div>
+              </header>
+              ${inventoryListing ? `
+                <div class="drawer-spotlight drawer-warehouse-spotlight">
+                  <strong>Already in warehouse</strong>
+                  <small>Photos, price, publish, sold/archive, and public visibility are managed from Inventory.</small>
+                  <button type="button" data-view-inventory="${escapeHtml(inventoryListing.id || "")}">Open warehouse listing</button>
+                </div>
+              ` : `
+                <div class="drawer-spotlight drawer-warehouse-spotlight">
+                  <strong>Ready to manage this vehicle as inventory?</strong>
+                  <small>The SELL lead leaves Active CRM, but stays traceable in Closed / All and can be restored if moved out.</small>
+                  <button type="button" data-quick-inventory="${escapeHtml(id)}" ${hasOpenDuplicateReview ? "disabled" : ""}>Move to warehouse</button>
+                  ${hasOpenDuplicateReview ? `<small>Resolve duplicate vehicle review before warehouse handoff.</small>` : ""}
+                </div>
+              `}
+            </section>`;
   const drawerVehicleContext = hasOpenDuplicateReview ? "" : vehicleContextInline(lead);
   const drawerDuplicateWarning = duplicateWarningInline(lead);
 
@@ -2890,6 +2914,7 @@ function renderAdminDrawer(leadId) {
             </section>
             ${vehiclePriceSection}
             ${renderAdminLeadPhotoReviewSection(lead)}
+            ${drawerWarehouseSection}
             ${renderAdminDealChecklistSection(lead)}
             <section class="admin-drawer-section admin-drawer-task-card" data-drawer-section="task">
               <header>
@@ -3851,6 +3876,18 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
   const restoreButton = event.target.closest("[data-restore-lead]");
   if (restoreButton) {
     await restoreSingleLead(restoreButton);
+    return;
+  }
+
+  const quickInventoryButton = event.target.closest("[data-quick-inventory]");
+  if (quickInventoryButton) {
+    await quickAddDraftInventory(quickInventoryButton);
+    return;
+  }
+
+  const viewInventoryButton = event.target.closest("[data-view-inventory]");
+  if (viewInventoryButton) {
+    openInventoryListing(viewInventoryButton.dataset.viewInventory || "");
     return;
   }
 
