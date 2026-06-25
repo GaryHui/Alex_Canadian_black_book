@@ -594,6 +594,7 @@ function specIcon(type) {
     gauge: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14a8 8 0 0 1 16 0M7 14h.01M17 14h.01M12 14l4-5M9 20h6"/></svg>',
     map: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.4 7-12a7 7 0 1 0-14 0c0 6.6 7 12 7 12Z"/><path d="M12 11.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/></svg>',
     body: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14h16l-2-5H6l-2 5Z"/><path d="M6 14v4M18 14v4M7 18h10M8 9V6h8v3"/></svg>',
+    camera: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4V8Z"/><path d="M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M18 10h.01"/></svg>',
     arrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
   };
   return icons[type] || icons.body;
@@ -842,12 +843,20 @@ function vehicleDetailPhotoStrip(vehicle, preparedPhotos) {
 }
 
 function vehicleImageMarkup(vehicle) {
-  const photo = Array.isArray(vehicle.photos) ? vehicle.photos[0] : null;
-  if (photo?.url) {
+  const photos = Array.isArray(vehicle.photos) ? vehicle.photos.filter((photo) => photo?.url) : [];
+  if (photos.length) {
+    const visiblePhotoCount = Math.min(photos.length, 3);
     return `
-      <figure class="inventory-photo">
-        <img src="${escapeHtml(photoDisplayUrl(photo.url))}" alt="${escapeHtml(vehicle.title)}" loading="lazy" />
-      </figure>
+      <section class="inventory-photo-gallery ${photos.length > 3 ? "is-scrollable" : ""}" style="--photo-count: ${visiblePhotoCount};" aria-label="${escapeHtml(vehicle.title)} photos">
+        <span class="inventory-photo-count" aria-label="${escapeHtml(`${photos.length} photos`)}">${specIcon("camera")}${escapeHtml(String(photos.length))}</span>
+        <div class="inventory-photo-track">
+          ${photos.map((photo, index) => `
+            <figure class="inventory-photo">
+              <img src="${escapeHtml(photoDisplayUrl(photo.url))}" alt="${escapeHtml(photo.label || `${vehicle.title} photo ${index + 1}`)}" loading="lazy" />
+            </figure>
+          `).join("")}
+        </div>
+      </section>
     `;
   }
   return `
