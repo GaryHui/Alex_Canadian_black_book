@@ -766,11 +766,8 @@ function showVehicleDetails(vehicle) {
     `;
   }
   vehicleDetailBody.innerHTML = `
-    ${vehicleDetailPhotoStrip(vehicle)}
+    ${vehicleDetailMedia(vehicle)}
     <div class="vehicle-detail-content">
-      <section class="vehicle-detail-gallery">
-        ${vehicle.photos?.length ? `<figure class="vehicle-detail-photo" data-detail-main-photo><img src="${escapeHtml(photoDisplayUrl(vehicle.photos[0].url))}" alt="${escapeHtml(vehicle.title)}" /><figcaption>${escapeHtml(vehicle.photos[0].label || "Vehicle photo")}</figcaption></figure>` : vehicleImageMarkup(vehicle)}
-      </section>
       <section class="vehicle-detail-main">
         <h3>Your vehicle details</h3>
         <div class="vehicle-detail-grid vehicle-detail-specs">
@@ -797,8 +794,31 @@ function showVehicleDetails(vehicle) {
   vehicleDetailModal.hidden = false;
 }
 
-function vehicleDetailPhotoStrip(vehicle) {
+function vehicleDetailMedia(vehicle) {
   const photos = Array.isArray(vehicle.photos) ? vehicle.photos.filter((photo) => photo?.url) : [];
+  const mainPhoto = photos[0] || null;
+  const mainMarkup = mainPhoto?.url
+    ? `<figure class="vehicle-detail-photo" data-detail-main-photo>
+        <img src="${escapeHtml(photoDisplayUrl(mainPhoto.url))}" alt="${escapeHtml(vehicle.title)}" />
+        <figcaption>${escapeHtml(mainPhoto.label || "Vehicle photo")}</figcaption>
+      </figure>`
+    : `<div class="vehicle-detail-photo vehicle-detail-photo-placeholder" data-detail-main-photo>${vehicleImageMarkup(vehicle)}</div>`;
+  return `
+    <section class="vehicle-detail-media" aria-label="Vehicle photos">
+      <header class="vehicle-detail-media-head">
+        <div>
+          <span>Photos</span>
+          <strong>${escapeHtml(photos.length ? `${photos.length} photo${photos.length === 1 ? "" : "s"}` : "Photo preview")}</strong>
+        </div>
+      </header>
+      ${vehicleDetailPhotoStrip(vehicle, photos)}
+      ${mainMarkup}
+    </section>
+  `;
+}
+
+function vehicleDetailPhotoStrip(vehicle, preparedPhotos) {
+  const photos = Array.isArray(preparedPhotos) ? preparedPhotos : Array.isArray(vehicle.photos) ? vehicle.photos.filter((photo) => photo?.url) : [];
   if (!photos.length) {
     return `
       <div class="vehicle-detail-photo-strip" aria-label="Vehicle photos">
@@ -809,7 +829,7 @@ function vehicleDetailPhotoStrip(vehicle) {
   return `
     <div class="vehicle-detail-photo-strip" aria-label="Vehicle photos">
       ${photos.map((photo, index) => `
-        <figure class="vehicle-detail-thumb" data-detail-photo-index="${index}">
+        <figure class="vehicle-detail-thumb ${index === 0 ? "is-selected" : ""}" data-detail-photo-index="${index}" tabindex="0" role="button" aria-label="${escapeHtml(photo.label || `Show photo ${index + 1}`)}">
           <img src="${escapeHtml(photoDisplayUrl(photo.url))}" alt="${escapeHtml(photo.label || `${vehicle.title} photo ${index + 1}`)}" loading="lazy" />
           <figcaption>${escapeHtml(photo.label || `Photo ${index + 1}`)}</figcaption>
         </figure>
@@ -1085,11 +1105,14 @@ vehicleDetailModal?.addEventListener("click", (event) => {
   }
   const thumb = event.target.closest("[data-detail-photo-index]");
   if (thumb && selectedFinanceVehicle) {
-    const photos = Array.isArray(selectedFinanceVehicle.photos) ? selectedFinanceVehicle.photos : [];
+    const photos = Array.isArray(selectedFinanceVehicle.photos) ? selectedFinanceVehicle.photos.filter((photo) => photo?.url) : [];
     const photo = photos[Number(thumb.dataset.detailPhotoIndex || 0)];
     const mainPhoto = vehicleDetailModal.querySelector("[data-detail-main-photo]");
     if (photo?.url && mainPhoto) {
       mainPhoto.innerHTML = `<img src="${escapeHtml(photoDisplayUrl(photo.url))}" alt="${escapeHtml(photo.label || selectedFinanceVehicle.title)}" /><figcaption>${escapeHtml(photo.label || "Vehicle photo")}</figcaption>`;
+      vehicleDetailModal.querySelectorAll("[data-detail-photo-index]").forEach((node) => {
+        node.classList.toggle("is-selected", node === thumb);
+      });
     }
     return;
   }
@@ -1114,6 +1137,10 @@ contactDealerForm?.addEventListener("submit", submitDealerContact);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeVehicleDetails();
   if (event.key === "Escape") closeContactDealer();
+  if ((event.key === "Enter" || event.key === " ") && event.target?.matches?.("[data-detail-photo-index]")) {
+    event.preventDefault();
+    event.target.click();
+  }
 });
 
 async function init() {
