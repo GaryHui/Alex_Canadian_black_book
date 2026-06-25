@@ -1573,7 +1573,8 @@ async function listAdminInventory() {
   if (!response.ok) return { ok: false, status: response.status, error: rows, inventory: [] };
   const inventory = Array.isArray(rows) ? rows.map(publicInventoryRow) : [];
   const withListingPhotos = await attachListingPhotos(inventory, false);
-  return { ok: true, storage: "supabase", inventory: await attachAvailableLeadPhotos(withListingPhotos) };
+  const withLeadSummary = await attachInventoryLeadSummary(withListingPhotos);
+  return { ok: true, storage: "supabase", inventory: await attachAvailableLeadPhotos(withLeadSummary) };
 }
 
 async function updateInventoryListing(body, user) {
@@ -2404,6 +2405,33 @@ async function attachAvailableLeadPhotos(inventory) {
     ...item,
     availableLeadPhotos: photosByLead.get(item.sourceLeadId) || []
   }));
+}
+
+async function attachInventoryLeadSummary(inventory) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return inventory;
+  const leadIds = [...new Set(inventory.map((item) => String(item.sourceLeadId || "").trim()).filter(Boolean))];
+  if (!leadIds.length) return inventory;
+
+  const result = await fetchSupabaseJson(
+    `${url}/rest/v1/valuation_leads?select=id,assigned_to,status,next_follow_up_at,last_activity_at&id=in.(${leadIds.map(encodeURIComponent).join(",")})`,
+    key
+  );
+  if (!result.ok || !Array.isArray(result.data)) return inventory;
+
+  const leads = new Map(result.data.map((lead) => [String(lead.id || ""), lead]));
+  return inventory.map((item) => {
+    const lead = leads.get(String(item.sourceLeadId || ""));
+    if (!lead) return item;
+    return {
+      ...item,
+      assignedTo: lead.assigned_to || "",
+      leadStatus: lead.status || "",
+      nextFollowUpAt: lead.next_follow_up_at || "",
+      lastActivityAt: lead.last_activity_at || ""
+    };
+  });
 }
 
 async function syncSelectedListingPhotos(supabase, listingId, leadId, selectedUrls = []) {
