@@ -2654,6 +2654,8 @@ async function attachListingPhotos(inventory, publicOnly) {
 }
 
 function mergeListingPublicOptions(body) {
+  const hasSelectedPublicPhotos = Array.isArray(body.selectedPhotoUrls)
+    && body.selectedPhotoUrls.map((url) => String(url || "").trim()).filter(Boolean).length > 0;
   return {
     showVin: body.showVin === "on" || body.showVin === true,
     showUvc: body.showUvc === "on" || body.showUvc === true,
@@ -2661,7 +2663,7 @@ function mergeListingPublicOptions(body) {
     showRegion: body.showRegion === "on" || body.showRegion === true,
     showColor: body.showColor === "on" || body.showColor === true,
     showMaintenance: body.showMaintenance === "on" || body.showMaintenance === true,
-    showPhotos: body.showPhotos === "on" || body.showPhotos === true
+    showPhotos: body.showPhotos === "on" || body.showPhotos === true || hasSelectedPublicPhotos
   };
 }
 
@@ -2707,6 +2709,8 @@ function buildListingFromLead(lead, body, user) {
 }
 
 function buildListingPublicOptions(body) {
+  const hasSelectedPublicPhotos = Array.isArray(body.selectedPhotoUrls)
+    && body.selectedPhotoUrls.map((url) => String(url || "").trim()).filter(Boolean).length > 0;
   return {
     showVin: body.showVin === "on" || body.showVin === true,
     showUvc: body.showUvc === "on" || body.showUvc === true,
@@ -2714,7 +2718,7 @@ function buildListingPublicOptions(body) {
     showRegion: body.showRegion === "on" || body.showRegion === true,
     showColor: body.showColor === "on" || body.showColor === true,
     showMaintenance: body.showMaintenance === "on" || body.showMaintenance === true,
-    showPhotos: body.showPhotos === "on" || body.showPhotos === true
+    showPhotos: body.showPhotos === "on" || body.showPhotos === true || hasSelectedPublicPhotos
   };
 }
 
