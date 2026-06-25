@@ -30,7 +30,8 @@ export async function listAdminInventory() {
   if (!result.ok) return { ...result, inventory: [] };
   const inventory = Array.isArray(result.data) ? result.data.map(publicInventoryRow) : [];
   const withListingPhotos = await attachListingPhotos(inventory, false, client);
-  return { ok: true, storage: "supabase", inventory: await attachAvailableLeadPhotos(withListingPhotos, client) };
+  const withLeadSummary = await attachInventoryLeadSummary(withListingPhotos, client);
+  return { ok: true, storage: "supabase", inventory: await attachAvailableLeadPhotos(withLeadSummary, client) };
 }
 
 export async function updateInventoryListing(body, user) {
@@ -41,9 +42,11 @@ export async function updateInventoryListing(body, user) {
   const currentListing = await fetchListingById(client, id);
   if (!currentListing) return { ok: false, status: 404, error: "Inventory listing not found" };
   const nextStatus = normalizeListingStatus(body.status || currentListing.status);
+  const hasAssignedTo = Object.prototype.hasOwnProperty.call(body || {}, "assignedTo");
+  let sourceLead = null;
   if (nextStatus === "published" && currentListing.source_lead_id) {
-    const lead = await fetchLeadById(client, currentListing.source_lead_id);
-    const duplicateWarning = await evaluateDuplicateSellerLead(client, lead);
+    sourceLead = await fetchLeadById(client, currentListing.source_lead_id);
+    const duplicateWarning = await evaluateDuplicateSellerLead(client, sourceLead);
     if (duplicateWarning && !duplicateWarning.reviewed) {
       return {
         ok: false,
@@ -75,6 +78,11 @@ export async function updateInventoryListing(body, user) {
   if (!saveResult.ok) return saveResult;
   if (Array.isArray(body.selectedPhotoUrls)) {
     await syncSelectedListingPhotos(client, id, String(body.sourceLeadId || "").trim(), body.selectedPhotoUrls);
+  }
+  if (hasAssignedTo && currentListing.source_lead_id) {
+    if (!sourceLead) sourceLead = await fetchLeadById(client, currentListing.source_lead_id);
+    const assignResult = await updateInventoryLeadAssignee(client, currentListing.source_lead_id, sourceLead, body.assignedTo, user);
+    if (assignResult && !assignResult.ok) return assignResult;
   }
   const timeline = buildInventoryUpdateTimeline(currentListing, patch, body);
   if (currentListing.source_lead_id && timeline) {
@@ -336,6 +344,55 @@ async function attachAvailableLeadPhotos(inventory, client) {
   }));
 }
 
+async function attachInventoryLeadSummary(inventory, client) {
+  const leadIds = [...new Set(inventory.map((item) => item.sourceLeadId).filter(Boolean))];
+  if (!leadIds.length) return inventory;
+  const result = await fetchSupabaseJson(
+    `${client.url}/rest/v1/valuation_leads?select=id,assigned_to,status,next_follow_up_at,last_activity_at&id=in.(${leadIds.map(encodeURIComponent).join(",")})`,
+    client.key
+  );
+  if (!result.ok || !Array.isArray(result.data)) return inventory;
+  const leads = new Map(result.data.map((lead) => [String(lead.id || ""), lead]));
+  return inventory.map((item) => {
+    const lead = leads.get(String(item.sourceLeadId || "")) || {};
+    return {
+      ...item,
+      assignedTo: lead.assigned_to || "",
+      leadStatus: lead.status || "",
+      nextFollowUpAt: lead.next_follow_up_at || "",
+      lastActivityAt: lead.last_activity_at || ""
+    };
+  });
+}
+
+async function updateInventoryLeadAssignee(client, leadId, sourceLead, assignedToValue, user) {
+  const assignedTo = String(assignedToValue || "").trim().toLowerCase();
+  const previous = String(sourceLead?.assigned_to || "").trim().toLowerCase();
+  if (previous === assignedTo) return { ok: true, changed: false };
+  const payload = {
+    assigned_to: assignedTo || null,
+    last_activity_at: new Date().toISOString()
+  };
+  const response = await fetch(`${client.url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+    method: "PATCH",
+    headers: {
+      ...serviceHeaders(client.key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data || "Unable to update inventory rep" };
+  await createLeadNote(
+    client,
+    leadId,
+    user,
+    `Inventory follow-up rep updated by ${user?.email || "admin"}: ${previous || "unassigned"} -> ${assignedTo || "unassigned"}.`
+  );
+  return { ok: true, changed: true };
+}
+
 async function attachLeadPhotosToListing(leadId, listingId, client) {
   if (!leadId || !listingId) return;
   const links = await findLeadPhotoLinks(leadId, client);
@@ -528,10 +585,7 @@ function normalizeRestoredLeadStatus(value) {
     "inspection_booked",
     "appointment_booked",
     "finance_sent",
-    "offer_sent",
-    "won",
-    "lost",
-    "closed"
+    "offer_sent"
   ].includes(status) ? status : "";
 }
 

@@ -573,6 +573,19 @@ function renderInventoryListing(listing) {
   const canPublish = listing.status !== "published" && listing.status !== "sold";
   const canArchive = listing.status !== "archived";
   const publicOptionInputs = renderInventoryPublicOptionInputs(listing.publicOptions || {});
+  const assignedTo = String(listing.assignedTo || "").trim();
+  const stockRepField = dealerStaffEmails.length ? `
+          <label>
+            <span>Stock rep</span>
+            <select name="assignedTo">
+              <option value="">Unassigned</option>
+              ${dealerStaffEmails.map((email) => `<option value="${escapeHtml(email)}" ${assignedTo === email ? "selected" : ""}>${escapeHtml(email)}</option>`).join("")}
+            </select>
+          </label>` : `
+          <label>
+            <span>Stock rep</span>
+            <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+          </label>`;
   const selectablePhotos = availablePhotos.length ? `
             <fieldset class="inventory-photo-picker">
               <legend>Replace public photos</legend>
@@ -661,6 +674,7 @@ function renderInventoryListing(listing) {
           <strong class="status-pill status-${escapeHtml(cssToken(listing.status || "draft"))}">${escapeHtml(listing.status || "draft")}</strong>
           <div class="lead-list-subline">
             <span>${escapeHtml(listing.sourceLeadId ? "From SELL lead" : "Manual listing")}</span>
+            <span>${escapeHtml(assignedTo ? `Rep ${shortEmail(assignedTo)}` : "No rep")}</span>
           </div>
         </div>
         <div class="inventory-actions inventory-list-actions">
@@ -694,6 +708,7 @@ function renderInventoryListing(listing) {
               ).join("")}
             </select>
           </label>
+          ${listing.sourceLeadId ? stockRepField : ""}
           <label class="inventory-description">
             <span>Description</span>
             <textarea name="description">${escapeHtml(listing.description || "")}</textarea>
@@ -3553,7 +3568,8 @@ function inventoryListingPayloadFromForm(form) {
     askingPrice: String(data.get("askingPrice") || "").trim(),
     monthlyPaymentEstimate: String(data.get("monthlyPaymentEstimate") || "").trim(),
     status: String(data.get("status") || "draft").trim(),
-    description: String(data.get("description") || "").trim()
+    description: String(data.get("description") || "").trim(),
+    assignedTo: String(data.get("assignedTo") || "").trim()
   };
   ["showVin", "showUvc", "showKilometers", "showRegion", "showColor", "showMaintenance", "showPhotos"].forEach((key) => {
     if (data.has(key)) payload[key] = true;
