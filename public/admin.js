@@ -718,7 +718,7 @@ function renderInventoryListing(listing) {
           </label>
           ${photoManager}
         </div>
-        <button type="submit">Save listing details</button>
+        <button type="button" data-save-inventory-listing>Save listing details</button>
       </details>
     </form>
   `;
@@ -3410,7 +3410,7 @@ inventoryEl?.addEventListener("submit", async (event) => {
 });
 
 inventoryEl?.addEventListener("click", async (event) => {
-  const saveListingButton = event.target.closest(".inventory-card-admin button[type='submit']");
+  const saveListingButton = event.target.closest("[data-save-inventory-listing]");
   if (saveListingButton) {
     event.preventDefault();
     const form = saveListingButton.closest(".inventory-card-admin");
