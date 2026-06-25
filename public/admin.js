@@ -3526,7 +3526,30 @@ async function saveInventoryListing(form, overrides = {}) {
   });
   const data = await response.json();
   inventoryStatusEl.textContent = data.ok ? "Inventory listing saved." : formatApiError(data, "Unable to save inventory listing.");
-  if (data.ok) await loadInventory();
+  if (data.ok) {
+    await syncInventoryRepAssignment(payload);
+    await loadInventory();
+  }
+}
+
+async function syncInventoryRepAssignment(payload) {
+  const leadId = String(payload?.sourceLeadId || "").trim();
+  const assignedTo = String(payload?.assignedTo || "").trim().toLowerCase();
+  if (!leadId || !assignedTo) return;
+  const response = await fetch("/api/leads", {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "assign_lead",
+      id: leadId,
+      assignedTo,
+      status: "assigned"
+    })
+  });
+  const data = await response.json();
+  if (!data.ok) {
+    throw new Error(formatApiError(data, "Inventory saved, but the stock rep was not assigned to the source lead."));
+  }
 }
 
 async function removeInventoryListing(button) {
