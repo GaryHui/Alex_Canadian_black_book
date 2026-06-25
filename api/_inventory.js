@@ -69,6 +69,10 @@ export async function updateInventoryListing(body, user) {
   };
   patch.published_at = status === "published" ? new Date().toISOString() : null;
   if (user?.email) patch.created_by = String(user.email || "").trim();
+  if (status === "published" && patch.public_options.showPhotos !== true) {
+    const selectedCount = await countListingPhotos(client, id);
+    if (selectedCount > 0) patch.public_options.showPhotos = true;
+  }
 
   const saveResult = await saveVehicleListing(client, {
     endpoint: `${client.url}/rest/v1/vehicle_listings?id=eq.${encodeURIComponent(id)}`,
@@ -462,6 +466,16 @@ async function syncSelectedListingPhotos(client, listingId, leadId, selectedUrls
     },
     body: JSON.stringify(rows)
   }).catch(() => null);
+}
+
+async function countListingPhotos(client, listingId) {
+  if (!listingId) return 0;
+  const result = await fetchSupabaseJson(
+    `${client.url}/rest/v1/listing_photos?select=id&listing_id=eq.${encodeURIComponent(listingId)}&limit=1`,
+    client.key
+  );
+  if (!result.ok || !Array.isArray(result.data)) return 0;
+  return result.data.length;
 }
 
 async function findLeadPhotoLinks(leadId, client) {

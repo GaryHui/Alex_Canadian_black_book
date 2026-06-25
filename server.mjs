@@ -1477,6 +1477,10 @@ async function updateInventoryListing(body, user) {
     patch.published_at = null;
   }
   if (user?.email) patch.created_by = String(user.email || "").trim();
+  if (status === "published" && patch.public_options.showPhotos !== true) {
+    const selectedCount = await countListingPhotos({ url, key }, id);
+    if (selectedCount > 0) patch.public_options.showPhotos = true;
+  }
 
   const saveResult = await saveVehicleListingWithRetry({
     url: `${url}/rest/v1/vehicle_listings?id=eq.${encodeURIComponent(id)}`,
@@ -2325,6 +2329,17 @@ async function findLeadPhotoLinks(leadId, supabase) {
     }
   }
   return photos.filter((photo) => !deletedUrls.has(photo.url));
+}
+
+async function countListingPhotos(supabase, listingId) {
+  if (!listingId) return 0;
+  const response = await fetch(
+    `${supabase.url}/rest/v1/listing_photos?select=id&listing_id=eq.${encodeURIComponent(listingId)}&limit=1`,
+    { headers: supabaseServiceHeaders(supabase.key) }
+  ).catch(() => null);
+  if (!response?.ok) return 0;
+  const rows = await response.json().catch(() => []);
+  return Array.isArray(rows) ? rows.length : 0;
 }
 
 function isDriveFolderUrl(url) {
