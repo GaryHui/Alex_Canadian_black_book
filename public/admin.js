@@ -3410,6 +3410,14 @@ inventoryEl?.addEventListener("submit", async (event) => {
 });
 
 inventoryEl?.addEventListener("click", async (event) => {
+  const saveListingButton = event.target.closest(".inventory-card-admin button[type='submit']");
+  if (saveListingButton) {
+    event.preventDefault();
+    const form = saveListingButton.closest(".inventory-card-admin");
+    if (form) await saveInventoryListing(form);
+    return;
+  }
+
   const uploadPhotosButton = event.target.closest("[data-upload-inventory-photos]");
   if (uploadPhotosButton) {
     await uploadInventoryPhotos(uploadPhotosButton);
