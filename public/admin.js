@@ -1110,10 +1110,10 @@ function vehicleContextInline(lead) {
   if (!pills.length && !context.related_lead_count) return "";
   return `
     <section class="lead-vehicle-context">
-      <span>Vehicle cluster</span>
+      <span>Same vehicle file</span>
       <strong>${escapeHtml(context.cluster_label || "Same vehicle activity")}</strong>
       <small>${escapeHtml(pills.join(" | ") || "Related vehicle activity found.")}</small>
-      ${context.primary_lead_id ? `<small>Primary CRM lead ${escapeHtml(context.primary_lead_title || context.primary_lead_id)}${context.primary_listing_id ? ` | warehouse ${escapeHtml(context.primary_listing_id)}` : ""}</small>` : ""}
+      ${context.primary_lead_id ? `<small>Primary record ${escapeHtml(context.primary_lead_title || "vehicle file")}${context.primary_listing_id ? " | linked to warehouse" : ""}</small>` : ""}
     </section>
   `;
 }
@@ -1124,13 +1124,13 @@ function mergeStateInline(lead) {
   if (state.kind === "merged") {
     return `
       <section class="owner-review-read duplicate-vehicle-reviewed">
-        <span>Merged into primary CRM lead ${escapeHtml(state.primary_lead_id || "-")} ${state.at ? escapeHtml(formatDateTime(state.at)) : ""}</span>
+        <span>Merged into the primary vehicle file${state.at ? ` ${escapeHtml(formatDateTime(state.at))}` : ""}</span>
       </section>
     `;
   }
   return `
     <section class="owner-review-read duplicate-vehicle-reviewed">
-      <span>Linked to warehouse listing ${escapeHtml(state.listing_id || "-")} under CRM lead ${escapeHtml(state.primary_lead_id || "-")} ${state.at ? escapeHtml(formatDateTime(state.at)) : ""}</span>
+      <span>Linked to the warehouse listing${state.at ? ` ${escapeHtml(formatDateTime(state.at))}` : ""}</span>
     </section>
   `;
 }
@@ -1361,6 +1361,7 @@ function renderDuplicateVehicleBlocks(leads) {
 function renderDuplicateVehicleCluster(group) {
   const primary = group.members[0] || {};
   const title = cleanLeadTitle(primary.valuation?.title || historyVehicleTitle(primary.input || {}) || "Vehicle lead", false);
+  const vin = primary.valuation?.vin || primary.input?.vin || "";
   const warning = group.members.find((lead) => lead.duplicate_warning?.message && !lead.duplicate_warning?.reviewed)?.duplicate_warning?.message
     || `${group.members.length} seller leads may reference the same vehicle.`;
   return `
@@ -1368,7 +1369,7 @@ function renderDuplicateVehicleCluster(group) {
       <div class="duplicate-cluster-main">
         <b>Same vehicle group</b>
         <strong>${escapeHtml(title)}</strong>
-        <span>${escapeHtml(group.key)}</span>
+        <span>${escapeHtml(`${group.members.length} seller lead${group.members.length === 1 ? "" : "s"}${vin ? ` | VIN ${vin}` : ""}`)}</span>
         <small>${escapeHtml(warning)}</small>
       </div>
       <div class="duplicate-cluster-members">
@@ -1761,39 +1762,9 @@ function renderAdminToday(leads) {
     </section>
     <section class="admin-manager-brief" aria-label="Manager brief">
       <button type="button" class="admin-brief-card brief-card-hot" data-admin-set-filter="owner-unread">
-        <span>Staff updates</span>
+        <span>Updates</span>
         <strong>${ownerUnreadCount}</strong>
-        <small>Needs manager review</small>
-      </button>
-      <button type="button" class="admin-brief-card brief-card-hot" data-admin-set-filter="deal-desk">
-        <span>Recon blockers</span>
-        <strong>${reconBlockerCount}</strong>
-        <small>Photos, keys, recon, price, publish</small>
-      </button>
-      <button type="button" class="admin-brief-card brief-card-hot" data-admin-set-filter="open-tasks">
-        <span>Open tasks</span>
-        <strong>${taskCount}</strong>
-        <small>Team tasks not done</small>
-      </button>
-      <button type="button" class="admin-brief-card" data-admin-set-filter="buyer">
-        <span>Buyer leads</span>
-        <strong>${buyerInquiryCount}</strong>
-        <small>Buy page and sales follow-up</small>
-      </button>
-      <button type="button" class="admin-brief-card" data-admin-set-filter="active">
-        <span>Active</span>
-        <strong>${activeLeads.length}</strong>
-        <small>Open all active Up Sheets</small>
-      </button>
-      <button type="button" class="admin-brief-card" data-admin-set-filter="fresh">
-        <span>Fresh</span>
-        <strong>${freshCount}</strong>
-        <small>New leads not worked yet</small>
-      </button>
-      <button type="button" class="admin-brief-card" data-admin-set-filter="waiting-reply">
-        <span>Needs Reply</span>
-        <strong>${waitingReplyCount}</strong>
-        <small>Customer waiting for staff</small>
+        <small>Staff changes to review</small>
       </button>
       <button type="button" class="admin-brief-card" data-admin-set-filter="unassigned">
         <span>Unassigned</span>
@@ -1806,9 +1777,14 @@ function renderAdminToday(leads) {
         <small>Follow-up due or overdue</small>
       </button>
       <button type="button" class="admin-brief-card" data-admin-set-filter="duplicate-review">
-        <span>Duplicate review</span>
+        <span>Same vehicle</span>
         <strong>${duplicateCount}</strong>
         <small>Seller conflicts to clear</small>
+      </button>
+      <button type="button" class="admin-brief-card brief-card-hot" data-admin-set-filter="deal-desk">
+        <span>Recon / listing</span>
+        <strong>${reconBlockerCount}</strong>
+        <small>Photos, keys, price, publish</small>
       </button>
       <button type="button" class="admin-brief-card" data-open-inventory-filter="draft">
         <span>Inventory draft</span>
@@ -2980,13 +2956,19 @@ function renderAdminDrawer(leadId) {
                 <button type="submit">Post update</button>
               </form>
             </section>
-            <section class="admin-drawer-section">
+            <details class="admin-drawer-section admin-drawer-settings-details">
+              <summary>
+                <span>
+                  <strong>Team timeline</strong>
+                  <small>Saved assignments, tasks, notes, photos, inventory, and manager decisions</small>
+                </span>
+              </summary>
               <header>
                 <h3>Team timeline</h3>
                 <button type="button" data-drawer-load-activity>Refresh</button>
               </header>
               <div class="lead-activity-list admin-drawer-activity-list">Activity not loaded yet.</div>
-            </section>
+            </details>
             <details class="admin-drawer-section admin-drawer-settings-details">
               <summary>
                 <span>

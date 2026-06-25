@@ -2288,9 +2288,6 @@ function renderDealerDrawer(leadId) {
                 <strong>${escapeHtml(nextAction)}</strong>
                 <small>${escapeHtml(followUp ? `Next follow-up ${formatDateTime(followUp)}` : "Set the next follow-up before leaving this workspace.")}</small>
               </div>
-              ${renderDealerCrmWorkflowPanel(lead)}
-              ${renderDealerLeadProgress(buyerLead, status)}
-              ${renderDealerSopProgress(lead)}
               <div class="dealer-lead-actions dealer-drawer-actions">
                 ${actionButtons}
               </div>
@@ -2299,7 +2296,18 @@ function renderDealerDrawer(leadId) {
               </div>
             </section>
             ${renderDealerCommunicationStrip(lead)}
-            ${renderDealerDealChecklistSection(lead)}
+            <details class="dealer-drawer-section drawer-more-details">
+              <summary>
+                <span>
+                  <strong>Stage details</strong>
+                  <small>Open for pipeline, checklist, and vehicle alerts</small>
+                </span>
+              </summary>
+              ${renderDealerCrmWorkflowPanel(lead)}
+              ${renderDealerLeadProgress(buyerLead, status)}
+              ${renderDealerSopProgress(lead)}
+              ${renderDealerDealChecklistSection(lead)}
+            </details>
             ${renderDealerPhotoSection(lead)}
             <section class="dealer-drawer-section dealer-task-section">
               <header>
@@ -2362,13 +2370,19 @@ function renderDealerDrawer(leadId) {
                 <button type="submit">Save note</button>
               </form>
             </section>
-            <section class="dealer-drawer-section">
+            <details class="dealer-drawer-section drawer-more-details">
+              <summary>
+                <span>
+                  <strong>Timeline</strong>
+                  <small>Saved calls, tasks, status changes, and manager notes</small>
+                </span>
+              </summary>
               <header>
-                <h3>Timeline</h3>
+                <h3>Team timeline</h3>
                 <button type="button" data-drawer-load-dealer-activity>Refresh</button>
               </header>
               <div class="dealer-activity-list dealer-drawer-activity-list">Timeline not loaded yet.</div>
-            </section>
+            </details>
             <details class="dealer-drawer-section drawer-more-tools">
               <summary>
                 <span>
@@ -2698,7 +2712,7 @@ function renderDealerTodayWork(leads) {
   const noResponseCount = activeLeads.filter((lead) => isDealerNoResponseLead(lead)).length;
   const photoTaskCount = activeLeads.filter((lead) => dealerTaskText(lead).includes("photo") || dealerTaskText(lead).includes("picture")).length;
   const reconTaskCount = activeLeads.filter((lead) => dealerTaskText(lead).includes("recon") || dealerTaskText(lead).includes("repair") || dealerTaskText(lead).includes("keys") || dealerTaskText(lead).includes("documents")).length;
-  const buyerTaskCount = activeLeads.filter((lead) => isBuyerLead(lead) && (hasDealerOpenTask(lead) || ["new", "contacted", "appointment_booked", "finance_sent"].includes(String(lead.status || "").toLowerCase()))).length;
+  const stockFollowUpCount = dealerInventoryCache.filter((item) => !["sold", "archived"].includes(String(item.status || "").toLowerCase())).length;
   const focus = dealerWorkFocus([
     { count: updateCount, label: "Review new lead updates", detail: "Start with leads changed by another team member.", filter: "updates" },
     { count: taskCount, label: "Work open tasks", detail: "Complete or update assigned tasks before adding new notes.", filter: "open-tasks" },
@@ -2722,12 +2736,12 @@ function renderDealerTodayWork(leads) {
     </section>
     <section class="dealer-manager-brief" aria-label="Dealer brief">
       <button type="button" class="dealer-brief-card brief-card-hot" data-dealer-filter-shortcut="updates">
-        <span>New updates</span>
+        <span>Updates</span>
         <strong>${updateCount}</strong>
         <small>Lead changes to review</small>
       </button>
       <button type="button" class="dealer-brief-card brief-card-hot" data-dealer-filter-shortcut="open-tasks">
-        <span>Open tasks</span>
+        <span>Tasks</span>
         <strong>${taskCount}</strong>
         <small>Assigned next actions</small>
       </button>
@@ -2736,51 +2750,21 @@ function renderDealerTodayWork(leads) {
         <strong>${activeLeads.length}</strong>
         <small>All assigned active work</small>
       </button>
-      <button type="button" class="dealer-brief-card brief-card-hot" data-dealer-filter-shortcut="open-tasks">
-        <span>Photo tasks</span>
-        <strong>${photoTaskCount}</strong>
-        <small>Intake/recon/listing photos</small>
-      </button>
-      <button type="button" class="dealer-brief-card brief-card-hot" data-dealer-filter-shortcut="open-tasks">
-        <span>Recon work</span>
-        <strong>${reconTaskCount}</strong>
-        <small>Keys, docs, repairs</small>
-      </button>
-      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="buyer">
-        <span>Buyer follow-up</span>
-        <strong>${buyerTaskCount}</strong>
-        <small>Buy page sales leads</small>
-      </button>
-      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="fresh">
-        <span>Fresh</span>
-        <strong>${freshCount}</strong>
-        <small>New assigned leads</small>
-      </button>
       <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="waiting-reply">
         <span>Needs Reply</span>
         <strong>${waitingReplyCount}</strong>
         <small>Customer waiting</small>
-      </button>
-      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="call-now">
-        <span>Call now</span>
-        <strong>${callNowCount}</strong>
-        <small>Hot leads first</small>
       </button>
       <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="due">
         <span>Due today</span>
         <strong>${dueCount}</strong>
         <small>Follow-up due or overdue</small>
       </button>
-      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="no-response">
-        <span>No response</span>
-        <strong>${noResponseCount}</strong>
-        <small>Needs a touch</small>
-      </button>
-      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="vehicle-alerts">
-        <span>Vehicle alerts</span>
-        <strong>${vehicleAlertCount}</strong>
-        <small>Same-vehicle changes to review</small>
-      </button>
+      <a class="dealer-brief-card dealer-brief-link" href="#dealer-stock-section">
+        <span>Inventory follow-up</span>
+        <strong>${stockFollowUpCount}</strong>
+        <small>Published or warehouse stock to work</small>
+      </a>
     </section>
   `;
 }
