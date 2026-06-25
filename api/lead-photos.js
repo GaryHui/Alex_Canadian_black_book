@@ -46,7 +46,7 @@ async function uploadLeadPhotos(body, dealer) {
   }
 
   const parsed = webhook.data || parseJson(webhook.response) || {};
-  const savedFiles = normalizeDriveFiles(Array.isArray(parsed.savedFiles) ? parsed.savedFiles : []);
+  const savedFiles = normalizeDriveFiles(extractDriveFileRows(parsed));
   if (!savedFiles.length) return { ok: false, status: 502, error: "Google Drive did not return saved image file URLs" };
 
   const lines = [];
@@ -91,6 +91,17 @@ function normalizeDriveFiles(files) {
       seen.add(key);
       return true;
     });
+}
+
+function extractDriveFileRows(parsed = {}) {
+  return [
+    ...(Array.isArray(parsed.savedFiles) ? parsed.savedFiles : []),
+    ...(Array.isArray(parsed.files) ? parsed.files : []),
+    ...(Array.isArray(parsed.photos) ? parsed.photos : []),
+    ...(Array.isArray(parsed.data?.savedFiles) ? parsed.data.savedFiles : []),
+    ...(Array.isArray(parsed.data?.files) ? parsed.data.files : []),
+    ...(Array.isArray(parsed.data?.photos) ? parsed.data.photos : [])
+  ];
 }
 
 function driveFileUrl(file, id = "") {

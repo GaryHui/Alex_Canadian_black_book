@@ -857,7 +857,14 @@ async function createLeadTimelineNote({ url, key, leadId, authorEmail, note }) {
 async function recordWebhookPhotosAsLeadNote({ url, key, leadId, uploadFiles = [], webhook = {} }) {
   if (!url || !key || !leadId || !webhook?.submitted) return;
   const parsed = webhook.data || parseJson(webhook.response) || {};
-  const savedFiles = Array.isArray(parsed.savedFiles) ? parsed.savedFiles : [];
+  const savedFiles = [
+    ...(Array.isArray(parsed.savedFiles) ? parsed.savedFiles : []),
+    ...(Array.isArray(parsed.files) ? parsed.files : []),
+    ...(Array.isArray(parsed.photos) ? parsed.photos : []),
+    ...(Array.isArray(parsed.data?.savedFiles) ? parsed.data.savedFiles : []),
+    ...(Array.isArray(parsed.data?.files) ? parsed.data.files : []),
+    ...(Array.isArray(parsed.data?.photos) ? parsed.data.photos : [])
+  ];
   if (!savedFiles.length) return;
   const lines = [];
   if (parsed.leadFolderUrl) lines.push(`Vehicle Drive folder: ${parsed.leadFolderUrl}`);
