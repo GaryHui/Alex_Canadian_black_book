@@ -46,14 +46,14 @@ async function uploadLeadPhotos(body, dealer) {
   }
 
   const parsed = webhook.data || parseJson(webhook.response) || {};
-  const savedFiles = Array.isArray(parsed.savedFiles) ? parsed.savedFiles : [];
-  if (!savedFiles.length) return { ok: false, status: 502, error: "Google Drive did not return saved file URLs" };
+  const savedFiles = normalizeDriveFiles(Array.isArray(parsed.savedFiles) ? parsed.savedFiles : []);
+  if (!savedFiles.length) return { ok: false, status: 502, error: "Google Drive did not return saved image file URLs" };
 
   const lines = [];
   if (parsed.leadFolderUrl) lines.push(`Vehicle Drive folder: ${parsed.leadFolderUrl}`);
   lines.push(...savedFiles.map((file, index) => {
     const label = files[index]?.role || files[index]?.angle || file.name || `Photo ${index + 1}`;
-    const url = file.url || file.webViewLink || "";
+    const url = file.url || "";
     return `${label}: ${url}`;
   }));
 
@@ -66,6 +66,51 @@ async function uploadLeadPhotos(body, dealer) {
 
   await touchLead(client, leadId);
   return { ok: true, photos: savedFiles, webhook };
+}
+
+function normalizeDriveFiles(files) {
+  const seen = new Set();
+  return files
+    .map((file, index) => {
+      const id = String(file.id || file.fileId || "").trim();
+      const url = driveFileUrl(file, id);
+      return {
+        id,
+        name: String(file.name || file.title || `Vehicle photo ${index + 1}`).trim(),
+        url,
+        webViewLink: url,
+        thumbnailLink: String(file.thumbnailLink || "").trim(),
+        mimeType: String(file.mimeType || "").trim()
+      };
+    })
+    .filter((file) => file.url && !isDriveFolderUrl(file.url))
+    .filter((file) => !file.mimeType || file.mimeType.startsWith("image/") || /\.(png|jpe?g|webp|gif|heic)$/i.test(file.name))
+    .filter((file) => {
+      const key = file.url || file.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function driveFileUrl(file, id = "") {
+  const direct = String(file.url || file.webViewLink || file.webUrl || "").trim();
+  if (direct) return direct;
+  const thumbnail = String(file.thumbnailLink || "").trim();
+  const thumbnailId = parseDriveFileId(thumbnail);
+  const fileId = id || thumbnailId;
+  return fileId ? `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view` : "";
+}
+
+function parseDriveFileId(url) {
+  const value = String(url || "");
+  const fileMatch = value.match(/\/d\/([^/?#]+)/);
+  const idMatch = value.match(/[?&]id=([^&]+)/);
+  return fileMatch?.[1] || idMatch?.[1] || "";
+}
+
+function isDriveFolderUrl(url) {
+  return /drive\.google\.com\/(?:drive\/)?folders\//i.test(String(url || ""));
 }
 
 async function canUploadLeadPhotos(client, leadId, dealer) {

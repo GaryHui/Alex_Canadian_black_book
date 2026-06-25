@@ -110,7 +110,7 @@ function normalizeDriveFiles(parsed) {
     .map((file, index) => ({
       id: String(file.id || file.fileId || "").trim(),
       name: String(file.name || file.title || `Vehicle photo ${index + 1}`).trim(),
-      url: String(file.url || file.webViewLink || file.webUrl || "").trim(),
+      url: driveFileUrl(file),
       mimeType: String(file.mimeType || "").trim()
     }))
     .filter((file) => file.url && !isDriveFolderUrl(file.url))
@@ -121,6 +121,20 @@ function normalizeDriveFiles(parsed) {
       seen.add(key);
       return true;
     });
+}
+
+function driveFileUrl(file) {
+  const direct = String(file.url || file.webViewLink || file.webUrl || "").trim();
+  if (direct) return direct;
+  const id = String(file.id || file.fileId || parseDriveFileId(file.thumbnailLink)).trim();
+  return id ? `https://drive.google.com/file/d/${encodeURIComponent(id)}/view` : "";
+}
+
+function parseDriveFileId(url) {
+  const value = String(url || "");
+  const fileMatch = value.match(/\/d\/([^/?#]+)/);
+  const idMatch = value.match(/[?&]id=([^&]+)/);
+  return fileMatch?.[1] || idMatch?.[1] || "";
 }
 
 async function recordSyncedPhotos(client, leadId, user, folderUrl, files) {
