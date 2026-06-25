@@ -117,6 +117,9 @@ export async function deleteInventoryListing(id, user) {
     };
   }
 
+  const restored = await restoreLeadFromInventory(client, listing.source_lead_id);
+  if (!restored.ok) return restored;
+
   const response = await fetch(`${client.url}/rest/v1/vehicle_listings?id=eq.${encodeURIComponent(listingId)}`, {
     method: "DELETE",
     headers: {
@@ -127,8 +130,6 @@ export async function deleteInventoryListing(id, user) {
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
 
-  const restored = await restoreLeadFromInventory(client, listing.source_lead_id);
-  if (!restored.ok) return restored;
   await createLeadNote(
     client,
     listing.source_lead_id,
