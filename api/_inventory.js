@@ -109,6 +109,14 @@ export async function deleteInventoryListing(id, user) {
   const listing = listingResult.data?.[0];
   if (!listing) return { ok: false, status: 404, error: "Inventory listing not found" };
 
+  if (!listing.source_lead_id) {
+    return {
+      ok: false,
+      status: 409,
+      error: "This warehouse listing is not linked to a SELL lead, so it cannot be moved back to Up Sheets automatically."
+    };
+  }
+
   const response = await fetch(`${client.url}/rest/v1/vehicle_listings?id=eq.${encodeURIComponent(listingId)}`, {
     method: "DELETE",
     headers: {
@@ -119,22 +127,27 @@ export async function deleteInventoryListing(id, user) {
   const data = await response.json().catch(() => null);
   if (!response.ok) return { ok: false, status: response.status, error: data };
 
-  if (listing.source_lead_id) {
-    const restoredStatus = await restoreLeadFromInventory(client, listing.source_lead_id);
-    await createLeadNote(
-      client,
-      listing.source_lead_id,
-      user,
-      `Inventory listing removed by ${user?.email || "admin"}. Lead restored to ${restoredStatus}. Staff can update the lead details, then an admin can publish it again.`
-    );
-  }
+  const restored = await restoreLeadFromInventory(client, listing.source_lead_id);
+  if (!restored.ok) return restored;
+  await createLeadNote(
+    client,
+    listing.source_lead_id,
+    user,
+    `Inventory listing removed by ${user?.email || "admin"}. Lead restored to ${restored.status}. Staff can update the lead details, then an admin can publish it again.`
+  );
   await notifySameVehicleBuyerLeads(client, listing, {
     code: "vehicle_unlisted",
     message: `This vehicle was removed from the Buy page: ${listing.title || "Vehicle"}. Review related buyer leads before continuing.`,
     authorEmail: String(user?.email || "").trim().toLowerCase()
   });
 
-  return { ok: true, deleted: Array.isArray(data) ? data.length : 1, listing: publicInventoryRow(listing) };
+  return {
+    ok: true,
+    deleted: Array.isArray(data) ? data.length : 1,
+    restoredStatus: restored.status,
+    sourceLeadId: listing.source_lead_id,
+    listing: publicInventoryRow(listing)
+  };
 }
 
 export async function publishLeadToInventory(body, user) {
@@ -507,18 +520,23 @@ async function createLeadNote(client, leadId, user, note) {
 async function restoreLeadFromInventory(client, leadId) {
   const previousStatus = await previousLeadStatusBeforeInventory(client, leadId);
   const status = normalizeRestoredLeadStatus(previousStatus) || "assigned";
-  await fetch(`${client.url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+  const response = await fetch(`${client.url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
     method: "PATCH",
     headers: {
       ...serviceHeaders(client.key),
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
     },
     body: JSON.stringify({
       status,
       last_activity_at: new Date().toISOString()
     })
   }).catch(() => null);
-  return status;
+  if (!response) return { ok: false, status: 500, error: "Unable to restore source SELL lead." };
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data || "Unable to restore source SELL lead." };
+  if (!Array.isArray(data) || !data[0]) return { ok: false, status: 404, error: "Source SELL lead was not found, so the vehicle cannot be moved back to Up Sheets." };
+  return { ok: true, status, lead: data[0] };
 }
 
 async function fetchListingById(client, listingId) {

@@ -3482,6 +3482,7 @@ async function removeInventoryListing(button) {
   const form = button.closest(".inventory-card-admin");
   const title = form?.querySelector(".inventory-list-col-main strong")?.textContent || "this vehicle";
   const id = button.dataset.removeInventory || form?.dataset.id || "";
+  const sourceLeadId = form?.dataset.sourceLeadId || "";
   if (!id) return;
   const confirmed = window.confirm(
     `Move "${title}" out of warehouse?\n\nIt will disappear from Inventory management and the public Buy page. The original lead and activity remain, so staff can keep working on it and an admin can publish it again later.`
@@ -3496,7 +3497,13 @@ async function removeInventoryListing(button) {
   const data = await response.json();
   inventoryStatusEl.textContent = data.ok ? "Vehicle moved out of warehouse. The seller lead was restored to the CRM Active queue." : formatApiError(data, "Unable to move vehicle out of warehouse.");
   if (data.ok) {
-    await Promise.all([loadInventory(), loadLeads({ suppressAlerts: true, forceOpenActivity: true })]);
+    inventoryCache = inventoryCache.filter((item) => item.id !== id && (!sourceLeadId || item.sourceLeadId !== sourceLeadId));
+    renderInventoryWarehouse(inventoryCache);
+    setAdminLeadFilter("active");
+    await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+    const leadId = data.sourceLeadId || sourceLeadId;
+    if (leadId) await openAdminLeadFromAlert(leadId);
+    await loadInventory();
   }
   button.disabled = false;
 }
