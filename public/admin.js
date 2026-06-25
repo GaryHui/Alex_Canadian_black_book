@@ -3416,6 +3416,10 @@ inventoryEl?.addEventListener("click", async (event) => {
     const form = saveListingButton.closest(".inventory-card-admin");
     if (form) {
       const assignedTo = String(form.querySelector("[name='assignedTo']")?.value || "").trim();
+      if (assignedTo) await syncInventoryRepAssignment({
+        sourceLeadId: form.dataset.sourceLeadId || form.querySelector("[name='sourceLeadId']")?.value || "",
+        assignedTo
+      });
       await saveInventoryListing(form, assignedTo ? { assignedTo } : {});
     }
     return;
