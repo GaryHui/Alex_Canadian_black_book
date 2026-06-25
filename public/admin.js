@@ -2860,9 +2860,9 @@ function renderAdminDrawer(leadId) {
             ` : ""}
             ${vehicleSignalInline(lead)}
             ${drawerVehicleContext}
-            ${drawerDuplicateWarning}
           </aside>
           <div class="drawer-workspace-main">
+            ${drawerDuplicateWarning}
             ${renderAdminCommunicationStrip(lead)}
             <section class="admin-drawer-section admin-drawer-command-card" data-drawer-section="assign">
               <header>

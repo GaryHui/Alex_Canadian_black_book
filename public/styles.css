@@ -4079,6 +4079,17 @@ body.admin-drawer-open {
   margin-top: 6px;
 }
 
+.drawer-workspace-main > .duplicate-vehicle-warning {
+  align-items: flex-start;
+  margin: 0;
+}
+
+.drawer-workspace-main > .duplicate-vehicle-warning .duplicate-review-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  max-width: 420px;
+}
+
 .duplicate-vehicle-reviewed {
   margin-top: 6px;
 }
@@ -4112,6 +4123,13 @@ body.admin-drawer-open {
 
 .duplicate-review-link:hover {
   text-decoration: underline;
+}
+
+.drawer-workspace-main > .duplicate-vehicle-warning .duplicate-review-link {
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  padding: 8px 12px;
+  white-space: nowrap;
 }
 
 .admin-duplicate-panel header span {
