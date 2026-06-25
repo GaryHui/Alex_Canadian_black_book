@@ -24,6 +24,7 @@
           <nav class="dealer-module-nav" aria-label="Dealer modules">
             <a href="#dealer-today-section">Dashboard</a>
             <a href="#dealer-assigned-leads">Up Sheets</a>
+            <a href="#dealer-stock-section">Inventory</a>
             <a href="#dealer-valuation-tool">Valuation</a>
             <a href="#history-panel">My quotes</a>
           </nav>
@@ -102,6 +103,18 @@
         </div>
         <p id="dealer-leads-status" class="status">Loading assigned leads...</p>
         <div id="dealer-leads-list" class="history-list dealer-leads-list"></div>
+        </section>
+        <section id="dealer-stock-section" class="history-panel dealer-leads-panel dealer-stock-panel">
+        <div class="history-head dealer-workbench-head">
+          <div>
+            <p class="eyebrow">Inventory follow-up</p>
+            <h2>Stock vehicles</h2>
+            <p>Continue work after a SELL lead becomes inventory. Upload supplemental photos, log blockers, and request manager review.</p>
+          </div>
+          <button id="reload-dealer-stock" type="button">Reload inventory</button>
+        </div>
+        <p id="dealer-stock-status" class="status">Loading assigned inventory...</p>
+        <div id="dealer-stock-list" class="dealer-stock-list"></div>
         </section>
         <section id="dealer-valuation-tool" class="search-panel dealer-valuation-panel">
         <details class="dealer-valuation-details">

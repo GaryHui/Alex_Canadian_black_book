@@ -1,5 +1,4 @@
-import { requireAdmin } from "./_admin.js";
-import { serviceClient, serviceHeaders } from "./_auth.js";
+import { requireDealer, serviceClient, serviceHeaders } from "./_auth.js";
 
 export const config = {
   api: {
@@ -15,14 +14,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
-  const admin = await requireAdmin(req);
-  if (!admin.ok) return res.status(admin.status).json({ ok: false, error: admin.error });
+  const dealer = await requireDealer(req);
+  if (!dealer.ok) return res.status(dealer.status).json({ ok: false, error: dealer.error });
 
-  const result = await uploadLeadPhotos(req.body || {}, admin.user);
+  const result = await uploadLeadPhotos(req.body || {}, dealer);
   return res.status(result.ok ? 200 : result.status || 400).json(result);
 }
 
-async function uploadLeadPhotos(body, user) {
+async function uploadLeadPhotos(body, dealer) {
   const client = serviceClient();
   if (!client.ok) return client;
 
@@ -30,6 +29,8 @@ async function uploadLeadPhotos(body, user) {
   const files = Array.isArray(body.files) ? body.files.slice(0, 12) : [];
   if (!leadId) return { ok: false, status: 400, error: "Lead id is required" };
   if (!files.length) return { ok: false, status: 400, error: "At least one photo is required" };
+  const access = await canUploadLeadPhotos(client, leadId, dealer);
+  if (!access.ok) return access;
 
   const leadResult = await fetchJson(
     `${client.url}/rest/v1/valuation_leads?select=*&id=eq.${encodeURIComponent(leadId)}&limit=1`,
@@ -39,7 +40,7 @@ async function uploadLeadPhotos(body, user) {
   const lead = leadResult.data?.[0];
   if (!lead) return { ok: false, status: 404, error: "Lead not found" };
 
-  const webhook = await submitPhotosToWebhook(lead, files, user);
+  const webhook = await submitPhotosToWebhook(lead, files, dealer.user);
   if (!webhook.submitted) {
     return { ok: false, status: 502, error: webhook.error || webhook.reason || "Google Drive upload webhook is not configured" };
   }
@@ -58,13 +59,35 @@ async function uploadLeadPhotos(body, user) {
 
   await insertJson(`${client.url}/rest/v1/lead_notes`, client.key, {
     lead_id: leadId,
-    author_email: String(user?.email || "").trim().toLowerCase(),
+    author_email: String(dealer.user?.email || "").trim().toLowerCase(),
     note_type: "inspection",
     note: `Vehicle photo upload:\n${lines.join("\n")}`
   });
 
   await touchLead(client, leadId);
   return { ok: true, photos: savedFiles, webhook };
+}
+
+async function canUploadLeadPhotos(client, leadId, dealer) {
+  if (dealer.role === "admin") return { ok: true };
+  const email = String(dealer.user?.email || "").trim().toLowerCase();
+  if (!email) return { ok: false, status: 403, error: "Dealer email is required" };
+
+  const direct = await fetchJson(
+    `${client.url}/rest/v1/valuation_leads?select=id&assigned_to=eq.${encodeURIComponent(email)}&id=eq.${encodeURIComponent(leadId)}&limit=1`,
+    client.key
+  );
+  if (!direct.ok) return direct;
+  if ((direct.data || []).length) return { ok: true };
+
+  const task = await fetchJson(
+    `${client.url}/rest/v1/lead_tasks?select=lead_id&assigned_to=eq.${encodeURIComponent(email)}&lead_id=eq.${encodeURIComponent(leadId)}&limit=1`,
+    client.key
+  );
+  if (!task.ok) return task;
+  if ((task.data || []).length) return { ok: true };
+
+  return { ok: false, status: 403, error: "You can upload photos only for leads assigned to you or tasks assigned to you." };
 }
 
 async function submitPhotosToWebhook(lead, files, user) {

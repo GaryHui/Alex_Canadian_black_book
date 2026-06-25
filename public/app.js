@@ -27,6 +27,9 @@ const reloadHistoryButton = document.querySelector("#reload-history");
 const dealerWorkbench = document.querySelector("#dealer-workbench");
 const dealerLeadsStatus = document.querySelector("#dealer-leads-status");
 const dealerLeadsList = document.querySelector("#dealer-leads-list");
+const dealerStockStatus = document.querySelector("#dealer-stock-status");
+const dealerStockList = document.querySelector("#dealer-stock-list");
+const reloadDealerStockButton = document.querySelector("#reload-dealer-stock");
 const reloadDealerLeadsButton = document.querySelector("#reload-dealer-leads");
 const dealerLeadAlertsEl = document.querySelector("#dealer-lead-alerts");
 const dealerTodayWorkEl = document.querySelector("#dealer-today-work");
@@ -94,6 +97,7 @@ let currentLookupMode = "free";
 let dealerRefreshTimer = null;
 let dealerDirectoryEmails = [];
 let dealerLeadsCache = [];
+let dealerInventoryCache = [];
 let dealerLeadRole = "dealer";
 let dealerLeadFilter = "active";
 let dealerLeadSort = "newest";
@@ -111,6 +115,7 @@ document.addEventListener("visibilitychange", () => {
 
 reloadHistoryButton.addEventListener("click", loadHistory);
 reloadDealerLeadsButton?.addEventListener("click", () => loadDealerLeads({ forceActivity: true }));
+reloadDealerStockButton?.addEventListener("click", loadDealerInventory);
 saveValuationLeadButton?.addEventListener("click", savePendingDealerLead);
 dealerLeadFilterButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -229,6 +234,20 @@ dealerLeadsList?.addEventListener("toggle", async (event) => {
 dealerLeadsList?.addEventListener("focusin", (event) => {
   const card = event.target.closest(".dealer-lead-card");
   if (card?.dataset?.leadId) setActiveDealerLead(card.dataset.leadId);
+});
+
+dealerStockList?.addEventListener("click", async (event) => {
+  const uploadButton = event.target.closest("[data-dealer-upload-stock-photos]");
+  if (uploadButton) {
+    await uploadDealerLeadPhotos(uploadButton);
+    await loadDealerInventory();
+    return;
+  }
+
+  const openLeadButton = event.target.closest("[data-dealer-open-stock-lead]");
+  if (openLeadButton) {
+    await openDealerLead(openLeadButton.dataset.dealerOpenStockLead || "");
+  }
 });
 
 dealerLeadDrawer?.addEventListener("click", async (event) => {
@@ -1334,6 +1353,7 @@ async function setSession(session) {
     loadUsage();
     loadHistory();
     loadDealerLeads({ forceActivity: true, suppressAlerts: dealer.role !== "admin" });
+    loadDealerInventory();
     startDealerAutoRefresh();
   } else {
     closeDealerDrawer();
@@ -1350,7 +1370,9 @@ async function setSession(session) {
     if (dealerWorkbench) dealerWorkbench.hidden = true;
     historyList.innerHTML = "";
     if (dealerLeadsList) dealerLeadsList.innerHTML = "";
+    if (dealerStockList) dealerStockList.innerHTML = "";
     historyLeads = [];
+    dealerInventoryCache = [];
     if (emailField) emailField.value = "";
     disableDealerTools(true);
   }
@@ -1493,6 +1515,113 @@ async function loadDealerLeads(options = {}) {
     dealerLeadsStatus.textContent = error.message || "Unable to load assigned leads";
     dealerLeadsList.innerHTML = "";
   }
+}
+
+async function loadDealerInventory() {
+  if (!authSession?.access_token || !dealerWorkbench || !dealerStockList) return;
+  if (dealerStockStatus) dealerStockStatus.textContent = "Loading assigned inventory...";
+  try {
+    const response = await fetch("/api/dealer-inventory", {
+      headers: {
+        Authorization: `Bearer ${authSession.access_token}`
+      }
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to load assigned inventory");
+    dealerInventoryCache = data.inventory || [];
+    renderDealerInventory(dealerInventoryCache);
+  } catch (error) {
+    if (dealerStockStatus) dealerStockStatus.textContent = error.message || "Unable to load assigned inventory";
+    dealerStockList.innerHTML = "";
+  }
+}
+
+function renderDealerInventory(inventory) {
+  if (!dealerStockList) return;
+  if (!inventory.length) {
+    if (dealerStockStatus) dealerStockStatus.textContent = "No inventory vehicles assigned to you yet.";
+    dealerStockList.innerHTML = `
+      <article class="dealer-stock-empty">
+        <strong>No stock follow-up right now</strong>
+        <span>When a seller lead moves to Warehouse and remains assigned to you, it appears here for photos, recon notes, and handoff work.</span>
+      </article>
+    `;
+    return;
+  }
+  const active = inventory.filter((item) => !["sold", "archived"].includes(String(item.status || "").toLowerCase())).length;
+  const published = inventory.filter((item) => String(item.status || "").toLowerCase() === "published").length;
+  if (dealerStockStatus) {
+    dealerStockStatus.textContent = `${inventory.length} assigned stock vehicle${inventory.length === 1 ? "" : "s"}. ${active} active / ${published} live on Buy page.`;
+  }
+  dealerStockList.innerHTML = inventory.map(renderDealerInventoryCard).join("");
+}
+
+function renderDealerInventoryCard(item) {
+  const status = String(item.status || "draft").toLowerCase();
+  const live = status === "published";
+  const photos = Array.isArray(item.photos) ? item.photos : [];
+  const leadId = String(item.sourceLeadId || "").trim();
+  const owner = item.ownerName || item.ownerEmail || item.ownerPhone || "Owner not recorded";
+  const price = Number(item.price || 0) ? `$${formatNumber(item.price)}` : "Price not set";
+  const km = Number(item.kilometers || 0) ? `${formatNumber(item.kilometers)} km` : "KM not set";
+  const lastTouch = item.lastActivityAt ? `Last touch ${formatDateTime(item.lastActivityAt)}` : "No recent stock activity";
+  return `
+    <article class="dealer-stock-card dealer-stock-${escapeHtml(cssToken(status))}">
+      <header class="dealer-stock-card-head">
+        <div>
+          <span class="dealer-stock-status ${live ? "is-live" : ""}">${escapeHtml(status.replaceAll("_", " "))}</span>
+          <h3>${escapeHtml(item.title || "Untitled stock vehicle")}</h3>
+          <p>${escapeHtml([price, km, item.region, item.color].filter(Boolean).join(" | "))}</p>
+        </div>
+        <div class="dealer-stock-photo-count">
+          <strong>${escapeHtml(String(photos.length))}</strong>
+          <span>${escapeHtml(photos.length === 1 ? "public photo" : "public photos")}</span>
+        </div>
+      </header>
+      <div class="dealer-stock-meta">
+        <span><b>Owner</b>${escapeHtml(owner)}</span>
+        <span><b>Rep</b>${escapeHtml(item.assignedTo || authSession?.user?.email || "Unassigned")}</span>
+        <span><b>VIN</b>${escapeHtml(item.vin || "-")}</span>
+        <span><b>Activity</b>${escapeHtml(lastTouch)}</span>
+      </div>
+      ${photos.length ? `<div class="dealer-stock-photo-strip">${photos.slice(0, 5).map((photo) => `<a href="${escapeHtml(photo.url)}" target="_blank" rel="noreferrer">${escapeHtml(photo.label || "Photo")}</a>`).join("")}</div>` : ""}
+      <section class="dealer-stock-actions">
+        ${leadId ? `
+          <button type="button" class="secondary-button" data-dealer-open-stock-lead="${escapeHtml(leadId)}">Open original lead</button>
+          ${renderDealerStockPhotoUpload(leadId)}
+        ` : `<p class="status">This stock vehicle is not linked to a SELL lead, so staff upload is unavailable.</p>`}
+      </section>
+    </article>
+  `;
+}
+
+function renderDealerStockPhotoUpload(leadId) {
+  const options = [
+    "Listing",
+    "Exterior",
+    "Interior",
+    "Damage",
+    "Odometer",
+    "VIN",
+    "Recon",
+    "Other / any angle"
+  ];
+  return `
+    <div class="lead-photo-manager dealer-photo-manager dealer-stock-photo-manager" data-lead-id="${escapeHtml(leadId)}">
+      <label>
+        <span>Photo type</span>
+        <select name="photoLabel">
+          ${options.map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join("")}
+        </select>
+      </label>
+      <label class="dealer-photo-file">
+        <span>Add photos</span>
+        <input name="leadPhotos" type="file" accept="image/*" multiple />
+      </label>
+      <button type="button" data-dealer-upload-stock-photos="${escapeHtml(leadId)}">Upload for manager review</button>
+      <p class="lead-photo-status" aria-live="polite">Uploads go to this vehicle folder. Manager chooses what appears on Buy page.</p>
+    </div>
+  `;
 }
 
 function collectDealerLeadAlerts(leads) {
@@ -3119,7 +3248,7 @@ function applyDealerTaskDue(due) {
 
 async function uploadDealerLeadPhotos(button) {
   const manager = button.closest(".lead-photo-manager");
-  const leadId = button.dataset.dealerUploadLeadPhotos || manager?.dataset.leadId || activeDealerDrawerLeadId || "";
+  const leadId = button.dataset.dealerUploadLeadPhotos || button.dataset.dealerUploadStockPhotos || manager?.dataset.leadId || activeDealerDrawerLeadId || "";
   const fileInput = manager?.querySelector("input[name='leadPhotos']");
   const labelInput = manager?.querySelector("select[name='photoLabel']");
   const status = manager?.querySelector(".lead-photo-status");
@@ -3161,6 +3290,7 @@ async function uploadDealerLeadPhotos(button) {
     dealerDrawerActivityLoaded = false;
     await Promise.all([
       loadDealerLeads({ forceActivity: true, suppressAlerts: true }),
+      loadDealerInventory(),
       loadDealerDrawerActivity({ force: true, highlightLatest: true })
     ]);
   } catch (error) {
@@ -3263,12 +3393,20 @@ function stopDealerAutoRefresh() {
 
 async function refreshOpenDealerTasks() {
   if (!authSession?.access_token || !dealerAdminAllowed || document.hidden || isEditingDealerLeads()) return;
-  await checkDealerLeadUpdates();
+  await Promise.all([
+    checkDealerLeadUpdates(),
+    isEditingDealerStock() ? Promise.resolve() : loadDealerInventory()
+  ]);
 }
 
 function isEditingDealerLeads() {
   const active = document.activeElement;
   return Boolean(active && dealerLeadsList?.contains(active) && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(active.tagName));
+}
+
+function isEditingDealerStock() {
+  const active = document.activeElement;
+  return Boolean(active && dealerStockList?.contains(active) && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(active.tagName));
 }
 
 async function checkDealerLeadUpdates() {
