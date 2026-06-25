@@ -1195,12 +1195,13 @@ async function openAdminLeadFromAlert(id) {
   if (!adminLeadsCache.some((lead) => String(lead.id || "") === id)) {
     await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
   }
-  if (adminLeadFilter !== "all") {
+  const visibleId = resolveVisibleAdminLeadId(id);
+  let card = leadsEl.querySelector(`.lead-card[data-id="${cssEscape(visibleId)}"]`);
+  if (!card && adminLeadFilter !== "all") {
     setAdminLeadFilter("all");
     renderLeadWorkbench(adminLeadsCache);
+    card = leadsEl.querySelector(`.lead-card[data-id="${cssEscape(visibleId)}"]`);
   }
-  const visibleId = resolveVisibleAdminLeadId(id);
-  const card = leadsEl.querySelector(`.lead-card[data-id="${cssEscape(visibleId)}"]`);
   if (!card) return;
   setActiveAdminLead(visibleId);
   clearAdminVisibleAlertGroup(id);
