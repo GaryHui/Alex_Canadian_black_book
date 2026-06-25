@@ -2019,14 +2019,20 @@ async function uploadLeadPhotos(body, user, role) {
   }
 
   const parsed = webhook.data || parseJson(webhook.response) || {};
-  const savedFiles = Array.isArray(parsed.savedFiles) ? parsed.savedFiles : [];
-  if (!savedFiles.length) return { ok: false, status: 502, error: "Google Drive did not return saved file URLs" };
+  const savedFiles = normalizeDriveUploadFiles(extractDriveFileRows(parsed));
+  if (!savedFiles.length) {
+    return {
+      ok: false,
+      status: 502,
+      error: `Google Drive did not return saved file URLs. ${driveWebhookSummary(parsed, webhook)}`
+    };
+  }
 
   const lines = [];
   if (parsed.leadFolderUrl) lines.push(`Vehicle Drive folder: ${parsed.leadFolderUrl}`);
   lines.push(...savedFiles.map((file, index) => {
     const label = files[index]?.role || files[index]?.angle || file.name || `Photo ${index + 1}`;
-    const url = file.url || file.webViewLink || "";
+    const url = file.url || "";
     return `${label}: ${url}`;
   }));
   await createLeadActivity({
@@ -2046,6 +2052,56 @@ async function uploadLeadPhotos(body, user, role) {
   }
 
   return { ok: true, photos: savedFiles, webhook };
+}
+
+function extractDriveFileRows(parsed = {}) {
+  return [
+    ...(Array.isArray(parsed.savedFiles) ? parsed.savedFiles : []),
+    ...(Array.isArray(parsed.files) ? parsed.files : []),
+    ...(Array.isArray(parsed.photos) ? parsed.photos : []),
+    ...(Array.isArray(parsed.data?.savedFiles) ? parsed.data.savedFiles : []),
+    ...(Array.isArray(parsed.data?.files) ? parsed.data.files : []),
+    ...(Array.isArray(parsed.data?.photos) ? parsed.data.photos : [])
+  ];
+}
+
+function normalizeDriveUploadFiles(files) {
+  const seen = new Set();
+  return (files || [])
+    .map((file, index) => {
+      const id = String(file.id || file.fileId || "").trim();
+      const url = driveUploadFileUrl(file, id);
+      return {
+        id,
+        name: String(file.name || file.title || `Vehicle photo ${index + 1}`).trim(),
+        url,
+        webViewLink: url,
+        thumbnailLink: String(file.thumbnailLink || "").trim(),
+        mimeType: String(file.mimeType || "").trim()
+      };
+    })
+    .filter((file) => file.url && !isDriveFolderUrl(file.url))
+    .filter((file) => !file.mimeType || file.mimeType.startsWith("image/") || /\.(png|jpe?g|webp|gif|heic)$/i.test(file.name))
+    .filter((file) => {
+      const key = file.url || file.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function driveUploadFileUrl(file, id = "") {
+  const direct = String(file.url || file.webViewLink || file.webUrl || "").trim();
+  if (direct) return direct;
+  const thumbnailId = parseDriveFileId(file.thumbnailLink);
+  const fileId = id || thumbnailId;
+  return fileId ? `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view` : "";
+}
+
+function driveWebhookSummary(parsed = {}, webhook = {}) {
+  const keys = Object.keys(parsed || {}).slice(0, 12).join(", ") || "none";
+  const response = String(webhook.response || "").replace(/\s+/g, " ").slice(0, 240);
+  return `Webhook keys: ${keys}.${response ? ` Response: ${response}` : ""}`;
 }
 
 async function submitLeadPhotosToWebhook(lead, files, user) {
@@ -2285,16 +2341,19 @@ async function uploadInventoryPhotos(body, user) {
     return { ok: false, status: 502, error: webhook.error || webhook.reason || "Google Drive upload webhook is not configured" };
   }
 
-  const savedFiles = Array.isArray(webhook.data?.savedFiles)
-    ? webhook.data.savedFiles
-    : Array.isArray(parseJson(webhook.response)?.savedFiles)
-      ? parseJson(webhook.response).savedFiles
-      : [];
-  if (!savedFiles.length) return { ok: false, status: 502, error: "Google Drive did not return saved file URLs" };
+  const parsed = webhook.data || parseJson(webhook.response) || {};
+  const savedFiles = normalizeDriveUploadFiles(extractDriveFileRows(parsed));
+  if (!savedFiles.length) {
+    return {
+      ok: false,
+      status: 502,
+      error: `Google Drive did not return saved file URLs. ${driveWebhookSummary(parsed, webhook)}`
+    };
+  }
 
   const rows = savedFiles.map((file, index) => ({
     listing_id: listingId,
-    url: String(file.url || "").trim(),
+    url: String(file.url || file.webViewLink || "").trim(),
     label: String(files[index]?.role || files[index]?.angle || file.name || `Photo ${index + 1}`).trim(),
     sort_order: index
   })).filter((row) => row.url);
