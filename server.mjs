@@ -1046,7 +1046,10 @@ function leadExportValues(lead) {
   const valuation = lead.valuation || {};
 
   return {
+    leadSource: leadSourceLabel(input.leadSource),
+    ownerName: input.ownerName || "",
     email: input.email || lead.auth_email || lead.auth_user?.email || "",
+    dealerEmail: input.dealerEmail || input.authEmail || lead.auth_email || lead.auth_user?.email || "",
     phone: input.phone || "",
     vin: valuation.vin || input.vin || "",
     uvc: input.uvc || "",
@@ -3793,8 +3796,25 @@ function supabaseServiceHeaders(key) {
   };
 }
 
+function normalizeLeadSource(value) {
+  const source = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (["dealer_appraisal", "dealer_valuation", "dealer_created"].includes(source)) return "dealer_appraisal";
+  if (["buyer_inquiry", "buy_page", "public_buy"].includes(source)) return "buyer_inquiry";
+  return "owner_self_valuation";
+}
+
+function leadSourceLabel(value) {
+  const source = normalizeLeadSource(value);
+  if (source === "dealer_appraisal") return "Dealer appraisal";
+  if (source === "buyer_inquiry") return "Buyer inquiry";
+  return "Owner self appraisal";
+}
+
 function sanitizeLeadInput(input) {
+  const leadSource = normalizeLeadSource(input.leadSource || input.sourceContext || (input.leadType === "buyer_inquiry" ? "buyer_inquiry" : input.createdByDealer ? "dealer_appraisal" : "owner_self_valuation"));
   return {
+    leadSource,
+    sourceLabel: leadSourceLabel(leadSource),
     email: String(input.email || "").trim(),
     phone: String(input.phone || "").trim(),
     ownerName: String(input.ownerName || input.name || "").trim(),
@@ -3805,10 +3825,8 @@ function sanitizeLeadInput(input) {
     submitterRelationship: String(input.submitterRelationship || "").trim(),
     dealerEmail: String(input.dealerEmail || "").trim(),
     authEmail: String(input.authEmail || "").trim(),
-    createdByDealer: Boolean(input.createdByDealer),
-    leadSource: String(input.leadSource || "").trim(),
+    createdByDealer: Boolean(input.createdByDealer || leadSource === "dealer_appraisal"),
     leadType: String(input.leadType || "").trim(),
-    sourceLabel: String(input.sourceLabel || "").trim(),
     vin: cleanVin(input.vin),
     uvc: String(input.uvc || "").trim(),
     year: String(input.year || "").trim(),
