@@ -3414,7 +3414,10 @@ inventoryEl?.addEventListener("click", async (event) => {
   if (saveListingButton) {
     event.preventDefault();
     const form = saveListingButton.closest(".inventory-card-admin");
-    if (form) await saveInventoryListing(form);
+    if (form) {
+      const assignedTo = String(form.querySelector("[name='assignedTo']")?.value || "").trim();
+      await saveInventoryListing(form, assignedTo ? { assignedTo } : {});
+    }
     return;
   }
 
