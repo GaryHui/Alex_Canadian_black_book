@@ -111,7 +111,7 @@ export default async function handler(req, res) {
   if (req.method === "DELETE") {
     const admin = await requireAdmin(req);
     if (!admin.ok) return res.status(admin.status).json({ ok: false, error: admin.error });
-    const result = await deleteLeadRecords(req.query || {});
+    const result = await deleteLeadRecords(req.query || {}, admin.user);
     return res.status(result.ok ? 200 : result.status || 400).json(result);
   }
 
@@ -345,7 +345,7 @@ async function listFromSupabase() {
 }
 
 async function repairOrphanInventoryLeads(client) {
-  const statusList = ["in_inventory", "closed", "lost", "won", "deleted", "archived"];
+  const statusList = ["in_inventory", "closed", "lost", "won"];
   const candidateResult = await fetch(`${client.url}/rest/v1/valuation_leads?select=*&status=in.(${statusList.join(",")})&order=last_activity_at.desc.nullslast,created_at.desc&limit=1000`, {
     headers: authHeaders(client.key)
   }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] }));
@@ -680,7 +680,7 @@ async function recordWebhookPhotosAsLeadNote({ url, key, leadId, uploadFiles = [
   }).catch(() => null);
 }
 
-async function deleteLeadRecords(query) {
+async function deleteLeadRecords(query, user = {}) {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
@@ -690,15 +690,29 @@ async function deleteLeadRecords(query) {
 
   if (id) {
     const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(id)}`, {
-      method: "DELETE",
+      method: "PATCH",
       headers: {
         ...authHeaders(key),
+        "Content-Type": "application/json",
         Prefer: "return=representation"
-      }
+      },
+      body: JSON.stringify({
+        status: "deleted",
+        last_activity_at: new Date().toISOString()
+      })
     });
     const data = await response.json().catch(() => null);
     if (!response.ok) return { ok: false, status: response.status, error: data };
-    return { ok: true, deleted: Array.isArray(data) ? data.length : 0 };
+    if (Array.isArray(data) && data[0]?.id) {
+      await createLeadTimelineNote({
+        url,
+        key,
+        leadId: data[0].id,
+        authorEmail: String(user?.email || "admin").trim().toLowerCase(),
+        note: "Lead moved to recycle bin."
+      });
+    }
+    return { ok: true, deleted: Array.isArray(data) ? data.length : 0, softDeleted: true, lead: data?.[0] || null };
   }
 
   if (confirm !== "DELETE ALL LEADS") {

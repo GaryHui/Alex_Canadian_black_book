@@ -685,7 +685,7 @@ function renderInventoryListing(listing) {
           <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="draft" ${canUnpublish ? "" : "disabled"}>Unpublish</button>
           <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="sold">Mark sold</button>
           <button class="secondary-action" type="button" data-inventory-status="${escapeHtml(listing.id || "")}" data-status="archived" ${canArchive ? "" : "disabled"}>Archive</button>
-          <button class="danger-outline" type="button" data-remove-inventory="${escapeHtml(listing.id || "")}">Remove</button>
+          <button class="danger-outline" type="button" data-remove-inventory="${escapeHtml(listing.id || "")}">Move out</button>
         </div>
       </section>
       <details class="inventory-edit-details">
@@ -2940,7 +2940,7 @@ function renderAdminDrawer(leadId) {
               <summary>
                 <span>
                   <strong>More lead tools</strong>
-                  <small>Admin notes, email log, and delete</small>
+                  <small>Admin notes, email log, and recycle bin</small>
                 </span>
               </summary>
               <form class="owner-review admin-drawer-owner-form">
@@ -2964,8 +2964,12 @@ function renderAdminDrawer(leadId) {
                 <button type="submit">Log email</button>
               </form>
               <div class="admin-drawer-danger-zone">
-                <span>Danger zone</span>
-                <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(id)}" data-delete-title="${escapeHtml(title)}">Delete lead</button>
+                <span>Recycle bin</span>
+                ${status === "deleted" ? `
+                  <button class="secondary-action" type="button" data-restore-lead="${escapeHtml(id)}" data-restore-title="${escapeHtml(title)}">Restore lead</button>
+                ` : `
+                  <button class="danger-outline" type="button" data-delete-lead="${escapeHtml(id)}" data-delete-title="${escapeHtml(title)}">Move to recycle bin</button>
+                `}
               </div>
             </details>
           </div>
@@ -3167,7 +3171,7 @@ function leadStatusOptions(buyer) {
         { value: "won", label: "Won" },
         { value: "lost", label: "Lost" },
         { value: "closed", label: "Closed" },
-        { value: "deleted", label: "Deleted" }
+        { value: "deleted", label: "Recycle Bin" }
       ]
     : [
         { value: "new", label: "New seller lead" },
@@ -3180,7 +3184,7 @@ function leadStatusOptions(buyer) {
         { value: "won", label: "Acquired / consigned" },
         { value: "lost", label: "Lost" },
         { value: "closed", label: "Closed" },
-        { value: "deleted", label: "Deleted" }
+        { value: "deleted", label: "Recycle Bin" }
       ];
 }
 
@@ -3480,17 +3484,17 @@ async function removeInventoryListing(button) {
   const id = button.dataset.removeInventory || form?.dataset.id || "";
   if (!id) return;
   const confirmed = window.confirm(
-    `Remove "${title}" from inventory?\n\nIt will disappear from Inventory management and the public Buy page. The original lead and activity remain, so staff can keep working on it and an admin can publish it again later.`
+    `Move "${title}" out of warehouse?\n\nIt will disappear from Inventory management and the public Buy page. The original lead and activity remain, so staff can keep working on it and an admin can publish it again later.`
   );
   if (!confirmed) return;
   button.disabled = true;
-  inventoryStatusEl.textContent = "Removing inventory listing...";
+  inventoryStatusEl.textContent = "Moving vehicle out of warehouse...";
   const response = await fetch(`/api/admin-inventory?id=${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers: authHeaders()
   });
   const data = await response.json();
-  inventoryStatusEl.textContent = data.ok ? "Inventory listing removed. The seller lead was restored to the CRM Active queue." : formatApiError(data, "Unable to remove inventory listing.");
+  inventoryStatusEl.textContent = data.ok ? "Vehicle moved out of warehouse. The seller lead was restored to the CRM Active queue." : formatApiError(data, "Unable to move vehicle out of warehouse.");
   if (data.ok) {
     await Promise.all([loadInventory(), loadLeads({ suppressAlerts: true, forceOpenActivity: true })]);
   }
@@ -3756,6 +3760,12 @@ leadsEl.addEventListener("click", async (event) => {
     return;
   }
 
+  const restoreButton = event.target.closest("[data-restore-lead]");
+  if (restoreButton) {
+    await restoreSingleLead(restoreButton);
+    return;
+  }
+
   const uploadLeadPhotosButton = event.target.closest("[data-upload-lead-photos]");
   if (uploadLeadPhotosButton) {
     await uploadLeadPhotos(uploadLeadPhotosButton);
@@ -3803,6 +3813,12 @@ adminLeadDrawer?.addEventListener("click", async (event) => {
   const deleteButton = event.target.closest("[data-delete-lead]");
   if (deleteButton) {
     await deleteSingleLead(deleteButton);
+    return;
+  }
+
+  const restoreButton = event.target.closest("[data-restore-lead]");
+  if (restoreButton) {
+    await restoreSingleLead(restoreButton);
     return;
   }
 
@@ -4480,21 +4496,53 @@ async function deleteSingleLead(button) {
   if (!id || !adminSession) return;
 
   const confirmed = window.confirm(
-    `Delete "${title}" permanently?\n\nThis removes the lead and its notes/tasks/email records from Supabase. This does not delete Google Sheet rows or Google Drive files.`
+    `Move "${title}" to the recycle bin?\n\nThis hides the lead from Active work but keeps its notes, tasks, email logs, Google Sheet rows, and Google Drive files. You can restore it from the Recycle Bin filter.`
   );
   if (!confirmed) return;
 
   button.disabled = true;
-  statusEl.textContent = "Deleting lead...";
+  statusEl.textContent = "Moving lead to recycle bin...";
   const response = await fetch(`/api/leads?id=${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers: authHeaders()
   });
   const data = await response.json();
-  statusEl.textContent = data.ok ? `Deleted ${data.deleted || 0} lead record.` : formatApiError(data, "Unable to delete lead.");
+  statusEl.textContent = data.ok ? `Moved ${data.deleted || 0} lead record to recycle bin.` : formatApiError(data, "Unable to move lead to recycle bin.");
   if (data.ok) {
     if (activeAdminDrawerLeadId === id) closeAdminDrawer();
     await loadLeads({ suppressAlerts: true });
+  }
+  button.disabled = false;
+}
+
+async function restoreSingleLead(button) {
+  const id = button.dataset.restoreLead || "";
+  const title = button.dataset.restoreTitle || "this lead";
+  if (!id || !adminSession) return;
+
+  const lead = adminLeadsCache.find((item) => String(item.id || "") === String(id));
+  const nextStatus = String(lead?.assigned_to || "").trim() ? "assigned" : "new";
+  const confirmed = window.confirm(`Restore "${title}" from the recycle bin?`);
+  if (!confirmed) return;
+
+  button.disabled = true;
+  statusEl.textContent = "Restoring lead...";
+  const response = await fetch("/api/leads", {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id,
+      status: nextStatus,
+      updatedBy: adminSession?.user?.email || "admin"
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  statusEl.textContent = data.ok ? "Lead restored to Active Up Sheets." : formatApiError(data, "Unable to restore lead.");
+  if (data.ok) {
+    if (activeAdminDrawerLeadId === id) closeAdminDrawer();
+    setAdminLeadFilter("active");
+    await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
+    await openAdminLeadFromAlert(id);
   }
   button.disabled = false;
 }
