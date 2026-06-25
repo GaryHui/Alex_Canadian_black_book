@@ -183,6 +183,9 @@ export async function reviewDuplicateSellerLead(client, leadId, decision, author
   if (choice === "merge_existing") {
     result = await mergeDuplicateSellerLead(client, snapshot, lead, author, options);
     if (!result.ok) return result;
+  } else if (choice === "merge_all_existing") {
+    result = await mergeAllDuplicateSellerLeads(client, snapshot, lead, author, options);
+    if (!result.ok) return result;
   } else if (choice === "link_inventory") {
     result = await linkDuplicateSellerLeadToInventory(client, snapshot, lead, author, options);
     if (!result.ok) return result;
@@ -947,6 +950,62 @@ async function mergeDuplicateSellerLead(client, snapshot, lead, author, options 
   };
 }
 
+async function mergeAllDuplicateSellerLeads(client, snapshot, lead, author, options = {}) {
+  const primaryLeadId = String(options.targetLeadId || lead?.id || "").trim();
+  const primaryLead = snapshot.leadsById.get(primaryLeadId) || lead;
+  const targetLeadId = String(primaryLead?.id || "").trim();
+  if (!targetLeadId) return { ok: false, error: "Primary seller lead is required for merge_all_existing." };
+  if (isBuyerLead(primaryLead)) return { ok: false, error: "Primary record must be a seller lead." };
+
+  const keys = leadVehicleKeys(primaryLead);
+  const duplicateLeads = snapshot.allLeads.filter((item) => {
+    const id = String(item?.id || "").trim();
+    return id
+      && id !== targetLeadId
+      && !isBuyerLead(item)
+      && !isVehicleChildLead(item, snapshot.relationMap)
+      && sharesVehicle(keys, leadVehicleKeys(item));
+  });
+  if (!duplicateLeads.length) {
+    return { ok: true, decision: "merge_all_existing", target_lead_id: targetLeadId, merged_count: 0 };
+  }
+
+  const mergedIds = [];
+  for (const duplicateLead of duplicateLeads) {
+    const duplicateLeadId = String(duplicateLead?.id || "").trim();
+    const result = await mergeDuplicateSellerLead(client, snapshot, duplicateLead, author, { targetLeadId });
+    if (!result.ok) return result;
+    mergedIds.push(duplicateLeadId);
+    await insertLeadNote(client, {
+      lead_id: duplicateLeadId,
+      author_email: author,
+      note_type: "internal",
+      note: `[Vehicle review:duplicate_reviewed:merge_existing] Owner reviewed duplicate seller vehicle and merged it into CRM lead ${targetLeadId}.`
+    });
+    await insertLeadNote(client, {
+      lead_id: duplicateLeadId,
+      author_email: author,
+      note_type: "owner_read",
+      note: `Duplicate vehicle review completed: Owner reviewed duplicate seller vehicle and merged it into CRM lead ${targetLeadId}.`
+    });
+  }
+  await insertLeadNote(client, {
+    lead_id: targetLeadId,
+    author_email: author,
+    note_type: "internal",
+    note: `Merged ${mergedIds.length} same-vehicle seller lead${mergedIds.length === 1 ? "" : "s"} into this primary CRM file.`
+  });
+
+  return {
+    ok: true,
+    decision: "merge_all_existing",
+    target_lead_id: targetLeadId,
+    target_listing_id: "",
+    merged_count: mergedIds.length,
+    merged_lead_ids: mergedIds
+  };
+}
+
 async function linkDuplicateSellerLeadToInventory(client, snapshot, lead, author, options = {}) {
   const duplicateLeadId = String(lead?.id || "").trim();
   const matchingListings = snapshot.inventoryRows.filter((item) => sharesVehicle(leadVehicleKeys(lead), listingVehicleKeys(item)));
@@ -1306,10 +1365,16 @@ async function insertLeadNote(client, payload) {
 
 function duplicateDecision(value) {
   const normalized = String(value || "").trim().toLowerCase();
-  return ["keep_separate", "merge_existing", "link_inventory"].includes(normalized) ? normalized : "keep_separate";
+  return ["keep_separate", "merge_existing", "merge_all_existing", "link_inventory"].includes(normalized) ? normalized : "keep_separate";
 }
 
 function duplicateDecisionMessage(decision, result = {}) {
+  if (decision === "merge_all_existing") {
+    const count = Number(result.merged_count || 0);
+    return result.target_lead_id
+      ? `Owner reviewed same-vehicle seller leads and merged ${count} into CRM lead ${result.target_lead_id}.`
+      : "Owner reviewed same-vehicle seller leads and merged them into the primary CRM record.";
+  }
   if (decision === "merge_existing") {
     return result.target_lead_id
       ? `Owner reviewed duplicate seller vehicle and merged it into CRM lead ${result.target_lead_id}.`

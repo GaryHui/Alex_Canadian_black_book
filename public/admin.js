@@ -1152,18 +1152,20 @@ function duplicateWarningInline(lead) {
   const warehouseLinkButton = listingId
     ? `<button type="button" data-duplicate-review="link_inventory" data-target-lead-id="${escapeHtml(safeMergeTargetId)}" data-listing-id="${escapeHtml(listingId)}">Link warehouse</button>`
     : "";
+  const mergeAllTargetId = safeMergeTargetId || currentId;
   return `
     <section class="owner-review-required duplicate-vehicle-warning" data-drawer-section="duplicate">
       <div>
         <span>Same vehicle review</span>
         <strong>Possible same vehicle. Review before warehouse.</strong>
-        <small>Choose merge, keep separate, or open the vehicle group.</small>
+        <small>Choose one primary CRM file, then fold duplicate seller leads into it.</small>
       </div>
       <div class="duplicate-review-actions">
         <button type="button" data-duplicate-review="keep_separate">Keep separate</button>
         <button type="button" data-duplicate-review="merge_existing" data-target-lead-id="${escapeHtml(safeMergeTargetId)}" ${safeMergeTargetId ? "" : "disabled"}>Merge into primary</button>
+        <button type="button" data-duplicate-review="merge_all_existing" data-target-lead-id="${escapeHtml(mergeAllTargetId)}">Merge all into this file</button>
         ${warehouseLinkButton}
-        <a class="duplicate-review-link" href="${escapeHtml(adminVehicleClusterUrl(lead))}" target="_blank" rel="noreferrer">Open vehicle group</a>
+        <a class="duplicate-review-link" href="${escapeHtml(adminVehicleClusterUrl(lead))}" target="_blank" rel="noreferrer">Review vehicle file</a>
       </div>
     </section>
   `;
@@ -2255,21 +2257,39 @@ function renderCollapsedSellerMembersInline(lead) {
   if (!shouldGroupSellerLead(lead)) return "";
   const hiddenMembers = adminCollapsedSellerMembers(lead);
   if (!hiddenMembers.length) return "";
-  const firstHiddenId = String(hiddenMembers[0]?.id || "").trim();
+  const unresolvedMembers = hiddenMembers.filter((item) => !item?.merge_state?.kind && item?.duplicate_warning?.message && !item.duplicate_warning.reviewed);
+  const foldedMembers = hiddenMembers.filter((item) => item?.merge_state?.kind);
+  const firstHiddenId = String((unresolvedMembers[0] || hiddenMembers[0])?.id || "").trim();
+  const currentId = String(lead?.id || "").trim();
+  const sourcePreview = hiddenMembers.slice(0, 3).map(adminSellerLeadSourcePreview).join(" | ");
+  const summary = unresolvedMembers.length
+    ? `${unresolvedMembers.length} same-vehicle SELL lead${unresolvedMembers.length === 1 ? "" : "s"} still need review`
+    : `${hiddenMembers.length} same-vehicle source${hiddenMembers.length === 1 ? "" : "s"} folded into this file`;
+  const detail = [
+    sourcePreview,
+    foldedMembers.length ? `${foldedMembers.length} already merged / archived` : "",
+    hiddenMembers.length > 3 ? `+${hiddenMembers.length - 3} more` : ""
+  ].filter(Boolean).join(" | ");
   return `
     <section class="lead-collapsed-cluster">
       <div>
-        <span>Same vehicle review</span>
-        <strong>${escapeHtml(`${hiddenMembers.length} related SELL lead${hiddenMembers.length === 1 ? "" : "s"} need an owner decision`)}</strong>
-        <small>${escapeHtml(hiddenMembers.slice(0, 3).map((item) => item.input?.email || item.auth_email || item.id || "Seller lead").join(" | "))}${hiddenMembers.length > 3 ? ` +${hiddenMembers.length - 3} more` : ""}</small>
+        <span>${unresolvedMembers.length ? "Same vehicle review" : "Same vehicle file"}</span>
+        <strong>${escapeHtml(summary)}</strong>
+        <small>${escapeHtml(detail)}</small>
       </div>
       <div class="lead-collapsed-actions">
-        <button type="button" data-admin-open-url="${escapeHtml(adminVehicleClusterUrl(lead))}">Open vehicle group</button>
-        <button type="button" data-admin-set-filter="duplicate-review">Review duplicate queue</button>
+        ${unresolvedMembers.length ? `<button type="button" data-duplicate-review="merge_all_existing" data-target-lead-id="${escapeHtml(currentId)}">Merge all into this file</button>` : ""}
+        <button type="button" data-admin-open-url="${escapeHtml(adminVehicleClusterUrl(lead))}">Review vehicle file</button>
+        ${unresolvedMembers.length ? `<button type="button" data-admin-set-filter="duplicate-review">Review duplicate queue</button>` : ""}
         ${firstHiddenId ? `<button type="button" data-admin-open-lead="${escapeHtml(firstHiddenId)}">Open related lead</button>` : ""}
       </div>
     </section>
   `;
+}
+
+function adminSellerLeadSourcePreview(lead) {
+  const input = lead?.input || {};
+  return input.ownerEmail || input.email || input.ownerPhone || input.phone || lead?.auth_email || lead?.id || "Seller lead";
 }
 
 function adminVehicleClusterKey(lead) {
