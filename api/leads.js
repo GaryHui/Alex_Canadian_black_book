@@ -328,31 +328,58 @@ async function listFromSupabase() {
     }
   });
 
-  const leads = await response.json().catch(() => []);
+  let leads = await response.json().catch(() => []);
   if (!response.ok) return { ok: false, status: response.status, error: leads, leads: [] };
-  const repairedLeads = await repairOrphanInventoryLeads(leads, { url, key });
-  const withReview = await attachOwnerReviewState(repairedLeads, { url, key });
+  const repairResult = await repairOrphanInventoryLeads({ url, key });
+  if (repairResult.repairedIds.size) {
+    const repairedResponse = await fetch(`${url}/rest/v1/valuation_leads?select=*&order=last_activity_at.desc.nullslast,created_at.desc&limit=500`, {
+      headers: authHeaders(key)
+    });
+    const repairedLeads = await repairedResponse.json().catch(() => []);
+    if (repairedResponse.ok) leads = repairedLeads;
+  }
+  const withReview = await attachOwnerReviewState(leads, { url, key });
   return { ok: true, storage: "supabase", leads: await attachLeadSignals(withReview, { url, key }) };
 }
 
-async function repairOrphanInventoryLeads(leads, client) {
-  if (!Array.isArray(leads) || !leads.length) return [];
-  const candidates = leads.filter((lead) => (
-    !isBuyerLead(lead)
-    && String(lead.status || "").trim().toLowerCase() === "in_inventory"
-    && String(lead.id || "").trim()
-  ));
-  if (!candidates.length) return leads;
-
-  const ids = candidates.map((lead) => String(lead.id || "").trim());
-  const listingResult = await fetch(`${client.url}/rest/v1/vehicle_listings?select=id,source_lead_id&source_lead_id=in.(${ids.map(encodeURIComponent).join(",")})&limit=500`, {
+async function repairOrphanInventoryLeads(client) {
+  const statusList = ["in_inventory", "closed", "lost", "won"];
+  const candidateResult = await fetch(`${client.url}/rest/v1/valuation_leads?select=*&status=in.(${statusList.join(",")})&order=last_activity_at.desc.nullslast,created_at.desc&limit=1000`, {
     headers: authHeaders(client.key)
   }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] }));
-  if (!listingResult.ok) return leads;
+  if (!candidateResult.ok || !Array.isArray(candidateResult.data)) return { repairedIds: new Set() };
+  const candidates = candidateResult.data.filter((lead) => !isBuyerLead(lead) && String(lead.id || "").trim());
+  if (!candidates.length) return { repairedIds: new Set() };
 
+  const ids = candidates.map((lead) => String(lead.id || "").trim());
+  const listingResult = await fetch(`${client.url}/rest/v1/vehicle_listings?select=id,source_lead_id&source_lead_id=in.(${ids.map(encodeURIComponent).join(",")})&limit=1000`, {
+    headers: authHeaders(client.key)
+  }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] }));
+  if (!listingResult.ok) return { repairedIds: new Set() };
   const inventoryLeadIds = new Set((listingResult.data || []).map((row) => String(row.source_lead_id || "").trim()).filter(Boolean));
-  const orphanLeads = candidates.filter((lead) => !inventoryLeadIds.has(String(lead.id || "").trim()));
-  if (!orphanLeads.length) return leads;
+  const orphanCandidates = candidates.filter((lead) => !inventoryLeadIds.has(String(lead.id || "").trim()));
+  if (!orphanCandidates.length) return { repairedIds: new Set() };
+
+  const noteResult = await fetch(`${client.url}/rest/v1/lead_notes?select=lead_id,note,created_at&lead_id=in.(${orphanCandidates.map((lead) => encodeURIComponent(String(lead.id || "").trim())).join(",")})&note_type=eq.internal&order=created_at.desc&limit=1000`, {
+    headers: authHeaders(client.key)
+  }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] }));
+  if (!noteResult.ok) return { repairedIds: new Set() };
+  const removedInventoryNotesByLead = new Map();
+  for (const note of noteResult.data || []) {
+    const text = String(note.note || "");
+    if (!/Inventory listing removed/i.test(text)) continue;
+    const leadId = String(note.lead_id || "").trim();
+    const current = removedInventoryNotesByLead.get(leadId);
+    if (!current || new Date(note.created_at || 0).getTime() > new Date(current.created_at || 0).getTime()) {
+      removedInventoryNotesByLead.set(leadId, note);
+    }
+  }
+  const orphanLeads = orphanCandidates.filter((lead) => {
+    const status = String(lead.status || "").trim().toLowerCase();
+    const leadId = String(lead.id || "").trim();
+    return status === "in_inventory" || removedInventoryNotesByLead.has(leadId);
+  });
+  if (!orphanLeads.length) return { repairedIds: new Set() };
 
   const repairedAt = new Date().toISOString();
   const repairedIds = new Set();
@@ -381,16 +408,7 @@ async function repairOrphanInventoryLeads(leads, client) {
     });
   }));
 
-  if (!repairedIds.size) return leads;
-  return leads.map((lead) => {
-    const id = String(lead.id || "").trim();
-    if (!repairedIds.has(id)) return lead;
-    return {
-      ...lead,
-      status: String(lead.assigned_to || "").trim() ? "assigned" : "new",
-      last_activity_at: repairedAt
-    };
-  });
+  return { repairedIds };
 }
 
 async function attachOwnerReviewState(leads, client) {
