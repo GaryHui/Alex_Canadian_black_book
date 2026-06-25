@@ -29,85 +29,69 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "POST") {
-    const rawInput = req.body?.input || {};
-    const uploadFiles = sanitizePhotoFiles(rawInput.photoFiles || []);
-    const lead = {
-      created_at: new Date().toISOString(),
-      input: sanitizeLeadInput(rawInput),
-      auth_user: sanitizeAuthUser(req.body?.user || {}),
-      valuation: sanitizeValuation(req.body?.valuation || {}),
-      auth_user_id: String(req.body?.user?.id || "").trim(),
-      auth_email: String(req.body?.user?.email || rawInput.email || "").trim(),
-      valuation_year: new Date().getFullYear(),
-      status: "new",
-      assigned_to: "",
-      priority: "normal",
-      next_follow_up_at: null,
-      last_activity_at: null,
-      notes: "",
-      owner_adjustment: {}
-    };
+    try {
+      const rawInput = req.body?.input || {};
+      const uploadFiles = sanitizePhotoFiles(rawInput.photoFiles || []);
+      const lead = {
+        created_at: new Date().toISOString(),
+        input: sanitizeLeadInput(rawInput),
+        auth_user: sanitizeAuthUser(req.body?.user || {}),
+        valuation: sanitizeValuation(req.body?.valuation || {}),
+        auth_user_id: String(req.body?.user?.id || "").trim(),
+        auth_email: String(req.body?.user?.email || rawInput.email || "").trim(),
+        valuation_year: new Date().getFullYear(),
+        status: "new",
+        assigned_to: "",
+        priority: "normal",
+        next_follow_up_at: null,
+        last_activity_at: null,
+        notes: "",
+        owner_adjustment: {}
+      };
 
-    const saved = await saveToSupabase(lead);
-    const savedLead = { ...lead, id: saved.lead?.id || "" };
-    if (saved.ok && savedLead.id) {
-      await createOwnerReviewNote({
-        url: process.env.SUPABASE_URL,
-        key: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        leadId: savedLead.id,
-        authorEmail: "system",
-        reason: `${leadSourceLabel(savedLead.input?.leadSource)} received.`
-      });
-      await createLeadTimelineNote({
-        url: process.env.SUPABASE_URL,
-        key: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        leadId: savedLead.id,
-        authorEmail: "system",
-        note: `Lead created from ${leadSourceLabel(savedLead.input?.leadSource)}.${savedLead.input?.dealerEmail ? ` Dealer: ${savedLead.input.dealerEmail}.` : ""}`
-      });
-      if (!isBuyerLead(savedLead)) {
-        await notifyDuplicateSellerLead({
-          url: process.env.SUPABASE_URL,
-          key: process.env.SUPABASE_SERVICE_ROLE_KEY
-        }, savedLead);
+      const saved = await saveToSupabase(lead);
+      const savedLead = { ...lead, id: saved.lead?.id || "" };
+      const warnings = [];
+      if (saved.ok && savedLead.id) {
+        warnings.push(...await runLeadPostSaveTasks(savedLead, uploadFiles));
       }
-      await maybeSendAfterHoursAutoReply({
-        url: process.env.SUPABASE_URL,
-        key: process.env.SUPABASE_SERVICE_ROLE_KEY
-      }, savedLead, { leadType: leadSourceLabel(savedLead.input?.leadSource) }).catch(() => null);
-    }
-    const webhook = await submitLeadToWebhook(savedLead, uploadFiles);
-    if (saved.ok && savedLead.id) {
-      await recordWebhookPhotosAsLeadNote({
-        url: process.env.SUPABASE_URL,
-        key: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        leadId: savedLead.id,
-        uploadFiles,
-        webhook
-      });
-    }
-    const crm = await submitLeadToCrm(savedLead, webhook);
-    if (saved.ok) return res.status(200).json({ ...saved, webhook, crm });
+      const webhook = await submitLeadToWebhook(savedLead, uploadFiles);
+      if (saved.ok && savedLead.id) {
+        warnings.push(...await runLeadPhotoNoteTask(savedLead.id, uploadFiles, webhook));
+      }
+      const crm = await submitLeadToCrm(savedLead, webhook);
+      if (saved.ok) return res.status(200).json({ ...saved, webhook, crm, warnings });
 
-    if (webhook.submitted || crm.submitted) {
+      if (webhook.submitted || crm.submitted) {
+        return res.status(200).json({
+          ok: true,
+          captured: true,
+          storage: webhook.submitted ? "webhook" : "crm",
+          webhook,
+          crm,
+          warnings,
+          message: "Lead sent to external lead receiver. Set Supabase env vars to also keep user history."
+        });
+      }
+
       return res.status(200).json({
         ok: true,
-        captured: true,
-        storage: webhook.submitted ? "webhook" : "crm",
+        captured: false,
+        storage: "not_configured",
         webhook,
         crm,
-        message: "Lead sent to external lead receiver. Set Supabase env vars to also keep user history."
+        warnings,
+        message: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on Vercel to persist leads."
+      });
+    } catch (error) {
+      console.error("Lead capture failed", error);
+      return res.status(500).json({
+        ok: false,
+        captured: false,
+        error: error?.message || "Lead capture failed",
+        message: "Lead capture failed before the CRM record could be saved."
       });
     }
-
-    return res.status(200).json({
-      ok: true,
-      captured: false,
-      storage: "not_configured",
-      webhook,
-      crm,
-      message: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on Vercel to persist leads."
-    });
   }
 
   if (req.method === "DELETE") {
@@ -205,6 +189,60 @@ async function submitLeadToCrm(lead, webhook = {}) {
     };
   } catch (error) {
     return { submitted: false, error: error.message || "CRM webhook submission failed" };
+  }
+}
+
+async function runLeadPostSaveTasks(savedLead, uploadFiles = []) {
+  const client = {
+    url: process.env.SUPABASE_URL,
+    key: process.env.SUPABASE_SERVICE_ROLE_KEY
+  };
+  const warnings = [];
+  const run = async (label, task) => {
+    try {
+      await task();
+    } catch (error) {
+      warnings.push({ task: label, error: error?.message || String(error || "failed") });
+      console.error(`Lead post-save task failed: ${label}`, error);
+    }
+  };
+
+  await run("owner_review", () => createOwnerReviewNote({
+    url: client.url,
+    key: client.key,
+    leadId: savedLead.id,
+    authorEmail: "system",
+    reason: `${leadSourceLabel(savedLead.input?.leadSource)} received.`
+  }));
+  await run("timeline_created", () => createLeadTimelineNote({
+    url: client.url,
+    key: client.key,
+    leadId: savedLead.id,
+    authorEmail: "system",
+    note: `Lead created from ${leadSourceLabel(savedLead.input?.leadSource)}.${savedLead.input?.dealerEmail ? ` Dealer: ${savedLead.input.dealerEmail}.` : ""}`
+  }));
+  if (!isBuyerLead(savedLead)) {
+    await run("duplicate_seller_scan", () => notifyDuplicateSellerLead(client, savedLead));
+  }
+  await run("after_hours_auto_reply", () => maybeSendAfterHoursAutoReply(client, savedLead, {
+    leadType: leadSourceLabel(savedLead.input?.leadSource)
+  }));
+  return warnings;
+}
+
+async function runLeadPhotoNoteTask(leadId, uploadFiles = [], webhook = {}) {
+  try {
+    await recordWebhookPhotosAsLeadNote({
+      url: process.env.SUPABASE_URL,
+      key: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      leadId,
+      uploadFiles,
+      webhook
+    });
+    return [];
+  } catch (error) {
+    console.error("Lead photo note task failed", error);
+    return [{ task: "photo_note", error: error?.message || String(error || "failed") }];
   }
 }
 
