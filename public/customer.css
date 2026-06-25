@@ -1625,6 +1625,169 @@ input::placeholder {
   overflow: auto;
 }
 
+.photo-viewer-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.photo-viewer-shell[hidden] {
+  display: none;
+}
+
+.photo-viewer-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(5, 10, 24, 0.72);
+}
+
+.photo-viewer-card {
+  position: relative;
+  width: min(1120px, calc(100vw - 40px));
+  height: min(820px, calc(100vh - 40px));
+  overflow: hidden;
+  background: #20242b;
+  border-radius: 8px;
+  box-shadow: 0 26px 80px rgba(5, 10, 24, 0.42);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 104px auto;
+}
+
+.photo-viewer-main {
+  position: relative;
+  min-height: 0;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  background: #1b2028;
+}
+
+.photo-viewer-main img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.photo-viewer-main figcaption {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  max-width: min(520px, calc(100% - 36px));
+  padding: 8px 12px;
+  color: #fff;
+  background: rgba(5, 10, 24, 0.66);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.photo-viewer-close,
+.photo-viewer-nav {
+  position: absolute;
+  z-index: 3;
+  border: 0;
+  color: #fff;
+  background: rgba(5, 10, 24, 0.58);
+  cursor: pointer;
+}
+
+.photo-viewer-close {
+  top: 16px;
+  right: 16px;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  font-size: 22px;
+}
+
+.photo-viewer-nav {
+  top: 42%;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.photo-viewer-prev {
+  left: 18px;
+}
+
+.photo-viewer-next {
+  right: 18px;
+}
+
+.photo-viewer-thumbs {
+  min-width: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 132px;
+  gap: 6px;
+  padding: 8px;
+  overflow-x: auto;
+  background: #2d3138;
+  scrollbar-color: #fff #3b4048;
+}
+
+.photo-viewer-thumb {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #111827;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.photo-viewer-thumb.is-selected {
+  border-color: #fff;
+}
+
+.photo-viewer-thumb img {
+  display: block;
+  width: 100%;
+  height: 84px;
+  object-fit: cover;
+}
+
+.photo-viewer-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 18px;
+  align-items: center;
+  padding: 18px 26px;
+  color: #fff;
+  background: #07106d;
+}
+
+.photo-viewer-footer strong,
+.photo-viewer-footer span {
+  display: block;
+}
+
+.photo-viewer-footer > div strong {
+  font-size: 24px;
+}
+
+.photo-viewer-footer > div span {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.photo-viewer-count {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.photo-viewer-payment {
+  font-size: 26px;
+}
+
 .vehicle-detail-dialog {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -2758,7 +2921,7 @@ input::placeholder {
   display: grid;
   gap: 12px;
   margin-inline: -24px;
-  padding: 18px 24px 0;
+  padding: 18px 24px;
   background: #eef2f6;
   border-bottom: 1px solid #d8e2ef;
 }
@@ -2787,7 +2950,7 @@ input::placeholder {
 .vehicle-detail-photo-strip {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(150px, 230px);
+  grid-auto-columns: minmax(180px, 240px);
   gap: 8px;
   min-width: 0;
   padding: 0 0 2px;
@@ -2798,7 +2961,7 @@ input::placeholder {
 
 .vehicle-detail-thumb,
 .vehicle-detail-thumb-placeholder {
-  min-height: 108px;
+  min-height: 124px;
   margin: 0;
   overflow: hidden;
   background: #f8fbff;
@@ -2821,7 +2984,7 @@ input::placeholder {
 .vehicle-detail-thumb img {
   display: block;
   width: 100%;
-  height: 94px;
+  height: 108px;
   object-fit: cover;
 }
 
@@ -3234,7 +3397,7 @@ input::placeholder {
 
   .vehicle-detail-media {
     margin-inline: -14px;
-    padding: 14px 14px 0;
+    padding: 14px;
   }
 
   .vehicle-detail-photo-strip {
@@ -3248,6 +3411,38 @@ input::placeholder {
 
   .vehicle-detail-thumb img {
     height: 78px;
+  }
+
+  .photo-viewer-shell {
+    padding: 8px;
+  }
+
+  .photo-viewer-card {
+    width: calc(100vw - 16px);
+    height: calc(100vh - 16px);
+    grid-template-rows: minmax(0, 1fr) 84px auto;
+  }
+
+  .photo-viewer-thumbs {
+    grid-auto-columns: 96px;
+  }
+
+  .photo-viewer-thumb img {
+    height: 66px;
+  }
+
+  .photo-viewer-footer {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px 16px;
+  }
+
+  .photo-viewer-footer > div strong {
+    font-size: 18px;
+  }
+
+  .photo-viewer-payment {
+    font-size: 22px;
   }
 
   .vehicle-detail-dialog .vehicle-detail-photo,

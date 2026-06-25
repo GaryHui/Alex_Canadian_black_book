@@ -189,6 +189,28 @@
       </section>
     </div>
 
+    <div id="vehicle-photo-viewer" class="photo-viewer-shell" hidden>
+      <button class="photo-viewer-backdrop" type="button" data-close-photo-viewer aria-label="Close photos"></button>
+      <section class="photo-viewer-card" role="dialog" aria-modal="true" aria-label="Vehicle photos">
+        <button class="photo-viewer-close" type="button" data-close-photo-viewer aria-label="Close photos">x</button>
+        <button class="photo-viewer-nav photo-viewer-prev" type="button" data-photo-prev aria-label="Previous photo">‹</button>
+        <figure class="photo-viewer-main">
+          <img id="photo-viewer-image" alt="" />
+          <figcaption id="photo-viewer-caption"></figcaption>
+        </figure>
+        <button class="photo-viewer-nav photo-viewer-next" type="button" data-photo-next aria-label="Next photo">›</button>
+        <div id="photo-viewer-thumbs" class="photo-viewer-thumbs" aria-label="Photo thumbnails"></div>
+        <footer class="photo-viewer-footer">
+          <div>
+            <strong id="photo-viewer-title"></strong>
+            <span id="photo-viewer-subtitle"></span>
+          </div>
+          <span id="photo-viewer-count" class="photo-viewer-count"></span>
+          <strong id="photo-viewer-payment" class="photo-viewer-payment"></strong>
+        </footer>
+      </section>
+    </div>
+
     <div id="contact-dealer-modal" class="modal-shell" hidden>
       <button class="modal-backdrop" type="button" data-close-contact aria-label="Close"></button>
       <section class="modal-card vehicle-detail-card contact-dealer-card" role="dialog" aria-modal="true" aria-labelledby="contact-dealer-title">
@@ -270,6 +292,6 @@
       </section>
     </div>
 
-    <script src="/buy.js?v=buyer-mature-20260624a"></script>
+    <script src="/buy.js?v=buyer-photo-viewer-20260625a"></script>
   </body>
 </html>

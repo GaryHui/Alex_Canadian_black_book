@@ -286,6 +286,14 @@ const detailOrderTitle = document.querySelector("#detail-order-title");
 const detailOrderSubtitle = document.querySelector("#detail-order-subtitle");
 const detailOrderPayment = document.querySelector("#detail-order-payment");
 const detailOrderFees = document.querySelector("#detail-order-fees");
+const photoViewerModal = document.querySelector("#vehicle-photo-viewer");
+const photoViewerImage = document.querySelector("#photo-viewer-image");
+const photoViewerCaption = document.querySelector("#photo-viewer-caption");
+const photoViewerThumbs = document.querySelector("#photo-viewer-thumbs");
+const photoViewerTitle = document.querySelector("#photo-viewer-title");
+const photoViewerSubtitle = document.querySelector("#photo-viewer-subtitle");
+const photoViewerCount = document.querySelector("#photo-viewer-count");
+const photoViewerPayment = document.querySelector("#photo-viewer-payment");
 const contactDealerModal = document.querySelector("#contact-dealer-modal");
 const contactDealerForm = document.querySelector("#contact-dealer-form");
 const contactDealerStatus = document.querySelector("#contact-dealer-status");
@@ -296,6 +304,9 @@ const filterChipButtons = document.querySelectorAll("[data-filter-chip]");
 const clearFilterButton = document.querySelector("[data-clear-filters]");
 let currentContactVehicle = null;
 let selectedFinanceVehicle = null;
+let activePhotoVehicle = null;
+let activePhotoList = [];
+let activePhotoIndex = 0;
 let filterInputTimer = null;
 
 function money(value) {
@@ -796,13 +807,6 @@ function showVehicleDetails(vehicle) {
 
 function vehicleDetailMedia(vehicle) {
   const photos = Array.isArray(vehicle.photos) ? vehicle.photos.filter((photo) => photo?.url) : [];
-  const mainPhoto = photos[0] || null;
-  const mainMarkup = mainPhoto?.url
-    ? `<figure class="vehicle-detail-photo" data-detail-main-photo>
-        <img src="${escapeHtml(photoDisplayUrl(mainPhoto.url))}" alt="${escapeHtml(vehicle.title)}" />
-        <figcaption>${escapeHtml(mainPhoto.label || "Vehicle photo")}</figcaption>
-      </figure>`
-    : `<div class="vehicle-detail-photo vehicle-detail-photo-placeholder" data-detail-main-photo>${vehicleImageMarkup(vehicle)}</div>`;
   return `
     <section class="vehicle-detail-media" aria-label="Vehicle photos">
       <header class="vehicle-detail-media-head">
@@ -812,7 +816,6 @@ function vehicleDetailMedia(vehicle) {
         </div>
       </header>
       ${vehicleDetailPhotoStrip(vehicle, photos)}
-      ${mainMarkup}
     </section>
   `;
 }
@@ -872,7 +875,53 @@ function detailItem(label, value) {
 }
 
 function closeVehicleDetails() {
+  closePhotoViewer();
   if (vehicleDetailModal) vehicleDetailModal.hidden = true;
+}
+
+function openVehiclePhotoViewer(vehicle, index = 0) {
+  const photos = Array.isArray(vehicle?.photos) ? vehicle.photos.filter((photo) => photo?.url) : [];
+  if (!photoViewerModal || !photoViewerImage || !photos.length) return;
+  activePhotoVehicle = vehicle;
+  activePhotoList = photos;
+  activePhotoIndex = Math.min(Math.max(Number(index) || 0, 0), photos.length - 1);
+  photoViewerModal.hidden = false;
+  renderPhotoViewer();
+}
+
+function closePhotoViewer() {
+  if (photoViewerModal) photoViewerModal.hidden = true;
+  activePhotoVehicle = null;
+  activePhotoList = [];
+  activePhotoIndex = 0;
+}
+
+function renderPhotoViewer() {
+  if (!photoViewerModal || !photoViewerImage || !activePhotoVehicle || !activePhotoList.length) return;
+  const photo = activePhotoList[activePhotoIndex] || activePhotoList[0];
+  const deal = vehicleDeal(activePhotoVehicle);
+  photoViewerImage.src = photoDisplayUrl(photo.url);
+  photoViewerImage.alt = photo.label || activePhotoVehicle.title;
+  if (photoViewerCaption) photoViewerCaption.textContent = photo.label || "Vehicle photo";
+  if (photoViewerTitle) photoViewerTitle.textContent = activePhotoVehicle.title;
+  if (photoViewerSubtitle) {
+    photoViewerSubtitle.textContent = `${number(activePhotoVehicle.kilometers)} km | ${activePhotoVehicle.region || text[language].notAvailable} | ${activePhotoVehicle.color || text[language].notAvailable}`;
+  }
+  if (photoViewerCount) photoViewerCount.textContent = `${activePhotoIndex + 1} / ${activePhotoList.length}`;
+  if (photoViewerPayment) photoViewerPayment.textContent = `${money(deal.monthly)} / mo`;
+  if (photoViewerThumbs) {
+    photoViewerThumbs.innerHTML = activePhotoList.map((item, index) => `
+      <button class="photo-viewer-thumb ${index === activePhotoIndex ? "is-selected" : ""}" type="button" data-photo-viewer-index="${index}" aria-label="${escapeHtml(item.label || `Show photo ${index + 1}`)}">
+        <img src="${escapeHtml(photoDisplayUrl(item.url))}" alt="${escapeHtml(item.label || `${activePhotoVehicle.title} photo ${index + 1}`)}" />
+      </button>
+    `).join("");
+  }
+}
+
+function stepPhotoViewer(direction) {
+  if (!activePhotoList.length) return;
+  activePhotoIndex = (activePhotoIndex + direction + activePhotoList.length) % activePhotoList.length;
+  renderPhotoViewer();
 }
 
 function openContactDealer(vehicle) {
@@ -1105,15 +1154,7 @@ vehicleDetailModal?.addEventListener("click", (event) => {
   }
   const thumb = event.target.closest("[data-detail-photo-index]");
   if (thumb && selectedFinanceVehicle) {
-    const photos = Array.isArray(selectedFinanceVehicle.photos) ? selectedFinanceVehicle.photos.filter((photo) => photo?.url) : [];
-    const photo = photos[Number(thumb.dataset.detailPhotoIndex || 0)];
-    const mainPhoto = vehicleDetailModal.querySelector("[data-detail-main-photo]");
-    if (photo?.url && mainPhoto) {
-      mainPhoto.innerHTML = `<img src="${escapeHtml(photoDisplayUrl(photo.url))}" alt="${escapeHtml(photo.label || selectedFinanceVehicle.title)}" /><figcaption>${escapeHtml(photo.label || "Vehicle photo")}</figcaption>`;
-      vehicleDetailModal.querySelectorAll("[data-detail-photo-index]").forEach((node) => {
-        node.classList.toggle("is-selected", node === thumb);
-      });
-    }
+    openVehiclePhotoViewer(selectedFinanceVehicle, Number(thumb.dataset.detailPhotoIndex || 0));
     return;
   }
   const contactButton = event.target.closest("[data-detail-contact]");
@@ -1127,6 +1168,26 @@ vehicleDetailModal?.addEventListener("click", (event) => {
   }
 });
 
+photoViewerModal?.addEventListener("click", (event) => {
+  if (event.target.closest("[data-close-photo-viewer]")) {
+    closePhotoViewer();
+    return;
+  }
+  if (event.target.closest("[data-photo-prev]")) {
+    stepPhotoViewer(-1);
+    return;
+  }
+  if (event.target.closest("[data-photo-next]")) {
+    stepPhotoViewer(1);
+    return;
+  }
+  const thumb = event.target.closest("[data-photo-viewer-index]");
+  if (thumb) {
+    activePhotoIndex = Number(thumb.dataset.photoViewerIndex || 0);
+    renderPhotoViewer();
+  }
+});
+
 contactDealerModal?.addEventListener("click", (event) => {
   if (event.target.closest("[data-close-contact]")) closeContactDealer();
 });
@@ -1135,8 +1196,14 @@ contactDealerForm?.addEventListener("change", updateContactBuyingSummary);
 contactDealerForm?.addEventListener("submit", submitDealerContact);
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && photoViewerModal && !photoViewerModal.hidden) {
+    closePhotoViewer();
+    return;
+  }
   if (event.key === "Escape") closeVehicleDetails();
   if (event.key === "Escape") closeContactDealer();
+  if (event.key === "ArrowLeft" && photoViewerModal && !photoViewerModal.hidden) stepPhotoViewer(-1);
+  if (event.key === "ArrowRight" && photoViewerModal && !photoViewerModal.hidden) stepPhotoViewer(1);
   if ((event.key === "Enter" || event.key === " ") && event.target?.matches?.("[data-detail-photo-index]")) {
     event.preventDefault();
     event.target.click();
