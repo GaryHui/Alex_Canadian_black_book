@@ -657,6 +657,18 @@ async function attachWarehouseRestoreState(leads, client) {
   }
 
   return leads.map((lead) => {
+    const adjustment = lead?.owner_adjustment || {};
+    if (adjustment && typeof adjustment === "object" && adjustment.warehouseRestoredAt) {
+      return {
+        ...lead,
+        warehouse_restore: {
+          restored: true,
+          at: adjustment.warehouseRestoredAt || "",
+          by: adjustment.warehouseRestoredBy || "",
+          note: "Lead restored from warehouse move-out."
+        }
+      };
+    }
     const note = latestRestore.get(String(lead.id || "").trim());
     if (!note) return lead;
     return {

@@ -117,7 +117,7 @@ export async function deleteInventoryListing(id, user) {
     };
   }
 
-  const restored = await restoreLeadFromInventory(client, listing.source_lead_id);
+  const restored = await restoreLeadFromInventory(client, listing.source_lead_id, listingId, user);
   if (!restored.ok) return restored;
 
   const response = await fetch(`${client.url}/rest/v1/vehicle_listings?id=eq.${encodeURIComponent(listingId)}`, {
@@ -518,9 +518,17 @@ async function createLeadNote(client, leadId, user, note) {
   }).catch(() => null);
 }
 
-async function restoreLeadFromInventory(client, leadId) {
+async function restoreLeadFromInventory(client, leadId, listingId = "", user = {}) {
   const previousStatus = await previousLeadStatusBeforeInventory(client, leadId);
   const status = normalizeRestoredLeadStatus(previousStatus) || "assigned";
+  const existingLead = await fetchSupabaseJson(
+    `${client.url}/rest/v1/valuation_leads?select=owner_adjustment&id=eq.${encodeURIComponent(leadId)}&limit=1`,
+    client.key
+  ).catch(() => ({ ok: false, data: [] }));
+  const existingAdjustment = existingLead.ok && existingLead.data?.[0]?.owner_adjustment && typeof existingLead.data[0].owner_adjustment === "object"
+    ? existingLead.data[0].owner_adjustment
+    : {};
+  const restoredAt = new Date().toISOString();
   const response = await fetch(`${client.url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
     method: "PATCH",
     headers: {
@@ -530,7 +538,13 @@ async function restoreLeadFromInventory(client, leadId) {
     },
     body: JSON.stringify({
       status,
-      last_activity_at: new Date().toISOString()
+      last_activity_at: restoredAt,
+      owner_adjustment: {
+        ...existingAdjustment,
+        warehouseRestoredAt: restoredAt,
+        warehouseRestoredBy: String(user?.email || "").trim().toLowerCase(),
+        warehouseRestoredFromListingId: String(listingId || "").trim()
+      }
     })
   }).catch(() => null);
   if (!response) return { ok: false, status: 500, error: "Unable to restore source SELL lead." };
