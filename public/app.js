@@ -3729,6 +3729,11 @@ async function openDealerLead(id, options = {}) {
   if (!dealerLeadsCache.some((lead) => String(lead.id || "") === id)) {
     await loadDealerLeads({ forceActivity: true, suppressAlerts: true });
   }
+  const lead = dealerLeadsCache.find((item) => String(item.id || "") === String(id));
+  if (!lead) {
+    if (dealerLeadsStatus) dealerLeadsStatus.textContent = "CRM file was not found for this stock vehicle.";
+    return;
+  }
   if (dealerLeadFilter !== "all") {
     setDealerLeadFilter("all");
     renderDealerLeads(dealerLeadsCache, dealerLeadRole);
@@ -3738,8 +3743,21 @@ async function openDealerLead(id, options = {}) {
     renderDealerLeads(dealerLeadsCache, dealerLeadRole);
     card = dealerLeadsList.querySelector(`.dealer-lead-card[data-lead-id="${cssEscape(id)}"]`);
   }
-  if (!card) return;
   setActiveDealerLead(id);
+  if (!card) {
+    const switchingDrawer = activeDealerDrawerLeadId !== String(id) || dealerLeadDrawer.hidden;
+    if (switchingDrawer) {
+      renderDealerDrawer(id);
+      dealerDrawerActivityLoaded = false;
+    }
+    await loadDealerDrawerActivity({
+      force: Boolean(switchingDrawer || options.focus === "timeline"),
+      highlightLatest: Boolean(options.focus === "timeline")
+    });
+    dealerLeadDrawer?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (dealerLeadsStatus) dealerLeadsStatus.textContent = "Opened CRM file from Inventory Follow-up.";
+    return;
+  }
   if (options.fromAlert) {
     markDealerLeadTokenRead(id);
     dealerLeadAlertMap.delete(id);
