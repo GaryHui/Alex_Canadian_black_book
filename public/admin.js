@@ -20,6 +20,8 @@ const adminLeadSortSelect = document.querySelector("#admin-lead-sort");
 const adminLeadDrawer = document.querySelector("#admin-lead-drawer");
 const adminLeadDrawerContent = document.querySelector("#admin-lead-drawer-content");
 const dealerStaffForm = document.querySelector("#dealer-staff-form");
+const leadRecoveryForm = document.querySelector("#lead-recovery-form");
+const leadRecoveryStatus = document.querySelector("#lead-recovery-status");
 const operationsSettingsForm = document.querySelector("#operations-settings-form");
 const operationsSettingsStatus = document.querySelector("#operations-settings-status");
 const businessHoursGrid = document.querySelector("#business-hours-grid");
@@ -85,6 +87,7 @@ reloadInventoryButton?.addEventListener("click", loadInventory);
 reloadInquiriesButton?.addEventListener("click", loadInquiries);
 clearLeadsButton?.addEventListener("click", clearAllLeads);
 dealerStaffForm.addEventListener("submit", addDealer);
+leadRecoveryForm?.addEventListener("submit", recoverHiddenLead);
 operationsSettingsForm?.addEventListener("submit", saveOperationsSettings);
 adminLoginButton.addEventListener("click", signInAdmin);
 adminLogoutButton.addEventListener("click", signOutAdmin);
@@ -781,6 +784,40 @@ async function addDealer(event) {
   if (data.ok) {
     dealerStaffForm.reset();
     await loadDealers();
+  }
+}
+
+async function recoverHiddenLead(event) {
+  event.preventDefault();
+  if (!adminSession || !leadRecoveryForm) return;
+
+  const driveFolderUrl = String(new FormData(leadRecoveryForm).get("driveFolderUrl") || "").trim();
+  if (!driveFolderUrl) return;
+  if (leadRecoveryStatus) leadRecoveryStatus.textContent = "Searching CRM records for this Drive folder...";
+  const response = await fetch("/api/leads", {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "recover_drive_folder",
+      driveFolderUrl
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!data.ok) {
+    if (leadRecoveryStatus) leadRecoveryStatus.textContent = formatApiError(data, "Unable to recover this Drive folder.");
+    return;
+  }
+  const lead = data.recovered?.[0] || null;
+  if (leadRecoveryStatus) {
+    leadRecoveryStatus.textContent = `Recovered ${data.recoveredCount || 1} SELL lead(s). Reloading Up Sheets...`;
+  }
+  leadRecoveryForm.reset();
+  setAdminLeadFilter("active");
+  await Promise.all([loadLeads({ suppressAlerts: true, forceOpenActivity: true }), loadInventory()]);
+  if (lead?.id) {
+    await openAdminLeadFromAlert(lead.id);
+  } else {
+    document.querySelector("#crm-leads")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
 

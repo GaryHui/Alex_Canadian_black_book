@@ -178,6 +178,22 @@
           </div>
         </form>
       </section>
+      <section class="admin-section admin-section-recovery">
+        <div class="admin-section-head">
+          <div>
+            <h2>Recover hidden SELL lead</h2>
+            <p>Use this only when a Drive vehicle folder still exists but the SELL lead is missing from Up Sheets.</p>
+          </div>
+        </div>
+        <form id="lead-recovery-form" class="dealer-staff-form">
+          <label>
+            <span>Google Drive folder URL</span>
+            <input name="driveFolderUrl" placeholder="https://drive.google.com/drive/folders/..." required />
+          </label>
+          <button type="submit">Recover lead</button>
+        </form>
+        <p id="lead-recovery-status" class="status"></p>
+      </section>
       <section class="admin-section admin-section-access">
         <div class="admin-section-head">
           <div>
@@ -230,6 +246,6 @@
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/turnstile.js"></script>
-    <script src="/admin.js?v=d5138ea"></script>
+    <script src="/admin.js?v=lead-recovery-20260625"></script>
   </body>
 </html>

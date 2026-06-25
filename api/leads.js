@@ -20,6 +20,8 @@ export default async function handler(req, res) {
         ? await markDuplicateReview(req.body || {}, admin.user)
         : req.body?.action === "assign_lead"
           ? await assignLead(req.body || {}, admin.user)
+          : req.body?.action === "recover_drive_folder"
+            ? await recoverLeadByDriveFolder(req.body || {}, admin.user)
           : await updateLead(req.body || {});
     return res.status(result.ok ? 200 : result.status || 400).json(result);
   }
@@ -343,7 +345,7 @@ async function listFromSupabase() {
 }
 
 async function repairOrphanInventoryLeads(client) {
-  const statusList = ["in_inventory", "closed", "lost", "won"];
+  const statusList = ["in_inventory", "closed", "lost", "won", "deleted", "archived"];
   const candidateResult = await fetch(`${client.url}/rest/v1/valuation_leads?select=*&status=in.(${statusList.join(",")})&order=last_activity_at.desc.nullslast,created_at.desc&limit=1000`, {
     headers: authHeaders(client.key)
   }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] }));
@@ -409,6 +411,81 @@ async function repairOrphanInventoryLeads(client) {
   }));
 
   return { repairedIds };
+}
+
+async function recoverLeadByDriveFolder(body, user) {
+  try {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) return { ok: false, status: 500, error: "Supabase is not configured" };
+
+    const folderUrl = String(body.driveFolderUrl || body.folderUrl || "").trim();
+    const folderId = driveFolderId(folderUrl);
+    if (!folderId) return { ok: false, status: 400, error: "Google Drive folder URL or folder id is required" };
+
+    const notesResult = await fetch(`${url}/rest/v1/lead_notes?select=lead_id,note,created_at&note=ilike.*${encodeURIComponent(folderId)}*&order=created_at.desc&limit=100`, {
+      headers: authHeaders(key)
+    }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] }));
+    if (!notesResult.ok) return { ok: false, status: 400, error: "Unable to search lead notes for this Drive folder" };
+
+    const leadIds = [...new Set((notesResult.data || []).map((note) => String(note.lead_id || "").trim()).filter(Boolean))];
+    if (!leadIds.length) return { ok: false, status: 404, error: "No lead record references this Drive folder. The folder may exist only in Google Drive, not in CRM." };
+
+    const leadsResult = await fetch(`${url}/rest/v1/valuation_leads?select=*&id=in.(${leadIds.map(encodeURIComponent).join(",")})&limit=100`, {
+      headers: authHeaders(key)
+    }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] }));
+    if (!leadsResult.ok) return { ok: false, status: 400, error: "Unable to read matched leads" };
+
+    const sellerLeads = (leadsResult.data || []).filter((lead) => !isBuyerLead(lead));
+    if (!sellerLeads.length) return { ok: false, status: 404, error: "This Drive folder is linked only to buyer or unknown records, not a SELL lead." };
+
+    const listingResult = await fetch(`${url}/rest/v1/vehicle_listings?select=id,source_lead_id&source_lead_id=in.(${sellerLeads.map((lead) => encodeURIComponent(String(lead.id || "").trim())).join(",")})&limit=100`, {
+      headers: authHeaders(key)
+    }).then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: [] }))).catch(() => ({ ok: false, data: [] }));
+    const inventoryLeadIds = new Set((listingResult.data || []).map((row) => String(row.source_lead_id || "").trim()).filter(Boolean));
+
+    const recoveredAt = new Date().toISOString();
+    const recovered = [];
+    for (const lead of sellerLeads) {
+      const leadId = String(lead.id || "").trim();
+      if (!leadId || inventoryLeadIds.has(leadId)) continue;
+      const status = String(lead.assigned_to || "").trim() ? "assigned" : "new";
+      const response = await fetch(`${url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(leadId)}`, {
+        method: "PATCH",
+        headers: {
+          ...authHeaders(key),
+          "Content-Type": "application/json",
+          Prefer: "return=representation"
+        },
+        body: JSON.stringify({
+          status,
+          last_activity_at: recoveredAt
+        })
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) return { ok: false, status: response.status, error: data || "Unable to recover lead" };
+      await createLeadTimelineNote({
+        url,
+        key,
+        leadId,
+        authorEmail: String(user?.email || "admin").trim().toLowerCase(),
+        note: `Lead recovered from Google Drive folder ${folderId}.`
+      });
+      recovered.push(data?.[0] || { ...lead, status, last_activity_at: recoveredAt });
+    }
+
+    if (!recovered.length) {
+      return {
+        ok: false,
+        status: 409,
+        error: "Matched SELL lead is still linked to an inventory listing, so it was not recovered into Active leads."
+      };
+    }
+
+    return { ok: true, recovered, recoveredCount: recovered.length, folderId };
+  } catch (error) {
+    return { ok: false, status: 500, error: error?.message || "Unable to recover lead by Drive folder" };
+  }
 }
 
 async function attachOwnerReviewState(leads, client) {
@@ -944,6 +1021,16 @@ function sanitizeFileName(value) {
     .replace(/^-|-$/g, "")
     .slice(0, 120);
   return cleaned || "vehicle-photo.jpg";
+}
+
+function driveFolderId(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const folderMatch = text.match(/\/folders\/([A-Za-z0-9_-]+)/);
+  if (folderMatch) return folderMatch[1];
+  const idMatch = text.match(/[?&]id=([A-Za-z0-9_-]+)/);
+  if (idMatch) return idMatch[1];
+  return /^[A-Za-z0-9_-]{10,}$/.test(text) ? text : "";
 }
 
 function sanitizeAuthUser(user) {
