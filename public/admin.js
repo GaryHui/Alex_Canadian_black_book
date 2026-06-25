@@ -2094,11 +2094,12 @@ function renderLeadGroups(leads) {
       </header>
       <div class="lead-list-header" aria-hidden="true">
         <span>Lead</span>
-        <span>Customer</span>
-        <span>Vehicle</span>
+        <span>Owner</span>
+        <span>Rep</span>
+        <span>VIN</span>
+        <span>Stage</span>
         <span>Next step</span>
-        <span>Pipeline</span>
-        <span>Quick actions</span>
+        <span>Actions</span>
       </div>
       <div class="lead-group-list">
         ${group.leads.map((lead, index) => renderLead(lead, index)).join("")}
@@ -2485,17 +2486,24 @@ function renderLead(lead, index = 0) {
           </div>
         </div>
         <div class="lead-list-col">
-          <span class="lead-list-label">${buyer ? "Customer" : "Vehicle owner"}</span>
+          <span class="lead-list-label">${buyer ? "Customer" : "Owner"}</span>
           <strong>${escapeHtml(customerDisplay)}</strong>
           <div class="lead-list-subline">
             ${customerName && customerEmail !== "-" ? `<span>${escapeHtml(customerEmail)}</span>` : ""}
             <span>${escapeHtml(customerPhone)}</span>
-            <span>${escapeHtml(assignedTo ? `Rep ${shortEmail(assignedTo)}` : "No rep")}</span>
             ${!buyer && submitterLabel ? `<span>${escapeHtml(submitterLabel)}</span>` : ""}
           </div>
         </div>
         <div class="lead-list-col">
-          <span class="lead-list-label">Vehicle</span>
+          <span class="lead-list-label">Rep</span>
+          <strong class="${assignedTo ? "" : "lead-unassigned-value"}">${escapeHtml(assignedTo ? shortEmail(assignedTo) : "Unassigned")}</strong>
+          <div class="lead-list-subline">
+            <span>${escapeHtml(assignedTo ? "Assigned" : "Needs dispatch")}</span>
+            <span>${escapeHtml(overdue ? "Overdue" : followUp ? "Scheduled" : "No follow-up")}</span>
+          </div>
+        </div>
+        <div class="lead-list-col">
+          <span class="lead-list-label">VIN</span>
           <strong class="lead-vin-value">VIN ${escapeHtml(vin)}</strong>
           <div class="lead-list-subline">
             <span>${escapeHtml(vehicleContext.cluster_label || title)}</span>
@@ -2505,17 +2513,18 @@ function renderLead(lead, index = 0) {
           </div>
         </div>
         <div class="lead-list-col">
-          <span class="lead-list-label">Next step</span>
-          <strong>${escapeHtml(queueSummary)}</strong>
+          <span class="lead-list-label">Stage</span>
+          <strong>${escapeHtml(progressSummary)}</strong>
           <div class="lead-list-subline">
-            <span>${escapeHtml(assignedTo ? `Rep ${shortEmail(assignedTo)}` : "Assign rep")}</span>
-            <span>${escapeHtml(overdue ? "Overdue" : followUp ? "Scheduled" : "Unscheduled")}</span>
+            <span class="${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</span>
+            <span>${escapeHtml(priority)}</span>
           </div>
         </div>
         <div class="lead-list-col">
-          <span class="lead-list-label">Pipeline</span>
-          <strong>${escapeHtml(progressSummary)}</strong>
+          <span class="lead-list-label">Next step</span>
+          <strong>${escapeHtml(queueSummary)}</strong>
           <div class="lead-list-subline">
+            <span>${escapeHtml(overdue ? "Overdue" : followUp ? "Scheduled" : "Unscheduled")}</span>
             <span>${escapeHtml(responseSummary)}</span>
           </div>
         </div>

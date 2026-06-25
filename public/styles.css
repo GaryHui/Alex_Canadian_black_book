@@ -3114,7 +3114,7 @@ body.admin-drawer-open {
   align-items: start;
   column-gap: 10px;
   display: grid;
-  grid-template-columns: minmax(220px, 1.35fr) minmax(150px, .95fr) minmax(180px, 1.1fr) minmax(190px, 1.15fr) minmax(140px, .8fr) minmax(170px, .9fr);
+  grid-template-columns: minmax(210px, 1.25fr) minmax(145px, .9fr) minmax(120px, .72fr) minmax(185px, 1.08fr) minmax(130px, .72fr) minmax(190px, 1.05fr) minmax(155px, .78fr);
 }
 
 .lead-list-col {
@@ -3154,6 +3154,10 @@ body.admin-drawer-open {
   font-size: 16px;
   font-weight: 950;
   letter-spacing: .01em;
+}
+
+.lead-list-col > strong.lead-unassigned-value {
+  color: #b45309;
 }
 
 .lead-list-col-actions {
@@ -3349,7 +3353,7 @@ body.admin-drawer-open {
   color: #64748b;
   display: grid;
   gap: 12px;
-  grid-template-columns: 1.3fr 1fr 1.1fr 1fr .9fr 1fr;
+  grid-template-columns: 1.25fr .9fr .72fr 1.08fr .72fr 1.05fr .78fr;
   padding: 0 12px;
   text-transform: uppercase;
   font-size: 11px;

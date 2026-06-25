@@ -2030,6 +2030,7 @@ function renderDealerLeads(leads, role) {
             ? "Buyer opportunity"
             : "Seller appraisal";
     const customerSummary = customerName || customerPhone || customerEmail;
+    const repSummary = lead.assigned_to || "Unassigned";
     const progressSummary = dealerLeadStatusLabel(status, buyerLead);
     const nextAction = dealerNextBestAction(lead);
     const compactTouchSummary = isDealerNoResponseLead(lead) ? "No response 48h+" : (dealerOutboundLabel(lead) || dealerLastTouchLabel(lead));
@@ -2054,16 +2055,24 @@ function renderDealerLeads(leads, role) {
             </div>
           </div>
           <div class="lead-list-col">
-            <span class="lead-list-label">${buyerLead ? "Customer" : "Vehicle owner"}</span>
+            <span class="lead-list-label">${buyerLead ? "Customer" : "Owner"}</span>
             <strong>${escapeHtml(customerSummary)}</strong>
             <div class="lead-list-subline">
               ${customerName && customerEmail !== "-" ? `<span>${escapeHtml(customerEmail)}</span>` : ""}
               <span>${escapeHtml(customerPhone)}</span>
-              <span>${escapeHtml(submitterLabel || lead.assigned_to || "Assigned lead")}</span>
+              ${submitterLabel ? `<span>${escapeHtml(submitterLabel)}</span>` : ""}
             </div>
           </div>
           <div class="lead-list-col">
-            <span class="lead-list-label">Vehicle</span>
+            <span class="lead-list-label">Rep</span>
+            <strong class="${repSummary === "Unassigned" ? "lead-unassigned-value" : ""}">${escapeHtml(repSummary === "Unassigned" ? "Unassigned" : shortEmail(repSummary))}</strong>
+            <div class="lead-list-subline">
+              <span>${escapeHtml(repSummary === "Unassigned" ? "Needs dispatch" : "Assigned")}</span>
+              <span>${escapeHtml(overdue ? "Overdue" : followUp ? "Scheduled" : "No follow-up")}</span>
+            </div>
+          </div>
+          <div class="lead-list-col">
+            <span class="lead-list-label">VIN</span>
             <strong class="lead-vin-value">VIN ${escapeHtml(vehicleVin)}</strong>
             <div class="lead-list-subline">
               <span>${escapeHtml(vehicleContext.cluster_label || title)}</span>
@@ -2073,18 +2082,19 @@ function renderDealerLeads(leads, role) {
             </div>
           </div>
           <div class="lead-list-col">
+            <span class="lead-list-label">Stage</span>
+            <strong>${escapeHtml(progressSummary)}</strong>
+            <div class="lead-list-subline">
+              <span class="${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</span>
+              <span>${escapeHtml(lead.priority || "normal")}</span>
+            </div>
+          </div>
+          <div class="lead-list-col">
             <span class="lead-list-label">Next step</span>
             <strong>${escapeHtml(nextStepSummary)}</strong>
             <div class="lead-list-subline">
               <span>${escapeHtml(hasOpenTask ? "Task assigned" : overdue ? "Overdue" : followUp ? "Scheduled" : "Unscheduled")}</span>
-              <span>${escapeHtml(lead.assigned_to || "Assigned")}</span>
-            </div>
-          </div>
-          <div class="lead-list-col">
-            <span class="lead-list-label">Pipeline</span>
-            <strong>${escapeHtml(progressSummary)}</strong>
-            <div class="lead-list-subline">
-              <span>${escapeHtml(lastActivity ? `Last timeline update ${formatDateTime(lastActivity)}` : "No timeline yet")}</span>
+              <span>${escapeHtml(lastActivity ? `Last ${formatDateTime(lastActivity)}` : "No timeline")}</span>
             </div>
           </div>
           <div class="lead-list-col lead-list-col-actions">
@@ -3204,11 +3214,12 @@ function renderDealerLeadGroups(leads, cardRenderer) {
       </header>
       <div class="lead-list-header dealer-lead-list-header" aria-hidden="true">
         <span>Lead</span>
-        <span>Customer</span>
-        <span>Vehicle</span>
+        <span>Owner</span>
+        <span>Rep</span>
+        <span>VIN</span>
+        <span>Stage</span>
         <span>Next step</span>
-        <span>Pipeline</span>
-        <span>Quick actions</span>
+        <span>Actions</span>
       </div>
       <div class="dealer-lead-group-list">
         ${group.leads.map((lead, index) => cardRenderer(lead, index)).join("")}
