@@ -1739,25 +1739,29 @@ function isDealerOwnLatestActivity(lead) {
 }
 
 function renderDealerLeads(leads, role) {
-  if (!leads.length) {
+  const queueLeads = leads.filter(isDealerQueueLead);
+  const stockLeadCount = leads.length - queueLeads.length;
+
+  if (!queueLeads.length) {
     dealerLeadsStatus.textContent = role === "admin"
-      ? "No active leads yet."
-      : "No leads assigned to you yet.";
+      ? (stockLeadCount ? "All assigned stock vehicles are in Inventory Follow-up." : "No active leads yet.")
+      : (stockLeadCount ? "Your assigned stock vehicles are in Inventory Follow-up." : "No leads assigned to you yet.");
     dealerLeadsList.innerHTML = "";
     return;
   }
 
-  const visibleLeads = sortDealerLeads(filterDealerLeads(leads));
+  const visibleLeads = sortDealerLeads(filterDealerLeads(queueLeads));
   if (!visibleLeads.length) {
     dealerLeadsStatus.textContent = `No ${dealerLeadFilter.replace("-", " ")} leads in this view.`;
     dealerLeadsList.innerHTML = "";
     return;
   }
 
-  const activeCount = leads.filter((lead) => !isDealerClosedLead(lead)).length;
-  const closedCount = leads.length - activeCount;
+  const activeCount = queueLeads.filter((lead) => !isDealerClosedLead(lead)).length;
+  const closedCount = queueLeads.length - activeCount;
   const sortLabel = dealerLeadSort === "oldest" ? "Oldest first" : "Newest first";
-  dealerLeadsStatus.textContent = `${visibleLeads.length} shown. ${activeCount} active / ${closedCount} closed assigned lead${leads.length === 1 ? "" : "s"}. Sort: ${sortLabel}, with urgent, overdue, and new pinned first.`;
+  const stockNote = stockLeadCount ? ` ${stockLeadCount} stock vehicle${stockLeadCount === 1 ? "" : "s"} moved to Inventory Follow-up.` : "";
+  dealerLeadsStatus.textContent = `${visibleLeads.length} shown. ${activeCount} active / ${closedCount} closed assigned Up Sheet${queueLeads.length === 1 ? "" : "s"}.${stockNote} Sort: ${sortLabel}, with urgent, overdue, and new pinned first.`;
   dealerLeadsList.innerHTML = renderDealerLeadGroups(visibleLeads, (lead, index) => {
     const input = lead.input || {};
     const valuation = lead.valuation || {};
@@ -2466,7 +2470,8 @@ function renderDealerCommunicationStrip(lead) {
 
 function renderDealerTodayWork(leads) {
   if (!dealerTodayWorkEl) return;
-  const activeLeads = leads.filter(isDealerActiveWorkLead);
+  const queueLeads = leads.filter(isDealerQueueLead);
+  const activeLeads = queueLeads.filter(isDealerActiveWorkLead);
   const updateCount = activeLeads.filter((lead) => dealerLeadAlertMap.has(String(lead.id || ""))).length;
   const taskCount = activeLeads.filter(hasDealerOpenTask).length;
   const callNowCount = activeLeads.filter((lead) => isDealerCallNowLead(lead)).length;
@@ -2490,7 +2495,7 @@ function renderDealerTodayWork(leads) {
   ]);
   dealerTodayWorkEl.hidden = false;
   dealerTodayWorkEl.innerHTML = `
-    ${renderDealerDashboardStats(leads)}
+    ${renderDealerDashboardStats(queueLeads)}
     <section class="work-focus-panel dealer-work-focus" aria-label="Today focus">
       <div>
         <span>Today focus</span>
@@ -2849,6 +2854,18 @@ function filterDealerLeads(leads) {
     return leads.filter((lead) => !isDealerClosedLead(lead) && isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"));
   }
   return leads;
+}
+
+function isDealerQueueLead(lead) {
+  return !isDealerStockSourceLead(lead);
+}
+
+function isDealerStockSourceLead(lead) {
+  if (isBuyerLead(lead)) return false;
+  const context = lead?.vehicle_context || {};
+  const inventoryStatus = String(context.primary_inventory_status || "").trim().toLowerCase();
+  if (inventoryStatus && !["removed", "deleted"].includes(inventoryStatus)) return true;
+  return ["in_inventory", "inventory", "warehouse", "published", "sold", "archived"].includes(String(lead?.status || "").trim().toLowerCase());
 }
 
 function sortDealerLeads(leads) {
