@@ -3684,6 +3684,7 @@ async function syncInventoryDrivePhotos(button) {
 
 function inventoryListingPayloadFromForm(form) {
   const data = new FormData(form);
+  const assignedToField = form.querySelector("[name='assignedTo']");
   const payload = {
     sourceLeadId: String(data.get("sourceLeadId") || form.dataset.sourceLeadId || "").trim(),
     title: String(data.get("title") || "").trim(),
@@ -3691,7 +3692,7 @@ function inventoryListingPayloadFromForm(form) {
     monthlyPaymentEstimate: String(data.get("monthlyPaymentEstimate") || "").trim(),
     status: String(data.get("status") || "draft").trim(),
     description: String(data.get("description") || "").trim(),
-    assignedTo: String(data.get("assignedTo") || "").trim()
+    assignedTo: String(assignedToField?.value || data.get("assignedTo") || "").trim()
   };
   ["showVin", "showUvc", "showKilometers", "showRegion", "showColor", "showMaintenance", "showPhotos"].forEach((key) => {
     if (data.has(key)) payload[key] = true;
