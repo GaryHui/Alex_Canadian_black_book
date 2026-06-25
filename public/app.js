@@ -247,6 +247,27 @@ dealerStockList?.addEventListener("click", async (event) => {
   const openLeadButton = event.target.closest("[data-dealer-open-stock-lead]");
   if (openLeadButton) {
     await openDealerLead(openLeadButton.dataset.dealerOpenStockLead || "");
+    return;
+  }
+
+  const actionButton = event.target.closest("[data-dealer-stock-action]");
+  if (actionButton) {
+    await handleDealerStockAction(actionButton);
+  }
+});
+
+dealerStockList?.addEventListener("submit", async (event) => {
+  const correctionForm = event.target.closest("[data-dealer-stock-correction]");
+  if (correctionForm) {
+    event.preventDefault();
+    await submitDealerStockCorrection(correctionForm);
+    return;
+  }
+
+  const taskForm = event.target.closest("[data-dealer-stock-task]");
+  if (taskForm) {
+    event.preventDefault();
+    await submitDealerStockTask(taskForm);
   }
 });
 
@@ -1565,6 +1586,8 @@ function renderDealerInventoryCard(item) {
   const price = Number(item.price || 0) ? `$${formatNumber(item.price)}` : "Price not set";
   const km = Number(item.kilometers || 0) ? `${formatNumber(item.kilometers)} km` : "KM not set";
   const lastTouch = item.lastActivityAt ? `Last touch ${formatDateTime(item.lastActivityAt)}` : "No recent stock activity";
+  const nextFollowUp = item.nextFollowUpAt ? `Next follow-up ${formatDateTime(item.nextFollowUpAt)}` : "No stock follow-up scheduled";
+  const stockRep = item.assignedTo || authSession?.user?.email || "";
   return `
     <article class="dealer-stock-card dealer-stock-${escapeHtml(cssToken(status))}">
       <header class="dealer-stock-card-head">
@@ -1580,19 +1603,201 @@ function renderDealerInventoryCard(item) {
       </header>
       <div class="dealer-stock-meta">
         <span><b>Owner</b>${escapeHtml(owner)}</span>
-        <span><b>Rep</b>${escapeHtml(item.assignedTo || authSession?.user?.email || "Unassigned")}</span>
+        <span><b>Rep</b>${escapeHtml(stockRep || "Unassigned")}</span>
         <span><b>VIN</b>${escapeHtml(item.vin || "-")}</span>
         <span><b>Activity</b>${escapeHtml(lastTouch)}</span>
       </div>
       ${photos.length ? `<div class="dealer-stock-photo-strip">${photos.slice(0, 5).map((photo) => `<a href="${escapeHtml(photo.url)}" target="_blank" rel="noreferrer">${escapeHtml(photo.label || "Photo")}</a>`).join("")}</div>` : ""}
       <section class="dealer-stock-actions">
         ${leadId ? `
-          <button type="button" class="secondary-button" data-dealer-open-stock-lead="${escapeHtml(leadId)}">Open original lead</button>
+          <div class="dealer-stock-workflow">
+            <div>
+              <span>Stock workflow</span>
+              <strong>${escapeHtml(live ? "Live inventory follow-up" : "Inventory prep")}</strong>
+              <small>${escapeHtml(nextFollowUp)} | Manager controls price, public photos, publish, sold, and archive.</small>
+            </div>
+            <button type="button" class="secondary-button" data-dealer-open-stock-lead="${escapeHtml(leadId)}">Open CRM file</button>
+          </div>
+          <div class="dealer-stock-quick-actions" aria-label="Stock quick actions">
+            <button type="button" data-dealer-stock-action="viewing" data-lead-id="${escapeHtml(leadId)}">Viewing / test drive</button>
+            <button type="button" data-dealer-stock-action="followup" data-lead-id="${escapeHtml(leadId)}">Follow up tomorrow</button>
+            <button type="button" data-dealer-stock-action="offer" data-lead-id="${escapeHtml(leadId)}">Offer / customer interest</button>
+            <button type="button" data-dealer-stock-action="sold_review" data-lead-id="${escapeHtml(leadId)}">Manager sold review</button>
+          </div>
+          <form class="dealer-stock-request-form" data-dealer-stock-correction data-lead-id="${escapeHtml(leadId)}">
+            <label>
+              <span>Request manager change</span>
+              <input name="note" placeholder="Example: KM should be 125,400, price needs review, color is wrong..." />
+            </label>
+            <button type="submit">Send request</button>
+          </form>
+          <form class="dealer-stock-task-form" data-dealer-stock-task data-lead-id="${escapeHtml(leadId)}">
+            <label>
+              <span>Add stock task</span>
+              <input name="title" placeholder="Example: Confirm viewing time, wash car, check tire light..." />
+            </label>
+            <select name="dueAt" aria-label="Task due date">
+              <option value="today">Today</option>
+              <option value="tomorrow">Tomorrow</option>
+              <option value="next_week">Next week</option>
+            </select>
+            <button type="submit">Add task</button>
+          </form>
           ${renderDealerStockPhotoUpload(leadId)}
         ` : `<p class="status">This stock vehicle is not linked to a SELL lead, so staff upload is unavailable.</p>`}
       </section>
     </article>
   `;
+}
+
+async function handleDealerStockAction(button) {
+  const leadId = String(button.dataset.leadId || "").trim();
+  const action = String(button.dataset.dealerStockAction || "").trim();
+  if (!leadId || !action) return;
+
+  const copy = dealerStockActionCopy(action);
+  if (!copy) return;
+
+  button.disabled = true;
+  if (dealerStockStatus) dealerStockStatus.textContent = copy.saving;
+  try {
+    if (copy.type === "task") {
+      await postDealerLeadActivity({
+        leadId,
+        type: "task",
+        title: copy.title,
+        assignedTo: authSession?.user?.email || "",
+        dueAt: dealerTaskDueValue(copy.due)
+      });
+    } else {
+      await postDealerLeadActivity({
+        leadId,
+        type: "note",
+        noteType: copy.noteType || "internal",
+        note: copy.note
+      });
+    }
+    if (dealerStockStatus) dealerStockStatus.textContent = copy.done;
+    await Promise.all([
+      loadDealerInventory(),
+      loadDealerLeads({ forceActivity: true, suppressAlerts: true })
+    ]);
+  } catch (error) {
+    button.disabled = false;
+    if (dealerStockStatus) dealerStockStatus.textContent = error.message || "Unable to update stock work.";
+  }
+}
+
+async function submitDealerStockCorrection(form) {
+  const leadId = String(form.dataset.leadId || "").trim();
+  const field = form.querySelector('[name="note"]');
+  const note = String(field?.value || "").trim();
+  if (!leadId || !note) {
+    if (dealerStockStatus) dealerStockStatus.textContent = "Add the detail that needs manager review.";
+    field?.focus();
+    return;
+  }
+
+  const button = form.querySelector('button[type="submit"]');
+  if (button) button.disabled = true;
+  if (dealerStockStatus) dealerStockStatus.textContent = "Sending manager change request...";
+  try {
+    await postDealerLeadActivity({
+      leadId,
+      type: "note",
+      noteType: "correction",
+      note: `Stock change request: ${note}`
+    });
+    form.reset();
+    if (dealerStockStatus) dealerStockStatus.textContent = "Manager change request sent.";
+    await Promise.all([
+      loadDealerInventory(),
+      loadDealerLeads({ forceActivity: true, suppressAlerts: true })
+    ]);
+  } catch (error) {
+    if (button) button.disabled = false;
+    if (dealerStockStatus) dealerStockStatus.textContent = error.message || "Unable to send manager change request.";
+  }
+}
+
+async function submitDealerStockTask(form) {
+  const leadId = String(form.dataset.leadId || "").trim();
+  const titleField = form.querySelector('[name="title"]');
+  const title = String(titleField?.value || "").trim();
+  const due = String(form.querySelector('[name="dueAt"]')?.value || "today").trim();
+  if (!leadId || !title) {
+    if (dealerStockStatus) dealerStockStatus.textContent = "Add a task before saving.";
+    titleField?.focus();
+    return;
+  }
+
+  const button = form.querySelector('button[type="submit"]');
+  if (button) button.disabled = true;
+  if (dealerStockStatus) dealerStockStatus.textContent = "Adding stock task...";
+  try {
+    await postDealerLeadActivity({
+      leadId,
+      type: "task",
+      title: `Stock task: ${title}`,
+      assignedTo: authSession?.user?.email || "",
+      dueAt: dealerTaskDueValue(due)
+    });
+    form.reset();
+    if (dealerStockStatus) dealerStockStatus.textContent = "Stock task added.";
+    await Promise.all([
+      loadDealerInventory(),
+      loadDealerLeads({ forceActivity: true, suppressAlerts: true })
+    ]);
+  } catch (error) {
+    if (button) button.disabled = false;
+    if (dealerStockStatus) dealerStockStatus.textContent = error.message || "Unable to add stock task.";
+  }
+}
+
+async function postDealerLeadActivity(payload) {
+  const response = await fetch("/api/lead-activity", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${authSession?.access_token || ""}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  if (!data.ok) throw new Error(data.error || "Unable to update lead activity");
+  return data;
+}
+
+function dealerStockActionCopy(action) {
+  const map = {
+    viewing: {
+      type: "task",
+      due: "today",
+      title: "Stock viewing / test drive: confirm appointment time, customer name, and vehicle availability.",
+      saving: "Adding viewing task...",
+      done: "Viewing task added."
+    },
+    followup: {
+      type: "task",
+      due: "tomorrow",
+      title: "Stock follow-up: contact customer and update interest, objections, or next appointment.",
+      saving: "Adding follow-up task...",
+      done: "Follow-up task added."
+    },
+    offer: {
+      noteType: "offer",
+      note: "Stock deal update: customer is interested or offer discussion started. Manager review requested before price or public listing changes.",
+      saving: "Logging offer update...",
+      done: "Offer update sent for manager review."
+    },
+    sold_review: {
+      noteType: "offer",
+      note: "Stock sold review requested: customer is ready to proceed. Manager should confirm deposit, paperwork, final price, and mark inventory sold when approved.",
+      saving: "Requesting manager sold review...",
+      done: "Manager sold review requested."
+    }
+  };
+  return map[action] || null;
 }
 
 function renderDealerStockPhotoUpload(leadId) {

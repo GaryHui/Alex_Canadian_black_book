@@ -5158,12 +5158,88 @@ body.admin-drawer-open {
 }
 
 .dealer-stock-actions {
-  align-items: end;
   border-top: 1px solid #e2e8f0;
   display: grid;
   gap: 12px;
-  grid-template-columns: auto minmax(0, 1fr);
   padding-top: 14px;
+}
+
+.dealer-stock-workflow {
+  align-items: center;
+  background: #f8fbff;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.dealer-stock-workflow span,
+.dealer-stock-request-form span,
+.dealer-stock-task-form span {
+  color: #586a80;
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.dealer-stock-workflow strong {
+  color: #162234;
+  display: block;
+  font-size: 16px;
+}
+
+.dealer-stock-workflow small {
+  color: #586a80;
+}
+
+.dealer-stock-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dealer-stock-quick-actions button,
+.dealer-stock-request-form button,
+.dealer-stock-task-form button {
+  background: #fff;
+  border: 1px solid #b8cbe2;
+  border-radius: 999px;
+  color: #0b4f9c;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 9px 13px;
+}
+
+.dealer-stock-quick-actions button:hover,
+.dealer-stock-request-form button:hover,
+.dealer-stock-task-form button:hover {
+  background: #eef6ff;
+}
+
+.dealer-stock-request-form,
+.dealer-stock-task-form {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1fr) auto;
+}
+
+.dealer-stock-task-form {
+  grid-template-columns: minmax(220px, 1fr) 150px auto;
+}
+
+.dealer-stock-request-form input,
+.dealer-stock-task-form input,
+.dealer-stock-task-form select {
+  border: 1px solid #b8cbe2;
+  border-radius: 8px;
+  font: inherit;
+  min-height: 42px;
+  padding: 9px 11px;
+  width: 100%;
 }
 
 .dealer-stock-photo-manager {
@@ -6413,7 +6489,10 @@ body.admin-drawer-open {
 
   .dealer-stock-card-head,
   .dealer-stock-actions,
-  .dealer-stock-photo-manager {
+  .dealer-stock-photo-manager,
+  .dealer-stock-workflow,
+  .dealer-stock-request-form,
+  .dealer-stock-task-form {
     grid-template-columns: 1fr;
   }
 
