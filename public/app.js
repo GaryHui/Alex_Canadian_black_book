@@ -2002,6 +2002,7 @@ function renderDealerLeads(leads, role) {
     const pendingAlert = dealerLeadAlertMap.has(String(lead.id || "")) || duplicateGroup.some((item) => dealerLeadAlertMap.has(String(item.id || "")));
     const wholesaleAvg = historyMarketAverage(valuation, "wholesale");
     const retailAvg = historyMarketAverage(valuation, "retail");
+    const vehicleVin = valuation.vin || input.vin || "-";
     const updateToken = dealerLeadUpdateToken(lead);
     const vehicleContext = lead.vehicle_context || {};
     const taskSummary = lead.task_summary || {};
@@ -2063,9 +2064,10 @@ function renderDealerLeads(leads, role) {
           </div>
           <div class="lead-list-col">
             <span class="lead-list-label">Vehicle</span>
-            <strong>${escapeHtml(vehicleSummary)}</strong>
+            <strong class="lead-vin-value">VIN ${escapeHtml(vehicleVin)}</strong>
             <div class="lead-list-subline">
-              <span>${escapeHtml(vehicleContext.cluster_label || `VIN ${valuation.vin || input.vin || "-"}`)}</span>
+              <span>${escapeHtml(vehicleContext.cluster_label || title)}</span>
+              <span>${escapeHtml(vehicleSummary)}</span>
               <span>${escapeHtml(buyerLead ? (purchase.intent || input.purchaseIntent || "Buyer") : (wholesaleAvg ? `W ${formatNumber(wholesaleAvg)}` : "Seller"))}</span>
               <span>${escapeHtml(!buyerLead && retailAvg ? `R ${formatNumber(retailAvg)}` : buyerLead && (purchase.monthlyPayment || retailAvg) ? `Budget ${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)}/mo` : formatNumber(retailAvg)}` : "-")}</span>
             </div>

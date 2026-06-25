@@ -3149,6 +3149,13 @@ body.admin-drawer-open {
   overflow-wrap: anywhere;
 }
 
+.lead-list-col > strong.lead-vin-value {
+  color: #0f4f9a;
+  font-size: 16px;
+  font-weight: 950;
+  letter-spacing: .01em;
+}
+
 .lead-list-col-actions {
   background: transparent;
   border-color: transparent;

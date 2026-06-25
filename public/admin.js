@@ -2496,9 +2496,10 @@ function renderLead(lead, index = 0) {
         </div>
         <div class="lead-list-col">
           <span class="lead-list-label">Vehicle</span>
-          <strong>${escapeHtml(vehicleContext.cluster_label || title)}</strong>
+          <strong class="lead-vin-value">VIN ${escapeHtml(vin)}</strong>
           <div class="lead-list-subline">
-            <span>VIN ${escapeHtml(vin)}</span>
+            <span>${escapeHtml(vehicleContext.cluster_label || title)}</span>
+            <span>${escapeHtml(vehicleSummary)}</span>
             <span>${escapeHtml(buyer ? (purchase.intent || input.purchaseIntent || "Buyer") : (wholesale ? `W ${formatNumber(wholesale)}` : "Seller"))}</span>
             <span>${escapeHtml(!buyer && retail ? `R ${formatNumber(retail)}` : buyer && (purchase.monthlyPayment || retail) ? `Budget ${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)}/mo` : formatNumber(retail)}` : "-")}</span>
           </div>
