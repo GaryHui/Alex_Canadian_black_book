@@ -3147,7 +3147,7 @@ function groupDealerVisibleLeads(leads = []) {
 function dealerSameVehicleKey(lead = {}) {
   const input = lead.input || {};
   const valuation = lead.valuation || {};
-  const vin = cleanVin(input.vin || valuation.vin);
+  const vin = cleanVinText(input.vin || valuation.vin);
   if (vin) return `vin:${vin}`;
   const uvc = String(input.uvc || valuation.uvc || "").trim();
   if (uvc) return `uvc:${uvc}`;
