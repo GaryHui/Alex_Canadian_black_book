@@ -1589,6 +1589,7 @@ async function updateInventoryListing(body, user) {
   );
   if (!previousResult.ok) return previousResult;
   const previousListing = previousResult.data?.[0] || null;
+  const hasAssignedTo = Object.prototype.hasOwnProperty.call(body || {}, "assignedTo");
   const status = normalizeListingStatus(body.status);
   const patch = {
     status,
@@ -1621,6 +1622,10 @@ async function updateInventoryListing(body, user) {
   if (Array.isArray(body.selectedPhotoUrls)) {
     await syncSelectedListingPhotos({ url, key }, id, String(body.sourceLeadId || "").trim(), body.selectedPhotoUrls);
   }
+  if (hasAssignedTo && previousListing?.source_lead_id) {
+    const assignResult = await updateInventoryLeadAssignee({ url, key }, previousListing.source_lead_id, body.assignedTo, user);
+    if (!assignResult.ok) return assignResult;
+  }
   const savedListing = saveResult.data?.[0] || { ...saveResult.payload, id };
   await recordInventoryLifecycleUpdate({
     url,
@@ -1631,6 +1636,53 @@ async function updateInventoryListing(body, user) {
     isNew: false
   });
   return { ok: true, listing: publicInventoryRow(savedListing) };
+}
+
+async function updateInventoryLeadAssignee(client, leadId, assignedToValue, user) {
+  const id = String(leadId || "").trim();
+  const assignedTo = String(assignedToValue || "").trim().toLowerCase();
+  if (!id) return { ok: true, changed: false };
+
+  const previousResult = await fetchSupabaseJson(
+    `${client.url}/rest/v1/valuation_leads?select=id,assigned_to,status&id=eq.${encodeURIComponent(id)}&limit=1`,
+    client.key
+  );
+  if (!previousResult.ok) return previousResult;
+
+  const previous = previousResult.data?.[0] || null;
+  if (!previous) return { ok: false, status: 404, error: "Source lead not found for inventory assignment" };
+
+  const previousRep = String(previous.assigned_to || "").trim().toLowerCase();
+  if (previousRep === assignedTo) return { ok: true, changed: false };
+
+  const patch = {
+    assigned_to: assignedTo || null,
+    last_activity_at: new Date().toISOString()
+  };
+  if (assignedTo && String(previous.status || "").trim().toLowerCase() === "new") {
+    patch.status = "assigned";
+  }
+
+  const response = await fetch(`${client.url}/rest/v1/valuation_leads?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: {
+      ...supabaseServiceHeaders(client.key),
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(patch)
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, status: response.status, error: data || "Unable to update inventory rep" };
+
+  await createLeadActivity({
+    leadId: id,
+    type: "note",
+    noteType: "internal",
+    note: `Inventory follow-up rep updated by ${user?.email || "admin"}: ${previousRep || "unassigned"} -> ${assignedTo || "unassigned"}.`
+  }, user, "admin");
+
+  return { ok: true, changed: true, lead: data?.[0] || null };
 }
 
 async function deleteInventoryListing(id, user) {
