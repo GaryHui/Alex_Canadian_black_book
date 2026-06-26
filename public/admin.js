@@ -704,6 +704,46 @@ function renderInventoryListing(listing) {
             <input name="monthlyPaymentEstimate" type="number" min="0" step="1" value="${escapeHtml(listing.monthlyPaymentEstimate || "")}" />
           </label>
           <label>
+            <span>VIN</span>
+            <input name="vin" value="${escapeHtml(listing.vin || "")}" />
+          </label>
+          <label>
+            <span>UVC</span>
+            <input name="uvc" value="${escapeHtml(listing.uvc || "")}" />
+          </label>
+          <label>
+            <span>Year</span>
+            <input name="vehicleYear" type="number" min="1900" max="2100" step="1" value="${escapeHtml(listing.year || "")}" />
+          </label>
+          <label>
+            <span>Make</span>
+            <input name="make" value="${escapeHtml(listing.make || "")}" />
+          </label>
+          <label>
+            <span>Model</span>
+            <input name="model" value="${escapeHtml(listing.model || "")}" />
+          </label>
+          <label>
+            <span>Trim / series</span>
+            <input name="series" value="${escapeHtml(listing.series || "")}" />
+          </label>
+          <label>
+            <span>Style</span>
+            <input name="style" value="${escapeHtml(listing.style || "")}" />
+          </label>
+          <label>
+            <span>Kilometers</span>
+            <input name="kilometers" type="number" min="0" step="1" value="${escapeHtml(listing.kilometers || "")}" />
+          </label>
+          <label>
+            <span>Color</span>
+            <input name="color" value="${escapeHtml(listing.color || "")}" />
+          </label>
+          <label>
+            <span>Region</span>
+            <input name="region" value="${escapeHtml(listing.region || "")}" />
+          </label>
+          <label>
             <span>Status</span>
             <select name="status">
               ${["draft", "review", "published", "sold", "archived"].map((status) =>
@@ -3786,6 +3826,16 @@ function inventoryListingPayloadFromForm(form) {
     title: String(data.get("title") || "").trim(),
     askingPrice: String(data.get("askingPrice") || "").trim(),
     monthlyPaymentEstimate: String(data.get("monthlyPaymentEstimate") || "").trim(),
+    vin: String(data.get("vin") || "").trim(),
+    uvc: String(data.get("uvc") || "").trim(),
+    vehicleYear: String(data.get("vehicleYear") || "").trim(),
+    make: String(data.get("make") || "").trim(),
+    model: String(data.get("model") || "").trim(),
+    series: String(data.get("series") || "").trim(),
+    style: String(data.get("style") || "").trim(),
+    kilometers: String(data.get("kilometers") || "").trim(),
+    color: String(data.get("color") || "").trim(),
+    region: String(data.get("region") || "").trim(),
     status: String(data.get("status") || "draft").trim(),
     description: String(data.get("description") || "").trim(),
     assignedTo: String(assignedToField?.value || data.get("assignedTo") || "").trim()

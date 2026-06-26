@@ -61,6 +61,16 @@ export async function updateInventoryListing(body, user) {
   const patch = {
     status,
     title: String(body.title || "").trim(),
+    vin: String(body.vin || "").trim(),
+    uvc: String(body.uvc || "").trim(),
+    vehicle_year: numberOrNull(body.vehicleYear),
+    make: String(body.make || "").trim(),
+    model: String(body.model || "").trim(),
+    series: String(body.series || "").trim(),
+    style: String(body.style || "").trim(),
+    kilometers: numberOrNull(body.kilometers),
+    color: String(body.color || "").trim(),
+    region: String(body.region || "").trim(),
     asking_price: numberOrNull(body.askingPrice),
     monthly_payment_estimate: numberOrNull(body.monthlyPaymentEstimate),
     description: String(body.description || "").trim(),
@@ -239,6 +249,13 @@ function buildInventoryUpdateTimeline(current = {}, patch = {}, body = {}) {
   const changes = [];
   if (String(current.status || "") !== String(patch.status || "")) changes.push(`status ${current.status || "blank"} -> ${patch.status || "blank"}`);
   if (String(current.title || "") !== String(patch.title || "")) changes.push("title updated");
+  if (String(current.vin || "") !== String(patch.vin || "")) changes.push("VIN updated");
+  if (String(current.uvc || "") !== String(patch.uvc || "")) changes.push("UVC updated");
+  if (numberOrNull(current.vehicle_year) !== numberOrNull(patch.vehicle_year)) changes.push(`year ${current.vehicle_year ?? "not set"} -> ${patch.vehicle_year ?? "not set"}`);
+  ["make", "model", "series", "style", "color", "region"].forEach((key) => {
+    if (String(current[key] || "") !== String(patch[key] || "")) changes.push(`${key} updated`);
+  });
+  if (numberOrNull(current.kilometers) !== numberOrNull(patch.kilometers)) changes.push(`kilometers ${current.kilometers ?? "not set"} -> ${patch.kilometers ?? "not set"}`);
   if (numberOrNull(current.asking_price) !== numberOrNull(patch.asking_price)) changes.push(`asking price ${current.asking_price ?? "not set"} -> ${patch.asking_price ?? "not set"}`);
   if (numberOrNull(current.monthly_payment_estimate) !== numberOrNull(patch.monthly_payment_estimate)) {
     changes.push(`monthly estimate ${current.monthly_payment_estimate ?? "not set"} -> ${patch.monthly_payment_estimate ?? "not set"}`);
