@@ -432,16 +432,16 @@ async function loadDealers() {
   }
 
   if (data.storage === "not_configured") {
-    dealersStatusEl.textContent = "Supabase is not configured, so dealer staff can only be managed through Vercel env vars.";
+    dealersStatusEl.textContent = "Supabase is not configured, so staff access can only be managed through Vercel env vars.";
   } else {
-    dealersStatusEl.textContent = `${data.staff.length} approved dealer email(s).`;
+    dealersStatusEl.textContent = `${data.staff.length} approved staff account(s). Staff see only assigned Up Sheets, assigned tasks, and assigned inventory follow-up.`;
   }
 
   dealerStaffEmails = (data.staff || [])
     .filter((staff) => staff.active !== false)
     .map((staff) => String(staff.email || "").trim().toLowerCase())
     .filter(Boolean);
-  dealersEl.innerHTML = (data.staff || []).map(renderDealer).join("") || "<p>No dealer emails yet.</p>";
+  dealersEl.innerHTML = (data.staff || []).map(renderDealer).join("") || "<p>No staff access yet.</p>";
   if (adminLeadsCache.length) renderLeadWorkbench(adminLeadsCache);
 }
 
@@ -793,7 +793,11 @@ function renderDealer(staff) {
     <article class="user-limit-card dealer-staff-card" data-email="${escapeHtml(staff.email)}">
       <div>
         <strong>${escapeHtml(staff.email)}</strong>
-        <span>${staff.source === "vercel_env" ? "Vercel DEALER_EMAILS" : "Supabase dealer_staff"}</span>
+        <span>${staff.source === "vercel_env" ? "Env-managed staff login" : "Team access list"}</span>
+      </div>
+      <div>
+        <span>Role</span>
+        <b>Staff rep</b>
       </div>
       <div>
         <span>Status</span>
@@ -803,7 +807,7 @@ function renderDealer(staff) {
         <span>Added by</span>
         <b>${escapeHtml(staff.created_by || "-")}</b>
       </div>
-      <button type="button" data-remove-dealer="${escapeHtml(staff.email)}" ${removable ? "" : "disabled"}>${removable ? "Remove" : "Env locked"}</button>
+      <button type="button" data-remove-dealer="${escapeHtml(staff.email)}" ${removable ? "" : "disabled"}>${removable ? "Remove access" : "Env locked"}</button>
     </article>
   `;
 }
@@ -813,14 +817,14 @@ async function addDealer(event) {
   if (!adminSession) return;
 
   const email = String(new FormData(dealerStaffForm).get("email") || "").trim();
-  dealersStatusEl.textContent = "Adding dealer email...";
+  dealersStatusEl.textContent = "Adding staff access...";
   const response = await fetch("/api/dealer-staff", {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ email })
   });
   const data = await response.json();
-  dealersStatusEl.textContent = data.ok ? "Dealer email saved." : formatApiError(data, "Unable to save dealer email.");
+  dealersStatusEl.textContent = data.ok ? "Staff access saved." : formatApiError(data, "Unable to save staff access.");
   if (data.ok) {
     dealerStaffForm.reset();
     await loadDealers();
@@ -5081,13 +5085,13 @@ dealersEl.addEventListener("click", async (event) => {
   if (!confirmed) return;
 
   button.disabled = true;
-  dealersStatusEl.textContent = "Removing dealer email...";
+  dealersStatusEl.textContent = "Removing staff access...";
   const response = await fetch(`/api/dealer-staff?email=${encodeURIComponent(email)}`, {
     method: "DELETE",
     headers: authHeaders()
   });
   const data = await response.json();
-  dealersStatusEl.textContent = data.ok ? "Dealer email removed." : formatApiError(data, "Unable to remove dealer email.");
+  dealersStatusEl.textContent = data.ok ? "Staff access removed." : formatApiError(data, "Unable to remove staff access.");
   await loadDealers();
 });
 

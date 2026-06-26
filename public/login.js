@@ -1,5 +1,7 @@
 const loginButton = document.querySelector("#google-login");
 const statusEl = document.querySelector("#login-status");
+const loginTitle = document.querySelector("#login-title");
+const loginCopy = document.querySelector("#login-copy");
 const turnstileWrap = document.querySelector("#login-turnstile-wrap");
 const turnstileContainer = document.querySelector("#login-turnstile");
 const turnstileStatus = document.querySelector("#login-turnstile-status");
@@ -9,6 +11,7 @@ let turnstileGate = null;
 const nextPath = safeNextPath(new URLSearchParams(window.location.search).get("next") || "/");
 
 initializeLogin();
+renderLoginIntent();
 
 loginButton.addEventListener("click", async () => {
   if (!client) {
@@ -68,4 +71,20 @@ function safeNextPath(value) {
   const text = String(value || "/").trim();
   if (!text.startsWith("/") || text.startsWith("//")) return "/";
   return text;
+}
+
+function renderLoginIntent() {
+  if (!loginTitle || !loginCopy) return;
+  if (nextPath.startsWith("/admin.html")) {
+    loginTitle.textContent = "Manager login";
+    loginCopy.textContent = "Managers can review all Up Sheets, assign responsible reps, approve pricing, publish inventory, and manage team access.";
+    return;
+  }
+  if (nextPath.startsWith("/dealer.html") || nextPath === "/") {
+    loginTitle.textContent = "Staff login";
+    loginCopy.textContent = "Staff can work assigned Up Sheets, assigned inventory follow-up, tasks, notes, and photo uploads. Manager-only decisions stay locked.";
+    return;
+  }
+  loginTitle.textContent = "Sign in to continue";
+  loginCopy.textContent = "Use Google to enter the right dealership workspace. Managers and staff are routed by approved access.";
 }

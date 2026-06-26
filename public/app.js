@@ -20,6 +20,7 @@ const modalStatus = document.querySelector("#modal-status");
 const quotaPanel = document.querySelector("#quota-panel");
 const quotaTitle = document.querySelector("#quota-title");
 const quotaSubtitle = document.querySelector("#quota-subtitle");
+const dealerAccessSummary = document.querySelector("#dealer-access-summary");
 const historyPanel = document.querySelector("#history-panel");
 const historyStatus = document.querySelector("#history-status");
 const historyList = document.querySelector("#history-list");
@@ -1398,18 +1399,22 @@ async function setSession(session) {
     if (!dealer.ok) {
       authTitle.textContent = "Dealer access denied";
       authSubtitle.textContent = dealer.error || `This Google account is not allowed: ${email}`;
+      renderDealerAccessSummary(null);
       disableDealerTools(true);
       quotaPanel.hidden = true;
       historyPanel.hidden = true;
     if (dealerLeadsList) dealerLeadsList.innerHTML = "";
       if (dealerLeadsStatus) dealerLeadsStatus.textContent = dealer.error || "Dealer access denied.";
-      statusEl.textContent = "Ask the site owner to add this email in Admin > Dealer portal access.";
+      statusEl.textContent = "Ask the manager to add this email in Admin > Settings > Team access.";
       setDealerAdminLinksVisible(false);
       return;
     }
     dealerAdminAllowed = true;
     setDealerAdminLinksVisible(dealer.role === "admin");
-    authSubtitle.textContent = "Dealer access confirmed. Dealer tools are available.";
+    authSubtitle.textContent = dealer.role === "admin"
+      ? "Manager access confirmed. You can open the admin backend for team, pricing, and inventory control."
+      : "Staff access confirmed. Work assigned leads, stock follow-up, tasks, notes, and photo uploads here.";
+    renderDealerAccessSummary(dealer);
     disableDealerTools(false);
     await loadDealerDirectory();
     loadUsage();
@@ -1424,6 +1429,7 @@ async function setSession(session) {
       return;
     }
     setDealerAdminLinksVisible(false);
+    renderDealerAccessSummary(null);
     authTitle.textContent = "Login not configured";
     authSubtitle.textContent = "Add Supabase environment variables to enable Google login.";
     logoutButton.hidden = true;
@@ -1440,6 +1446,26 @@ async function setSession(session) {
   }
 }
 
+function renderDealerAccessSummary(dealer) {
+  if (!dealerAccessSummary) return;
+  if (!dealer?.ok) {
+    dealerAccessSummary.hidden = true;
+    dealerAccessSummary.innerHTML = "";
+    return;
+  }
+  const role = dealer.role === "admin" ? "Manager / owner" : "Staff rep";
+  const canManage = dealer.role === "admin";
+  dealerAccessSummary.hidden = false;
+  dealerAccessSummary.innerHTML = `
+    <span>${escapeHtml(role)}</span>
+    <strong>${escapeHtml(authSession?.user?.email || "")}</strong>
+    <small>${canManage
+      ? "Can manage team access, pricing decisions, inventory publish/sold/archive, and all Up Sheets."
+      : "Can work assigned Up Sheets and stock, upload photos, add notes/tasks, and request manager changes."
+    }</small>
+  `;
+}
+
 function setDealerAdminLinksVisible(visible) {
   dealerAdminLinks.forEach((element) => {
     element.hidden = !visible;
@@ -1451,7 +1477,7 @@ function requireLogin() {
   if (!supabaseClient) {
     statusEl.textContent = "Supabase Google login is not configured yet. Add Supabase env vars to enable this flow.";
   } else if (authSession?.user && !dealerAdminAllowed) {
-    statusEl.textContent = "Dealer access is restricted to approved dealer emails.";
+    statusEl.textContent = "Staff access is restricted to approved team emails.";
   } else {
     statusEl.textContent = "Please sign in with Google first.";
   }
@@ -2421,7 +2447,7 @@ function renderDealerDrawer(leadId) {
                 </label>
                 <details class="task-advanced-options">
                   <summary>Assign this task to a helper</summary>
-                  <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to dealer email" />
+                  <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to staff email" />
                   <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
                 </details>
                 <button type="submit">Add task</button>
