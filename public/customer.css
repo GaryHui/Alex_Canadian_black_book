@@ -2323,6 +2323,8 @@ input::placeholder {
 
 .inventory-photo {
   position: relative;
+  width: 100%;
+  min-width: 0;
   min-height: 260px;
   aspect-ratio: 16 / 9;
   margin: 0;
@@ -2451,6 +2453,18 @@ input::placeholder {
   grid-template-columns: 1fr;
   align-content: start;
   min-height: 100%;
+}
+
+.inventory-carousel-page .inventory-photo,
+.inventory-carousel-page .inventory-image {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: 16 / 10;
+}
+
+.inventory-carousel-page .inventory-photo img {
+  min-height: 0;
 }
 
 .inventory-carousel-page .inventory-card-body {
