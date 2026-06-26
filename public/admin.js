@@ -2405,7 +2405,6 @@ function renderLead(lead, index = 0) {
   const customerPhone = buyer ? (input.phone || input.ownerPhone || "No phone") : (input.ownerPhone || "No phone");
   const submitterEmail = input.submitterEmail || input.dealerEmail || lead.auth_email || lead.auth_user?.email || "";
   const submitterLabel = submitterEmail ? `Submitted by ${shortEmail(submitterEmail)}` : (input.submitterRelationship || "");
-  const sourceAuditLabel = submitterLabel ? `${sourceDetailLabel} / ${submitterLabel}` : sourceDetailLabel;
   const vin = input.vin || valuation.vin || "-";
   const status = lead.status || "new";
   const assignedTo = lead.assigned_to || "";
@@ -2481,6 +2480,15 @@ function renderLead(lead, index = 0) {
   const progressSummary = leadStatusLabel(status, buyer);
   const nextAction = adminNextBestAction(lead);
   const compactTouchSummary = isAdminStaleLead(lead) ? "No response 48h+" : (adminOutboundLabel(lead) || adminLastTouchLabel(lead));
+  const vehicleValuePills = buyer
+    ? [
+      purchase.intent || input.purchaseIntent || "Buyer inquiry",
+      purchase.monthlyPayment ? `Budget ${formatNumber(purchase.monthlyPayment)}/mo` : ""
+    ].filter(Boolean)
+    : [
+      wholesale ? `W ${formatNumber(wholesale)}` : "",
+      retail ? `R ${formatNumber(retail)}` : ""
+    ].filter(Boolean);
   const compactAlertLabel = lead?.duplicate_warning?.message && !lead?.duplicate_warning?.reviewed
     ? "Duplicate review required"
     : ownerReview.unread
@@ -2527,7 +2535,6 @@ function renderLead(lead, index = 0) {
           <div class="lead-list-subline lead-primary-meta">
             <span class="lead-time-chip">${escapeHtml(formatDateTime(lead.created_at))}</span>
             <span class="priority-pill priority-${escapeHtml(priority)}">${escapeHtml(priority)}</span>
-            <span class="status-pill ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</span>
           </div>
         </div>
         <div class="lead-list-col">
@@ -2550,10 +2557,9 @@ function renderLead(lead, index = 0) {
           <span class="lead-list-label">VIN</span>
           <strong class="lead-vin-value">VIN ${escapeHtml(vin)}</strong>
           <div class="lead-list-subline">
-            <span>${escapeHtml(vehicleContext.cluster_label || title)}</span>
-            <span>${escapeHtml(sourceAuditLabel)}</span>
-            <span>${escapeHtml(buyer ? (purchase.intent || input.purchaseIntent || "Buyer") : (wholesale ? `W ${formatNumber(wholesale)}` : "Seller"))}</span>
-            <span>${escapeHtml(!buyer && retail ? `R ${formatNumber(retail)}` : buyer && (purchase.monthlyPayment || retail) ? `Budget ${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)}/mo` : formatNumber(retail)}` : "-")}</span>
+            <span>${escapeHtml(sourceDetailLabel)}</span>
+            ${submitterLabel ? `<span>${escapeHtml(submitterLabel)}</span>` : ""}
+            ${vehicleValuePills.map((pill) => `<span>${escapeHtml(pill)}</span>`).join("")}
           </div>
         </div>
         <div class="lead-list-col">
@@ -2561,7 +2567,7 @@ function renderLead(lead, index = 0) {
           <strong>${escapeHtml(progressSummary)}</strong>
           <div class="lead-list-subline">
             <span class="${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</span>
-            <span>${escapeHtml(priority)}</span>
+            <span>${escapeHtml(vehicleSummary)}</span>
           </div>
         </div>
         <div class="lead-list-col">
@@ -2587,7 +2593,7 @@ function renderLead(lead, index = 0) {
           <span class="lead-queue-insight-label">Next action</span>
           <strong>${escapeHtml(nextAction)}</strong>
         </div>
-        <span>${escapeHtml(queueSummary)} | ${escapeHtml(compactTouchSummary)}</span>
+        <span>${escapeHtml(compactTouchSummary)}</span>
       </section>
       ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-admin-open-alert="${escapeHtml(lead.id || "")}">${escapeHtml(compactAlertLabel)}</button>` : ""}
       ${detailLayer}

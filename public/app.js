@@ -2029,7 +2029,6 @@ function renderDealerLeads(leads, role) {
     const customerPhone = buyerLead ? (input.phone || input.ownerPhone || "No phone") : (input.ownerPhone || "No phone");
     const submitterEmail = input.submitterEmail || input.dealerEmail || lead.auth_email || lead.auth_user?.email || "";
     const submitterLabel = submitterEmail ? `Submitted by ${shortEmail(submitterEmail)}` : (input.submitterRelationship || "");
-    const sourceAuditLabel = submitterLabel ? `${sourceDetailLabel} / ${submitterLabel}` : sourceDetailLabel;
     const followUp = lead.next_follow_up_at || "";
     const lastActivity = lead.last_activity_at || "";
     const status = lead.status || "new";
@@ -2077,6 +2076,15 @@ function renderDealerLeads(leads, role) {
     const progressSummary = dealerLeadStatusLabel(status, buyerLead);
     const nextAction = dealerNextBestAction(lead);
     const compactTouchSummary = isDealerNoResponseLead(lead) ? "No response 48h+" : (dealerOutboundLabel(lead) || dealerLastTouchLabel(lead));
+    const vehicleValuePills = buyerLead
+      ? [
+        purchase.intent || input.purchaseIntent || "Buyer inquiry",
+        purchase.monthlyPayment ? `Budget ${formatNumber(purchase.monthlyPayment)}/mo` : ""
+      ].filter(Boolean)
+      : [
+        wholesaleAvg ? `W ${formatNumber(wholesaleAvg)}` : "",
+        retailAvg ? `R ${formatNumber(retailAvg)}` : ""
+      ].filter(Boolean);
 
     return `
       <article class="history-card dealer-lead-card dealer-lead-${leadKind} dealer-lead-card-alt-${index % 2 === 0 ? "even" : "odd"} ${String(lead.priority || "").toLowerCase() === "urgent" ? "dealer-lead-card-urgent" : ""} ${overdue ? "lead-overdue" : ""} ${pendingAlert ? "dealer-lead-updated" : ""}" data-lead-id="${escapeHtml(lead.id || "")}" data-update-token="${escapeHtml(updateToken)}">
@@ -2094,7 +2102,6 @@ function renderDealerLeads(leads, role) {
               <span class="lead-time-chip">${escapeHtml(formatDateTime(lead.created_at))}</span>
               <span class="priority-pill priority-${escapeHtml(lead.priority || "normal")}">${escapeHtml(lead.priority || "normal")}</span>
               ${hasOpenTask ? `<span>${escapeHtml(`${taskSummary.open_count} open task${Number(taskSummary.open_count) === 1 ? "" : "s"}`)}</span>` : ""}
-              <span class="dealer-status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</span>
             </div>
           </div>
           <div class="lead-list-col">
@@ -2117,10 +2124,9 @@ function renderDealerLeads(leads, role) {
             <span class="lead-list-label">VIN</span>
             <strong class="lead-vin-value">VIN ${escapeHtml(vehicleVin)}</strong>
             <div class="lead-list-subline">
-              <span>${escapeHtml(vehicleContext.cluster_label || title)}</span>
-              <span>${escapeHtml(sourceAuditLabel)}</span>
-              <span>${escapeHtml(buyerLead ? (purchase.intent || input.purchaseIntent || "Buyer") : (wholesaleAvg ? `W ${formatNumber(wholesaleAvg)}` : "Seller"))}</span>
-              <span>${escapeHtml(!buyerLead && retailAvg ? `R ${formatNumber(retailAvg)}` : buyerLead && (purchase.monthlyPayment || retailAvg) ? `Budget ${purchase.monthlyPayment ? `${formatNumber(purchase.monthlyPayment)}/mo` : formatNumber(retailAvg)}` : "-")}</span>
+              <span>${escapeHtml(sourceDetailLabel)}</span>
+              ${submitterLabel ? `<span>${escapeHtml(submitterLabel)}</span>` : ""}
+              ${vehicleValuePills.map((pill) => `<span>${escapeHtml(pill)}</span>`).join("")}
             </div>
           </div>
           <div class="lead-list-col">
@@ -2128,7 +2134,7 @@ function renderDealerLeads(leads, role) {
             <strong>${escapeHtml(progressSummary)}</strong>
             <div class="lead-list-subline">
               <span class="${escapeHtml(statusClass)}">${escapeHtml(statusLabel)}</span>
-              <span>${escapeHtml(lead.priority || "normal")}</span>
+              <span>${escapeHtml(vehicleSummary)}</span>
             </div>
           </div>
           <div class="lead-list-col">
@@ -2154,7 +2160,7 @@ function renderDealerLeads(leads, role) {
             <span class="lead-queue-insight-label">Next action</span>
             <strong>${escapeHtml(nextAction)}</strong>
           </div>
-          <span>${escapeHtml(nextStepSummary)} | ${escapeHtml(compactTouchSummary)}</span>
+          <span>${escapeHtml(compactTouchSummary)}</span>
         </section>
         ${pendingAlert ? `<button class="lead-inline-alert" type="button" data-dealer-open-alert="${escapeHtml(lead.id || "")}">New update on this lead</button>` : ""}
         <details class="lead-queue-more dealer-queue-more">
