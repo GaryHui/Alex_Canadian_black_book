@@ -31,6 +31,14 @@ body {
   letter-spacing: 0;
 }
 
+body.modal-open {
+  position: fixed;
+  right: 0;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
 button,
 input,
 select {
@@ -1575,6 +1583,7 @@ input::placeholder {
   z-index: 30;
   display: grid;
   place-items: center;
+  overflow: hidden;
   padding: 20px;
 }
 
@@ -1623,6 +1632,7 @@ input::placeholder {
   width: min(720px, 100%);
   max-height: min(760px, calc(100vh - 40px));
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .photo-viewer-shell {
@@ -1631,7 +1641,9 @@ input::placeholder {
   z-index: 60;
   display: grid;
   place-items: center;
+  overflow: hidden;
   padding: 18px;
+  overscroll-behavior: contain;
 }
 
 .photo-viewer-shell[hidden] {
@@ -1882,6 +1894,7 @@ input::placeholder {
   display: grid;
   gap: 16px;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 18px 26px 26px;
 }
 

@@ -36,7 +36,7 @@ const text = {
     brandName: "AutoSwitch Canada",
     sellNav: "Sell",
     dealerNav: "Dealer portal",
-    eyebrow: "Dealer-reviewed inventory",
+    eyebrow: "Available vehicles",
     headline: "Find your next vehicle",
     subhead: "Browse available vehicles, estimate monthly payments, and contact the dealer when you are ready.",
     heroPointOne: "Verified listings",
@@ -77,8 +77,8 @@ const text = {
     filterEyebrow: "Vehicle search",
     inventoryEyebrow: "Available vehicles",
     inventoryTitle: "Current marketplace preview",
-    inventoryIntro: "Browse dealer-reviewed vehicles when they are available.",
-    inventoryEmptyIntro: "New dealer-reviewed vehicles will appear here when they are published.",
+    inventoryIntro: "Browse vehicles published by the dealer.",
+    inventoryEmptyIntro: "New vehicles will appear here when they are published.",
     financeEyebrow: "Finance estimate",
     financeTitle: "Monthly payment calculator",
     paymentModeLabel: "Payment type",
@@ -149,7 +149,7 @@ const text = {
     brandName: "AutoSwitch Canada",
     sellNav: "Vendre",
     dealerNav: "Portail concessionnaire",
-    eyebrow: "Inventaire revise par le concessionnaire",
+    eyebrow: "Vehicules disponibles",
     headline: "Trouvez votre prochain vehicule",
     subhead: "Consultez les vehicules disponibles, estimez les paiements mensuels et contactez le concessionnaire.",
     heroPointOne: "Annonces verifiees",
@@ -190,8 +190,8 @@ const text = {
     filterEyebrow: "Recherche de vehicule",
     inventoryEyebrow: "Vehicules disponibles",
     inventoryTitle: "Apercu du marche",
-    inventoryIntro: "Consultez les vehicules verifies par le concessionnaire lorsqu'ils sont disponibles.",
-    inventoryEmptyIntro: "Les vehicules verifies par le concessionnaire apparaitront ici lorsqu'ils seront publies.",
+    inventoryIntro: "Consultez les vehicules publies par le concessionnaire.",
+    inventoryEmptyIntro: "Les nouveaux vehicules apparaitront ici lorsqu'ils seront publies.",
     financeEyebrow: "Estimation de financement",
     financeTitle: "Calculateur de paiement mensuel",
     paymentModeLabel: "Type de paiement",
@@ -307,6 +307,8 @@ let selectedFinanceVehicle = null;
 let activePhotoVehicle = null;
 let activePhotoList = [];
 let activePhotoIndex = 0;
+let modalLockScrollY = 0;
+let modalLockCount = 0;
 const INVENTORY_PAGE_SIZE = 3;
 let inventoryPageIndex = 0;
 let filterInputTimer = null;
@@ -833,6 +835,7 @@ function showVehicleDetails(vehicle) {
   `;
   vehicleDetailBody.querySelector(".vehicle-detail-payment-slot")?.appendChild(detailPaymentPanel);
   vehicleDetailModal.hidden = false;
+  lockModalScroll();
 }
 
 function vehicleDetailMedia(vehicle) {
@@ -908,7 +911,10 @@ function detailItem(label, value) {
 
 function closeVehicleDetails() {
   closePhotoViewer();
-  if (vehicleDetailModal) vehicleDetailModal.hidden = true;
+  if (vehicleDetailModal && !vehicleDetailModal.hidden) {
+    vehicleDetailModal.hidden = true;
+    unlockModalScroll();
+  }
 }
 
 function openVehiclePhotoViewer(vehicle, index = 0) {
@@ -918,11 +924,15 @@ function openVehiclePhotoViewer(vehicle, index = 0) {
   activePhotoList = photos;
   activePhotoIndex = Math.min(Math.max(Number(index) || 0, 0), photos.length - 1);
   photoViewerModal.hidden = false;
+  lockModalScroll();
   renderPhotoViewer();
 }
 
 function closePhotoViewer() {
-  if (photoViewerModal) photoViewerModal.hidden = true;
+  if (photoViewerModal && !photoViewerModal.hidden) {
+    photoViewerModal.hidden = true;
+    unlockModalScroll();
+  }
   activePhotoVehicle = null;
   activePhotoList = [];
   activePhotoIndex = 0;
@@ -972,11 +982,31 @@ function openContactDealer(vehicle) {
   updateContactBuyingSummary();
   if (contactDealerStatus) contactDealerStatus.textContent = "";
   contactDealerModal.hidden = false;
+  lockModalScroll();
 }
 
 function closeContactDealer() {
-  if (contactDealerModal) contactDealerModal.hidden = true;
+  if (contactDealerModal && !contactDealerModal.hidden) {
+    contactDealerModal.hidden = true;
+    unlockModalScroll();
+  }
   currentContactVehicle = null;
+}
+
+function lockModalScroll() {
+  modalLockCount += 1;
+  if (modalLockCount > 1) return;
+  modalLockScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  document.body.classList.add("modal-open");
+  document.body.style.top = `-${modalLockScrollY}px`;
+}
+
+function unlockModalScroll() {
+  modalLockCount = Math.max(0, modalLockCount - 1);
+  if (modalLockCount > 0) return;
+  document.body.classList.remove("modal-open");
+  document.body.style.top = "";
+  window.scrollTo(0, modalLockScrollY);
 }
 
 async function submitDealerContact(event) {
