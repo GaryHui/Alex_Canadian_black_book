@@ -677,7 +677,7 @@ function renderInventoryListing(listing) {
           <strong class="status-pill status-${escapeHtml(cssToken(listing.status || "draft"))}">${escapeHtml(listing.status || "draft")}</strong>
           <div class="lead-list-subline">
             <span>${escapeHtml(listing.sourceLeadId ? "From SELL lead" : "Manual listing")}</span>
-            <span>${escapeHtml(assignedTo ? `Rep ${shortEmail(assignedTo)}` : "No rep")}</span>
+            <span>${escapeHtml(assignedTo ? `Responsible ${shortEmail(assignedTo)}` : "No responsible rep")}</span>
           </div>
         </div>
         <div class="inventory-actions inventory-list-actions">
@@ -1754,12 +1754,12 @@ function renderAdminToday(leads) {
   const dashboardStats = renderAdminDashboardStats(leads);
   const focus = adminWorkFocus([
     { count: managerApprovalCount, label: "Clear manager approvals", detail: "Price, recon, publish, or staff updates need your decision.", filter: "manager-approval" },
-    { count: unassignedCount, label: "Dispatch unassigned leads", detail: "Assign a staff rep before the lead gets cold.", filter: "unassigned" },
+    { count: unassignedCount, label: "Assign responsible reps", detail: "Give every hot lead one clear main rep before it gets cold.", filter: "unassigned" },
     { count: reconBlockerCount, label: "Unblock recon / listing", detail: "Seller vehicles are waiting on photos, keys, recon, pricing, or publish review.", filter: "deal-desk" },
     { count: dueCount, label: "Push due follow-ups", detail: "These leads need action today or are overdue.", filter: "needs-follow-up" },
     { count: taskCount, label: "Check open tasks", detail: "See team tasks that still need completion.", filter: "open-tasks" },
     { count: duplicateCount, label: "Clear vehicle conflicts", detail: "Review duplicate or same-vehicle warnings.", filter: "duplicate-review" },
-    { count: freshCount, label: "Start fresh leads", detail: "Make sure every new lead has an owner and next step.", filter: "fresh" },
+    { count: freshCount, label: "Start fresh leads", detail: "Make sure every new lead has a responsible rep and next step.", filter: "fresh" },
     { count: activeLeads.length, label: "Monitor active pipeline", detail: "Open the active queue and coach the next bottleneck.", filter: "active" }
   ]);
 
@@ -2108,7 +2108,7 @@ function renderLeadGroups(leads) {
       <div class="lead-list-header" aria-hidden="true">
         <span>Lead</span>
         <span>Owner</span>
-        <span>Rep</span>
+        <span>Responsible rep</span>
         <span>VIN</span>
         <span>Stage</span>
         <span>Next step</span>
@@ -2462,7 +2462,7 @@ function renderLead(lead, index = 0) {
   const queueSummary = needsOwnerInfo
     ? "Confirm vehicle owner name and contact"
     : overdue
-    ? "Rep follow-up is overdue"
+    ? "Responsible rep follow-up is overdue"
     : followUp
       ? `Next follow-up ${formatDateTime(followUp)}`
       : String(status || "").toLowerCase() === "new"
@@ -2539,10 +2539,10 @@ function renderLead(lead, index = 0) {
           </div>
         </div>
         <div class="lead-list-col">
-          <span class="lead-list-label">Rep</span>
+          <span class="lead-list-label">Responsible rep</span>
           <strong class="${assignedTo ? "" : "lead-unassigned-value"}">${escapeHtml(assignedTo ? shortEmail(assignedTo) : "Unassigned")}</strong>
           <div class="lead-list-subline">
-            <span>${escapeHtml(assignedTo ? "Assigned" : "Needs dispatch")}</span>
+            <span>${escapeHtml(assignedTo ? "Responsible" : "Needs rep")}</span>
             <span>${escapeHtml(overdue ? "Overdue" : followUp ? "Scheduled" : "No follow-up")}</span>
           </div>
         </div>
@@ -2613,7 +2613,7 @@ function renderSharedLeadMeta({
       <div><dt>Phone</dt><dd>${escapeHtml(phone || "-")}</dd></div>
       <div><dt>VIN</dt><dd>${escapeHtml(vin || "-")}</dd></div>
       <div><dt>Lead type</dt><dd>${escapeHtml(leadTypeLabel || "-")}</dd></div>
-      <div><dt>Rep</dt><dd>${escapeHtml(assignedTo || "Unassigned")}</dd></div>
+      <div><dt>Responsible rep</dt><dd>${escapeHtml(assignedTo || "Unassigned")}</dd></div>
       <div><dt>Priority</dt><dd>${escapeHtml(priority || "normal")}</dd></div>
       <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "Not set")}</dd></div>
       <div><dt>Last activity</dt><dd>${escapeHtml(lastActivity ? formatDateTime(lastActivity) : "No recent activity")}</dd></div>
@@ -2685,9 +2685,15 @@ function renderAdminDrawer(leadId) {
                     ${dealerStaffEmails.map((email) => `<option value="${escapeHtml(email)}" ${assignedTo === email ? "selected" : ""}>${escapeHtml(email)}</option>`).join("")}
                   </select>` : `
                   <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />`;
+  const taskAssigneeField = dealerStaffEmails.length ? `
+                  <select name="assignedTo">
+                    <option value="${escapeHtml(assignedTo)}">${escapeHtml(assignedTo ? `Main rep: ${shortEmail(assignedTo)}` : "Use main responsible rep")}</option>
+                    ${dealerStaffEmails.map((email) => `<option value="${escapeHtml(email)}">${escapeHtml(email)}</option>`).join("")}
+                  </select>` : `
+                  <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />`;
   const quickAssignButtons = dealerStaffEmails.length ? `
               <div class="admin-drawer-quick-assign" aria-label="Quick assign staff">
-                <span>One-click dispatch</span>
+                <span>One-click responsible rep</span>
                 ${dealerStaffEmails.slice(0, 6).map((email) => `
                   <button type="button" data-drawer-assign-to="${escapeHtml(email)}">${escapeHtml(shortEmail(email))}</button>
                 `).join("")}
@@ -2895,7 +2901,7 @@ function renderAdminDrawer(leadId) {
                 <small>${escapeHtml(input.dealerEmail ? `Dealer ${input.dealerEmail}` : "Public owner flow")}</small>
               </div>
               <div class="admin-drawer-stat">
-                <span>Assigned rep</span>
+                <span>Responsible rep</span>
                 <strong>${escapeHtml(assignedTo ? shortEmail(assignedTo) : "Unassigned")}</strong>
                 <small>${escapeHtml(priority)} priority</small>
               </div>
@@ -2929,8 +2935,8 @@ function renderAdminDrawer(leadId) {
             ${ownerInfoSection}
             <section class="admin-drawer-section admin-drawer-command-card" data-drawer-section="assign">
               <header>
-                <h3>Assign & next step</h3>
-                <span>Rep, priority, due time, and pipeline</span>
+                <h3>Responsible rep & next step</h3>
+                <span>One main responsible rep owns the lead. Assign other helpers through tasks.</span>
               </header>
               <form class="owner-review admin-drawer-owner-form admin-drawer-assign-form">
                 <input type="hidden" name="ownerWholesale" value="${ownerWholesaleValue}" />
@@ -2938,7 +2944,7 @@ function renderAdminDrawer(leadId) {
                 <input type="hidden" name="reason" value="${escapeHtml(adjustment.reason || "")}" />
                 <input type="hidden" name="notes" value="${escapeHtml(lead.notes || "")}" />
                 <label>
-                  <span>Assigned rep</span>
+                  <span>Responsible rep</span>
                   ${assignField}
                 </label>
                 <label>
@@ -2959,7 +2965,7 @@ function renderAdminDrawer(leadId) {
                     ).join("")}
                   </select>
                 </label>
-                <button type="submit">Save next step</button>
+                <button type="submit">${assignedTo ? "Save responsible rep" : "Assign responsible rep"}</button>
                 <small class="admin-drawer-form-status" data-assign-status></small>
               </form>
               <div class="admin-drawer-followup-presets" aria-label="Follow-up presets">
@@ -2982,8 +2988,8 @@ function renderAdminDrawer(leadId) {
             ${renderAdminDealChecklistSection(lead)}
             <section class="admin-drawer-section admin-drawer-task-card" data-drawer-section="task">
               <header>
-                <h3>Task</h3>
-                <span>Pick a common CRM task, adjust if needed, then add it.</span>
+                <h3>Collaborator task</h3>
+                <span>Use tasks when another teammate helps with photos, calls, recon, finance, or paperwork.</span>
               </header>
               <form class="lead-task-form admin-drawer-task-form">
                 <label class="task-form-field">
@@ -3009,8 +3015,8 @@ function renderAdminDrawer(leadId) {
                   <input name="dueAt" type="datetime-local" />
                 </label>
                 <details class="task-advanced-options">
-                  <summary>Assign to someone else</summary>
-                  <input name="assignedTo" type="email" value="${escapeHtml(assignedTo)}" placeholder="staff@example.com" />
+                  <summary>Assign this task to a helper</summary>
+                  ${taskAssigneeField}
                 </details>
                 <button type="submit">Add task</button>
               </form>
@@ -3384,7 +3390,7 @@ function adminCrmStage(lead) {
     if (["finance_sent", "offer_sent"].includes(status)) return { key: "finance", label: "Finance / offer", hint: "Decision point: approval, gross, trade, and close plan.", needsManager: true };
     if (status === "appointment_booked") return { key: "appointment", label: "Appointment", hint: "Confirm appointment quality and vehicle availability." };
     if (["contacted", "waiting_for_customer"].includes(status)) return { key: "contact", label: "Customer contact", hint: "Coach next follow-up and keep the lead warm." };
-    return { key: "lead", label: "New buyer lead", hint: "Assign owner and require first touch." };
+    return { key: "lead", label: "New buyer lead", hint: "Assign rep and require first touch." };
   }
   if (inventoryStatus === "sold" || status === "sold") return { key: "sold", label: "Vehicle sold", hint: "Confirm delivery, accounting, and final CRM close.", needsManager: true };
   if (inventoryStatus === "published") return { key: "inventory", label: "Listed inventory", hint: "Vehicle is live. Watch buyer activity and sales handoff." };
@@ -3393,7 +3399,7 @@ function adminCrmStage(lead) {
   if (status === "offer_sent") return { key: "offer", label: "Offer sent", hint: "Decision point: purchase price or consignment commission, expiry, and seller response.", needsManager: true };
   if (status === "inspection_booked") return { key: "appraisal", label: "Inspection / appraisal", hint: "Confirm condition, title, lien, and appraisal path." };
   if (["contacted", "waiting_for_customer"].includes(status)) return { key: "contact", label: "Seller contact", hint: "Make sure inspection or next task is assigned." };
-  return { key: "lead", label: "New seller lead", hint: "Assign owner and verify the vehicle." };
+  return { key: "lead", label: "New seller lead", hint: "Assign rep and verify the vehicle." };
 }
 
 function marketAverageFromValuation(valuation, market) {
@@ -4209,7 +4215,7 @@ adminLeadDrawer?.addEventListener("submit", async (event) => {
     const savedMessage = ownerForm.classList.contains("admin-drawer-assign-form")
       ? "Assignment saved."
       : ownerForm.classList.contains("admin-drawer-pricing-form")
-        ? "Owner pricing saved."
+        ? "Manager pricing saved."
         : ownerForm.classList.contains("admin-drawer-vehicle-form")
           ? "Vehicle details saved."
           : ownerForm.classList.contains("admin-drawer-owner-info-form")
@@ -4409,7 +4415,7 @@ function adminTaskTemplates(buyerLead) {
   const shared = [
     { key: "first_touch", label: "First touch", hint: "Call/text within 15 min", title: "First touch: call or text customer, confirm request and best callback time.", due: "soon" },
     { key: "manager_review", label: "Manager review", hint: "Decision needed", title: "Manager review: confirm price, status, and next move before staff updates customer.", due: "today" },
-    { key: "assign_owner", label: "Assign owner", hint: "Dispatch work", title: "Assign owner and confirm the next required customer touch.", due: "today" }
+    { key: "assign_rep", label: "Assign rep", hint: "Main responsibility", title: "Assign responsible rep and confirm the next required customer touch.", due: "today" }
   ];
   const buyer = [
     { key: "buyer_followup", label: "Buyer follow-up", hint: "Buy page inquiry", title: "Call buyer inquiry, confirm vehicle interest, budget, trade, finance plan, and visit timeline.", due: "soon" },
@@ -4433,7 +4439,7 @@ function applyAdminTaskTemplate(key) {
   if (!template) return;
   const title = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form textarea[name="title"], .admin-drawer-task-form input[name="title"]');
   const dueAt = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form input[name="dueAt"]');
-  const assignedTo = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form input[name="assignedTo"]');
+  const assignedTo = adminLeadDrawerContent?.querySelector('.admin-drawer-task-form input[name="assignedTo"], .admin-drawer-task-form select[name="assignedTo"]');
   if (title) title.value = template.title;
   if (dueAt) dueAt.value = adminTaskDueValue(template.due);
   if (assignedTo && !assignedTo.value) assignedTo.value = lead?.assigned_to || "";

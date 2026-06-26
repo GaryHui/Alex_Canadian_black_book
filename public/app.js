@@ -1644,7 +1644,7 @@ function renderDealerInventoryCard(item) {
       </header>
       <div class="dealer-stock-meta">
         <span><b>Owner</b>${escapeHtml(owner)}</span>
-        <span><b>Rep</b>${escapeHtml(stockRep || "Unassigned")}</span>
+        <span><b>Responsible rep</b>${escapeHtml(stockRep || "Unassigned")}</span>
         <span><b>VIN</b>${escapeHtml(item.vin || "-")}</span>
         <span><b>Activity</b>${escapeHtml(lastTouch)}</span>
       </div>
@@ -2106,10 +2106,10 @@ function renderDealerLeads(leads, role) {
             </div>
           </div>
           <div class="lead-list-col">
-            <span class="lead-list-label">Rep</span>
+            <span class="lead-list-label">Responsible rep</span>
             <strong class="${repSummary === "Unassigned" ? "lead-unassigned-value" : ""}">${escapeHtml(repSummary === "Unassigned" ? "Unassigned" : shortEmail(repSummary))}</strong>
             <div class="lead-list-subline">
-              <span>${escapeHtml(repSummary === "Unassigned" ? "Needs dispatch" : "Assigned")}</span>
+              <span>${escapeHtml(repSummary === "Unassigned" ? "Needs rep" : "Responsible")}</span>
               <span>${escapeHtml(overdue ? "Overdue" : followUp ? "Scheduled" : "No follow-up")}</span>
             </div>
           </div>
@@ -2191,7 +2191,7 @@ function renderDealerSharedLeadMeta({
       <div><dt>Phone</dt><dd>${escapeHtml(phone || "-")}</dd></div>
       <div><dt>VIN</dt><dd>${escapeHtml(vin || "-")}</dd></div>
       <div><dt>Lead type</dt><dd>${escapeHtml(leadTypeLabel || "-")}</dd></div>
-      <div><dt>Assigned rep</dt><dd>${escapeHtml(assignedTo || "Unassigned")}</dd></div>
+      <div><dt>Responsible rep</dt><dd>${escapeHtml(assignedTo || "Unassigned")}</dd></div>
       <div><dt>Priority</dt><dd>${escapeHtml(priority || "normal")}</dd></div>
       <div><dt>Next follow-up</dt><dd>${escapeHtml(followUp ? formatDateTime(followUp) : "Not set")}</dd></div>
       <div><dt>Last timeline</dt><dd>${escapeHtml(lastActivity ? formatDateTime(lastActivity) : "No timeline yet")}</dd></div>
@@ -2387,8 +2387,8 @@ function renderDealerDrawer(leadId) {
             ${renderDealerPhotoSection(lead)}
             <section class="dealer-drawer-section dealer-task-section">
               <header>
-                <h3>Task</h3>
-                <span>Pick a common CRM task, adjust if needed, then add it.</span>
+                <h3>Collaborator task</h3>
+                <span>Use tasks when another teammate helps with photos, calls, recon, finance, or paperwork.</span>
               </header>
               <form class="dealer-task-form dealer-drawer-task-form">
                 <label class="task-form-field">
@@ -2414,7 +2414,7 @@ function renderDealerDrawer(leadId) {
                   <input name="dueAt" type="datetime-local" />
                 </label>
                 <details class="task-advanced-options">
-                  <summary>Assign to someone else</summary>
+                  <summary>Assign this task to a helper</summary>
                   <input name="assignedTo" type="email" list="${escapeHtml(dealerEmailOptionsId)}" placeholder="Assign to dealer email" />
                   <datalist id="${escapeHtml(dealerEmailOptionsId)}">${dealerEmailOptions}</datalist>
                 </details>
@@ -3289,7 +3289,7 @@ function renderDealerLeadGroups(leads, cardRenderer) {
       <div class="lead-list-header dealer-lead-list-header" aria-hidden="true">
         <span>Lead</span>
         <span>Owner</span>
-        <span>Rep</span>
+        <span>Responsible rep</span>
         <span>VIN</span>
         <span>Stage</span>
         <span>Next step</span>
@@ -3375,13 +3375,13 @@ function renderDealerCrmWorkflowPanel(lead) {
       </ol>
       <div class="crm-responsibility-grid">
         <div>
-          <span>Assigned rep</span>
+          <span>Responsible rep</span>
           <strong>${escapeHtml(lead?.assigned_to || authSession?.user?.email || "Unassigned")}</strong>
         </div>
         <div>
-          <span>Current task</span>
+          <span>Current helper task</span>
           <strong>${escapeHtml(task.latest_open_title || "No open task")}</strong>
-          <small>${escapeHtml(task.latest_open_due_at ? `Due ${formatDateTime(task.latest_open_due_at)}` : "Add one before handoff if follow-up is needed.")}</small>
+          <small>${escapeHtml(task.latest_open_due_at ? `Due ${formatDateTime(task.latest_open_due_at)}` : "Tasks are for helper work or next action.")}</small>
         </div>
         <div>
           <span>Manager</span>
