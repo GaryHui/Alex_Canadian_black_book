@@ -61,6 +61,163 @@ CRM / Zapier / Make 账号，可选，用于对接外部 CRM
 开发者只保留 GitHub 或 Vercel 协作权限，方便后续维护。
 ```
 
+### 如果客户不会注册其它账号怎么办
+
+如果客户目前只有 Google Sheet 和 Google Drive，不代表不能交付，但不能直接算“客户完全拥有的正式生产环境”。因为现在项目至少还需要：
+
+```text
+Vercel：放网站和后端接口
+Supabase：登录、车单、任务、库存、员工、设置
+Google Cloud OAuth：Google 登录
+Canadian Black Book API：车辆估价
+Google Sheet / Drive / Apps Script：保存线索、图片、PDF
+```
+
+最稳妥的做法有三种：
+
+```text
+方案 A：客户自己注册，我们远程指导
+方案 B：我们帮客户注册和配置，但账号必须用客户邮箱/客户付款方式
+方案 C：先临时跑在我们的账号，等客户准备好后再迁移
+```
+
+推荐优先级：
+
+```text
+正式交付优先用方案 B。
+客户完全不会操作时，可以短期用方案 C，但要写清楚这只是过渡方案。
+```
+
+#### 方案 A：客户自己注册，我们远程指导
+
+适合客户有 IT 人员或愿意自己管理账号。
+
+客户需要做：
+
+```text
+1. 注册 Vercel。
+2. 注册 Supabase。
+3. 进入 Google Cloud 创建 OAuth Client。
+4. 提供 Canadian Black Book API 账号或联系人。
+5. 把我们加入 Vercel / Supabase / Google Cloud 协作者。
+```
+
+优点：
+
+```text
+客户从第一天起拥有全部资产。
+以后付款、权限、域名、数据库都在客户自己名下。
+```
+
+缺点：
+
+```text
+客户学习成本高。
+容易把 OAuth callback、环境变量、权限设置填错。
+```
+
+#### 方案 B：我们帮客户注册，但客户拥有账号
+
+这是最适合普通车行客户的方案。
+
+做法：
+
+```text
+1. 客户准备一个公司邮箱，例如 admin@客户域名.com。
+2. 客户自己登录这个邮箱。
+3. 我们远程指导或屏幕共享，帮客户创建 Vercel、Supabase、Google Cloud。
+4. 所有账号都用客户邮箱注册。
+5. 需要付款方式时，由客户自己输入信用卡。
+6. 我们只作为协作者加入。
+7. 配置完成后，客户修改密码或开启两步验证。
+```
+
+优点：
+
+```text
+客户真正拥有账号。
+客户不用懂太多技术。
+以后不会因为我们的账号权限、付款、离职、合作结束而卡住。
+```
+
+缺点：
+
+```text
+第一次设置需要约 1-2 小时屏幕共享。
+客户需要配合登录邮箱、收验证码、输入付款方式。
+```
+
+#### 方案 C：先用我们的账号托管，之后再迁移
+
+适合客户只是想先试运行。
+
+这种情况下要说清楚：
+
+```text
+这是代托管，不是完整交付。
+Vercel、Supabase、Google OAuth 等关键资源还在我们账号下。
+客户只有 Google Sheet / Drive，不等于拥有完整系统。
+以后正式交付时仍然需要迁移 Vercel、Supabase、OAuth、环境变量。
+```
+
+建议写进合同或交付说明：
+
+```text
+当前阶段为试运行/代托管。
+客户正式接管前，需要完成账号迁移。
+迁移时可能需要 1 个工作日配置和测试。
+```
+
+## 2.1 客户最低需要提供什么
+
+如果客户不懂技术，至少让客户提供：
+
+```text
+1. 一个长期使用的公司 Google 邮箱。
+2. Google Sheet 和 Google Drive 根目录。
+3. 老板/Admin 的 Google 登录邮箱。
+4. 员工/Dealer 的 Google 登录邮箱。
+5. 公司名称、电话、邮箱、地址。
+6. 正式域名，如果有。
+7. Canadian Black Book API 账号或联系人。
+8. 是否需要自动回复邮件。
+9. 是否需要对接外部 CRM。
+```
+
+然后由我们协助处理：
+
+```text
+Vercel 创建和部署
+Supabase 创建和建表
+Google Cloud OAuth
+Apps Script 部署
+环境变量填写
+最终测试
+```
+
+## 2.2 哪些账号可以晚点再做
+
+可以后补：
+
+```text
+Cloudflare Turnstile：不需要人机验证时可以不做。
+Resend：不需要自动邮件回复时可以不做。
+CRM / Zapier / Make：客户还没有 CRM 时可以不做。
+正式域名：可以先用 Vercel 域名测试，之后再换客户域名。
+```
+
+不建议后补，正式上线前最好完成：
+
+```text
+Vercel
+Supabase
+Google OAuth
+Google Apps Script
+Canadian Black Book API
+ADMIN_EMAILS
+PUBLIC_SITE_URL
+```
+
 ## 3. 现在系统的组成
 
 整体流程：
