@@ -249,6 +249,114 @@ PUBLIC_SITE_URL
 /admin-vehicles.html
 ```
 
+## 3.1 手动修改网站名、Logo、图标的位置
+
+客户以后如果要换网站名、Logo、浏览器图标或首页车图，先改下面这些位置，再重新部署 Vercel。
+
+### 网站名称
+
+当前公开品牌名：
+
+```text
+AutoSwitch Canada
+```
+
+手动修改位置：
+
+```text
+public/home.html       首页顶部 aria-label 和备用显示文字
+public/home.js         首页英文/法文 brandName
+public/buy.html        买车页顶部 aria-label 和备用显示文字
+public/buy.js          买车页英文/法文 brandName
+public/customer.html   卖车页顶部 aria-label 和备用显示文字
+public/customer.js     卖车页英文/法文 brandName
+public/login.html      登录页浏览器标题和页面 eyebrow
+public/admin.js        老板台 Dashboard 里的 dealership 名称
+```
+
+还要检查浏览器标签标题：
+
+```text
+public/home.html       <title>AutoSwitch Canada | Buy or Sell Your Car</title>
+public/buy.html        <title>AutoSwitch Canada | Buy A Car</title>
+public/customer.html   <title>AutoSwitch Canada | Sell Your Car</title>
+public/login.html      <title>Sign in | AutoSwitch Canada</title>
+```
+
+改完后快速检查：
+
+```text
+在整个项目里搜索旧网站名，确认没有旧的公开品牌名残留。
+```
+
+### 顶部 Logo / 图标
+
+现在顶部左上角的标识是文字形式：
+
+```html
+<span class="brand-mark">HC</span>
+```
+
+手动修改位置：
+
+```text
+public/home.html
+public/buy.html
+public/customer.html
+```
+
+样式位置：
+
+```text
+public/customer.css    .brand, .brand-mark
+```
+
+如果客户以后给的是正式图片 Logo：
+
+```text
+1. 把 Logo 图片放到 public/assets/，例如 public/assets/client-logo.png。
+2. 在 home.html、buy.html、customer.html 里，把 <span class="brand-mark">HC</span> 换成：
+   <img class="brand-logo" src="/assets/client-logo.png" alt="客户网站名" />
+3. 在 public/customer.css 里新增 .brand-logo 样式。
+4. 建议保留旁边的网站名称文字，除非客户明确要求只显示图标。
+```
+
+### 浏览器 Favicon 小图标
+
+目前项目还没有单独配置 favicon 文件。如果客户提供 favicon：
+
+```text
+1. 添加 public/assets/favicon.ico 或 public/assets/favicon.png。
+2. 在这些页面的 <head> 里加入：
+   <link rel="icon" href="/assets/favicon.png" />
+3. 需要加的页面：
+   public/home.html
+   public/buy.html
+   public/customer.html
+   public/login.html
+   public/admin.html
+   public/admin-vehicles.html
+   public/index.html
+   说明：public/index.html 是员工台 / dealer workbench 页面。
+4. 部署后要 hard refresh，因为浏览器会强缓存 favicon。
+```
+
+### 首页汽车图片
+
+首页右侧汽车图位置：
+
+```text
+public/assets/home-hero-car.png
+```
+
+更换方法：
+
+```text
+1. 尽量用相同尺寸和风格的新车图。
+2. 直接替换 public/assets/home-hero-car.png，或者在 public/home.html 里改图片路径。
+3. 部署后检查电脑端和手机端显示。
+```
+
 ## 4. 换客户账号的正确顺序
 
 建议按这个顺序，不要跳着做：

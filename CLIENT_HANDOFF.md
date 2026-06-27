@@ -103,6 +103,104 @@ Protected staff pages:
 /admin-vehicles.html
 ```
 
+## 3.1 Manual Branding Changes
+
+When the client changes the website name, logo, icon, or hero image, update these code locations before redeploying Vercel.
+
+### Website Name
+
+Current public brand name:
+
+```text
+AutoSwitch Canada
+```
+
+Manual edit locations:
+
+```text
+public/home.html       Header aria-label and visible fallback brand text
+public/home.js         English/French brandName text
+public/buy.html        Header aria-label and visible fallback brand text
+public/buy.js          English/French brandName text
+public/customer.html   Header aria-label and visible fallback brand text
+public/customer.js     English/French brandName text
+public/login.html      Browser title and login page eyebrow
+public/admin.js        Dashboard dealership label
+```
+
+Also check browser tab titles:
+
+```text
+public/home.html       <title>AutoSwitch Canada | Buy or Sell Your Car</title>
+public/buy.html        <title>AutoSwitch Canada | Buy A Car</title>
+public/customer.html   <title>AutoSwitch Canada | Sell Your Car</title>
+public/login.html      <title>Sign in | AutoSwitch Canada</title>
+```
+
+Fast check after editing:
+
+```text
+Search the repo for the old brand name and confirm no old public-facing name remains.
+```
+
+### Header Logo / Icon
+
+Current header mark is text-based:
+
+```html
+<span class="brand-mark">HC</span>
+```
+
+Manual edit locations:
+
+```text
+public/home.html
+public/buy.html
+public/customer.html
+```
+
+Visual styling lives here:
+
+```text
+public/customer.css    .brand, .brand-mark
+```
+
+If the client wants a real logo image instead of the `HC` text mark:
+
+```text
+1. Put the logo file in public/assets/, for example public/assets/client-logo.png.
+2. Replace <span class="brand-mark">HC</span> with <img class="brand-logo" src="/assets/client-logo.png" alt="Client name" /> in home.html, buy.html, and customer.html.
+3. Add .brand-logo styling in public/customer.css.
+4. Keep the brand text beside it for clarity unless the client specifically wants icon-only.
+```
+
+### Browser Favicon
+
+There is no separate favicon file configured yet. If the client provides one:
+
+```text
+1. Add public/assets/favicon.ico or public/assets/favicon.png.
+2. Add this inside the <head> of public/home.html, public/buy.html, public/customer.html, public/login.html, public/admin.html, public/admin-vehicles.html, and public/index.html. `public/index.html` is the dealer workbench page:
+   <link rel="icon" href="/assets/favicon.png" />
+3. Redeploy and hard-refresh the browser because favicons are heavily cached.
+```
+
+### Homepage Car Image
+
+The homepage hero vehicle image is:
+
+```text
+public/assets/home-hero-car.png
+```
+
+To replace it:
+
+```text
+1. Save the new image with the same size/style if possible.
+2. Replace public/assets/home-hero-car.png, or update the image path in public/home.html.
+3. Check desktop and mobile after redeploy.
+```
+
 ## 4. Migration Order
 
 Follow this exact order for a clean client handoff:
