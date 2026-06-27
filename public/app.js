@@ -681,7 +681,7 @@ searchClear.addEventListener("click", () => {
   freeForm.elements.searchText.value = "";
   choiceList.hidden = true;
   inlineChoiceList.hidden = true;
-  modalStatus.textContent = "Type a VIN or vehicle description, then press Enter.";
+  modalStatus.textContent = "Enter VIN first when available, then press Enter to find the vehicle.";
   freeForm.elements.searchText.focus();
 });
 
@@ -794,7 +794,7 @@ async function runValuation(extra = {}, options = {}) {
   }
 
   if (!isVehicleSelectionReady(payload)) {
-    statusEl.textContent = "Find and select the exact vehicle first, then Generate valuation will unlock.";
+    statusEl.textContent = "Enter VIN first, then find and select the exact vehicle to unlock valuation.";
     if (vehicleSearchText(payload)) await searchVehicleChoices(payload);
     return;
   }
@@ -887,7 +887,7 @@ function hideDealerSaveOption() {
 async function searchVehicleChoices(payload) {
   const searchText = vehicleSearchText(payload);
   if (!searchText) {
-    statusEl.textContent = "Choose at least year and make, or enter a VIN.";
+    statusEl.textContent = "Enter a VIN first, or choose at least year and make.";
     return;
   }
 
@@ -1059,7 +1059,7 @@ function updateGenerateValuationState() {
   if (!generateValuationButton || !form) return;
   const ready = isVehicleSelectionReady();
   generateValuationButton.disabled = !ready;
-  generateValuationButton.textContent = ready ? "Generate valuation" : "Select vehicle first";
+  generateValuationButton.textContent = ready ? "Generate valuation" : "Enter VIN first";
 }
 
 function setLookupMode(mode, options = {}) {

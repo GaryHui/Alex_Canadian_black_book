@@ -133,7 +133,7 @@
           <div>
             <p class="eyebrow">Dealer valuation tool</p>
             <h2>Create a vehicle estimate</h2>
-            <p class="section-subtitle">Use this area when a dealer staff member wants to search a vehicle and create a new valuation.</p>
+            <p class="section-subtitle">Enter the VIN first, find the matching vehicle, then generate the valuation.</p>
           </div>
 
           <div class="lookup-layout">
@@ -201,7 +201,7 @@
               </label>
               <label>
                 <span>VIN</span>
-                <input name="vin" placeholder="17-character VIN" />
+                <input name="vin" placeholder="Enter 17-character VIN first" />
               </label>
               <label>
                 <span>UVC</span>
@@ -238,12 +238,12 @@
               <option value="U">United States</option>
             </select>
           </label>
-          <button id="generate-valuation" type="submit" disabled>Generate valuation</button>
+          <button id="generate-valuation" type="submit" disabled>Enter VIN first</button>
             </form>
           </div>
           </div>
 
-          <p id="status" class="status">Ready.</p>
+          <p id="status" class="status">Enter VIN first, then find and select the matching vehicle.</p>
           <button id="save-valuation-lead" class="save-valuation-lead" type="button" hidden>Save valuation to leads</button>
           <div id="inline-choice-list" class="choice-list inline-choice-list" hidden></div>
           <p class="admin-link" data-dealer-admin-link hidden><a href="/admin.html" target="_blank" rel="noreferrer">View captured leads</a></p>
@@ -285,13 +285,13 @@
               <span>Enter a VIN, year, make or model</span>
               <div class="search-input-wrap">
                 <span class="search-icon" aria-hidden="true">⌕</span>
-                <input name="searchText" placeholder="VIN, 2022 Toyota Camry, Audi Q5 Technik..." autocomplete="off" />
+                <input name="searchText" placeholder="Enter VIN first, or search 2022 Toyota Camry..." autocomplete="off" />
                 <button id="search-clear" class="search-clear" type="button" aria-label="Clear search">×</button>
               </div>
             </label>
           </form>
 
-          <p id="modal-status" class="modal-status">Type a VIN or vehicle description, then press Enter.</p>
+          <p id="modal-status" class="modal-status">Enter VIN first when available, then press Enter to find the vehicle.</p>
           <div id="choice-list" class="choice-list modal-choice-list" hidden></div>
         </section>
       </div>
