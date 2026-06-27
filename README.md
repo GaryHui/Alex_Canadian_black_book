@@ -23,6 +23,7 @@ http://localhost:3000
 - `FEATURE_DEVELOPMENT_PLAN.md`: main MVP feature, module, page, API, database, and next-development guide. Start here.
 - `SETUP.md`: Supabase, Google OAuth, Vercel, admin, and deployment setup.
 - `CLIENT_HANDOFF.md`: client account migration, Vercel variables, Google/Supabase handoff, and final acceptance checklist.
+- `CLIENT_HANDOFF_CN.md`: Chinese handoff checklist for account migration, variables, URLs, and final delivery testing.
 - `PROJECT_STRUCTURE.md`: current file structure and responsibility of each module.
 - `MVP_ROADMAP.md`: MVP meaning, Supabase capacity notes, and staged CRM workflow plan.
 - `GOOGLE_DRIVE_UPLOADS.md`: final Google Apps Script for Sheet, Drive folders, photos, PDFs, and spreadsheet summaries.
