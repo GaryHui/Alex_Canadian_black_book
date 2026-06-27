@@ -736,7 +736,7 @@ drilldownForm.addEventListener("submit", async (event) => {
       uvc: exactVehicle.uvc || ""
     });
     detailsEl.hidden = true;
-    statusEl.textContent = "Vehicle selected. Ready to generate the estimate and submit the Up Sheet.";
+    statusEl.textContent = "Vehicle selected. Ready to generate the estimate.";
     updateGenerateValuationState();
     return;
   }
@@ -819,8 +819,8 @@ async function runValuation(extra = {}, options = {}) {
 
     if (data.choices?.length > 1 && !payload.uvc) {
       const message = payload.vin
-        ? "This VIN can match more than one trim. Choose the closest vehicle before submitting the Up Sheet."
-        : "Multiple matches found. Choose the correct trim before submitting the Up Sheet.";
+        ? "This VIN can match more than one trim. Choose the closest vehicle before generating the estimate."
+        : "Multiple matches found. Choose the correct trim before generating the estimate.";
       statusEl.textContent = message;
       modalStatus.textContent = message;
       renderChoices(data.choices, { modal: Boolean(options.choicesInModal) });
@@ -831,6 +831,13 @@ async function runValuation(extra = {}, options = {}) {
     currentMarket = firstAvailableMarket(data) || "wholesale";
     renderResult(data);
     closeSearchModal();
+    if (dealerAdminAllowed) {
+      pendingDealerLeadCapture = { payload, valuation: data };
+      if (saveValuationLeadButton) saveValuationLeadButton.hidden = false;
+      statusEl.textContent = "Estimate generated. Submit to Owner Desk only if this should become an Up Sheet.";
+      await loadUsage();
+      return;
+    }
     const capture = await captureLead(payload, data);
     await loadUsage();
     if (capture?.captured) {
@@ -906,7 +913,7 @@ async function searchVehicleChoices(payload) {
 
     renderChoices(data.items || [], { modal: true, selectOnly: true });
     statusEl.textContent = data.items?.length
-      ? "Choose the closest vehicle to unlock appraisal submission."
+      ? "Choose the closest vehicle to unlock estimate generation."
       : "No matching vehicles found. Try another model, series, or style.";
   } catch (error) {
     statusEl.textContent = error.message || "Search failed.";
@@ -1022,7 +1029,7 @@ function renderChoices(items, options = {}) {
       if (selectOnly) {
         closeSearchModal();
         detailsEl.hidden = true;
-        statusEl.textContent = "Vehicle selected. Ready to generate the estimate and submit the Up Sheet.";
+        statusEl.textContent = "Vehicle selected. Ready to generate the estimate.";
         updateGenerateValuationState();
         return;
       }
@@ -1059,7 +1066,7 @@ function updateGenerateValuationState() {
   if (!generateValuationButton || !form) return;
   const ready = isVehicleSelectionReady();
   generateValuationButton.disabled = !ready;
-  generateValuationButton.textContent = ready ? "Generate & submit Up Sheet" : "Enter VIN first";
+  generateValuationButton.textContent = ready ? "Generate estimate" : "Enter VIN first";
 }
 
 function setLookupMode(mode, options = {}) {
