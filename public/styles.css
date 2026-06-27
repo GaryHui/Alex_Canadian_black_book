@@ -946,6 +946,13 @@ select {
   color: #fff;
 }
 
+.form-grid button:disabled {
+  background: #eef2f6;
+  border-color: #cfd8e3;
+  color: #687789;
+  cursor: not-allowed;
+}
+
 .lookup-form button {
   background: var(--red);
   color: #fff;

@@ -763,10 +763,11 @@ form.addEventListener("submit", async (event) => {
 form.addEventListener("input", (event) => {
   if (event.target?.name === "vin") {
     form.elements.uvc.value = "";
-    updateGenerateValuationState();
   }
+  updateGenerateValuationState();
 });
 updateGenerateValuationState();
+window.addEventListener("pageshow", updateGenerateValuationState);
 
 async function runValuation(extra = {}, options = {}) {
   if (!requireLogin()) return;
@@ -1076,6 +1077,7 @@ function setLookupMode(mode, options = {}) {
   drilldownForm.hidden = currentLookupMode !== "drilldown";
   form.hidden = currentLookupMode === "free" && !options.showValuation;
   if (lookupPanel) lookupPanel.hidden = currentLookupMode === "free" && !options.showValuation;
+  updateGenerateValuationState();
 }
 
 function showValuationFormForCurrentSelection() {
