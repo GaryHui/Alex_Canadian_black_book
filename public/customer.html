@@ -390,6 +390,31 @@
 
           <div class="review-extras">
             <h3 data-i18n="additionalDetailsTitle">Additional details</h3>
+            <section class="seller-contact-section" aria-labelledby="seller-contact-title">
+              <div>
+                <h3 id="seller-contact-title" data-i18n="sellerContactTitle">Seller contact</h3>
+                <p data-i18n="sellerContactIntro">Tell the dealer who should be contacted about this vehicle.</p>
+              </div>
+              <div class="seller-contact-grid">
+                <label>
+                  <span data-i18n="sellerNameLabel">Owner / contact name</span>
+                  <input name="ownerName" autocomplete="name" data-i18n-placeholder="sellerNamePlaceholder" placeholder="Full name" />
+                </label>
+                <label>
+                  <span data-i18n="sellerPhoneLabel">Phone</span>
+                  <input name="ownerPhone" autocomplete="tel" inputmode="tel" data-i18n-placeholder="phonePlaceholder" placeholder="604-000-0000" />
+                </label>
+                <label>
+                  <span data-i18n="sellerRelationshipLabel">I am</span>
+                  <select name="submitterRelationship">
+                    <option value="owner" data-i18n="sellerRelationshipOwner">The vehicle owner</option>
+                    <option value="family" data-i18n="sellerRelationshipFamily">Helping family or friend</option>
+                    <option value="staff" data-i18n="sellerRelationshipStaff">Dealer staff entering the lead</option>
+                    <option value="other" data-i18n="sellerRelationshipOther">Other</option>
+                  </select>
+                </label>
+              </div>
+            </section>
             <label>
               <span data-i18n="colorLabel">Color</span>
               <input name="color" data-review-color list="color-options" autocomplete="off" data-i18n-placeholder="colorPlaceholder" placeholder="White, black, silver..." />

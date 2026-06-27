@@ -79,6 +79,7 @@ const text = {
     inventoryTitle: "Current marketplace preview",
     inventoryIntro: "Browse vehicles published by the dealer.",
     inventoryEmptyIntro: "New vehicles will appear here when they are published.",
+    inventoryLoading: "Loading published vehicles...",
     financeEyebrow: "Finance estimate",
     financeTitle: "Monthly payment calculator",
     paymentModeLabel: "Payment type",
@@ -95,7 +96,13 @@ const text = {
     viewDetails: "View details",
     inventoryReal: "Showing published dealer inventory.",
     inventoryEmpty: "No vehicles are available right now.",
-    inventoryDemo: "Demo inventory is shown because the inventory backend is not configured or unavailable.",
+    inventoryDemo: "Sample vehicles are shown for local testing.",
+    inventoryUnavailable: "Published vehicles are being prepared. Please check back soon or contact the dealer.",
+    contactForPrice: "Contact for price",
+    dealerWillConfirmPrice: "Dealer will confirm price",
+    askDealerPayment: "Ask dealer",
+    paymentToConfirm: "Payment to confirm",
+    priceToConfirm: "Price to be confirmed",
     resultsLabel: "vehicle available",
     resultsLabelPlural: "vehicles available",
     resultsFilteredLabel: "matching vehicle",
@@ -192,6 +199,7 @@ const text = {
     inventoryTitle: "Apercu du marche",
     inventoryIntro: "Consultez les vehicules publies par le concessionnaire.",
     inventoryEmptyIntro: "Les nouveaux vehicules apparaitront ici lorsqu'ils seront publies.",
+    inventoryLoading: "Chargement des vehicules publies...",
     financeEyebrow: "Estimation de financement",
     financeTitle: "Calculateur de paiement mensuel",
     paymentModeLabel: "Type de paiement",
@@ -208,7 +216,13 @@ const text = {
     viewDetails: "Voir les details",
     inventoryReal: "Inventaire publie par l'equipe du concessionnaire.",
     inventoryEmpty: "Aucun vehicule disponible pour le moment.",
-    inventoryDemo: "Un inventaire de demo est affiche parce que le backend d'inventaire n'est pas configure ou disponible.",
+    inventoryDemo: "Vehicules exemples affiches pour les tests locaux.",
+    inventoryUnavailable: "Les vehicules publies sont en preparation. Veuillez revenir bientot ou contacter le concessionnaire.",
+    contactForPrice: "Prix sur demande",
+    dealerWillConfirmPrice: "Prix a confirmer par le concessionnaire",
+    askDealerPayment: "Demander au concessionnaire",
+    paymentToConfirm: "Paiement a confirmer",
+    priceToConfirm: "Prix a confirmer",
     resultsLabel: "vehicule disponible",
     resultsLabelPlural: "vehicules disponibles",
     resultsFilteredLabel: "vehicule trouve",
@@ -261,9 +275,10 @@ const text = {
 };
 
 let language = localStorage.getItem("customer-language") || "en";
-let inventory = [...sampleInventory];
-let filteredInventory = [...inventory];
-let inventorySource = "sample";
+const shouldUseSampleInventory = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
+let inventory = [];
+let filteredInventory = [];
+let inventorySource = "loading";
 
 const languageToggle = document.querySelector("#language-toggle");
 const inventoryList = document.querySelector("#inventory-list");
@@ -317,11 +332,33 @@ function money(value) {
   return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(Number(value || 0));
 }
 
+function vehicleHasPrice(vehicle) {
+  return Number(vehicle?.price || 0) > 0;
+}
+
+function vehiclePriceText(vehicle) {
+  return vehicleHasPrice(vehicle) ? money(vehicle.price) : text[language].contactForPrice;
+}
+
+function vehiclePriceSubtext(vehicle) {
+  return vehicleHasPrice(vehicle) ? `${money(vehicle.price)} CBB-based dealer price` : text[language].dealerWillConfirmPrice;
+}
+
+function vehiclePaymentText(vehicle) {
+  const deal = vehicleDeal(vehicle);
+  return deal.hasPrice ? `${money(deal.monthly)} / mo` : text[language].askDealerPayment;
+}
+
 function renderInventory() {
   updateInventoryResultsCount();
+  if (inventorySource === "loading") {
+    inventoryList.innerHTML = `<div class="inventory-empty"><strong>${escapeHtml(text[language].inventoryLoading)}</strong><p>${escapeHtml(text[language].inventoryIntro)}</p></div>`;
+    return;
+  }
   if (!filteredInventory.length) {
-    const emptyText = inventorySource === "supabase-empty" ? text[language].inventoryEmpty : text[language].noResults;
-    inventoryList.innerHTML = `<div class="inventory-empty"><strong>${escapeHtml(emptyText)}</strong><p>${escapeHtml(text[language].inventoryEmptyIntro)}</p></div>`;
+    const emptyText = ["supabase-empty", "unavailable"].includes(inventorySource) ? text[language].inventoryEmpty : text[language].noResults;
+    const emptyIntro = inventorySource === "unavailable" ? text[language].inventoryUnavailable : text[language].inventoryEmptyIntro;
+    inventoryList.innerHTML = `<div class="inventory-empty"><strong>${escapeHtml(emptyText)}</strong><p>${escapeHtml(emptyIntro)}</p></div>`;
     return;
   }
 
@@ -347,7 +384,7 @@ function renderInventoryCard(vehicle) {
       <div class="inventory-card-body">
         <header class="inventory-card-copy inventory-deal-copy">
           <h3>${escapeHtml(vehicle.title)}</h3>
-          <p>${escapeHtml(money(vehicle.price))} CBB-based dealer price</p>
+          <p>${escapeHtml(vehiclePriceSubtext(vehicle))}</p>
           ${tags.length ? `<div class="inventory-tags">${tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
         </header>
         <div class="inventory-spec-row" aria-label="Vehicle specs">
@@ -361,12 +398,17 @@ function renderInventoryCard(vehicle) {
         </div>
         <div class="inventory-card-price inventory-deal-price">
           <span>${escapeHtml(text[language].dealMonthlyLabel)}</span>
-          <strong>${money(deal.monthly)} / mo</strong>
-          <small>${escapeHtml(money(vehicle.price))} CBB-based dealer price</small>
+          <strong>${escapeHtml(vehiclePaymentText(vehicle))}</strong>
+          <small>${escapeHtml(vehiclePriceSubtext(vehicle))}</small>
           <div class="inventory-deal-terms" aria-label="Estimated payment terms">
-            <span><b>${escapeHtml(money(deal.downPayment))}</b>${escapeHtml(text[language].dealDownLabel)}</span>
-            <span><b>${escapeHtml(String(deal.termMonths))} mo</b>${escapeHtml(text[language].dealTermLabel)}</span>
-            <span><b>${escapeHtml(String(deal.annualRate))}%</b>${escapeHtml(text[language].dealRateLabel)}</span>
+            ${deal.hasPrice ? `
+              <span><b>${escapeHtml(money(deal.downPayment))}</b>${escapeHtml(text[language].dealDownLabel)}</span>
+              <span><b>${escapeHtml(String(deal.termMonths))} mo</b>${escapeHtml(text[language].dealTermLabel)}</span>
+              <span><b>${escapeHtml(String(deal.annualRate))}%</b>${escapeHtml(text[language].dealRateLabel)}</span>
+            ` : `
+              <span><b>${escapeHtml(text[language].contactForPrice)}</b>${escapeHtml(text[language].detailPrice)}</span>
+              <span><b>${escapeHtml(text[language].paymentToConfirm)}</b>${escapeHtml(text[language].detailMonthly)}</span>
+            `}
           </div>
         </div>
         <div class="inventory-card-actions">
@@ -410,8 +452,8 @@ async function loadInventory() {
   } catch (error) {
     console.warn("Unable to load inventory", error);
   }
-  inventorySource = "sample";
-  inventory = [...sampleInventory];
+  inventorySource = shouldUseSampleInventory ? "sample" : "unavailable";
+  inventory = shouldUseSampleInventory ? [...sampleInventory] : [];
   filteredInventory = [...inventory];
   updateInventoryIntro();
   updateInventorySourceStatus();
@@ -424,6 +466,10 @@ function updateInventoryIntro() {
     intro.textContent = text[language].inventoryReal;
   } else if (inventorySource === "supabase-empty") {
     intro.textContent = text[language].inventoryEmptyIntro;
+  } else if (inventorySource === "loading") {
+    intro.textContent = text[language].inventoryLoading;
+  } else if (inventorySource === "unavailable") {
+    intro.textContent = text[language].inventoryUnavailable;
   } else {
     intro.textContent = text[language].inventoryIntro;
   }
@@ -435,6 +481,10 @@ function updateInventorySourceStatus() {
     inventorySourceStatus.textContent = text[language].inventoryReal;
   } else if (inventorySource === "supabase-empty") {
     inventorySourceStatus.textContent = "";
+  } else if (inventorySource === "loading") {
+    inventorySourceStatus.textContent = text[language].inventoryLoading;
+  } else if (inventorySource === "unavailable") {
+    inventorySourceStatus.textContent = text[language].inventoryUnavailable;
   } else {
     inventorySourceStatus.textContent = text[language].inventoryDemo;
   }
@@ -559,6 +609,13 @@ function calculatePayment() {
   const taxRate = Number(data.get("taxRate") || 0);
   const residualPercent = Number(data.get("residualPercent") || 48);
   const mode = String(data.get("paymentMode") || "finance");
+  if (price <= 0) {
+    paymentOutput.textContent = text[language].paymentToConfirm;
+    if (detailOrderPayment) detailOrderPayment.textContent = text[language].askDealerPayment;
+    if (detailOrderFees) detailOrderFees.textContent = text[language].priceToConfirm;
+    financeForm?.classList.toggle("lease-mode", mode === "lease");
+    return;
+  }
   const payment = mode === "lease"
     ? estimatedLeasePayment({ price, downPayment, annualRate, termMonths, taxRate, residualPercent })
     : estimatedMonthlyPayment({ price, downPayment, annualRate, termMonths, taxRate });
@@ -595,12 +652,24 @@ function estimatedLeasePayment({ price, downPayment, annualRate, termMonths, tax
 
 function vehicleDeal(vehicle) {
   const price = Number(vehicle.price || 0);
+  const hasPrice = price > 0;
+  if (!hasPrice) {
+    return {
+      hasPrice: false,
+      downPayment: 0,
+      termMonths: 72,
+      annualRate: 7.99,
+      taxRate: 12,
+      monthly: 0
+    };
+  }
   const downPayment = Math.max(2500, Math.round(price * 0.1 / 500) * 500);
   const termMonths = 72;
   const annualRate = 7.99;
   const taxRate = 12;
   const monthly = Number(vehicle.monthlyPaymentEstimate || 0) || estimatedMonthlyPayment({ price, downPayment, annualRate, termMonths, taxRate });
   return {
+    hasPrice,
     downPayment,
     termMonths,
     annualRate,
@@ -634,7 +703,7 @@ function selectVehicleForFinance(vehicle) {
   if (!vehicle || !financeForm) return;
   selectedFinanceVehicle = vehicle;
   const deal = vehicleDeal(vehicle);
-  financeForm.elements.price.value = vehicle.price;
+  financeForm.elements.price.value = deal.hasPrice ? vehicle.price : "";
   financeForm.elements.downPayment.value = deal.downPayment;
   financeForm.elements.termMonths.value = deal.termMonths;
   financeForm.elements.annualRate.value = deal.annualRate;
@@ -642,7 +711,9 @@ function selectVehicleForFinance(vehicle) {
   if (detailOrderTitle) detailOrderTitle.textContent = vehicle.title;
   if (detailOrderSubtitle) detailOrderSubtitle.textContent = [vehicle.series, vehicle.style].filter(Boolean).join(" | ");
   if (detailOrderFees) {
-    detailOrderFees.textContent = `${money(deal.downPayment)} down | ${deal.termMonths} months | ${deal.annualRate}% APR`;
+    detailOrderFees.textContent = deal.hasPrice
+      ? `${money(deal.downPayment)} down | ${deal.termMonths} months | ${deal.annualRate}% APR`
+      : text[language].priceToConfirm;
   }
   calculatePayment();
   updateSendEstimateButton();
@@ -671,7 +742,8 @@ function applyFilters(event) {
   filteredInventory = inventory.filter((vehicle) => {
     const haystack = `${vehicle.title} ${vehicle.make} ${vehicle.model} ${vehicle.region} ${vehicle.color} ${vehicle.tags.join(" ")}`.toLowerCase();
     const vehicleType = `${vehicle.style || ""} ${vehicle.series || ""} ${(vehicle.tags || []).join(" ")}`.toLowerCase();
-    const monthly = vehicleDeal(vehicle).monthly;
+    const deal = vehicleDeal(vehicle);
+    const monthly = deal.hasPrice ? deal.monthly : Number.POSITIVE_INFINITY;
     const matchesQuery = !query || haystack.includes(query);
     const matchesMake = !make || String(vehicle.make || "").toLowerCase() === make;
     const matchesModel = !model || String(vehicle.model || "").toLowerCase() === model;
@@ -689,11 +761,19 @@ function applyFilters(event) {
 }
 
 function compareVehicles(a, b, sortBy) {
+  const hasPriceA = vehicleHasPrice(a);
+  const hasPriceB = vehicleHasPrice(b);
+  const priceA = vehicleHasPrice(a) ? Number(a.price || 0) : Number.POSITIVE_INFINITY;
+  const priceB = vehicleHasPrice(b) ? Number(b.price || 0) : Number.POSITIVE_INFINITY;
+  const dealA = vehicleDeal(a);
+  const dealB = vehicleDeal(b);
+  const monthlyA = dealA.hasPrice ? dealA.monthly : Number.POSITIVE_INFINITY;
+  const monthlyB = dealB.hasPrice ? dealB.monthly : Number.POSITIVE_INFINITY;
   const comparisons = {
-    "monthly-asc": vehicleDeal(a).monthly - vehicleDeal(b).monthly,
-    "monthly-desc": vehicleDeal(b).monthly - vehicleDeal(a).monthly,
-    "price-asc": Number(a.price || 0) - Number(b.price || 0),
-    "price-desc": Number(b.price || 0) - Number(a.price || 0),
+    "monthly-asc": monthlyA - monthlyB,
+    "monthly-desc": compareKnownNumbers(monthlyA, monthlyB, dealA.hasPrice, dealB.hasPrice, "desc"),
+    "price-asc": priceA - priceB,
+    "price-desc": compareKnownNumbers(priceA, priceB, hasPriceA, hasPriceB, "desc"),
     "year-desc": Number(b.year || 0) - Number(a.year || 0),
     "km-asc": Number(a.kilometers || 0) - Number(b.kilometers || 0),
     recent: String(b.id || "").localeCompare(String(a.id || ""))
@@ -702,6 +782,13 @@ function compareVehicles(a, b, sortBy) {
   return Number.isFinite(result) && result !== 0
     ? result
     : String(a.title || "").localeCompare(String(b.title || ""));
+}
+
+function compareKnownNumbers(aValue, bValue, aKnown, bKnown, direction = "asc") {
+  if (aKnown && !bKnown) return -1;
+  if (!aKnown && bKnown) return 1;
+  if (!aKnown && !bKnown) return 0;
+  return direction === "desc" ? bValue - aValue : aValue - bValue;
 }
 
 function updateSearchUrl(data) {
@@ -805,7 +892,7 @@ function showVehicleDetails(vehicle) {
   if (vehicleDetailPriceSummary) {
     vehicleDetailPriceSummary.innerHTML = `
       <span>${escapeHtml(text[language].detailPrice)}</span>
-      <strong>${money(vehicle.price)}</strong>
+      <strong>${escapeHtml(vehiclePriceText(vehicle))}</strong>
     `;
   }
   vehicleDetailBody.innerHTML = `
@@ -950,7 +1037,7 @@ function renderPhotoViewer() {
     photoViewerSubtitle.textContent = `${number(activePhotoVehicle.kilometers)} km | ${activePhotoVehicle.region || text[language].notAvailable} | ${activePhotoVehicle.color || text[language].notAvailable}`;
   }
   if (photoViewerCount) photoViewerCount.textContent = `${activePhotoIndex + 1} / ${activePhotoList.length}`;
-  if (photoViewerPayment) photoViewerPayment.textContent = `${money(deal.monthly)} / mo`;
+  if (photoViewerPayment) photoViewerPayment.textContent = deal.hasPrice ? `${money(deal.monthly)} / mo` : text[language].askDealerPayment;
   if (photoViewerThumbs) {
     photoViewerThumbs.innerHTML = activePhotoList.map((item, index) => `
       <button class="photo-viewer-thumb ${index === activePhotoIndex ? "is-selected" : ""}" type="button" data-photo-viewer-index="${index}" aria-label="${escapeHtml(item.label || `Show photo ${index + 1}`)}">
@@ -1037,7 +1124,7 @@ async function submitDealerContact(event) {
 
 function contactVehicleContextMarkup(vehicle) {
   const parts = [
-    vehicle.price ? money(vehicle.price) : "",
+    vehicleHasPrice(vehicle) ? money(vehicle.price) : text[language].contactForPrice,
     isPublicFieldVisible(vehicle, "showKilometers") && vehicle.kilometers ? `${vehicle.kilometers.toLocaleString("en-CA")} km` : "",
     isPublicFieldVisible(vehicle, "showRegion") ? vehicle.region : "",
     isPublicFieldVisible(vehicle, "showColor") ? vehicle.color : "",
@@ -1053,7 +1140,7 @@ function updateContactBuyingSummary() {
   if (purchase.intent === "cash") {
     contactFinanceSummary.innerHTML = `
       <strong>${escapeHtml(text[language].purchaseCashSummary)}</strong>
-      <span>${escapeHtml(money(purchase.vehiclePrice || currentContactVehicle?.price || 0))}</span>
+      <span>${escapeHtml(vehicleHasPrice(currentContactVehicle) ? money(purchase.vehiclePrice || currentContactVehicle?.price || 0) : text[language].contactForPrice)}</span>
     `;
     return;
   }
@@ -1068,7 +1155,15 @@ function updateContactBuyingSummary() {
   if (purchase.intent === "undecided") {
     contactFinanceSummary.innerHTML = `
       <strong>${escapeHtml(text[language].purchaseUndecidedSummary)}</strong>
-      <span>${escapeHtml(money(purchase.vehiclePrice || currentContactVehicle?.price || 0))} vehicle</span>
+      <span>${escapeHtml(vehicleHasPrice(currentContactVehicle) ? `${money(purchase.vehiclePrice || currentContactVehicle?.price || 0)} vehicle` : text[language].priceToConfirm)}</span>
+    `;
+    return;
+  }
+  if (!vehicleHasPrice(currentContactVehicle)) {
+    contactFinanceSummary.innerHTML = `
+      <strong>${escapeHtml(text[language].purchaseFinanceSummary)}</strong>
+      <span>${escapeHtml(text[language].paymentToConfirm)}</span>
+      <small>${escapeHtml(text[language].priceToConfirm)}</small>
     `;
     return;
   }

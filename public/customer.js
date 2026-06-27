@@ -197,7 +197,8 @@ const text = {
     vinSpotFourText: "If you cannot access the car, check your registration, insurance card, or bill of sale.",
     vinGuideNote: "Tip: most modern VINs are 17 characters and do not use the letters I, O, or Q.",
     authChecking: "Checking sign-in...",
-    authRequired: "Sign in with Google or email before valuation.",
+    authRequiredTitle: "Sign in before valuation",
+    authRequired: "Create a free account or log in so your valuation can be saved for dealer follow-up.",
     authReady: "Signed in as",
     authReadyHelp: "Your email will be saved with the valuation for follow-up.",
     authMissing: "Customer sign-in is not configured yet.",
@@ -279,6 +280,16 @@ const text = {
     reviewSummary: "Vehicle data",
     blackbookOptionsTitle: "Black Book options",
     additionalDetailsTitle: "Additional details",
+    sellerContactTitle: "Seller contact",
+    sellerContactIntro: "Tell the dealer who should be contacted about this vehicle.",
+    sellerNameLabel: "Owner / contact name",
+    sellerNamePlaceholder: "Full name",
+    sellerPhoneLabel: "Phone",
+    sellerRelationshipLabel: "I am",
+    sellerRelationshipOwner: "The vehicle owner",
+    sellerRelationshipFamily: "Helping family or friend",
+    sellerRelationshipStaff: "Dealer staff entering the lead",
+    sellerRelationshipOther: "Other",
     editVehicle: "Edit",
     goBack: "Go Back",
     changeVehicle: "Change vehicle",
@@ -404,7 +415,8 @@ const text = {
     vinSpotFourText: "Si vous n'avez pas accès au véhicule, vérifiez l'immatriculation, l'assurance ou l'acte de vente.",
     vinGuideNote: "Conseil : la plupart des NIV modernes comptent 17 caractères et n'utilisent pas les lettres I, O ou Q.",
     authChecking: "Vérification de la connexion...",
-    authRequired: "Connectez-vous avec Google ou par courriel avant l'evaluation.",
+    authRequiredTitle: "Connectez-vous avant l'evaluation",
+    authRequired: "Creez un compte gratuit ou connectez-vous afin que l'evaluation soit enregistree pour le suivi.",
     authReady: "Connecté avec",
     authReadyHelp: "Votre courriel sera enregistré avec l'évaluation pour le suivi.",
     authMissing: "La connexion client n'est pas encore configuree.",
@@ -484,6 +496,18 @@ const text = {
     reviewTitle: "Confirmez quelques détails sur le véhicule",
     reviewIntro: "Ces renseignements nous aident à fournir une valeur plus précise.",
     reviewSummary: "Données du véhicule",
+    blackbookOptionsTitle: "Options Black Book",
+    additionalDetailsTitle: "Détails supplémentaires",
+    sellerContactTitle: "Contact vendeur",
+    sellerContactIntro: "Indiquez qui le concessionnaire doit contacter pour ce véhicule.",
+    sellerNameLabel: "Nom du proprietaire / contact",
+    sellerNamePlaceholder: "Nom complet",
+    sellerPhoneLabel: "Telephone",
+    sellerRelationshipLabel: "Je suis",
+    sellerRelationshipOwner: "Le proprietaire du vehicule",
+    sellerRelationshipFamily: "J'aide un proche ou un ami",
+    sellerRelationshipStaff: "Employe du concessionnaire",
+    sellerRelationshipOther: "Autre",
     editVehicle: "Modifier",
     goBack: "Retour",
     changeVehicle: "Changer de véhicule",
@@ -1033,7 +1057,7 @@ function setCustomerSession(session) {
     void loadUsage();
     void loadHistory();
   } else {
-    customerAuthTitle.textContent = t("authRequired");
+    customerAuthTitle.textContent = t("authRequiredTitle");
     customerAuthSubtitle.textContent = t("authRequired");
     emailAuthForm.hidden = false;
     form.elements.email.value = "";
@@ -1407,7 +1431,16 @@ async function handleReviewSubmit(event) {
 function collectReviewInput() {
   const formData = new FormData(reviewForm);
   const photos = [...selectedPhotos.values()];
+  const ownerName = String(formData.get("ownerName") || authSession?.user?.user_metadata?.full_name || authSession?.user?.user_metadata?.name || "").trim();
+  const ownerPhone = String(formData.get("ownerPhone") || "").trim();
+  const submitterEmail = authSession?.user?.email || "";
   return {
+    ownerName,
+    ownerPhone,
+    phone: ownerPhone,
+    submitterEmail,
+    submitterName: authSession?.user?.user_metadata?.full_name || authSession?.user?.user_metadata?.name || "",
+    submitterRelationship: String(formData.get("submitterRelationship") || "owner").trim(),
     series: cleanReviewValue(formData.get("series")),
     engine: cleanReviewValue(formData.get("engine")),
     drivetrain: cleanReviewValue(formData.get("drivetrain")),

@@ -1187,6 +1187,31 @@ input::placeholder {
   border-radius: 8px;
 }
 
+.seller-contact-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid rgba(184, 199, 217, 0.86);
+  border-radius: 8px;
+}
+
+.seller-contact-section h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.seller-contact-section p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.seller-contact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .review-extras label span {
   position: static;
   width: auto;
@@ -1198,6 +1223,7 @@ input::placeholder {
 }
 
 .review-extras select,
+.review-extras input,
 .review-form textarea {
   width: 100%;
   padding: 13px 14px;
@@ -1218,6 +1244,7 @@ input::placeholder {
 }
 
 .review-extras select:focus,
+.review-extras input:focus,
 .review-form textarea:focus {
   border-color: var(--blue);
   outline: 3px solid rgba(22, 119, 210, 0.14);
@@ -3775,6 +3802,10 @@ input::placeholder {
 
   .history-meta {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .seller-contact-grid {
+    grid-template-columns: 1fr;
   }
 
   .step-pill {
