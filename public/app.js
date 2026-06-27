@@ -1,6 +1,7 @@
 const form = document.querySelector("#valuation-form");
 const freeForm = document.querySelector("#free-form");
 const drilldownForm = document.querySelector("#drilldown-form");
+const generateValuationButton = document.querySelector("#generate-valuation");
 const statusEl = document.querySelector("#status");
 const detailsEl = document.querySelector("#details");
 const valueBody = document.querySelector("#value-body");
@@ -735,7 +736,8 @@ drilldownForm.addEventListener("submit", async (event) => {
       uvc: exactVehicle.uvc || ""
     });
     detailsEl.hidden = true;
-    statusEl.textContent = "Vehicle selected. Click Generate to create the valuation.";
+    statusEl.textContent = "Vehicle selected. Generate valuation is ready.";
+    updateGenerateValuationState();
     return;
   }
   setValuationFields({ vin: form.elements.vin.value || "", uvc: "", ...payload });
@@ -758,6 +760,13 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   await runValuation();
 });
+form.addEventListener("input", (event) => {
+  if (event.target?.name === "vin") {
+    form.elements.uvc.value = "";
+    updateGenerateValuationState();
+  }
+});
+updateGenerateValuationState();
 
 async function runValuation(extra = {}, options = {}) {
   if (!requireLogin()) return;
@@ -784,9 +793,9 @@ async function runValuation(extra = {}, options = {}) {
     payload.phone = payload.ownerPhone || payload.phone || "";
   }
 
-  if (!payload.vin && !payload.uvc && payload.year && payload.make && (!payload.model || payload.model === unknownOption)) {
-    statusEl.textContent = "Choose a model first, or use Find to search matching vehicles.";
-    await searchVehicleChoices(payload);
+  if (!isVehicleSelectionReady(payload)) {
+    statusEl.textContent = "Find and select the exact vehicle first, then Generate valuation will unlock.";
+    if (vehicleSearchText(payload)) await searchVehicleChoices(payload);
     return;
   }
 
@@ -897,7 +906,7 @@ async function searchVehicleChoices(payload) {
 
     renderChoices(data.items || [], { modal: true, selectOnly: true });
     statusEl.textContent = data.items?.length
-      ? "Choose the closest vehicle, then click Generate to create the valuation."
+      ? "Choose the closest vehicle to unlock Generate valuation."
       : "No matching vehicles found. Try another model, series, or style.";
   } catch (error) {
     statusEl.textContent = error.message || "Search failed.";
@@ -971,7 +980,7 @@ function renderChoices(items, options = {}) {
     target.hidden = false;
     target.innerHTML = `
       <p>No vehicle matches found.</p>
-      <p class="hint">Try a more specific description like "2024 Lexus NX350", or enter a full VIN and click Generate.</p>
+      <p class="hint">Try a more specific description like "2024 Lexus NX350", or enter a full VIN and select the matching vehicle.</p>
     `;
     statusEl.textContent = "No matches.";
     modalStatus.textContent = "No matches found.";
@@ -1013,7 +1022,8 @@ function renderChoices(items, options = {}) {
       if (selectOnly) {
         closeSearchModal();
         detailsEl.hidden = true;
-        statusEl.textContent = "Vehicle selected. Click Generate to create the valuation.";
+        statusEl.textContent = "Vehicle selected. Generate valuation is ready.";
+        updateGenerateValuationState();
         return;
       }
       await runValuation({ vin: currentVin, uvc: item.uvc || "" });
@@ -1038,6 +1048,18 @@ function setValuationFields(values) {
     if (field) field.value = value === unknownOption ? "" : value ?? "";
   }
   setDrilldownFields(values);
+  updateGenerateValuationState();
+}
+
+function isVehicleSelectionReady(payload = Object.fromEntries(new FormData(form).entries())) {
+  return Boolean(String(payload.uvc || "").trim());
+}
+
+function updateGenerateValuationState() {
+  if (!generateValuationButton || !form) return;
+  const ready = isVehicleSelectionReady();
+  generateValuationButton.disabled = !ready;
+  generateValuationButton.textContent = ready ? "Generate valuation" : "Select vehicle first";
 }
 
 function setLookupMode(mode, options = {}) {
