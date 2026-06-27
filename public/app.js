@@ -736,7 +736,7 @@ drilldownForm.addEventListener("submit", async (event) => {
       uvc: exactVehicle.uvc || ""
     });
     detailsEl.hidden = true;
-    statusEl.textContent = "Vehicle selected. Generate valuation is ready.";
+    statusEl.textContent = "Vehicle selected. Ready to generate the estimate and submit the Up Sheet.";
     updateGenerateValuationState();
     return;
   }
@@ -819,8 +819,8 @@ async function runValuation(extra = {}, options = {}) {
 
     if (data.choices?.length > 1 && !payload.uvc) {
       const message = payload.vin
-        ? "This VIN can match more than one trim. Choose the closest vehicle."
-        : "Multiple matches found. Choose the correct trim.";
+        ? "This VIN can match more than one trim. Choose the closest vehicle before submitting the Up Sheet."
+        : "Multiple matches found. Choose the correct trim before submitting the Up Sheet.";
       statusEl.textContent = message;
       modalStatus.textContent = message;
       renderChoices(data.choices, { modal: Boolean(options.choicesInModal) });
@@ -856,7 +856,7 @@ async function savePendingDealerLead() {
   }
 
   saveValuationLeadButton.disabled = true;
-  statusEl.textContent = "Saving valuation to leads...";
+  statusEl.textContent = "Submitting appraisal Up Sheet to Owner Desk...";
   try {
     const capture = await captureLead(pendingDealerLeadCapture.payload, pendingDealerLeadCapture.valuation);
     await loadUsage();
@@ -906,7 +906,7 @@ async function searchVehicleChoices(payload) {
 
     renderChoices(data.items || [], { modal: true, selectOnly: true });
     statusEl.textContent = data.items?.length
-      ? "Choose the closest vehicle to unlock Generate valuation."
+      ? "Choose the closest vehicle to unlock appraisal submission."
       : "No matching vehicles found. Try another model, series, or style.";
   } catch (error) {
     statusEl.textContent = error.message || "Search failed.";
@@ -1022,7 +1022,7 @@ function renderChoices(items, options = {}) {
       if (selectOnly) {
         closeSearchModal();
         detailsEl.hidden = true;
-        statusEl.textContent = "Vehicle selected. Generate valuation is ready.";
+        statusEl.textContent = "Vehicle selected. Ready to generate the estimate and submit the Up Sheet.";
         updateGenerateValuationState();
         return;
       }
@@ -1059,7 +1059,7 @@ function updateGenerateValuationState() {
   if (!generateValuationButton || !form) return;
   const ready = isVehicleSelectionReady();
   generateValuationButton.disabled = !ready;
-  generateValuationButton.textContent = ready ? "Generate valuation" : "Enter VIN first";
+  generateValuationButton.textContent = ready ? "Generate & submit Up Sheet" : "Enter VIN first";
 }
 
 function setLookupMode(mode, options = {}) {
@@ -1378,10 +1378,10 @@ async function captureLead(input, valuation) {
 
 function leadCaptureStatusMessage(capture = {}, usedMock = false) {
   const source = usedMock ? "Rendered with mock data" : "Rendered from Black Book API";
-  if (capture.webhook?.submitted) return `${source}. CRM lead saved and Google Sheet synced.`;
-  if (capture.webhook?.skipped) return `${source}. CRM lead saved, but Google Sheet sync is not configured.`;
-  if (capture.webhook?.error) return `${source}. CRM lead saved, but Google Sheet sync failed: ${capture.webhook.error}`;
-  return `${source}. CRM lead saved.`;
+  if (capture.webhook?.submitted) return `${source}. Up Sheet submitted to Owner Desk and Google Sheet synced.`;
+  if (capture.webhook?.skipped) return `${source}. Up Sheet submitted to Owner Desk, but Google Sheet sync is not configured.`;
+  if (capture.webhook?.error) return `${source}. Up Sheet submitted to Owner Desk, but Google Sheet sync failed: ${capture.webhook.error}`;
+  return `${source}. Up Sheet submitted to Owner Desk for manager review.`;
 }
 
 async function initializeAuth() {

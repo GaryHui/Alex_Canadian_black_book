@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Black Book Valuation Demo</title>
-    <link rel="stylesheet" href="/styles.css?v=dealer-valuation-flow-20260627" />
+    <link rel="stylesheet" href="/styles.css?v=dealer-submit-lead-20260627" />
   </head>
   <body>
     <main class="shell">
@@ -126,14 +126,14 @@
         <details class="dealer-valuation-details">
           <summary>
             <span>
-              <b>Create valuation</b>
-              <small>Open this sub-tool only when staff needs to price a vehicle manually.</small>
+              <b>Create appraisal lead</b>
+              <small>Estimate the vehicle, then send the Up Sheet to Owner Desk.</small>
             </span>
           </summary>
           <div>
             <p class="eyebrow">Dealer valuation tool</p>
-            <h2>Create a vehicle estimate</h2>
-            <p class="section-subtitle">Enter the VIN first, find the matching vehicle, then generate the valuation.</p>
+            <h2>Create an appraisal Up Sheet</h2>
+            <p class="section-subtitle">Enter the VIN first, find the matching vehicle, then generate the estimate and submit it for manager review.</p>
           </div>
 
           <div class="lookup-layout">
@@ -244,7 +244,7 @@
           </div>
 
           <p id="status" class="status">Enter VIN first, then find and select the matching vehicle.</p>
-          <button id="save-valuation-lead" class="save-valuation-lead" type="button" hidden>Save valuation to leads</button>
+          <button id="save-valuation-lead" class="save-valuation-lead" type="button" hidden>Submit appraisal to Owner Desk</button>
           <div id="inline-choice-list" class="choice-list inline-choice-list" hidden></div>
           <p class="admin-link" data-dealer-admin-link hidden><a href="/admin.html" target="_blank" rel="noreferrer">View captured leads</a></p>
         </details>
@@ -369,6 +369,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="/app.js?v=dealer-valuation-flow-20260627"></script>
+    <script src="/app.js?v=dealer-submit-lead-20260627"></script>
   </body>
 </html>
