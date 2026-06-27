@@ -32,6 +32,10 @@
               <span data-i18n="heroPointThree">Dealer follow-up</span>
             </div>
             <form class="marketplace-search-bar" id="inventory-filter" aria-label="Vehicle search">
+              <label class="marketplace-keyword-field">
+                <span data-i18n="searchLabel">Keyword</span>
+                <input name="query" placeholder="Lexus, AWD, hybrid..." data-i18n-placeholder="searchPlaceholder" />
+              </label>
               <label>
                 <span data-i18n="makeLabel">Make</span>
                 <select name="make">
@@ -78,10 +82,6 @@
                 <label>
                   <span data-i18n="maxKmLabel">Max KM</span>
                   <input name="maxKm" type="number" inputmode="numeric" placeholder="80000" />
-                </label>
-                <label>
-                  <span data-i18n="searchLabel">Keyword</span>
-                  <input name="query" placeholder="Lexus, AWD, hybrid..." data-i18n-placeholder="searchPlaceholder" />
                 </label>
                 <button class="secondary-button marketplace-clear-button" type="button" data-clear-filters data-i18n="clearFilters">Clear filters</button>
               </section>

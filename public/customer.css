@@ -2967,7 +2967,7 @@ input::placeholder {
 
 .marketplace-search-bar {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(126px, 0.82fr) minmax(158px, 0.9fr);
+  grid-template-columns: minmax(220px, 1.45fr) repeat(4, minmax(0, 0.9fr)) minmax(126px, 0.72fr) minmax(158px, 0.82fr);
   width: 100%;
   overflow: hidden;
   margin-top: 14px;
@@ -3024,7 +3024,7 @@ input::placeholder {
 }
 
 .marketplace-keyword-field {
-  background: rgba(255, 255, 255, 0.06);
+  background: #fff;
 }
 
 .marketplace-filter-button {
