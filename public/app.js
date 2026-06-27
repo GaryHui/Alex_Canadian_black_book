@@ -36,6 +36,7 @@ const dealerLeadAlertsEl = document.querySelector("#dealer-lead-alerts");
 const dealerTodayWorkEl = document.querySelector("#dealer-today-work");
 const dealerLeadFilterButtons = document.querySelectorAll("[data-dealer-filter]");
 const dealerLeadSortSelect = document.querySelector("#dealer-lead-sort");
+const dealerLeadSearchInput = document.querySelector("#dealer-lead-search");
 const MAX_LEAD_PHOTOS = 20;
 const dealerLeadDrawer = document.querySelector("#dealer-lead-drawer");
 const dealerLeadDrawerContent = document.querySelector("#dealer-lead-drawer-content");
@@ -102,6 +103,7 @@ let dealerInventoryCache = [];
 let dealerLeadRole = "dealer";
 let dealerLeadFilter = "active";
 let dealerLeadSort = "newest";
+let dealerLeadSearch = "";
 let dealerLeadAlertMap = new Map();
 let dealerLeadDuplicateMap = new Map();
 let activeDealerLeadId = "";
@@ -127,6 +129,10 @@ dealerLeadFilterButtons.forEach((button) => {
 });
 dealerLeadSortSelect?.addEventListener("change", () => {
   dealerLeadSort = dealerLeadSortSelect.value === "oldest" ? "oldest" : "newest";
+  renderDealerLeads(dealerLeadsCache, dealerLeadRole);
+});
+dealerLeadSearchInput?.addEventListener("input", () => {
+  dealerLeadSearch = String(dealerLeadSearchInput.value || "").trim().toLowerCase();
   renderDealerLeads(dealerLeadsCache, dealerLeadRole);
 });
 dealerLeadAlertsEl?.addEventListener("click", async (event) => {
@@ -2033,10 +2039,11 @@ function renderDealerLeads(leads, role) {
   const activeCount = queueLeads.filter((lead) => !isDealerClosedLead(lead)).length;
   const closedCount = queueLeads.length - activeCount;
   const sortLabel = dealerLeadSort === "oldest" ? "Oldest first" : "Newest first";
+  const searchLabel = dealerLeadSearch ? ` Search: "${dealerLeadSearch}".` : "";
   const stockNote = stockLeadCount ? ` ${stockLeadCount} stock vehicle${stockLeadCount === 1 ? "" : "s"} moved to Inventory Follow-up.` : "";
   const foldedCount = visibleLeads.length - groupedLeads.length;
   const foldedNote = foldedCount ? ` ${foldedCount} same-vehicle duplicate${foldedCount === 1 ? "" : "s"} folded into primary vehicle files.` : "";
-  dealerLeadsStatus.textContent = `${groupedLeads.length} vehicle file${groupedLeads.length === 1 ? "" : "s"} shown from ${visibleLeads.length} lead${visibleLeads.length === 1 ? "" : "s"}. ${activeCount} active / ${closedCount} closed assigned Up Sheet${queueLeads.length === 1 ? "" : "s"}.${foldedNote}${stockNote} Sort: ${sortLabel}, with urgent, overdue, and new pinned first.`;
+  dealerLeadsStatus.textContent = `${groupedLeads.length} vehicle file${groupedLeads.length === 1 ? "" : "s"} shown from ${visibleLeads.length} lead${visibleLeads.length === 1 ? "" : "s"}. ${activeCount} active / ${closedCount} closed assigned Up Sheet${queueLeads.length === 1 ? "" : "s"}.${foldedNote}${stockNote} Sort: ${sortLabel}, with urgent, overdue, and new pinned first.${searchLabel}`;
   dealerLeadsList.innerHTML = renderDealerLeadGroups(groupedLeads, (lead, index) => {
     const input = lead.input || {};
     const valuation = lead.valuation || {};
@@ -3149,29 +3156,90 @@ function formatShortDate(value) {
 }
 
 function filterDealerLeads(leads) {
-  if (dealerLeadFilter === "active") return leads.filter(isDealerActiveWorkLead);
-  if (dealerLeadFilter === "closed") return leads.filter(isDealerClosedLead);
-  if (dealerLeadFilter === "fresh") return leads.filter((lead) => !isDealerClosedLead(lead) && String(lead.status || "new").toLowerCase() === "new");
-  if (dealerLeadFilter === "delivered") return leads.filter((lead) => ["delivered", "sold", "won"].includes(String(lead.status || "").toLowerCase()));
-  if (dealerLeadFilter === "lost") return leads.filter((lead) => ["lost", "failed"].includes(String(lead.status || "").toLowerCase()));
-  if (dealerLeadFilter === "inactive") return leads.filter((lead) => isDealerClosedLead(lead) && !["delivered", "sold", "won", "lost", "failed", "deleted"].includes(String(lead.status || "").toLowerCase()));
-  if (dealerLeadFilter === "call-now") return leads.filter(isDealerCallNowLead);
-  if (dealerLeadFilter === "no-response") return leads.filter(isDealerNoResponseLead);
-  if (dealerLeadFilter === "appointments") return leads.filter(isDealerAppointmentLead);
-  if (dealerLeadFilter === "deal-desk") return leads.filter(isDealerDealDeskLead);
-  if (dealerLeadFilter === "aging-critical") return leads.filter(isDealerAgingCriticalLead);
-  if (dealerLeadFilter === "priority") return leads.filter((lead) => !isDealerClosedLead(lead) && ["high", "urgent"].includes(String(lead.priority || "").toLowerCase()));
-  if (dealerLeadFilter === "unassigned") return leads.filter((lead) => !isDealerClosedLead(lead) && !String(lead.assigned_to || "").trim());
-  if (dealerLeadFilter === "open-tasks") return leads.filter((lead) => !isDealerClosedLead(lead) && hasDealerOpenTask(lead));
-  if (dealerLeadFilter === "updates") return leads.filter((lead) => !isDealerClosedLead(lead) && dealerLeadAlertMap.has(String(lead.id || "")));
-  if (dealerLeadFilter === "buyer") return leads.filter((lead) => !isDealerClosedLead(lead) && isBuyerLead(lead));
-  if (dealerLeadFilter === "seller") return leads.filter((lead) => !isDealerClosedLead(lead) && !isBuyerLead(lead));
-  if (dealerLeadFilter === "waiting-reply") return leads.filter(isDealerWaitingReply);
-  if (dealerLeadFilter === "vehicle-alerts") return leads.filter((lead) => !isDealerClosedLead(lead) && (lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market));
+  let filtered = leads;
+  if (dealerLeadFilter === "active") filtered = leads.filter(isDealerActiveWorkLead);
+  if (dealerLeadFilter === "closed") filtered = leads.filter(isDealerClosedLead);
+  if (dealerLeadFilter === "fresh") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && String(lead.status || "new").toLowerCase() === "new");
+  if (dealerLeadFilter === "delivered") filtered = leads.filter((lead) => ["delivered", "sold", "won"].includes(String(lead.status || "").toLowerCase()));
+  if (dealerLeadFilter === "lost") filtered = leads.filter((lead) => ["lost", "failed"].includes(String(lead.status || "").toLowerCase()));
+  if (dealerLeadFilter === "inactive") filtered = leads.filter((lead) => isDealerClosedLead(lead) && !["delivered", "sold", "won", "lost", "failed", "deleted"].includes(String(lead.status || "").toLowerCase()));
+  if (dealerLeadFilter === "call-now") filtered = leads.filter(isDealerCallNowLead);
+  if (dealerLeadFilter === "no-response") filtered = leads.filter(isDealerNoResponseLead);
+  if (dealerLeadFilter === "appointments") filtered = leads.filter(isDealerAppointmentLead);
+  if (dealerLeadFilter === "deal-desk") filtered = leads.filter(isDealerDealDeskLead);
+  if (dealerLeadFilter === "aging-critical") filtered = leads.filter(isDealerAgingCriticalLead);
+  if (dealerLeadFilter === "priority") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && ["high", "urgent"].includes(String(lead.priority || "").toLowerCase()));
+  if (dealerLeadFilter === "unassigned") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && !String(lead.assigned_to || "").trim());
+  if (dealerLeadFilter === "open-tasks") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && hasDealerOpenTask(lead));
+  if (dealerLeadFilter === "updates") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && dealerLeadAlertMap.has(String(lead.id || "")));
+  if (dealerLeadFilter === "buyer") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && isBuyerLead(lead));
+  if (dealerLeadFilter === "seller") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && !isBuyerLead(lead));
+  if (dealerLeadFilter === "waiting-reply") filtered = leads.filter(isDealerWaitingReply);
+  if (dealerLeadFilter === "vehicle-alerts") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && (lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market));
   if (dealerLeadFilter === "due") {
-    return leads.filter((lead) => !isDealerClosedLead(lead) && isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"));
+    filtered = leads.filter((lead) => !isDealerClosedLead(lead) && isDealerLeadDueNow(lead.next_follow_up_at || "", lead.status || "new"));
   }
-  return leads;
+  const query = dealerLeadSearch.trim();
+  if (!query) return filtered;
+  const terms = query.split(/\s+/).filter(Boolean);
+  return filtered.filter((lead) => {
+    const haystack = searchableDealerLeadText(lead);
+    return terms.every((term) => haystack.includes(term));
+  });
+}
+
+function searchableDealerLeadText(lead) {
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  const taskSummary = lead?.task_summary || {};
+  const activitySummary = lead?.activity_summary || {};
+  const vehicleContext = lead?.vehicle_context || {};
+  const purchase = input.buyerPlan || valuation.buyerPlan || {};
+  return [
+    lead?.id,
+    lead?.status,
+    lead?.priority,
+    lead?.assigned_to,
+    lead?.owner_review?.message,
+    lead?.vehicle_signal?.message,
+    taskSummary.latest_open_title,
+    taskSummary.latest_open_due_at,
+    activitySummary.latest_activity_by,
+    activitySummary.latest_activity_type,
+    vehicleContext.primary_inventory_status,
+    purchase.intent,
+    purchase.monthlyPayment,
+    input.name,
+    input.email,
+    input.phone,
+    input.ownerName,
+    input.ownerEmail,
+    input.ownerPhone,
+    input.submitterEmail,
+    input.dealerEmail,
+    input.submitterRelationship,
+    input.vin,
+    input.uvc,
+    input.year,
+    input.make,
+    input.model,
+    input.series,
+    input.style,
+    input.color,
+    input.region,
+    valuation.title,
+    valuation.vin,
+    valuation.uvc,
+    valuation.year,
+    valuation.make,
+    valuation.model,
+    valuation.series,
+    valuation.style,
+    dealerLeadSourceLabel(lead),
+    dealerLeadSourceDetailLabel(lead),
+    dealerLeadStatusLabel(lead?.status || "new", isBuyerLead(lead)),
+    dealerNextBestAction(lead)
+  ].filter(Boolean).join(" ").toLowerCase();
 }
 
 function isDealerQueueLead(lead) {

@@ -64,6 +64,10 @@
           </div>
         </div>
         <div class="lead-filter-shell">
+          <label class="admin-lead-search dealer-lead-search">
+            <span>Search Up Sheets</span>
+            <input id="dealer-lead-search" type="search" placeholder="Customer, vehicle, VIN, phone, email, staff, task..." autocomplete="off" />
+          </label>
           <div class="dealer-lead-filters" role="tablist" aria-label="Lead filters">
             <button type="button" data-dealer-filter="all">All</button>
             <button class="active" type="button" data-dealer-filter="active">Active</button>
@@ -94,6 +98,7 @@
           </details>
         </div>
         <div class="dealer-lead-toolbar">
+          <p id="dealer-search-help" class="dealer-search-help">Search works with the current filter, then urgent, due, and updated leads stay pinned first.</p>
           <label class="lead-sort-control">
             <span>Sort by time</span>
             <select id="dealer-lead-sort">
@@ -149,31 +154,31 @@
                 <span>Year</span>
                 <select class="drill-select" data-field="year"></select>
                 <input class="manual-input" data-field="year" inputmode="numeric" hidden />
-                <input name="year" type="hidden" value="2017" />
+                <input name="year" type="hidden" />
               </label>
               <label>
                 <span>Make</span>
                 <select class="drill-select" data-field="make"></select>
                 <input class="manual-input" data-field="make" hidden />
-                <input name="make" type="hidden" value="Honda" />
+                <input name="make" type="hidden" />
               </label>
               <label>
                 <span>Model</span>
                 <select class="drill-select" data-field="model"></select>
                 <input class="manual-input" data-field="model" hidden />
-                <input name="model" type="hidden" value="Odyssey" />
+                <input name="model" type="hidden" />
               </label>
               <label>
                 <span>Series</span>
                 <select class="drill-select" data-field="series"></select>
                 <input class="manual-input" data-field="series" hidden />
-                <input name="series" type="hidden" value="LX" />
+                <input name="series" type="hidden" />
               </label>
               <label>
                 <span>Style</span>
                 <select class="drill-select" data-field="style"></select>
                 <input class="manual-input" data-field="style" hidden />
-                <input name="style" type="hidden" value="4D Wagon" />
+                <input name="style" type="hidden" />
               </label>
               <button type="submit">Find</button>
             </form>
@@ -196,7 +201,7 @@
               </label>
               <label>
                 <span>VIN</span>
-                <input name="vin" value="2T2GGCEZ9RC032642" />
+                <input name="vin" placeholder="17-character VIN" />
               </label>
               <label>
                 <span>UVC</span>
@@ -209,7 +214,7 @@
               <input name="style" type="hidden" />
               <label>
                 <span>Kilometers</span>
-                <input name="kilometers" type="number" min="0" value="37000" required />
+                <input name="kilometers" type="number" min="0" placeholder="Current odometer" required />
               </label>
               <label>
                 <span>Color</span>
@@ -280,7 +285,7 @@
               <span>Enter a VIN, year, make or model</span>
               <div class="search-input-wrap">
                 <span class="search-icon" aria-hidden="true">⌕</span>
-                <input name="searchText" value="2017 Honda O" placeholder="2017 Honda Odyssey or VIN" autocomplete="off" />
+                <input name="searchText" placeholder="VIN, 2022 Toyota Camry, Audi Q5 Technik..." autocomplete="off" />
                 <button id="search-clear" class="search-clear" type="button" aria-label="Clear search">×</button>
               </div>
             </label>
