@@ -645,6 +645,10 @@ function initialize() {
     setEmailAuthMode(emailAuthSwitchButton.dataset.authMode || "signin");
   });
   emailAuthTabs.forEach((button) => button.addEventListener("click", () => setEmailAuthMode(button.dataset.authMode || "signin")));
+  emailAuthPassword.addEventListener("input", syncGeneratedPasswordFields);
+  emailAuthPassword.addEventListener("change", syncGeneratedPasswordFields);
+  emailAuthConfirm.addEventListener("input", syncGeneratedPasswordFields);
+  emailAuthConfirm.addEventListener("change", syncGeneratedPasswordFields);
   emailAuthForm.addEventListener("submit", handleEmailAuthSubmit);
   reloadHistoryButton.addEventListener("click", loadHistory);
   initializeCustomerAuth();
@@ -993,6 +997,7 @@ function setEmailAuthMode(mode) {
   emailAuthConfirm.required = isSignup || isUpdate;
   if (emailAuthTermsCheck) emailAuthTermsCheck.required = isSignup;
   emailAuthPassword.autocomplete = isSignup || isUpdate ? "new-password" : "current-password";
+  emailAuthConfirm.autocomplete = isSignup || isUpdate ? "new-password" : "off";
 
   const actionKey = isReset
     ? "emailResetAction"
@@ -1049,6 +1054,18 @@ function setEmailAuthBusy(isBusy) {
 
 function isUsablePassword(password) {
   return String(password || "").length >= 6;
+}
+
+function syncGeneratedPasswordFields(event) {
+  if (!["signup", "update"].includes(emailAuthMode)) return;
+  const source = event?.target;
+  if (source === emailAuthConfirm && emailAuthConfirm.value && emailAuthPassword.value !== emailAuthConfirm.value) {
+    emailAuthPassword.value = emailAuthConfirm.value;
+    return;
+  }
+  if (source === emailAuthPassword && emailAuthPassword.value && !emailAuthConfirm.value) {
+    emailAuthConfirm.value = emailAuthPassword.value;
+  }
 }
 
 function setCustomerSession(session) {
