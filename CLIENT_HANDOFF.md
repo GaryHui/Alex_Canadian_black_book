@@ -10,7 +10,7 @@ Use it when replacing:
 - Google Sheet, Google Drive folder, and Apps Script webhook
 - Domain / production URL
 - Admin and dealer staff emails
-- Optional Cloudflare Turnstile, Resend, CRM webhook, and Google Form integrations
+- Cloudflare Turnstile for production login protection, plus optional Resend, CRM webhook, and Google Form integrations
 
 Do not send secret values in chat or email. Store them in Vercel environment variables, Supabase, Google Cloud, or the client's password manager.
 
@@ -60,7 +60,7 @@ Supabase
 Google account / Google Workspace
 Google Cloud Console
 Canadian Black Book API account
-Optional Cloudflare account for Turnstile
+Cloudflare account for Turnstile login protection
 Optional Resend account for automatic email replies
 Optional CRM / Zapier / Make account
 ```
@@ -487,18 +487,18 @@ dealer_staff table = normal staff
 DEALER_EMAILS = emergency fallback only
 ```
 
-## 11. Optional Services
+## 11. Production Security And Optional Services
 
 ### Cloudflare Turnstile
 
-Use only if the client wants human verification before Google login.
+Recommended for every production site. It adds human verification before staff, manager, and customer login actions so bots cannot repeatedly trigger Google or email login flows.
 
 ```text
 TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET_KEY=
 ```
 
-Set both or neither. If only one is set, login verification can fail.
+Set both values in Vercel and redeploy. If only one is set, login verification can fail. For local testing or a temporary demo, the site can run without these values, but final production should enable them.
 
 ### Resend After-Hours Auto Reply
 
@@ -656,7 +656,7 @@ Business email:
 Business address:
 Google account that owns Drive/Sheet:
 Canadian Black Book API contact or credentials:
-Whether Turnstile is required:
+Turnstile login protection: required for production unless client explicitly accepts the risk
 Whether after-hours auto reply is required:
 Whether CRM webhook is required:
 ```

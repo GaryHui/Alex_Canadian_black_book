@@ -49,7 +49,7 @@ Supabase
 Google 账号或 Google Workspace
 Google Cloud Console
 Canadian Black Book API 账号
-Cloudflare 账号，可选，用于 Turnstile 人机验证
+Cloudflare 账号，用于正式上线登录真人验证 Turnstile
 Resend 账号，可选，用于非工作时间自动邮件回复
 CRM / Zapier / Make 账号，可选，用于对接外部 CRM
 ```
@@ -200,7 +200,7 @@ Apps Script 部署
 可以后补：
 
 ```text
-Cloudflare Turnstile：不需要人机验证时可以不做。
+Cloudflare Turnstile：临时测试可以不做，正式上线建议开启。
 Resend：不需要自动邮件回复时可以不做。
 CRM / Zapier / Make：客户还没有 CRM 时可以不做。
 正式域名：可以先用 Vercel 域名测试，之后再换客户域名。
@@ -664,18 +664,18 @@ DEALER_EMAILS = 紧急备用
 
 老板账号可以进老板台，也可以进员工台查看流程，但真正的员工列表最好用后台管理，不要长期依赖 `DEALER_EMAILS`。
 
-## 12. 可选服务设置
+## 12. 正式上线安全与可选服务设置
 
 ### Cloudflare Turnstile
 
-如果客户希望 Google 登录前先做人机验证，需要设置：
+正式上线建议开启。它会在员工、老板、客户登录动作前增加真人验证，减少机器人反复触发 Google 登录或邮箱登录。
 
 ```text
 TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET_KEY=
 ```
 
-两个要同时设置。只设一个容易导致登录失败。
+两个要同时设置在 Vercel，并重新部署。只设一个容易导致登录失败。临时测试环境可以不设置，但正式生产环境建议开启。
 
 ### Resend 非工作时间自动回复
 
@@ -831,7 +831,7 @@ SOP progress 和 Next action 显示合理。
 公司地址：
 用于 Google Sheet/Drive 的 Google 账号：
 Canadian Black Book API 账号或联系人：
-是否需要 Turnstile 人机验证：
+Turnstile 登录真人验证：正式上线默认需要，除非客户明确接受不开启的风险
 是否需要非工作时间自动回复：
 是否需要外部 CRM webhook：
 ```
