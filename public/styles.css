@@ -30,6 +30,10 @@ body.modal-open {
   overflow: hidden;
 }
 
+.dealer-auth-pending .shell {
+  visibility: hidden;
+}
+
 button,
 input,
 select {

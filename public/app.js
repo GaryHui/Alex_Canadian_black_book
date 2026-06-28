@@ -1396,6 +1396,7 @@ function leadCaptureStatusMessage(capture = {}, usedMock = false) {
 async function initializeAuth() {
   const config = await fetch("/api/config").then((res) => res.json()).catch(() => ({}));
   if (!config.supabaseUrl || !config.supabaseAnonKey || !window.supabase) {
+    document.body.classList.remove("dealer-auth-pending");
     authTitle.textContent = "Demo mode";
     authSubtitle.textContent = "Supabase Google login is not configured yet.";
     return;
@@ -1427,6 +1428,7 @@ async function setSession(session) {
   stopDealerAutoRefresh();
 
   if (session?.user) {
+    document.body.classList.remove("dealer-auth-pending");
     const email = session.user.email || "";
     if (dealerWorkbench) dealerWorkbench.hidden = false;
     authTitle.textContent = `Signed in as ${email}`;
