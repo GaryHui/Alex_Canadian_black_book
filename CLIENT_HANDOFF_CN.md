@@ -450,6 +450,7 @@ PUBLIC_SITE_URL 生产环境不能填 localhost。
 ANNUAL_VALUATION_LIMIT=3
 BLACKBOOK_TEMPLATE=12
 DEALER_EMAILS=
+SKIP_EMAIL_DOMAIN_CHECK=0
 
 TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET_KEY=
@@ -480,6 +481,7 @@ CRM_WEBHOOK_URL / CRM_WEBHOOK_TOKEN：对接外部 CRM、Make、Zapier。
 RESEND_API_KEY / RESEND_FROM_EMAIL / AUTO_REPLY_FROM_EMAIL：自动邮件回复。
 GOOGLE_FORM_*：旧的 Google Form 输出方式，现在主要推荐 LEAD_WEBHOOK_URL。
 PORT：本地开发用，Vercel 一般不用设置。
+SKIP_EMAIL_DOMAIN_CHECK=1：关闭买车/卖车公开提交的邮箱域名 DNS 检查。正式上线建议保持 0，除非客户的正常企业邮箱被误判。
 ```
 
 ## 7. 怎么查看当前 Vercel 设置过什么
@@ -676,6 +678,8 @@ TURNSTILE_SECRET_KEY=
 ```
 
 两个要同时设置在 Vercel，并重新部署。只设一个容易导致登录失败。临时测试环境可以不设置，但正式生产环境建议开启。
+
+买车询价和卖车提交也会使用 Turnstile、隐藏机器人陷阱字段、轻量频率限制和邮箱域名检查，通过后才会进入 CRM 车单。
 
 ### Resend 非工作时间自动回复
 

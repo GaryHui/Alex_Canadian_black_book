@@ -20,6 +20,14 @@
   display: none !important;
 }
 
+.lead-honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   color: var(--ink);

@@ -315,9 +315,13 @@ const contactDealerStatus = document.querySelector("#contact-dealer-status");
 const contactVehicleTitle = document.querySelector("#contact-vehicle-title");
 const contactVehicleContext = document.querySelector("#contact-vehicle-context");
 const contactFinanceSummary = document.querySelector("#contact-finance-summary");
+const buyerTurnstileWrap = document.querySelector("#buyer-turnstile-wrap");
+const buyerTurnstile = document.querySelector("#buyer-turnstile");
+const buyerTurnstileStatus = document.querySelector("#buyer-turnstile-status");
 const filterChipButtons = document.querySelectorAll("[data-filter-chip]");
 const clearFilterButton = document.querySelector("[data-clear-filters]");
 let currentContactVehicle = null;
+let buyerTurnstileGate = null;
 let selectedFinanceVehicle = null;
 let activePhotoVehicle = null;
 let activePhotoList = [];
@@ -1103,6 +1107,10 @@ async function submitDealerContact(event) {
     contactDealerStatus.textContent = text[language].contactNeedInfo;
     return;
   }
+  if (buyerTurnstileGate && !buyerTurnstileGate.canProceed()) {
+    contactDealerStatus.textContent = "Complete the human verification first.";
+    return;
+  }
   contactDealerStatus.textContent = text[language].contactSending;
   const vehicle = currentContactVehicle || inventory.find((item) => item.id === data.listingId) || {};
   const response = await fetch("/api/buyer-inquiries", {
@@ -1110,6 +1118,10 @@ async function submitDealerContact(event) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...data,
+      protection: {
+        turnstileToken: buyerTurnstileGate?.getToken?.() || "",
+        honeypot: data.companyWebsite || ""
+      },
       vehicle: buyerVehiclePayload(vehicle),
       finance: financeEstimatePayload(),
       purchase: purchaseIntentPayload(data)
@@ -1118,6 +1130,7 @@ async function submitDealerContact(event) {
   const result = await response.json().catch(() => ({}));
   contactDealerStatus.textContent = result.ok ? text[language].contactSent : (result.error || text[language].contactFailed);
   if (result.ok) {
+    buyerTurnstileGate?.reset?.();
     window.setTimeout(closeContactDealer, 1200);
   }
 }
@@ -1382,6 +1395,7 @@ document.addEventListener("keydown", (event) => {
 
 async function init() {
   setLanguage(language);
+  await initializeBuyerProtection();
   await loadInventory();
   populateInventoryFilters();
   applyUrlSearchParams();
@@ -1389,6 +1403,23 @@ async function init() {
   applyFilters();
   calculatePayment();
   updateSendEstimateButton();
+}
+
+async function initializeBuyerProtection() {
+  const config = await fetch("/api/config").then((res) => res.json()).catch(() => ({}));
+  buyerTurnstileGate = window.createTurnstileGate?.({
+    siteKey: config.turnstileSiteKey,
+    wrap: buyerTurnstileWrap,
+    container: buyerTurnstile,
+    button: contactDealerForm?.querySelector("button[type='submit']"),
+    statusEl: buyerTurnstileStatus,
+    waitingText: "Complete the human verification first.",
+    readyText: "Human verification ready.",
+    failedText: "Human verification failed. Please try again.",
+    action: "buyer_inquiry",
+    lazy: true,
+    deferServerVerification: true
+  }) || null;
 }
 
 init();

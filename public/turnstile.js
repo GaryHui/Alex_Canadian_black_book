@@ -28,11 +28,13 @@
     const action = String(options?.action || "login").trim();
     const language = String(options?.language || "en").trim();
     const lazy = Boolean(options?.lazy);
+    const deferServerVerification = Boolean(options?.deferServerVerification);
     const onVerified = typeof options?.onVerified === "function" ? options.onVerified : null;
     let verified = false;
     let initialized = false;
     let verifying = false;
     let widgetId = null;
+    let currentToken = "";
     const enabled = Boolean(siteKey && container);
 
     function setButtonState() {
@@ -46,6 +48,15 @@
     }
 
     async function verifyToken(token) {
+      currentToken = String(token || "").trim();
+      if (deferServerVerification) {
+        verified = Boolean(currentToken);
+        verifying = false;
+        setStatus(verified ? readyText : failedText);
+        setButtonState();
+        if (verified && onVerified) window.setTimeout(onVerified, 0);
+        return;
+      }
       verified = false;
       verifying = true;
       setButtonState();
@@ -87,11 +98,13 @@
           callback: verifyToken,
           "expired-callback": () => {
             verified = false;
+            currentToken = "";
             setButtonState();
             setStatus(waitingText);
           },
           "error-callback": () => {
             verified = false;
+            currentToken = "";
             setButtonState();
             setStatus(failedText);
           }
@@ -105,6 +118,7 @@
     function reset() {
       verified = false;
       verifying = false;
+      currentToken = "";
       setButtonState();
       setStatus(enabled ? waitingText : "");
       if (window.turnstile && widgetId !== null) window.turnstile.reset(widgetId);
@@ -120,9 +134,14 @@
     function hide() {
       verified = false;
       verifying = false;
+      currentToken = "";
       if (lazy && wrap) wrap.hidden = true;
       setStatus("");
       setButtonState();
+    }
+
+    function getToken() {
+      return enabled && verified ? currentToken : "";
     }
 
     if (lazy) {
@@ -131,6 +150,6 @@
     } else {
       void init();
     }
-    return { enabled, canProceed, hide, reset, start: init };
+    return { enabled, canProceed, getToken, hide, reset, start: init };
   };
 })();

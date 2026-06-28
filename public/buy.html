@@ -225,6 +225,10 @@
         </header>
         <form id="contact-dealer-form" class="contact-dealer-form">
           <input name="listingId" type="hidden" />
+          <label class="lead-honeypot" aria-hidden="true">
+            Company website
+            <input name="companyWebsite" tabindex="-1" autocomplete="off" />
+          </label>
           <section class="contact-vehicle-summary" aria-label="Selected vehicle">
             <p id="contact-vehicle-title" class="contact-vehicle-title"></p>
             <div id="contact-vehicle-context" class="contact-vehicle-context"></div>
@@ -286,6 +290,10 @@
             <span data-i18n="contactMessage">Message</span>
             <textarea name="message" rows="4"></textarea>
           </label>
+          <div class="turnstile-wrap" id="buyer-turnstile-wrap" hidden>
+            <div id="buyer-turnstile"></div>
+            <small id="buyer-turnstile-status" aria-live="polite"></small>
+          </div>
           <footer class="contact-form-footer">
             <p id="contact-dealer-status" class="status"></p>
             <button class="primary-button" type="submit" data-i18n="contactSubmit">Send message</button>
@@ -307,6 +315,7 @@
     </footer>
 
     <script src="/contact.js?v=dealership-maturity-20260628"></script>
+    <script src="/turnstile.js"></script>
     <script src="/buy.js?v=buyer-modal-lock-20260626"></script>
   </body>
 </html>

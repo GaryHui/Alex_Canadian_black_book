@@ -286,6 +286,7 @@ What they do:
 ANNUAL_VALUATION_LIMIT=3
 BLACKBOOK_TEMPLATE=12
 DEALER_EMAILS=
+SKIP_EMAIL_DOMAIN_CHECK=0
 
 TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET_KEY=
@@ -311,6 +312,7 @@ Notes:
 - Never put secrets into frontend JavaScript.
 - After changing Vercel variables, redeploy Vercel. Existing deployments do not automatically use new environment values.
 - `PORT` is mainly for local development. Vercel does not normally need it.
+- `SKIP_EMAIL_DOMAIN_CHECK=1` disables MX/A DNS checks for public buyer and seller lead emails. Keep it off in production unless a legitimate client email domain is being incorrectly rejected.
 
 ## 6. How To See Existing Vercel Variables
 
@@ -499,6 +501,8 @@ TURNSTILE_SECRET_KEY=
 ```
 
 Set both values in Vercel and redeploy. If only one is set, login verification can fail. For local testing or a temporary demo, the site can run without these values, but final production should enable them.
+
+Public buyer and seller submissions also use Turnstile, a hidden bot-trap field, light rate limits, and email domain checks before they can create CRM leads.
 
 ### Resend After-Hours Auto Reply
 

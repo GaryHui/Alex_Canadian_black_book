@@ -445,6 +445,14 @@
           </div>
 
           <div class="review-actions">
+            <label class="lead-honeypot" aria-hidden="true">
+              Company website
+              <input name="companyWebsite" tabindex="-1" autocomplete="off" />
+            </label>
+            <div class="turnstile-wrap" id="seller-submit-turnstile-wrap" hidden>
+              <div id="seller-submit-turnstile"></div>
+              <small id="seller-submit-turnstile-status" aria-live="polite"></small>
+            </div>
             <button class="ghost-button" type="button" data-review-back data-i18n="goBack">Go Back</button>
             <button id="generate-review" class="primary-button" type="submit" data-i18n="generateValuation">Get Value Range</button>
           </div>

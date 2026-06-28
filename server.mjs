@@ -1,4 +1,5 @@
 import http from "node:http";
+import dns from "node:dns/promises";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +25,18 @@ const API_PATH = process.env.BLACKBOOK_API_PATH || "/UsedCarWS/CanUsedAPI";
 const VALUATION_TEMPLATE = process.env.BLACKBOOK_TEMPLATE || "12";
 const LOG_FILE = path.join(__dirname, "server.log");
 const MAX_LEAD_PHOTOS = 20;
+const PUBLIC_LEAD_RATE_WINDOW_MS = 60 * 60 * 1000;
+const PUBLIC_LEAD_RATE_LIMIT = 8;
+const publicLeadRateBuckets = new Map();
+const DISPOSABLE_EMAIL_DOMAINS = new Set([
+  "10minutemail.com",
+  "guerrillamail.com",
+  "mailinator.com",
+  "tempmail.com",
+  "temp-mail.org",
+  "throwawaymail.com",
+  "yopmail.com"
+]);
 
 process.on("uncaughtException", (error) => {
   log(`uncaughtException: ${error.stack || error.message}`);
@@ -225,7 +238,10 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/api/buyer-inquiries") {
       if (req.method === "POST") {
-        const result = await createBuyerInquiry(await readJson(req));
+        const body = await readJson(req);
+        const protection = await protectPublicLeadSubmission(body, req, "buyer_inquiry");
+        if (!protection.ok) return sendJson(res, protection.status || 400, protection);
+        const result = await createBuyerInquiry(body);
         return sendJson(res, result.ok ? 200 : result.status || 400, result);
       }
       if (req.method === "GET") {
@@ -363,6 +379,10 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === "POST") {
         const body = await readJson(req);
+        if (!body.input?.createdByDealer) {
+          const protection = await protectPublicLeadSubmission(body, req, "seller_lead");
+          if (!protection.ok) return sendJson(res, protection.status || 400, protection);
+        }
         const result = await saveLead(body);
         return sendJson(res, 200, result);
       }
@@ -483,6 +503,128 @@ function readJson(req) {
       }
     });
   });
+}
+
+async function protectPublicLeadSubmission(body, req, leadType) {
+  const protection = body?.protection || {};
+  if (String(protection.honeypot || body.companyWebsite || body.website || "").trim()) {
+    return { ok: false, status: 400, error: "Submission could not be accepted." };
+  }
+
+  const contact = publicLeadContact(body, leadType);
+  if (contact.email) {
+    const emailCheck = await validateLeadEmail(contact.email);
+    if (!emailCheck.ok) return emailCheck;
+  }
+  if (looksLikeSpamText([body.message, body.input?.conditionNotes, body.input?.notes].join(" "))) {
+    return { ok: false, status: 400, error: "Submission could not be accepted." };
+  }
+
+  const rate = checkPublicLeadRateLimit(req, leadType, contact);
+  if (!rate.ok) return rate;
+
+  const turnstile = await verifyTurnstile({
+    token: protection.turnstileToken || body.turnstileToken || "",
+    action: leadType
+  }, req);
+  if (!turnstile.ok) {
+    return {
+      ok: false,
+      status: turnstile.status || 403,
+      error: turnstile.error || "Complete the human verification first."
+    };
+  }
+  return { ok: true };
+}
+
+function publicLeadContact(body, leadType) {
+  if (leadType === "buyer_inquiry") {
+    return {
+      email: normalizePublicEmail(body.email),
+      phone: normalizePublicPhone(body.phone),
+      vehicleKey: String(body.listingId || body.vehicle?.id || "").trim()
+    };
+  }
+  const input = body.input || {};
+  return {
+    email: normalizePublicEmail(input.email || input.ownerEmail || body.user?.email || ""),
+    phone: normalizePublicPhone(input.phone || input.ownerPhone || ""),
+    vehicleKey: cleanVin(input.vin) || [input.year, input.make, input.model].filter(Boolean).join("-").toLowerCase()
+  };
+}
+
+function checkPublicLeadRateLimit(req, leadType, contact) {
+  const now = Date.now();
+  for (const [key, bucket] of publicLeadRateBuckets) {
+    if (now - bucket.startedAt > PUBLIC_LEAD_RATE_WINDOW_MS) publicLeadRateBuckets.delete(key);
+  }
+  const keys = [
+    `${leadType}:ip:${requestIp(req)}`,
+    contact.email ? `${leadType}:email:${contact.email}` : "",
+    contact.phone ? `${leadType}:phone:${contact.phone}` : "",
+    contact.vehicleKey ? `${leadType}:vehicle:${contact.vehicleKey}` : ""
+  ].filter(Boolean);
+  for (const key of keys) {
+    const bucket = publicLeadRateBuckets.get(key) || { count: 0, startedAt: now };
+    if (now - bucket.startedAt > PUBLIC_LEAD_RATE_WINDOW_MS) {
+      bucket.count = 0;
+      bucket.startedAt = now;
+    }
+    bucket.count += 1;
+    publicLeadRateBuckets.set(key, bucket);
+    if (bucket.count > PUBLIC_LEAD_RATE_LIMIT) {
+      return { ok: false, status: 429, error: "Too many submissions. Please try again later." };
+    }
+  }
+  return { ok: true };
+}
+
+function requestIp(req) {
+  return String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown")
+    .split(",")[0]
+    .trim()
+    .toLowerCase();
+}
+
+function normalizePublicEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizePublicPhone(value) {
+  return String(value || "").replace(/[^\d+]/g, "").trim();
+}
+
+async function validateLeadEmail(email) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email)) {
+    return { ok: false, status: 400, error: "Please enter a valid email address." };
+  }
+  const domain = email.split("@").pop();
+  if (!domain || DISPOSABLE_EMAIL_DOMAINS.has(domain)) {
+    return { ok: false, status: 400, error: "Please use a real contact email." };
+  }
+  if (process.env.SKIP_EMAIL_DOMAIN_CHECK === "1") return { ok: true };
+  try {
+    const mx = await dns.resolveMx(domain);
+    if (Array.isArray(mx) && mx.length) return { ok: true };
+  } catch {}
+  try {
+    await dns.resolve4(domain);
+    return { ok: true };
+  } catch {}
+  try {
+    await dns.resolve6(domain);
+    return { ok: true };
+  } catch {}
+  return { ok: false, status: 400, error: "This email domain does not appear to receive email." };
+}
+
+function looksLikeSpamText(value) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  const links = text.match(/https?:\/\//gi) || [];
+  if (links.length > 2) return true;
+  if (text.length > 2500) return true;
+  return /\b(casino|crypto giveaway|loan guaranteed|seo backlinks)\b/i.test(text);
 }
 
 async function verifyTurnstile(body, req) {

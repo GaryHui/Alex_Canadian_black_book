@@ -51,6 +51,9 @@ const emailAuthStatus = document.querySelector("#email-auth-status");
 const customerTurnstileWrap = document.querySelector("#customer-turnstile-wrap");
 const customerTurnstile = document.querySelector("#customer-turnstile");
 const customerTurnstileStatus = document.querySelector("#customer-turnstile-status");
+const sellerSubmitTurnstileWrap = document.querySelector("#seller-submit-turnstile-wrap");
+const sellerSubmitTurnstile = document.querySelector("#seller-submit-turnstile");
+const sellerSubmitTurnstileStatus = document.querySelector("#seller-submit-turnstile-status");
 const quotaPanel = document.querySelector("#customer-quota");
 const quotaTitle = document.querySelector("#quota-title");
 const quotaSubtitle = document.querySelector("#quota-subtitle");
@@ -575,6 +578,7 @@ let usageState = null;
 let historyLeads = [];
 let siteUrl = window.location.origin;
 let customerTurnstileGate = null;
+let sellerSubmitTurnstileGate = null;
 let pendingHumanAction = null;
 let emailAuthMode = "signin";
 let makeRequestId = 0;
@@ -757,6 +761,19 @@ async function initializeCustomerAuth() {
 
   siteUrl = config.siteUrl || window.location.origin;
   customerTurnstileGate = null;
+  sellerSubmitTurnstileGate = window.createTurnstileGate?.({
+    siteKey: config.turnstileSiteKey,
+    wrap: sellerSubmitTurnstileWrap,
+    container: sellerSubmitTurnstile,
+    button: document.querySelector("#generate-review"),
+    statusEl: sellerSubmitTurnstileStatus,
+    waitingText: "Complete the human verification first.",
+    readyText: "Human verification ready.",
+    failedText: "Human verification failed. Please try again.",
+    action: "seller_lead",
+    lazy: true,
+    deferServerVerification: true
+  }) || null;
   if (customerTurnstileWrap) customerTurnstileWrap.hidden = true;
   supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: {
@@ -1621,12 +1638,19 @@ async function generateForVehicle(vehicle, baseInput) {
 
 async function captureLead(input, valuation) {
   try {
+    if (sellerSubmitTurnstileGate && !sellerSubmitTurnstileGate.canProceed()) {
+      return { ok: false, captured: false, error: "Complete the human verification first." };
+    }
     const response = await fetch("/api/leads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         input,
         valuation,
+        protection: {
+          turnstileToken: sellerSubmitTurnstileGate?.getToken?.() || "",
+          honeypot: input.companyWebsite || ""
+        },
         user: {
           id: authSession?.user?.id || "",
           email: authSession?.user?.email || input.email,
@@ -1634,7 +1658,9 @@ async function captureLead(input, valuation) {
         }
       })
     });
-    return response.json();
+    const result = await response.json();
+    if (result.ok || result.captured) sellerSubmitTurnstileGate?.reset?.();
+    return result;
   } catch (error) {
     console.warn(error);
     return { ok: false, captured: false };
