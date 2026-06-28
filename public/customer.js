@@ -127,6 +127,7 @@ const commonModels = {
 const text = {
   en: {
     brandName: "AutoSwitch Canada",
+    buyNav: "Buy",
     dealerLink: "Dealer portal",
     toolsLink: "Tools",
     eyebrow: "Canadian vehicle valuation",
@@ -345,6 +346,7 @@ const text = {
   },
   fr: {
     brandName: "AutoÉchange Canada",
+    buyNav: "Acheter",
     dealerLink: "Portail concessionnaire",
     toolsLink: "Outils",
     eyebrow: "Évaluation automobile canadienne",
