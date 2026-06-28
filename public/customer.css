@@ -101,6 +101,40 @@ button {
   text-underline-offset: 3px;
 }
 
+.site-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 28px clamp(18px, 5vw, 72px);
+  color: #43536a;
+  background: rgba(255, 255, 255, 0.86);
+  border-top: 1px solid rgba(217, 225, 236, 0.86);
+}
+
+.site-footer > div,
+.site-footer address {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  margin: 0;
+}
+
+.site-footer strong {
+  color: var(--ink);
+}
+
+.site-footer a {
+  color: var(--blue-dark);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.site-footer span {
+  line-height: 1.5;
+}
+
 .ghost-button,
 .primary-button,
 .secondary-button {
@@ -3538,6 +3572,17 @@ input::placeholder {
 
   .top-nav {
     gap: 8px;
+  }
+
+  .site-footer {
+    flex-direction: column;
+    padding: 24px 16px;
+  }
+
+  .site-footer > div,
+  .site-footer address {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .top-nav a {

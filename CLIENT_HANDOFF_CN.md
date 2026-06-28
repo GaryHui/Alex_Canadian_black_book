@@ -323,11 +323,17 @@ public/customer.css    .brand, .brand-mark
 
 ### 浏览器 Favicon 小图标
 
-目前项目还没有单独配置 favicon 文件。如果客户提供 favicon：
+目前临时浏览器图标使用：
+
+```text
+public/assets/home-hero-car.png
+```
+
+客户正式交付时，建议换成专门的 favicon：
 
 ```text
 1. 添加 public/assets/favicon.ico 或 public/assets/favicon.png。
-2. 在这些页面的 <head> 里加入：
+2. 在这些页面的 `<head>` 里把现有 favicon 路径改成：
    <link rel="icon" href="/assets/favicon.png" />
 3. 需要加的页面：
    public/home.html
@@ -402,6 +408,11 @@ LEAD_WEBHOOK_URL=
 ADMIN_EMAILS=
 OWNER_EMAIL=
 OWNER_CONTACT=
+
+PUBLIC_DEALER_NAME=
+PUBLIC_DEALER_PHONE=
+PUBLIC_DEALER_EMAIL=
+PUBLIC_DEALER_ADDRESS=
 ```
 
 变量解释：
@@ -420,6 +431,10 @@ OWNER_CONTACT=
 | `ADMIN_EMAILS` | 老板/管理员 Google 邮箱 | 客户提供 |
 | `OWNER_EMAIL` | 对外显示的老板联系邮箱 | 客户提供 |
 | `OWNER_CONTACT` | 用户估价次数用完时看到的联系说明 | 客户提供 |
+| `PUBLIC_DEALER_NAME` | 公开页面页脚显示的车行名称 | 客户提供 |
+| `PUBLIC_DEALER_PHONE` | 首页、买车页、卖车页显示的联系电话 | 客户提供 |
+| `PUBLIC_DEALER_EMAIL` | 首页、买车页、卖车页显示的联系邮箱 | 客户提供 |
+| `PUBLIC_DEALER_ADDRESS` | 首页、买车页、卖车页显示的车行地址 | 客户提供 |
 
 注意：
 
@@ -518,7 +533,7 @@ vehicle_listings
 listing_photos
 buyer_inquiries
 finance_estimates
-operations_settings
+dealer_settings
 ```
 
 如果后台显示库存表不存在、车单加载失败，先重新运行完整 `supabase.sql`，等一分钟后刷新页面。

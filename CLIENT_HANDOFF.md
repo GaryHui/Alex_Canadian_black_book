@@ -176,11 +176,17 @@ If the client wants a real logo image instead of the `HC` text mark:
 
 ### Browser Favicon
 
-There is no separate favicon file configured yet. If the client provides one:
+The current temporary favicon uses:
+
+```text
+public/assets/home-hero-car.png
+```
+
+For a final client brand, replace it with a dedicated favicon:
 
 ```text
 1. Add public/assets/favicon.ico or public/assets/favicon.png.
-2. Add this inside the <head> of public/home.html, public/buy.html, public/customer.html, public/login.html, public/admin.html, public/admin-vehicles.html, and public/index.html. `public/index.html` is the dealer workbench page:
+2. Update this line inside the `<head>` of public/home.html, public/buy.html, public/customer.html, public/login.html, public/admin.html, public/admin-vehicles.html, and public/index.html. `public/index.html` is the dealer workbench page:
    <link rel="icon" href="/assets/favicon.png" />
 3. Redeploy and hard-refresh the browser because favicons are heavily cached.
 ```
@@ -248,6 +254,11 @@ LEAD_WEBHOOK_URL=
 ADMIN_EMAILS=
 OWNER_EMAIL=
 OWNER_CONTACT=
+
+PUBLIC_DEALER_NAME=
+PUBLIC_DEALER_PHONE=
+PUBLIC_DEALER_EMAIL=
+PUBLIC_DEALER_ADDRESS=
 ```
 
 What they do:
@@ -266,6 +277,10 @@ What they do:
 | `ADMIN_EMAILS` | Comma-separated admin Google emails | Client/admin list |
 | `OWNER_EMAIL` | Owner contact email shown to users | Client |
 | `OWNER_CONTACT` | Contact message when valuation limit is reached | Client |
+| `PUBLIC_DEALER_NAME` | Public website dealer name in the contact footer | Client |
+| `PUBLIC_DEALER_PHONE` | Public phone number shown on home, buy, and sell pages | Client |
+| `PUBLIC_DEALER_EMAIL` | Public email shown on home, buy, and sell pages | Client |
+| `PUBLIC_DEALER_ADDRESS` | Public address shown on home, buy, and sell pages | Client |
 
 ### Optional But Supported
 
@@ -350,7 +365,7 @@ vehicle_listings
 listing_photos
 buyer_inquiries
 finance_estimates
-operations_settings
+dealer_settings
 ```
 
 If admin inventory or leads fail to load, rerun `supabase.sql`, wait one minute, then reload the admin page.

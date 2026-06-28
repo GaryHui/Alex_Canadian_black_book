@@ -94,6 +94,10 @@ const server = http.createServer(async (req, res) => {
       return sendFile(res, path.join(__dirname, "public", "turnstile.js"), "application/javascript; charset=utf-8");
     }
 
+    if (req.method === "GET" && url.pathname === "/contact.js") {
+      return sendFile(res, path.join(__dirname, "public", "contact.js"), "application/javascript; charset=utf-8");
+    }
+
     if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/assets/home-hero-car.png") {
       return sendFile(res, path.join(__dirname, "public", "assets", "home-hero-car.png"), "image/png");
     }
@@ -111,7 +115,13 @@ const server = http.createServer(async (req, res) => {
         supabaseUrl: process.env.SUPABASE_URL || "",
         supabaseAnonKey: process.env.SUPABASE_ANON_KEY || "",
         siteUrl: process.env.PUBLIC_SITE_URL || requestOrigin(req),
-        turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || ""
+        turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || "",
+        publicDealer: {
+          name: process.env.PUBLIC_DEALER_NAME || "AutoSwitch Canada",
+          phone: process.env.PUBLIC_DEALER_PHONE || "",
+          email: process.env.PUBLIC_DEALER_EMAIL || process.env.OWNER_EMAIL || "",
+          address: process.env.PUBLIC_DEALER_ADDRESS || ""
+        }
       });
     }
 
