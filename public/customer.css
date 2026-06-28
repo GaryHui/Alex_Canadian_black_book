@@ -381,6 +381,18 @@ h1 {
   height: auto;
 }
 
+.hero-car-image {
+  position: absolute;
+  right: -4%;
+  bottom: 6px;
+  left: -4%;
+  display: block;
+  width: min(112%, 720px);
+  max-width: none;
+  margin: auto;
+  object-fit: contain;
+}
+
 .valuation-card,
 .choice-section,
 .vehicle-review-section,
