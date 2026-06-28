@@ -99,6 +99,7 @@ function buildDemoResponse(input, raw) {
   }
 
   const values = extractValues(vehicle);
+  const chargeable = hasChargeableValuationValues(values);
   const title = vehicleTitle(vehicle, input.vin);
   const vin = cleanVin(input.vin) || vehicle?.vin;
   const kilometers = Number(input.kilometers || input.mileage || 0);
@@ -116,6 +117,8 @@ function buildDemoResponse(input, raw) {
     activeMarket: "wholesale",
     columns: ["xclean", "clean", "avg", "rough"],
     values,
+    chargeable,
+    noChargeReason: chargeable ? "" : "Canadian Black Book did not return usable market pricing for this vehicle, so this lookup will not use one of your annual valuations.",
     loanValue: findNumber(vehicle, ["loan_value", "finadv", "adjusted_finadv", "finance_advance_value"]),
     thresholds: vehicle?.kilometer_adjustments || null,
     choices: vehicles.length > 1 ? vehicles.map(vehicleChoice) : [],
@@ -191,6 +194,20 @@ function extractValues(vehicle = {}) {
     retail: extractMarket(vehicle, "retail"),
     tradeIn: extractMarket(vehicle, "trade")
   };
+}
+
+function hasChargeableValuationValues(values) {
+  return ["wholesale", "retail", "tradeIn"].some((market) => {
+    const marketData = values?.[market] || {};
+    return ["adjusted", "base"].some((rowKey) =>
+      Object.values(marketData[rowKey] || {}).some((value) => positiveNumber(value) !== null)
+    );
+  });
+}
+
+function positiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
 }
 
 function extractMarket(vehicle, market) {

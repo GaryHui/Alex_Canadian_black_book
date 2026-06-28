@@ -913,6 +913,7 @@ function buildDemoResponse(input, raw) {
   }
 
   const values = extractValues(vehicle);
+  const chargeable = hasChargeableValuationValues(values);
   const title = vehicleTitle(vehicle, input.vin);
   const vin = cleanVin(input.vin) || vehicle?.vin;
   const kilometers = Number(input.kilometers || input.mileage || 0);
@@ -930,6 +931,8 @@ function buildDemoResponse(input, raw) {
     activeMarket: "wholesale",
     columns: ["xclean", "clean", "avg", "rough"],
     values,
+    chargeable,
+    noChargeReason: chargeable ? "" : "Canadian Black Book did not return usable market pricing for this vehicle, so this lookup will not use one of your annual valuations.",
     loanValue: findNumber(vehicle, ["loan_value", "finadv", "adjusted_finadv", "finance_advance_value"]),
     thresholds: vehicle?.kilometer_adjustments || null,
     choices: vehicles.length > 1 ? vehicles.map(vehicleChoice) : [],
@@ -941,6 +944,7 @@ function buildDemoResponse(input, raw) {
 async function saveLead(body) {
   const rawInput = body.input || {};
   const uploadFiles = sanitizePhotoFiles(rawInput.photoFiles || []);
+  const noCharge = !rawInput.createdByDealer && !isChargeableValuation(body.valuation || {});
   const lead = {
     created_at: new Date().toISOString(),
     input: sanitizeLeadInput(rawInput),
@@ -969,7 +973,9 @@ async function saveLead(body) {
       key: process.env.SUPABASE_SERVICE_ROLE_KEY,
       leadId: savedLead.id,
       authorEmail: "system",
-      reason: "New lead received."
+      reason: noCharge
+        ? "New lead received, but CBB did not return usable market pricing. This lookup should not count against the customer's annual valuation allowance."
+        : "New lead received."
     });
     if (!isBuyerLead(savedLead)) {
       await notifyDuplicateSellerLead({
@@ -995,12 +1001,13 @@ async function saveLead(body) {
   const googleForm = await submitLeadToGoogleForm(savedLead);
   const crm = await submitLeadToCrm(savedLead, webhook);
 
-  if (saved.ok) return { ...saved, webhook, googleForm, crm };
+  if (saved.ok) return { ...saved, noCharge, webhook, googleForm, crm };
 
   if (webhook.submitted || googleForm.submitted || crm.submitted) {
     return {
       ok: true,
       captured: true,
+      noCharge,
       storage: webhook.submitted ? "webhook" : googleForm.submitted ? "google_form" : "crm",
       webhook,
       googleForm,
@@ -1012,6 +1019,7 @@ async function saveLead(body) {
   return {
     ok: true,
     captured: false,
+    noCharge,
     storage: "not_configured",
     webhook,
     googleForm,
@@ -1238,6 +1246,20 @@ function leadExportValues(lead) {
 function marketAverage(valuation, market) {
   const marketData = valuation?.values?.[market] || {};
   return positiveNumber(marketData.adjusted?.avg) ?? positiveNumber(marketData.base?.avg) ?? "";
+}
+
+function isChargeableValuation(valuation) {
+  if (valuation?.chargeable === false || valuation?.noCharge) return false;
+  return hasChargeableValuationValues(valuation?.values || {});
+}
+
+function hasChargeableValuationValues(values) {
+  return ["wholesale", "retail", "tradeIn"].some((market) => {
+    const marketData = values?.[market] || {};
+    return ["adjusted", "base"].some((rowKey) =>
+      Object.values(marketData[rowKey] || {}).some((value) => positiveNumber(value) !== null)
+    );
+  });
 }
 
 function marketRange(valuation, market) {
@@ -3670,7 +3692,7 @@ async function getUsedCount({ url, key, userId, email, year }) {
   const rows = await response.json().catch(() => []);
   if (!response.ok) return { error: `Unable to load valuation usage (${response.status})` };
 
-  return { count: Array.isArray(rows) ? rows.filter((row) => !isBuyerInquiryLead(row)).length : 0 };
+  return { count: Array.isArray(rows) ? rows.filter(isChargeableUsageLead).length : 0 };
 }
 
 async function listUserLimits(year) {
@@ -3692,7 +3714,7 @@ async function listUserLimits(year) {
   const usersById = new Map();
 
   for (const lead of leadsResult.data || []) {
-    if (isBuyerInquiryLead(lead)) continue;
+    if (!isChargeableUsageLead(lead)) continue;
     const userId = lead.auth_user_id || lead.auth_email;
     if (!userId) continue;
     const current = usersById.get(userId) || { userId, email: lead.auth_email || "", used: 0 };
@@ -3751,6 +3773,12 @@ function isBuyerInquiryLead(lead) {
   const input = lead?.input || {};
   const valuation = lead?.valuation || {};
   return input.leadType === "buyer_inquiry" || valuation.source === "buyer_inquiry";
+}
+
+function isChargeableUsageLead(lead) {
+  if (isBuyerInquiryLead(lead)) return false;
+  if (lead?.valuation?.noCharge || lead?.valuation?.chargeable === false) return false;
+  return isChargeableValuation(lead?.valuation || {});
 }
 
 function mergeUsersByEmail(users) {
@@ -4130,6 +4158,9 @@ function sanitizeValuation(valuation) {
     region: valuation.region,
     country: valuation.country,
     values: valuation.values,
+    chargeable: valuation.chargeable,
+    noCharge: valuation.noCharge,
+    noChargeReason: valuation.noChargeReason,
     loanValue: valuation.loanValue,
     thresholds: valuation.thresholds,
     choices: valuation.choices || []

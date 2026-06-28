@@ -108,7 +108,7 @@ async function getUsedCount({ url, key, userId, email, year }) {
 
   const rowsById = new Map();
   for (const row of responses.flatMap((result) => result.rows)) {
-    if (isBuyerInquiryLead(row)) continue;
+    if (!isChargeableUsageLead(row)) continue;
     if (row?.id) rowsById.set(row.id, row);
   }
 
@@ -119,6 +119,26 @@ function isBuyerInquiryLead(lead) {
   const input = lead?.input || {};
   const valuation = lead?.valuation || {};
   return input.leadType === "buyer_inquiry" || valuation.source === "buyer_inquiry";
+}
+
+function isChargeableUsageLead(lead) {
+  if (isBuyerInquiryLead(lead)) return false;
+  if (lead?.valuation?.noCharge || lead?.valuation?.chargeable === false) return false;
+  return isChargeableValuation(lead?.valuation || {});
+}
+
+function isChargeableValuation(valuation) {
+  return ["wholesale", "retail", "tradeIn"].some((market) => {
+    const marketData = valuation?.values?.[market] || {};
+    return ["adjusted", "base"].some((rowKey) =>
+      Object.values(marketData[rowKey] || {}).some((value) => positiveNumber(value) !== null)
+    );
+  });
+}
+
+function positiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
 }
 
 function normalizeEmail(value) {

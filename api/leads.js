@@ -32,6 +32,7 @@ export default async function handler(req, res) {
     try {
       const rawInput = req.body?.input || {};
       const uploadFiles = sanitizePhotoFiles(rawInput.photoFiles || []);
+      const noCharge = !rawInput.createdByDealer && !isChargeableValuation(req.body?.valuation || {});
       const lead = {
         created_at: new Date().toISOString(),
         input: sanitizeLeadInput(rawInput),
@@ -60,12 +61,13 @@ export default async function handler(req, res) {
         warnings.push(...await runLeadPhotoNoteTask(savedLead.id, uploadFiles, webhook));
       }
       const crm = await submitLeadToCrm(savedLead, webhook);
-      if (saved.ok) return res.status(200).json({ ...saved, webhook, crm, warnings });
+      if (saved.ok) return res.status(200).json({ ...saved, noCharge, webhook, crm, warnings });
 
       if (webhook.submitted || crm.submitted) {
         return res.status(200).json({
           ok: true,
           captured: true,
+          noCharge,
           storage: webhook.submitted ? "webhook" : "crm",
           webhook,
           crm,
@@ -77,6 +79,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         captured: false,
+        noCharge,
         storage: "not_configured",
         webhook,
         crm,
@@ -295,6 +298,20 @@ function leadExportValues(lead) {
 function marketAverage(valuation, market) {
   const marketData = valuation?.values?.[market] || {};
   return positiveNumber(marketData.adjusted?.avg) ?? positiveNumber(marketData.base?.avg) ?? "";
+}
+
+function isChargeableValuation(valuation) {
+  if (valuation?.chargeable === false || valuation?.noCharge) return false;
+  return hasChargeableValuationValues(valuation?.values || {});
+}
+
+function hasChargeableValuationValues(values) {
+  return ["wholesale", "retail", "tradeIn"].some((market) => {
+    const marketData = values?.[market] || {};
+    return ["adjusted", "base"].some((rowKey) =>
+      Object.values(marketData[rowKey] || {}).some((value) => positiveNumber(value) !== null)
+    );
+  });
 }
 
 function marketRange(valuation, market) {
@@ -1326,6 +1343,9 @@ function sanitizeValuation(valuation) {
     region: valuation.region,
     country: valuation.country,
     values: valuation.values,
+    chargeable: valuation.chargeable,
+    noCharge: valuation.noCharge,
+    noChargeReason: valuation.noChargeReason,
     loanValue: valuation.loanValue,
     thresholds: valuation.thresholds,
     choices: valuation.choices || []

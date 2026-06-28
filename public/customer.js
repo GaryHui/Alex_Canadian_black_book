@@ -10,6 +10,7 @@ const blackbookOptions = document.querySelector("#blackbook-options");
 const resultSection = document.querySelector("#result-section");
 const resultTitle = document.querySelector("#result-title");
 const resultMeta = document.querySelector("#result-meta");
+const resultNoteEl = document.querySelector("[data-i18n='resultNote']");
 const wholesaleValue = document.querySelector("#wholesale-value");
 const retailValue = document.querySelector("#retail-value");
 const wholesaleAverage = document.querySelector("#wholesale-average");
@@ -177,6 +178,8 @@ const text = {
     averageLabel: "Average",
     avgFormula: "Average uses CBB adjusted.avg; if unavailable, base.avg.",
     resultNote: "This is an estimate. A dealer may adjust it after reviewing condition, options, and photos.",
+    noChargeValuationNote: "Canadian Black Book did not return usable market pricing for this vehicle. This usually means there is not enough data for this exact year, trim, mileage, or region. This lookup will not use one of your annual valuations.",
+    noChargeSaved: "No usable CBB price was returned, so this lookup was not counted against your annual valuations.",
     toolsEyebrow: "Useful tools",
     toolsTitle: "Plan the next step with confidence",
     toolsIntro: "These tools help visitors prepare for a trade-in conversation without overwhelming them.",
@@ -396,6 +399,8 @@ const text = {
     averageLabel: "Moyenne",
     avgFormula: "La moyenne utilise adjusted.avg de CBB; sinon base.avg.",
     resultNote: "Il s'agit d'une estimation. Un concessionnaire peut l'ajuster après examen de l'état, des options et des photos.",
+    noChargeValuationNote: "Canadian Black Book n'a pas retourné de prix de marché utilisable pour ce véhicule. Cela signifie généralement qu'il n'y a pas assez de données pour cette année, cette version, ce kilométrage ou cette région. Cette recherche ne comptera pas dans vos évaluations annuelles.",
+    noChargeSaved: "Aucun prix CBB utilisable n'a été retourné, donc cette recherche ne compte pas dans vos évaluations annuelles.",
     toolsEyebrow: "Outils utiles",
     toolsTitle: "Planifiez la prochaine étape avec confiance",
     toolsIntro: "Ces outils aident les visiteurs à préparer une discussion d'échange sans les submerger.",
@@ -1627,7 +1632,9 @@ async function generateForVehicle(vehicle, baseInput) {
   renderResult(valuation, payload);
   statusEl.textContent = t("saving");
   const capture = await captureLead(payload, valuation);
-  statusEl.textContent = capture?.captured || capture?.webhook?.submitted || capture?.googleForm?.submitted
+  statusEl.textContent = capture?.noCharge
+    ? t("noChargeSaved")
+    : capture?.captured || capture?.webhook?.submitted || capture?.googleForm?.submitted
     ? t("saved")
     : t("saveIssue");
   choiceSection.hidden = true;
@@ -1851,8 +1858,22 @@ function renderResult(valuation, input) {
   retailValue.textContent = moneyRangeOrDash(retail);
   if (wholesaleAverage) wholesaleAverage.textContent = `${t("averageLabel")}: ${moneyOrDash(wholesaleAvg)}`;
   if (retailAverage) retailAverage.textContent = `${t("averageLabel")}: ${moneyOrDash(retailAvg)}`;
+  if (resultNoteEl) {
+    resultNoteEl.textContent = hasChargeableValuation(valuation)
+      ? t("resultNote")
+      : valuation.noChargeReason || t("noChargeValuationNote");
+  }
   resultSection.hidden = false;
   resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function hasChargeableValuation(valuation) {
+  return ["wholesale", "retail", "tradeIn"].some((market) => {
+    const values = valuation?.values?.[market] || {};
+    return ["adjusted", "base"].some((rowKey) =>
+      Object.values(values[rowKey] || {}).some((value) => positiveNumber(value) !== null)
+    );
+  });
 }
 
 function marketAverage(valuation, market) {
