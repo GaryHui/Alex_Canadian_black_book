@@ -55,7 +55,6 @@ Mobile screenshots:
 4. Added Vercel-configurable public dealer contact fields:
    - `PUBLIC_DEALER_NAME`
    - `PUBLIC_DEALER_PHONE`
-   - `PUBLIC_DEALER_EMAIL`
    - `PUBLIC_DEALER_ADDRESS`
 5. Updated internal browser titles so staff/admin pages no longer look like a generic demo in the tab title.
 6. Updated handoff documentation with the new contact variables and corrected the settings table name to `dealer_settings`.
@@ -164,7 +163,7 @@ Home, buy, vehicle detail modal, and sell pages remain usable at mobile width. P
 These should be resolved before saying the client's production site is fully accepted:
 
 1. Run the latest `supabase.sql` in production Supabase and confirm `dealer_settings` exists.
-2. Fill public dealer contact variables in Vercel.
+2. Fill public dealer contact variables in Vercel. Public pages should keep CRM forms as the main buying/selling contact route instead of showing a bottom email link.
 3. Replace the temporary favicon with the client favicon/logo.
 4. Test a normal staff account, not only owner/manager access.
 5. Submit one test seller lead and confirm Sheet/Drive/PDF output.

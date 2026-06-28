@@ -411,7 +411,6 @@ OWNER_CONTACT=
 
 PUBLIC_DEALER_NAME=
 PUBLIC_DEALER_PHONE=
-PUBLIC_DEALER_EMAIL=
 PUBLIC_DEALER_ADDRESS=
 ```
 
@@ -433,7 +432,6 @@ PUBLIC_DEALER_ADDRESS=
 | `OWNER_CONTACT` | 用户估价次数用完时看到的联系说明 | 客户提供 |
 | `PUBLIC_DEALER_NAME` | 公开页面页脚显示的车行名称 | 客户提供 |
 | `PUBLIC_DEALER_PHONE` | 首页、买车页、卖车页显示的联系电话 | 客户提供 |
-| `PUBLIC_DEALER_EMAIL` | 首页、买车页、卖车页显示的联系邮箱 | 客户提供 |
 | `PUBLIC_DEALER_ADDRESS` | 首页、买车页、卖车页显示的车行地址 | 客户提供 |
 
 注意：

@@ -119,7 +119,6 @@ const server = http.createServer(async (req, res) => {
         publicDealer: {
           name: process.env.PUBLIC_DEALER_NAME || "AutoSwitch Canada",
           phone: process.env.PUBLIC_DEALER_PHONE || "",
-          email: process.env.PUBLIC_DEALER_EMAIL || process.env.OWNER_EMAIL || "",
           address: process.env.PUBLIC_DEALER_ADDRESS || ""
         }
       });

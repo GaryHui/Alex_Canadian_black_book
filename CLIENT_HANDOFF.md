@@ -257,7 +257,6 @@ OWNER_CONTACT=
 
 PUBLIC_DEALER_NAME=
 PUBLIC_DEALER_PHONE=
-PUBLIC_DEALER_EMAIL=
 PUBLIC_DEALER_ADDRESS=
 ```
 
@@ -279,7 +278,6 @@ What they do:
 | `OWNER_CONTACT` | Contact message when valuation limit is reached | Client |
 | `PUBLIC_DEALER_NAME` | Public website dealer name in the contact footer | Client |
 | `PUBLIC_DEALER_PHONE` | Public phone number shown on home, buy, and sell pages | Client |
-| `PUBLIC_DEALER_EMAIL` | Public email shown on home, buy, and sell pages | Client |
 | `PUBLIC_DEALER_ADDRESS` | Public address shown on home, buy, and sell pages | Client |
 
 ### Optional But Supported
