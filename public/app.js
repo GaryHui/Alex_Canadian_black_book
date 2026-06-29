@@ -1465,7 +1465,7 @@ async function setSession(session) {
     await loadDealerDirectory();
     loadUsage();
     loadHistory();
-    loadDealerLeads({ forceActivity: true, suppressAlerts: dealer.role !== "admin" });
+    loadDealerLeads({ forceActivity: true, suppressAlerts: true });
     loadDealerInventory();
     startDealerAutoRefresh();
   } else {
