@@ -101,6 +101,10 @@ const server = http.createServer(async (req, res) => {
       return sendFile(res, path.join(__dirname, "public", "buy.js"), "application/javascript; charset=utf-8");
     }
 
+    if (req.method === "GET" && url.pathname === "/staff-nav.js") {
+      return sendFile(res, path.join(__dirname, "public", "staff-nav.js"), "application/javascript; charset=utf-8");
+    }
+
     if (req.method === "GET" && url.pathname === "/login.js") {
       return sendFile(res, path.join(__dirname, "public", "login.js"), "application/javascript; charset=utf-8");
     }
