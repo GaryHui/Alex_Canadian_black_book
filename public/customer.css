@@ -823,6 +823,10 @@ h1 {
   gap: 8px;
 }
 
+.split-row {
+  grid-template-columns: minmax(0, 1fr) minmax(92px, 0.55fr) minmax(0, 1fr);
+}
+
 .mode-panel label:first-child {
   grid-column: 1 / -1;
 }

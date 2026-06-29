@@ -153,6 +153,7 @@ const text = {
     modelLabel: "Model",
     vinLabel: "VIN",
     postalLabel: "Postal code",
+    provinceLabel: "Province",
     odometerLabel: "Odometer",
     emailLabel: "Email",
     phoneLabel: "Phone (optional)",
@@ -374,6 +375,7 @@ const text = {
     modelLabel: "Modèle",
     vinLabel: "NIV",
     postalLabel: "Code postal",
+    provinceLabel: "Province",
     odometerLabel: "Odomètre",
     emailLabel: "Courriel",
     phoneLabel: "Téléphone (optionnel)",
@@ -1188,6 +1190,7 @@ function collectInput() {
   const input = Object.fromEntries(formData.entries());
   const vin = cleanVin(input.vin);
   const postalCode = String(input.postalCode || "").trim().toUpperCase();
+  const region = String(input.region || "").trim().toUpperCase() || provinceFromPostal(postalCode) || "BC";
   return {
     mode: input.mode,
     year: String(input.year || "").trim(),
@@ -1198,7 +1201,7 @@ function collectInput() {
     kilometers: normalizeKilometers(input.kilometers),
     email: authSession?.user?.email || String(input.email || "").trim(),
     phone: String(input.phone || "").trim(),
-    region: provinceFromPostal(postalCode),
+    region,
     country: "C",
     language: language === "fr" ? "fr" : "en",
     ownershipType: String(input.ownershipType || "").trim(),
