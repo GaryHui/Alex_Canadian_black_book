@@ -29,6 +29,7 @@ const customerAuthSubtitle = document.querySelector("#customer-auth-subtitle");
 const customerLoginButton = document.querySelector("#customer-login");
 const customerLogoutButton = document.querySelector("#customer-logout");
 const customerAuthActions = document.querySelector("#customer-auth-actions");
+const customerDashboardLink = document.querySelector("#customer-dashboard-link");
 const openCreateAccountButton = document.querySelector("#open-create-account");
 const openLoginButton = document.querySelector("#open-login");
 const emailAuthModal = document.querySelector("#email-auth-modal");
@@ -141,6 +142,8 @@ const text = {
   en: {
     brandName: "AutoSwitch Canada",
     buyNav: "Buy",
+    dashboardNav: "My dashboard",
+    dashboardButton: "View dashboard",
     dealerLink: "Dealer portal",
     toolsLink: "Tools",
     eyebrow: "Canadian vehicle valuation",
@@ -385,6 +388,8 @@ const text = {
   fr: {
     brandName: "AutoÉchange Canada",
     buyNav: "Acheter",
+    dashboardNav: "Mon tableau",
+    dashboardButton: "Voir le tableau",
     dealerLink: "Portail concessionnaire",
     toolsLink: "Outils",
     eyebrow: "Évaluation automobile canadienne",
@@ -1306,6 +1311,7 @@ function setCustomerSession(session) {
   customerLoginButton.hidden = Boolean(session?.user);
   customerLogoutButton.hidden = !session?.user;
   if (customerAuthActions) customerAuthActions.hidden = Boolean(session?.user && emailAuthMode !== "update");
+  if (customerDashboardLink) customerDashboardLink.hidden = true;
   if (customerTurnstileWrap && customerTurnstileGate?.enabled) {
     if (session?.user) customerTurnstileGate.hide();
     customerTurnstileWrap.hidden = true;
@@ -1326,6 +1332,7 @@ function setCustomerSession(session) {
       return;
     }
     customerAuthSubtitle.textContent = t("authReadyHelp");
+    if (customerDashboardLink) customerDashboardLink.hidden = false;
     setFormDisabled(false);
     void loadUsage();
     void loadHistory();

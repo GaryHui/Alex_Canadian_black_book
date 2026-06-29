@@ -443,6 +443,22 @@ h1 {
   width: 100%;
 }
 
+.customer-dashboard-link {
+  align-self: center;
+  justify-self: end;
+  min-height: 40px;
+  padding: 10px 14px;
+  color: #fff;
+  background: var(--blue-dark);
+  border-radius: 8px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.customer-dashboard-link:hover {
+  background: #132033;
+}
+
 .google-auth-button {
   min-width: 210px;
   min-height: 44px;
