@@ -2102,10 +2102,10 @@ function renderDealerLeads(leads, role) {
   const closedCount = queueLeads.length - activeCount;
   const sortLabel = dealerLeadSort === "oldest" ? "Oldest first" : "Newest first";
   const searchLabel = dealerLeadSearch ? ` Search: "${dealerLeadSearch}".` : "";
-  const stockNote = stockLeadCount ? ` ${stockLeadCount} stock vehicle${stockLeadCount === 1 ? "" : "s"} moved to Inventory Follow-up.` : "";
+  const stockNote = stockLeadCount ? ` ${stockLeadCount} Inventory Follow-up. ${queueLeads.length} Up Sheets + ${stockLeadCount} Inventory = ${leads.length} total records.` : "";
   const foldedCount = visibleLeads.length - groupedLeads.length;
   const foldedNote = foldedCount ? ` ${foldedCount} same-vehicle duplicate${foldedCount === 1 ? "" : "s"} folded into primary vehicle files.` : "";
-  dealerLeadsStatus.textContent = `${groupedLeads.length} vehicle file${groupedLeads.length === 1 ? "" : "s"} shown from ${visibleLeads.length} lead${visibleLeads.length === 1 ? "" : "s"}. ${activeCount} active / ${closedCount} closed assigned Up Sheet${queueLeads.length === 1 ? "" : "s"}.${foldedNote}${stockNote} Sort: ${sortLabel}, with urgent, overdue, and new pinned first.${searchLabel}`;
+  dealerLeadsStatus.textContent = `${groupedLeads.length} vehicle file${groupedLeads.length === 1 ? "" : "s"} shown from ${visibleLeads.length} lead${visibleLeads.length === 1 ? "" : "s"}. ${activeCount} active / ${closedCount} closed Up Sheets.${foldedNote}${stockNote} Sort: ${sortLabel}, with urgent, overdue, and new pinned first.${searchLabel}`;
   dealerLeadsList.innerHTML = renderDealerLeadGroups(groupedLeads, (lead, index) => {
     const input = lead.input || {};
     const valuation = lead.valuation || {};

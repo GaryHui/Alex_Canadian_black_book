@@ -1354,12 +1354,16 @@ function renderLeadWorkbench(leads, options = {}) {
   const sellerCount = leads.length - buyerCount;
   const activeCount = leads.filter((lead) => !isClosedLead(lead)).length;
   const closedCount = leads.length - activeCount;
+  const inventoryFollowUpCount = leads.filter(isAdminInventoryFollowUpLead).length;
+  const closedUpSheetCount = Math.max(0, closedCount - inventoryFollowUpCount);
+  const upSheetCount = leads.length - inventoryFollowUpCount;
   const searchLabel = adminLeadSearch.trim() ? ` Search: "${adminLeadSearch.trim()}".` : "";
   const sortLabel = adminLeadSort === "oldest" ? "Oldest first" : "Newest first";
   const duplicateLabel = collapsed.hiddenSellerDuplicates > 0
     ? ` ${collapsed.hiddenSellerDuplicates} duplicate SELL lead${collapsed.hiddenSellerDuplicates === 1 ? "" : "s"} collapsed into Vehicle clusters.`
     : "";
-  statusEl.textContent = `${collapsed.visible.length} shown. ${activeCount} active / ${closedCount} closed. ${buyerCount} BUY / ${sellerCount} SELL. Sort: ${sortLabel}, with urgent, overdue, and new pinned first.${duplicateLabel}${searchLabel}`;
+  const inventoryLabel = inventoryFollowUpCount ? ` ${inventoryFollowUpCount} Inventory Follow-up. ${upSheetCount} Up Sheets + ${inventoryFollowUpCount} Inventory = ${leads.length} total records.` : "";
+  statusEl.textContent = `${collapsed.visible.length} shown. ${activeCount} active / ${closedUpSheetCount} closed Up Sheets.${inventoryLabel} ${buyerCount} BUY / ${sellerCount} SELL total. Sort: ${sortLabel}, with urgent, overdue, and new pinned first.${duplicateLabel}${searchLabel}`;
   leadsEl.innerHTML = `${renderDuplicateVehicleBlocks(sorted)}${renderLeadGroups(collapsed.visible)}`;
   syncActiveAdminLeadCard();
   if (activeAdminDrawerLeadId) {
@@ -2283,8 +2287,17 @@ function isBuyerLead(lead) {
 }
 
 function isClosedLead(lead) {
-  if (!isBuyerLead(lead) && inventoryCache.some((item) => item.sourceLeadId && item.sourceLeadId === lead?.id)) return true;
+  if (isAdminInventoryFollowUpLead(lead)) return true;
   return ["won", "lost", "closed", "deleted", "in_inventory"].includes(String(lead?.status || "").toLowerCase());
+}
+
+function isAdminInventoryFollowUpLead(lead) {
+  if (isBuyerLead(lead)) return false;
+  const context = lead?.vehicle_context || {};
+  const inventoryStatus = String(context.primary_inventory_status || "").trim().toLowerCase();
+  if (inventoryStatus && !["removed", "deleted"].includes(inventoryStatus)) return true;
+  if (inventoryCache.some((item) => item.sourceLeadId && item.sourceLeadId === lead?.id)) return true;
+  return ["in_inventory", "inventory", "warehouse", "published", "sold", "archived"].includes(String(lead?.status || "").trim().toLowerCase());
 }
 
 function resolveVisibleAdminLeadId(id) {
