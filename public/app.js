@@ -1441,15 +1441,18 @@ async function setSession(session) {
     if (emailField) emailField.value = email;
     const dealer = await checkDealerAccess();
     if (!dealer.ok) {
-      authTitle.textContent = "Dealer access denied";
-      authSubtitle.textContent = dealer.error || `This Google account is not allowed: ${email}`;
+      authTitle.textContent = "Staff access required";
+      authSubtitle.textContent = "This workspace is for approved dealership staff and managers. Customers can track buying and selling follow-ups in My dashboard.";
       renderDealerAccessSummary(null);
       disableDealerTools(true);
       quotaPanel.hidden = true;
       historyPanel.hidden = true;
-    if (dealerLeadsList) dealerLeadsList.innerHTML = "";
-      if (dealerLeadsStatus) dealerLeadsStatus.textContent = dealer.error || "Dealer access denied.";
-      statusEl.textContent = "Ask the manager to add this email in Admin > Settings > Team access.";
+      if (dealerLeadsList) dealerLeadsList.innerHTML = "";
+      if (dealerLeadsStatus) dealerLeadsStatus.textContent = "Customer account signed in. Use My dashboard for your buying and selling follow-ups.";
+      statusEl.innerHTML = `
+        <a class="primary-button" href="/sell.html#history-panel">Open My dashboard</a>
+        <a class="secondary-button" href="/">Back to customer home</a>
+      `;
       setDealerAdminLinksVisible(false);
       return;
     }
