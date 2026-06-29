@@ -1670,6 +1670,25 @@ select {
   font-size: 13px;
 }
 
+.admin-actions a {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #17324d;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  min-height: 36px;
+  padding: 0 12px;
+  text-decoration: none;
+}
+
+.admin-actions a:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
 .admin-actions button {
   background: var(--red);
   border: 1px solid var(--red);
