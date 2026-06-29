@@ -35,6 +35,11 @@ const reloadDealerStockButton = document.querySelector("#reload-dealer-stock");
 const reloadDealerLeadsButton = document.querySelector("#reload-dealer-leads");
 const dealerLeadAlertsEl = document.querySelector("#dealer-lead-alerts");
 const dealerTodayWorkEl = document.querySelector("#dealer-today-work");
+const dealerPageTitle = document.querySelector("#dealer-page-title");
+const dealerPageSubtitle = document.querySelector("#dealer-page-subtitle");
+const dealerDashboardEyebrow = document.querySelector("#dealer-dashboard-eyebrow");
+const dealerDashboardTitle = document.querySelector("#dealer-dashboard-title");
+const dealerDashboardCopy = document.querySelector("#dealer-dashboard-copy");
 const dealerLeadFilterButtons = document.querySelectorAll("[data-dealer-filter]");
 const dealerLeadSortSelect = document.querySelector("#dealer-lead-sort");
 const dealerLeadSearchInput = document.querySelector("#dealer-lead-search");
@@ -1449,7 +1454,9 @@ async function setSession(session) {
       return;
     }
     dealerAdminAllowed = true;
+    dealerLeadRole = dealer.role || "dealer";
     setDealerAdminLinksVisible(dealer.role === "admin");
+    applyDealerWorkbenchRole(dealer.role);
     authSubtitle.textContent = dealer.role === "admin"
       ? "Manager access confirmed. You can open the admin backend for team, pricing, and inventory control."
       : "Staff access confirmed. Work assigned leads, stock follow-up, tasks, notes, and photo uploads here.";
@@ -1468,6 +1475,7 @@ async function setSession(session) {
       return;
     }
     setDealerAdminLinksVisible(false);
+    applyDealerWorkbenchRole("dealer");
     renderDealerAccessSummary(null);
     authTitle.textContent = "Login not configured";
     authSubtitle.textContent = "Add Supabase environment variables to enable Google login.";
@@ -1482,6 +1490,23 @@ async function setSession(session) {
     dealerInventoryCache = [];
     if (emailField) emailField.value = "";
     disableDealerTools(true);
+  }
+}
+
+function applyDealerWorkbenchRole(role) {
+  const isManager = role === "admin";
+  if (dealerPageTitle) dealerPageTitle.textContent = isManager ? "Manager workbench" : "Dealer workbench";
+  if (dealerPageSubtitle) {
+    dealerPageSubtitle.textContent = isManager
+      ? "Whole-store work, staff updates, approvals, and inventory follow-up"
+      : "Responsible leads, valuation, and quote history";
+  }
+  if (dealerDashboardEyebrow) dealerDashboardEyebrow.textContent = isManager ? "Manager workbench" : "Dealer workbench";
+  if (dealerDashboardTitle) dealerDashboardTitle.textContent = isManager ? "Manager dashboard" : "Dashboard";
+  if (dealerDashboardCopy) {
+    dealerDashboardCopy.textContent = isManager
+      ? "Start with unassigned leads, overdue work, staff updates, and manager approvals."
+      : "Review your totals, then jump into the right Up Sheets view for follow-up work.";
   }
 }
 
@@ -1620,7 +1645,7 @@ async function loadDealerLeads(options = {}) {
   if (!authSession?.access_token || !dealerWorkbench) return;
 
   dealerWorkbench.hidden = false;
-  dealerLeadsStatus.textContent = "Loading assigned leads...";
+  dealerLeadsStatus.textContent = dealerLeadRole === "admin" ? "Loading store leads..." : "Loading assigned leads...";
 
   try {
     const response = await fetch("/api/dealer-leads", {
@@ -1646,7 +1671,7 @@ async function loadDealerLeads(options = {}) {
 
 async function loadDealerInventory() {
   if (!authSession?.access_token || !dealerWorkbench || !dealerStockList) return;
-  if (dealerStockStatus) dealerStockStatus.textContent = "Loading assigned inventory...";
+  if (dealerStockStatus) dealerStockStatus.textContent = dealerLeadRole === "admin" ? "Loading store inventory..." : "Loading assigned inventory...";
   try {
     const response = await fetch("/api/dealer-inventory", {
       headers: {
@@ -1657,6 +1682,7 @@ async function loadDealerInventory() {
     if (!data.ok) throw new Error(data.error || "Unable to load assigned inventory");
     dealerInventoryCache = data.inventory || [];
     renderDealerInventory(dealerInventoryCache);
+    renderDealerTodayWork(dealerLeadsCache);
   } catch (error) {
     if (dealerStockStatus) dealerStockStatus.textContent = error.message || "Unable to load assigned inventory";
     dealerStockList.innerHTML = "";
@@ -2858,6 +2884,7 @@ function renderDealerCommunicationStrip(lead) {
 
 function renderDealerTodayWork(leads) {
   if (!dealerTodayWorkEl) return;
+  const isManager = dealerLeadRole === "admin";
   const queueLeads = leads.filter(isDealerQueueLead);
   const activeLeads = queueLeads.filter(isDealerActiveWorkLead);
   const updateCount = activeLeads.filter((lead) => dealerLeadAlertMap.has(String(lead.id || ""))).length;
@@ -2868,10 +2895,23 @@ function renderDealerTodayWork(leads) {
   const freshCount = activeLeads.filter((lead) => String(lead.status || "new").toLowerCase() === "new").length;
   const vehicleAlertCount = activeLeads.filter((lead) => lead.vehicle_signal?.message || lead.vehicle_context?.has_active_offer || lead.vehicle_context?.sold_elsewhere || lead.vehicle_context?.off_market).length;
   const noResponseCount = activeLeads.filter((lead) => isDealerNoResponseLead(lead)).length;
+  const currentUserEmail = String(authSession?.user?.email || "").trim().toLowerCase();
+  const myLeadCount = activeLeads.filter((lead) => dealerLeadAssignedTo(lead) === currentUserEmail).length;
+  const unassignedCount = activeLeads.filter((lead) => !String(lead.assignedTo || lead.assigned_to || "").trim()).length;
+  const reviewCount = activeLeads.filter((lead) => lead.owner_review?.unread || lead.ownerReview?.unread).length;
+  const overdueCount = activeLeads.filter((lead) => isDealerLeadOverdue(lead.next_follow_up_at || "", lead.status || "new")).length;
   const photoTaskCount = activeLeads.filter((lead) => dealerTaskText(lead).includes("photo") || dealerTaskText(lead).includes("picture")).length;
   const reconTaskCount = activeLeads.filter((lead) => dealerTaskText(lead).includes("recon") || dealerTaskText(lead).includes("repair") || dealerTaskText(lead).includes("keys") || dealerTaskText(lead).includes("documents")).length;
   const stockFollowUpCount = dealerInventoryCache.filter((item) => !["sold", "archived"].includes(String(item.status || "").toLowerCase())).length;
-  const focus = dealerWorkFocus([
+  const managerFocusItems = [
+    { count: unassignedCount, label: "Assign unowned leads", detail: "New Up Sheets need a responsible person before work starts.", filter: "unassigned" },
+    { count: reviewCount, label: "Review staff updates", detail: "Staff added price, photo, inspection, or status updates for manager approval.", filter: "updates" },
+    { count: overdueCount, label: "Clear overdue follow-ups", detail: "Follow-ups are past due and need manager attention.", filter: "due" },
+    { count: taskCount, label: "Check open tasks", detail: "See what the team has not completed yet.", filter: "open-tasks" },
+    { count: stockFollowUpCount, label: "Move inventory forward", detail: "Review recon, photo, publish, sold, or archive work.", filter: "active" },
+    { count: activeLeads.length, label: "Review whole-store queue", detail: "Scan every active lead and decide the next owner or checkpoint.", filter: "active" }
+  ];
+  const staffFocusItems = [
     { count: updateCount, label: "Review new lead updates", detail: "Start with leads changed by another team member.", filter: "updates" },
     { count: taskCount, label: "Work open tasks", detail: "Complete or update assigned tasks before adding new notes.", filter: "open-tasks" },
     { count: photoTaskCount, label: "Upload missing photos", detail: "Finish intake, damage, odometer, VIN, recon, or listing photos.", filter: "open-tasks" },
@@ -2880,13 +2920,14 @@ function renderDealerTodayWork(leads) {
     { count: waitingReplyCount, label: "Reply to waiting customers", detail: "Customers are waiting for a staff response.", filter: "waiting-reply" },
     { count: freshCount, label: "Start fresh leads", detail: "New leads need the first touch and next step.", filter: "fresh" },
     { count: activeLeads.length, label: "Keep the active queue moving", detail: "Open your queue and continue the next best lead.", filter: "active" }
-  ]);
+  ];
+  const focus = dealerWorkFocus(isManager ? managerFocusItems : staffFocusItems, isManager);
   dealerTodayWorkEl.hidden = false;
   dealerTodayWorkEl.innerHTML = `
-    ${renderDealerDashboardStats(queueLeads)}
+    ${renderDealerDashboardStats(queueLeads, isManager)}
     <section class="work-focus-panel dealer-work-focus" aria-label="Today focus">
       <div>
-        <span>Today focus</span>
+        <span>${isManager ? "Manager focus" : "Today focus"}</span>
         <strong>${escapeHtml(focus.label)}</strong>
         <small>${escapeHtml(focus.detail)}</small>
       </div>
@@ -2894,43 +2935,59 @@ function renderDealerTodayWork(leads) {
     </section>
     <section class="dealer-manager-brief" aria-label="Dealer brief">
       <button type="button" class="dealer-brief-card brief-card-hot" data-dealer-filter-shortcut="updates">
-        <span>Updates</span>
-        <strong>${updateCount}</strong>
-        <small>Lead changes to review</small>
+        <span>${isManager ? "Staff updates" : "Updates"}</span>
+        <strong>${isManager ? reviewCount || updateCount : updateCount}</strong>
+        <small>${isManager ? "Need manager review" : "Lead changes to review"}</small>
       </button>
       <button type="button" class="dealer-brief-card brief-card-hot" data-dealer-filter-shortcut="open-tasks">
         <span>Tasks</span>
         <strong>${taskCount}</strong>
-        <small>Assigned next actions</small>
+        <small>${isManager ? "Open team next actions" : "Assigned next actions"}</small>
       </button>
-      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="active">
-        <span>My queue</span>
-        <strong>${activeLeads.length}</strong>
-        <small>All assigned active work</small>
+      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="${isManager ? "unassigned" : "active"}">
+        <span>${isManager ? "Unassigned" : "My queue"}</span>
+        <strong>${isManager ? unassignedCount : activeLeads.length}</strong>
+        <small>${isManager ? "Need owner assignment" : "All assigned active work"}</small>
       </button>
+      ${isManager ? `
+        <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="my-leads">
+          <span>My leads</span>
+          <strong>${myLeadCount}</strong>
+          <small>Manager personally owns</small>
+        </button>
+      ` : ""}
       <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="waiting-reply">
         <span>Needs Reply</span>
         <strong>${waitingReplyCount}</strong>
         <small>Customer waiting</small>
       </button>
       <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="due">
-        <span>Due today</span>
-        <strong>${dueCount}</strong>
-        <small>Follow-up due or overdue</small>
+        <span>${isManager ? "Overdue / due" : "Due today"}</span>
+        <strong>${isManager ? overdueCount || dueCount : dueCount}</strong>
+        <small>${isManager ? "Manager should unblock" : "Follow-up due or overdue"}</small>
       </button>
       <a class="dealer-brief-card dealer-brief-link" href="#dealer-stock-section">
         <span>Inventory follow-up</span>
         <strong>${stockFollowUpCount}</strong>
-        <small>Published or warehouse stock to work</small>
+        <small>${isManager ? "Recon, publish, sold review" : "Published or warehouse stock to work"}</small>
       </a>
+      ${isManager ? `
+        <a class="dealer-brief-card dealer-brief-link" href="/admin.html">
+          <span>Admin backend</span>
+          <strong>Open</strong>
+          <small>Team, settings, price, publish</small>
+        </a>
+      ` : ""}
     </section>
   `;
 }
 
-function dealerWorkFocus(items) {
+function dealerWorkFocus(items, isManager = false) {
   return items.find((item) => Number(item.count || 0) > 0) || {
-    label: "No urgent work right now",
-    detail: "Your queue is clear. Reload later or create a valuation if a customer arrives.",
+    label: isManager ? "Store queue is under control" : "No urgent work right now",
+    detail: isManager
+      ? "No manager checkpoints are urgent. Review active leads or inventory when needed."
+      : "Your queue is clear. Reload later or create a valuation if a customer arrives.",
     filter: "active"
   };
 }
@@ -2944,14 +3001,23 @@ function dealerTaskText(lead) {
   ].filter(Boolean).join(" ").toLowerCase();
 }
 
-function renderDealerDashboardStats(leads) {
+function dealerLeadAssignedTo(lead) {
+  return String(lead?.assignedTo || lead?.assigned_to || "").trim().toLowerCase();
+}
+
+function renderDealerDashboardStats(leads, isManager = false) {
   const stats = buildDealerLeadDashboardStats(leads, dealerDashboardRange);
+  const scopeLabel = isManager ? "Store totals" : "My totals";
+  const scopeCopy = isManager
+    ? "Whole-store Up Sheet totals from current CRM data."
+    : "Real assigned Up Sheet totals from current CRM data.";
+  const queueLabel = isManager ? "Store queue" : "My queue";
   return `
     <section class="crm-dashboard-panel dealer-dashboard-panel" aria-label="Dealer account totals">
       <header class="crm-dashboard-hero">
         <div>
-          <span>My totals</span>
-          <h3>Real assigned Up Sheet totals from current CRM data.</h3>
+          <span>${escapeHtml(scopeLabel)}</span>
+          <h3>${escapeHtml(scopeCopy)}</h3>
         </div>
         <form class="crm-dashboard-range" data-dealer-dashboard-range>
           <label>
@@ -2984,7 +3050,7 @@ function renderDealerDashboardStats(leads) {
         <table class="crm-dashboard-table">
           <thead>
             <tr>
-              <th>My queue</th>
+              <th>${escapeHtml(queueLabel)}</th>
               ${stats.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}
             </tr>
           </thead>
@@ -3203,6 +3269,10 @@ function filterDealerLeads(leads) {
   if (dealerLeadFilter === "aging-critical") filtered = leads.filter(isDealerAgingCriticalLead);
   if (dealerLeadFilter === "priority") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && ["high", "urgent"].includes(String(lead.priority || "").toLowerCase()));
   if (dealerLeadFilter === "unassigned") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && !String(lead.assigned_to || "").trim());
+  if (dealerLeadFilter === "my-leads") {
+    const currentUserEmail = String(authSession?.user?.email || "").trim().toLowerCase();
+    filtered = leads.filter((lead) => !isDealerClosedLead(lead) && dealerLeadAssignedTo(lead) === currentUserEmail);
+  }
   if (dealerLeadFilter === "open-tasks") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && hasDealerOpenTask(lead));
   if (dealerLeadFilter === "updates") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && dealerLeadAlertMap.has(String(lead.id || "")));
   if (dealerLeadFilter === "buyer") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && isBuyerLead(lead));

@@ -13,10 +13,10 @@
       <header class="dealer-head">
         <div>
           <p class="eyebrow">Internal</p>
-          <h1>Dealer workbench</h1>
+          <h1 id="dealer-page-title">Dealer workbench</h1>
         </div>
         <div class="dealer-actions">
-          <span>Responsible leads, valuation, and quote history</span>
+          <span id="dealer-page-subtitle">Responsible leads, valuation, and quote history</span>
           <a href="/">Customer home</a>
           <a href="/admin.html" data-dealer-admin-link hidden>Admin backend</a>
         </div>
@@ -35,9 +35,9 @@
         <section id="dealer-today-section" class="history-panel dealer-leads-panel dealer-today-panel">
         <div class="history-head dealer-workbench-head">
           <div>
-            <p class="eyebrow">Dealer workbench</p>
-            <h1>Dashboard</h1>
-            <p>Review your totals, then jump into the right Up Sheets view for follow-up work.</p>
+            <p id="dealer-dashboard-eyebrow" class="eyebrow">Dealer workbench</p>
+            <h1 id="dealer-dashboard-title">Dashboard</h1>
+            <p id="dealer-dashboard-copy">Review your totals, then jump into the right Up Sheets view for follow-up work.</p>
           </div>
           <button id="reload-dealer-leads" type="button">Reload leads</button>
         </div>
@@ -72,6 +72,7 @@
           </label>
           <div class="dealer-lead-filters" role="tablist" aria-label="Lead filters">
             <button type="button" data-dealer-filter="all">All</button>
+            <button type="button" data-dealer-filter="my-leads">My Leads</button>
             <button class="active" type="button" data-dealer-filter="active">Active</button>
             <button type="button" data-dealer-filter="fresh">Fresh</button>
             <button type="button" data-dealer-filter="waiting-reply">Needs Reply</button>
@@ -109,7 +110,7 @@
             </select>
           </label>
         </div>
-        <p id="dealer-leads-status" class="status">Loading assigned leads...</p>
+        <p id="dealer-leads-status" class="status">Loading leads...</p>
         <div id="dealer-leads-list" class="history-list dealer-leads-list"></div>
         </section>
         <section id="dealer-stock-section" class="history-panel dealer-leads-panel dealer-stock-panel">
