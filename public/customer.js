@@ -628,6 +628,8 @@ function initialize() {
   });
   vinGuideClose.addEventListener("click", closeVinGuide);
   postalHelp.addEventListener("click", openModal);
+  form.elements.postalCode?.addEventListener("input", syncProvinceFromPostalCode);
+  form.elements.postalCode?.addEventListener("change", syncProvinceFromPostalCode);
   modal.querySelectorAll("[data-close-modal]").forEach((item) => item.addEventListener("click", closeModal));
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -1190,7 +1192,7 @@ function collectInput() {
   const input = Object.fromEntries(formData.entries());
   const vin = cleanVin(input.vin);
   const postalCode = String(input.postalCode || "").trim().toUpperCase();
-  const region = String(input.region || "").trim().toUpperCase() || provinceFromPostal(postalCode) || "BC";
+  const region = postalCode ? provinceFromPostal(postalCode) || "BC" : String(input.region || "BC").trim().toUpperCase();
   return {
     mode: input.mode,
     year: String(input.year || "").trim(),
@@ -1207,6 +1209,13 @@ function collectInput() {
     ownershipType: String(input.ownershipType || "").trim(),
     ownsVehicle: input.ownershipType === "Owned"
   };
+}
+
+function syncProvinceFromPostalCode() {
+  const postalCode = String(form.elements.postalCode?.value || "").trim().toUpperCase();
+  const regionSelect = form.elements.region;
+  if (!regionSelect) return;
+  regionSelect.value = postalCode ? provinceFromPostal(postalCode) || "BC" : "BC";
 }
 
 function validateInput(input) {
@@ -2028,7 +2037,7 @@ function provinceFromPostal(postalCode) {
     V: "BC",
     X: "NT",
     Y: "YT"
-  }[first] || "ON";
+  }[first] || "";
 }
 
 function regionName(code) {
