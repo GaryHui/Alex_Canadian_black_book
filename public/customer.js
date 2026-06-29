@@ -286,14 +286,14 @@ const text = {
     quotaUnavailable: "Unavailable",
     quotaSummary: "used of",
     quotaLeft: "left",
-    historyEyebrow: "My valuations",
-    historyTitle: "Quote history",
-    historyIntro: "Your saved valuations stay here so you and the dealer can review them later.",
+    historyEyebrow: "My follow-ups",
+    historyTitle: "Customer dashboard",
+    historyIntro: "Track your sell requests, buyer inquiries, next steps, and dealer follow-up in one place.",
     reloadHistory: "Reload",
-    historyLoading: "Loading quote history...",
-    historyEmpty: "No saved quotes yet. Generate a valuation and it will appear here.",
-    historySaved: "saved quote",
-    historyView: "View result",
+    historyLoading: "Loading your follow-ups...",
+    historyEmpty: "No follow-ups yet. Submit a sell valuation or ask about a vehicle and it will appear here.",
+    historySaved: "active follow-up",
+    historyView: "View estimate",
     historyDelete: "Delete",
     historyDeleting: "Deleting...",
     historyDeleted: "Quote deleted. Annual valuation allowance was not restored.",
@@ -530,14 +530,14 @@ const text = {
     quotaUnavailable: "Indisponible",
     quotaSummary: "utilisées sur",
     quotaLeft: "restantes",
-    historyEyebrow: "Mes évaluations",
-    historyTitle: "Historique des devis",
-    historyIntro: "Vos évaluations enregistrées restent ici pour révision avec le concessionnaire.",
+    historyEyebrow: "Mes suivis",
+    historyTitle: "Tableau de bord client",
+    historyIntro: "Suivez vos demandes de vente, demandes d'achat, prochaines étapes et suivis du concessionnaire.",
     reloadHistory: "Recharger",
-    historyLoading: "Chargement de l'historique...",
-    historyEmpty: "Aucun devis enregistré. Générez une évaluation et elle apparaîtra ici.",
-    historySaved: "devis enregistré",
-    historyView: "Voir le résultat",
+    historyLoading: "Chargement de vos suivis...",
+    historyEmpty: "Aucun suivi pour le moment. Envoyez une évaluation ou une demande d'achat et elle apparaîtra ici.",
+    historySaved: "suivi actif",
+    historyView: "Voir l'estimation",
     historyDelete: "Supprimer",
     historyDeleting: "Suppression...",
     historyDeleted: "Devis supprimé. La limite annuelle n'a pas été restaurée.",
@@ -2000,32 +2000,56 @@ function renderHistory(leads) {
   historyList.innerHTML = leads.map((lead, index) => {
     const input = lead.input || {};
     const valuation = lead.valuation || {};
-    const title = valuation.title || vehicleTitle(input) || "Vehicle valuation";
+    const buyerLead = isCustomerBuyerLead(lead);
+    const title = customerLeadTitle(lead);
+    const publicStage = customerPublicStage(lead);
+    const nextStep = customerNextStep(lead, publicStage);
+    const rep = customerRepLabel(lead);
     const wholesaleRange = marketRange(valuation, "wholesale");
     const retailRange = marketRange(valuation, "retail");
     const wholesaleAvg = marketAverage(valuation, "wholesale");
     const retailAvg = marketAverage(valuation, "retail");
+    const priceValue = Number(input.askingPrice || valuation.values?.retail?.adjusted?.avg || valuation.listing?.price || 0);
+    const finance = valuation.financeEstimate || input.financeEstimate || {};
+    const buyerPlan = valuation.buyerPlan || input.buyerPlan || {};
+    const canViewEstimate = !buyerLead;
 
     return `
-      <article class="history-card">
-        <div>
-          <strong>${escapeHtml(title)}</strong>
-          <time>${escapeHtml(formatDateTime(lead.created_at))}</time>
+      <article class="history-card customer-followup-card customer-followup-${buyerLead ? "buy" : "sell"}">
+        <div class="customer-followup-head">
+          <div>
+            <span class="customer-followup-type">${escapeHtml(buyerLead ? "BUY inquiry" : "SELL request")}</span>
+            <strong>${escapeHtml(title)}</strong>
+            <time>${escapeHtml(formatDateTime(lead.created_at))}</time>
+          </div>
+          <span class="customer-stage-pill">${escapeHtml(publicStage.label)}</span>
         </div>
-        <dl class="history-meta">
+        <div class="customer-followup-progress" aria-label="Follow-up progress">
+          ${customerProgressSteps(buyerLead).map((step) => `
+            <span class="${step.rank <= publicStage.rank ? "done" : ""}">${escapeHtml(step.label)}</span>
+          `).join("")}
+        </div>
+        <dl class="history-meta customer-followup-meta">
+          <div><dt>Current step</dt><dd>${escapeHtml(publicStage.label)}</dd></div>
+          <div><dt>Next step</dt><dd>${escapeHtml(nextStep)}</dd></div>
+          <div><dt>Dealer contact</dt><dd>${escapeHtml(rep)}</dd></div>
           <div><dt>VIN</dt><dd>${escapeHtml(valuation.vin || input.vin || "-")}</dd></div>
-          <div><dt>UVC</dt><dd>${escapeHtml(input.uvc || "-")}</dd></div>
           <div><dt>${escapeHtml(t("odometerLabel"))}</dt><dd>${input.kilometers ? formatNumber(input.kilometers) : "-"}</dd></div>
           <div><dt>${escapeHtml(t("postalLabel"))}</dt><dd>${escapeHtml(valuation.region || input.region || "-")}</dd></div>
-          <div><dt>${escapeHtml(t("colorLabel"))}</dt><dd>${escapeHtml(input.color || "Not provided")}</dd></div>
-          <div><dt>Status</dt><dd>${escapeHtml(lead.status || "new")}</dd></div>
         </dl>
-        <div class="history-values">
-          <span><b>${escapeHtml(t("dealerPurchaseRange"))}</b>${escapeHtml(moneyRangeOrDash(wholesaleRange))}<small>${escapeHtml(t("averageLabel"))}: ${escapeHtml(moneyOrDash(wholesaleAvg))}</small></span>
-          <span><b>${escapeHtml(t("privateSaleRange"))}</b>${escapeHtml(moneyRangeOrDash(retailRange))}<small>${escapeHtml(t("averageLabel"))}: ${escapeHtml(moneyOrDash(retailAvg))}</small></span>
-        </div>
+        ${buyerLead ? `
+          <div class="history-values customer-followup-values">
+            <span><b>Vehicle price</b>${escapeHtml(priceValue ? money(priceValue) : "Dealer will confirm")}<small>${escapeHtml(buyerPlan.buyingTimeline ? `Timeline: ${buyerPlan.buyingTimeline}` : "Availability and terms will be confirmed by the dealer.")}</small></span>
+            <span><b>Purchase plan</b>${escapeHtml(customerPurchasePlanLabel(buyerPlan, finance))}<small>${escapeHtml(input.preferredContact ? `Preferred contact: ${input.preferredContact}` : "A specialist will follow up.")}</small></span>
+          </div>
+        ` : `
+          <div class="history-values customer-followup-values">
+            <span><b>${escapeHtml(t("dealerPurchaseRange"))}</b>${escapeHtml(moneyRangeOrDash(wholesaleRange))}<small>${escapeHtml(t("averageLabel"))}: ${escapeHtml(moneyOrDash(wholesaleAvg))}</small></span>
+            <span><b>${escapeHtml(t("privateSaleRange"))}</b>${escapeHtml(moneyRangeOrDash(retailRange))}<small>${escapeHtml(t("averageLabel"))}: ${escapeHtml(moneyOrDash(retailAvg))}</small></span>
+          </div>
+        `}
         <div class="history-actions">
-          <button type="button" data-history-index="${index}">${escapeHtml(t("historyView"))}</button>
+          ${canViewEstimate ? `<button type="button" data-history-index="${index}">${escapeHtml(t("historyView"))}</button>` : ""}
           <button class="danger" type="button" data-delete-lead-id="${escapeHtml(lead.id || "")}">${escapeHtml(t("historyDelete"))}</button>
         </div>
       </article>
@@ -2039,6 +2063,101 @@ function renderHistory(leads) {
   historyList.querySelectorAll("[data-delete-lead-id]").forEach((button) => {
     button.addEventListener("click", () => deleteHistoryLead(button));
   });
+}
+
+function isCustomerBuyerLead(lead) {
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  return input.leadType === "buyer_inquiry" || valuation.source === "buyer_inquiry";
+}
+
+function customerLeadTitle(lead) {
+  const input = lead?.input || {};
+  const valuation = lead?.valuation || {};
+  if (isCustomerBuyerLead(lead)) {
+    return String(valuation.title || "").replace(/^Buyer inquiry\s*-\s*/i, "") || vehicleTitle(input) || "Vehicle inquiry";
+  }
+  return valuation.title || vehicleTitle(input) || "Vehicle valuation";
+}
+
+function customerPublicStage(lead) {
+  const buyerLead = isCustomerBuyerLead(lead);
+  const status = String(lead?.status || "new").toLowerCase();
+  const hasRep = Boolean(String(lead?.assigned_to || lead?.assignedTo || "").trim());
+  if (buyerLead) {
+    if (["won", "sold", "delivered"].includes(status)) return { label: "Delivery / completed", rank: 6 };
+    if (["finance_sent", "offer_sent"].includes(status)) return { label: "Finance / offer", rank: 5 };
+    if (["appointment", "test_drive", "viewing"].includes(status)) return { label: "Viewing / test drive", rank: 4 };
+    if (["contacted", "working", "follow_up"].includes(status)) return { label: "Dealer contacted", rank: 3 };
+    if (hasRep || ["assigned"].includes(status)) return { label: "Assigned to specialist", rank: 2 };
+    if (["lost", "failed", "closed"].includes(status)) return { label: "Closed", rank: 6 };
+    return { label: "Inquiry received", rank: 1 };
+  }
+  if (["sold", "delivered", "closed"].includes(status)) return { label: "Sold / completed", rank: 7 };
+  if (["published", "listed"].includes(status)) return { label: "Listed for sale", rank: 6 };
+  if (["in_inventory", "inventory", "warehouse"].includes(status)) return { label: "Intake / reconditioning", rank: 5 };
+  if (["won", "offer_accepted"].includes(status)) return { label: "Purchase / consignment confirmed", rank: 4 };
+  if (["offer_sent", "quoted"].includes(status)) return { label: "Offer / quote sent", rank: 4 };
+  if (["inspection", "appointment", "viewing"].includes(status)) return { label: "Inspection scheduled", rank: 3 };
+  if (["contacted", "working", "follow_up"].includes(status)) return { label: "Dealer contacted", rank: 2 };
+  if (hasRep || ["assigned"].includes(status)) return { label: "Assigned to specialist", rank: 2 };
+  if (["lost", "failed"].includes(status)) return { label: "Closed", rank: 7 };
+  return { label: "Request received", rank: 1 };
+}
+
+function customerNextStep(lead, stage) {
+  const buyerLead = isCustomerBuyerLead(lead);
+  const followUp = lead?.next_follow_up_at ? formatDateTime(lead.next_follow_up_at) : "";
+  if (followUp) return `Dealer follow-up scheduled for ${followUp}.`;
+  if (buyerLead) {
+    if (stage.rank <= 1) return "A specialist will confirm availability and contact you.";
+    if (stage.rank === 2) return "Your specialist will reach out with availability and appointment options.";
+    if (stage.rank === 3) return "Confirm viewing, test drive, finance, or offer details.";
+    if (stage.rank === 4) return "Attend the viewing or confirm your buying plan.";
+    if (stage.rank === 5) return "Review finance, payment, trade, and final offer details.";
+    return "Dealer will confirm final paperwork and delivery details.";
+  }
+  if (stage.rank <= 1) return "A specialist will review your vehicle details and contact you.";
+  if (stage.rank === 2) return "Confirm appointment time, photos, VIN, ownership, and vehicle condition.";
+  if (stage.rank === 3) return "Complete the inspection or upload requested vehicle photos.";
+  if (stage.rank === 4) return "Review the offer, purchase, or consignment terms with the dealer.";
+  if (stage.rank === 5) return "Dealer prepares intake, repairs, photos, and listing readiness.";
+  if (stage.rank === 6) return "Dealer monitors buyer interest and sale progress.";
+  return "Dealer will confirm closing, payment, and handoff details.";
+}
+
+function customerRepLabel(lead) {
+  const rep = String(lead?.assigned_to || lead?.assignedTo || "").trim();
+  return rep ? rep : "Dealer team";
+}
+
+function customerProgressSteps(buyerLead) {
+  return buyerLead
+    ? [
+      { label: "Received", rank: 1 },
+      { label: "Assigned", rank: 2 },
+      { label: "Contacted", rank: 3 },
+      { label: "Viewing", rank: 4 },
+      { label: "Offer", rank: 5 },
+      { label: "Delivery", rank: 6 }
+    ]
+    : [
+      { label: "Received", rank: 1 },
+      { label: "Contacted", rank: 2 },
+      { label: "Inspection", rank: 3 },
+      { label: "Offer", rank: 4 },
+      { label: "Intake", rank: 5 },
+      { label: "Listed", rank: 6 },
+      { label: "Closed", rank: 7 }
+    ];
+}
+
+function customerPurchasePlanLabel(plan = {}, finance = {}) {
+  const intent = String(plan.intent || "").trim();
+  if (intent === "cash") return "Cash purchase";
+  if (intent === "lease") return "Lease discussion";
+  if (intent === "finance") return finance.monthlyPayment ? `Finance around ${money(finance.monthlyPayment)} / mo` : "Finance discussion";
+  return "Buying options open";
 }
 
 async function deleteHistoryLead(button) {

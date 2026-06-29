@@ -35,6 +35,7 @@ const text = {
   en: {
     brandName: "AutoSwitch Canada",
     sellNav: "Sell",
+    dashboardNav: "My dashboard",
     dealerNav: "Dealer portal",
     eyebrow: "Available vehicles",
     headline: "Find your next vehicle",
@@ -155,6 +156,7 @@ const text = {
   fr: {
     brandName: "AutoSwitch Canada",
     sellNav: "Vendre",
+    dashboardNav: "Mon tableau",
     dealerNav: "Portail concessionnaire",
     eyebrow: "Vehicules disponibles",
     headline: "Trouvez votre prochain vehicule",
