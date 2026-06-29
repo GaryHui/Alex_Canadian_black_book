@@ -582,7 +582,9 @@ Authentication > URL Configuration
 Site URL: https://客户正式域名
 Redirect URLs:
 https://客户正式域名
+https://客户正式域名/sell.html
 http://localhost:3000
+http://localhost:3000/sell.html
 ```
 
 常见错误：

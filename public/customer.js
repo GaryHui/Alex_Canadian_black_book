@@ -883,7 +883,7 @@ async function startGoogleSignIn() {
   await supabaseClient.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${siteUrl}/`
+      redirectTo: sellerAuthRedirectUrl()
     }
   });
 }
@@ -975,7 +975,7 @@ async function signUpWithEmail(email, password) {
     email,
     password,
     options: {
-      emailRedirectTo: `${siteUrl}/`
+      emailRedirectTo: sellerAuthRedirectUrl()
     }
   });
   setEmailAuthBusy(false);
@@ -995,7 +995,7 @@ async function sendPasswordReset(email) {
   setEmailAuthBusy(true);
   setEmailAuthStatus("");
   const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-    redirectTo: `${siteUrl}/?reset_password=1`
+    redirectTo: sellerAuthRedirectUrl("?reset_password=1")
   });
   setEmailAuthBusy(false);
   if (error) {
@@ -1153,6 +1153,11 @@ function setEmailAuthMode(mode) {
 
 function setEmailAuthStatus(message) {
   if (emailAuthStatus) emailAuthStatus.textContent = message || "";
+}
+
+function sellerAuthRedirectUrl(suffix = "") {
+  const base = String(siteUrl || window.location.origin).replace(/\/$/, "");
+  return `${base}/sell.html${suffix}`;
 }
 
 function setEmailAuthBusy(isBusy) {

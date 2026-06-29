@@ -49,6 +49,8 @@ const homeText = {
   }
 };
 
+redirectSellerAuthLink();
+
 let homeLanguage = localStorage.getItem("customer-language") || "en";
 const languageToggle = document.querySelector("#language-toggle");
 const homeLogoutButton = document.querySelector("#home-logout");
@@ -97,3 +99,10 @@ homeLogoutButton?.addEventListener("click", async () => {
 languageToggle?.addEventListener("click", () => setHomeLanguage(homeLanguage === "en" ? "fr" : "en"));
 setHomeLanguage(homeLanguage);
 initializeHomeAuth();
+
+function redirectSellerAuthLink() {
+  const hasAuthCode = window.location.search.includes("code=");
+  const hasAuthToken = window.location.hash.includes("access_token");
+  if (!hasAuthCode && !hasAuthToken) return;
+  window.location.replace(`/sell.html${window.location.search}${window.location.hash}`);
+}

@@ -410,7 +410,9 @@ Authentication > URL Configuration
 Site URL: https://CLIENT_DOMAIN_OR_VERCEL_URL
 Redirect URLs:
 https://CLIENT_DOMAIN_OR_VERCEL_URL
+https://CLIENT_DOMAIN_OR_VERCEL_URL/sell.html
 http://localhost:3000
+http://localhost:3000/sell.html
 ```
 
 Common mistake:
