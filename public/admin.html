@@ -172,6 +172,87 @@
               <textarea name="body" rows="7" placeholder="Use {{name}}, {{vehicle}}, and {{leadType}} as placeholders."></textarea>
             </label>
           </fieldset>
+          <fieldset class="auto-reply-settings finance-lease-settings">
+            <legend>Finance and lease calculator</legend>
+            <div class="settings-two-col">
+              <label class="checkbox-row">
+                <input name="financeEnabled" type="checkbox" />
+                <span>Show finance option</span>
+              </label>
+              <label class="checkbox-row">
+                <input name="leaseEnabled" type="checkbox" />
+                <span>Show lease option</span>
+              </label>
+            </div>
+            <label>
+              <span>Default payment type</span>
+              <select name="defaultPaymentMode">
+                <option value="finance">Finance</option>
+                <option value="lease">Lease</option>
+              </select>
+            </label>
+            <div class="settings-two-col">
+              <label>
+                <span>Finance APR %</span>
+                <input name="financeAnnualRate" type="number" min="0" max="39.99" step="0.01" />
+              </label>
+              <label>
+                <span>Lease APR %</span>
+                <input name="leaseAnnualRate" type="number" min="0" max="39.99" step="0.01" />
+              </label>
+              <label>
+                <span>Tax rate %</span>
+                <input name="taxRate" type="number" min="0" max="30" step="0.01" />
+              </label>
+              <label>
+                <span>Default down %</span>
+                <input name="defaultDownPaymentPercent" type="number" min="0" max="100" step="0.01" />
+              </label>
+              <label>
+                <span>Minimum down payment</span>
+                <input name="minimumDownPayment" type="number" min="0" step="100" />
+              </label>
+              <label>
+                <span>Lease residual %</span>
+                <input name="leaseResidualPercent" type="number" min="0" max="100" step="0.01" />
+              </label>
+              <label>
+                <span>Default finance term</span>
+                <select name="defaultFinanceTerm">
+                  <option value="36">36 months</option>
+                  <option value="48">48 months</option>
+                  <option value="60">60 months</option>
+                  <option value="72">72 months</option>
+                  <option value="84">84 months</option>
+                </select>
+              </label>
+              <label>
+                <span>Default lease term</span>
+                <select name="defaultLeaseTerm">
+                  <option value="24">24 months</option>
+                  <option value="36">36 months</option>
+                  <option value="48">48 months</option>
+                  <option value="60">60 months</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              <span>Finance terms</span>
+              <input name="financeTerms" placeholder="36,48,60,72,84" />
+            </label>
+            <label>
+              <span>Lease terms</span>
+              <input name="leaseTerms" placeholder="24,36,48,60" />
+            </label>
+            <label>
+              <span>Annual lease km allowance</span>
+              <input name="annualMileageAllowance" type="number" min="0" step="1000" />
+            </label>
+            <label>
+              <span>Calculator disclaimer</span>
+              <textarea name="financeDisclaimer" rows="3"></textarea>
+            </label>
+          </fieldset>
           <div class="settings-actions">
             <button type="submit">Save operations settings</button>
             <span id="operations-settings-status" class="status">Loading operations settings...</span>

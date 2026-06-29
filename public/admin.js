@@ -359,6 +359,22 @@ function renderOperationsSettings(settings = {}) {
   operationsSettingsForm.elements.fromEmail.value = autoReply.fromEmail || "";
   operationsSettingsForm.elements.subject.value = autoReply.subject || "";
   operationsSettingsForm.elements.body.value = autoReply.body || "";
+  const financeLease = settings.financeLease || {};
+  operationsSettingsForm.elements.financeEnabled.checked = financeLease.financeEnabled !== false;
+  operationsSettingsForm.elements.leaseEnabled.checked = financeLease.leaseEnabled !== false;
+  operationsSettingsForm.elements.defaultPaymentMode.value = financeLease.defaultPaymentMode || "finance";
+  operationsSettingsForm.elements.financeAnnualRate.value = financeLease.financeAnnualRate ?? 7.99;
+  operationsSettingsForm.elements.leaseAnnualRate.value = financeLease.leaseAnnualRate ?? 7.99;
+  operationsSettingsForm.elements.taxRate.value = financeLease.taxRate ?? 12;
+  operationsSettingsForm.elements.defaultDownPaymentPercent.value = financeLease.defaultDownPaymentPercent ?? 10;
+  operationsSettingsForm.elements.minimumDownPayment.value = financeLease.minimumDownPayment ?? 2500;
+  operationsSettingsForm.elements.leaseResidualPercent.value = financeLease.leaseResidualPercent ?? 48;
+  operationsSettingsForm.elements.defaultFinanceTerm.value = financeLease.defaultFinanceTerm || 72;
+  operationsSettingsForm.elements.defaultLeaseTerm.value = financeLease.defaultLeaseTerm || 48;
+  operationsSettingsForm.elements.financeTerms.value = (financeLease.financeTerms || [36, 48, 60, 72, 84]).join(",");
+  operationsSettingsForm.elements.leaseTerms.value = (financeLease.leaseTerms || [24, 36, 48, 60]).join(",");
+  operationsSettingsForm.elements.annualMileageAllowance.value = financeLease.annualMileageAllowance ?? 16000;
+  operationsSettingsForm.elements.financeDisclaimer.value = financeLease.disclaimer || "Estimate only. Final approval, rate, term, taxes, fees, residual, and payment depend on the dealer and lender.";
 }
 
 async function saveOperationsSettings(event) {
@@ -395,6 +411,23 @@ function operationsSettingsPayload() {
       fromEmail: operationsSettingsForm.elements.fromEmail.value,
       subject: operationsSettingsForm.elements.subject.value,
       body: operationsSettingsForm.elements.body.value
+    },
+    financeLease: {
+      financeEnabled: Boolean(operationsSettingsForm.elements.financeEnabled.checked),
+      leaseEnabled: Boolean(operationsSettingsForm.elements.leaseEnabled.checked),
+      defaultPaymentMode: operationsSettingsForm.elements.defaultPaymentMode.value,
+      financeAnnualRate: operationsSettingsForm.elements.financeAnnualRate.value,
+      leaseAnnualRate: operationsSettingsForm.elements.leaseAnnualRate.value,
+      taxRate: operationsSettingsForm.elements.taxRate.value,
+      defaultDownPaymentPercent: operationsSettingsForm.elements.defaultDownPaymentPercent.value,
+      minimumDownPayment: operationsSettingsForm.elements.minimumDownPayment.value,
+      leaseResidualPercent: operationsSettingsForm.elements.leaseResidualPercent.value,
+      defaultFinanceTerm: operationsSettingsForm.elements.defaultFinanceTerm.value,
+      defaultLeaseTerm: operationsSettingsForm.elements.defaultLeaseTerm.value,
+      financeTerms: operationsSettingsForm.elements.financeTerms.value,
+      leaseTerms: operationsSettingsForm.elements.leaseTerms.value,
+      annualMileageAllowance: operationsSettingsForm.elements.annualMileageAllowance.value,
+      disclaimer: operationsSettingsForm.elements.financeDisclaimer.value
     }
   };
 }

@@ -333,6 +333,27 @@ let modalLockCount = 0;
 const INVENTORY_PAGE_SIZE = 3;
 let inventoryPageIndex = 0;
 let filterInputTimer = null;
+let financeSettings = defaultFinanceSettings();
+
+function defaultFinanceSettings() {
+  return {
+    financeEnabled: true,
+    leaseEnabled: true,
+    defaultPaymentMode: "finance",
+    financeAnnualRate: 7.99,
+    leaseAnnualRate: 7.99,
+    taxRate: 12,
+    defaultDownPaymentPercent: 10,
+    minimumDownPayment: 2500,
+    financeTerms: [36, 48, 60, 72, 84],
+    leaseTerms: [24, 36, 48, 60],
+    defaultFinanceTerm: 72,
+    defaultLeaseTerm: 48,
+    leaseResidualPercent: 48,
+    annualMileageAllowance: 16000,
+    disclaimer: "Estimate only. Final approval, rate, term, taxes, fees, residual, and payment depend on the dealer and lender."
+  };
+}
 
 function money(value) {
   return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -610,11 +631,11 @@ function calculatePayment() {
   const data = new FormData(financeForm);
   const price = Number(data.get("price") || 0);
   const downPayment = Number(data.get("downPayment") || 0);
-  const annualRate = Number(data.get("annualRate") || 0);
+  const mode = normalizedPaymentMode(String(data.get("paymentMode") || financeSettings.defaultPaymentMode || "finance"));
+  const annualRate = Number(data.get("annualRate") || activeAnnualRate(mode));
   const termMonths = Number(data.get("termMonths") || 72);
   const taxRate = Number(data.get("taxRate") || 0);
   const residualPercent = Number(data.get("residualPercent") || 48);
-  const mode = String(data.get("paymentMode") || "finance");
   if (price <= 0) {
     paymentOutput.textContent = text[language].paymentToConfirm;
     if (detailOrderPayment) detailOrderPayment.textContent = text[language].askDealerPayment;
@@ -663,16 +684,16 @@ function vehicleDeal(vehicle) {
     return {
       hasPrice: false,
       downPayment: 0,
-      termMonths: 72,
-      annualRate: 7.99,
-      taxRate: 12,
+      termMonths: financeSettings.defaultFinanceTerm,
+      annualRate: financeSettings.financeAnnualRate,
+      taxRate: financeSettings.taxRate,
       monthly: 0
     };
   }
-  const downPayment = Math.max(2500, Math.round(price * 0.1 / 500) * 500);
-  const termMonths = 72;
-  const annualRate = 7.99;
-  const taxRate = 12;
+  const downPayment = defaultDownPaymentForPrice(price);
+  const termMonths = financeSettings.defaultFinanceTerm;
+  const annualRate = financeSettings.financeAnnualRate;
+  const taxRate = financeSettings.taxRate;
   const monthly = Number(vehicle.monthlyPaymentEstimate || 0) || estimatedMonthlyPayment({ price, downPayment, annualRate, termMonths, taxRate });
   return {
     hasPrice,
@@ -682,6 +703,37 @@ function vehicleDeal(vehicle) {
     taxRate,
     monthly: Math.round(monthly)
   };
+}
+
+function defaultDownPaymentForPrice(price) {
+  const percentDown = Number(price || 0) * Number(financeSettings.defaultDownPaymentPercent || 0) / 100;
+  return Math.max(Number(financeSettings.minimumDownPayment || 0), Math.round(percentDown / 500) * 500);
+}
+
+function normalizedPaymentMode(value) {
+  const requested = value === "lease" ? "lease" : "finance";
+  if (requested === "lease" && financeSettings.leaseEnabled) return "lease";
+  if (requested === "finance" && financeSettings.financeEnabled) return "finance";
+  return financeSettings.financeEnabled ? "finance" : "lease";
+}
+
+function activeAnnualRate(mode) {
+  return mode === "lease" ? financeSettings.leaseAnnualRate : financeSettings.financeAnnualRate;
+}
+
+function financeTermsForMode(mode) {
+  return mode === "lease" ? financeSettings.leaseTerms : financeSettings.financeTerms;
+}
+
+function defaultTermForMode(mode) {
+  return mode === "lease" ? financeSettings.defaultLeaseTerm : financeSettings.defaultFinanceTerm;
+}
+
+function renderFinanceTermOptions(mode, selectedTerm) {
+  if (!financeForm?.elements.termMonths) return;
+  const terms = financeTermsForMode(mode);
+  financeForm.elements.termMonths.innerHTML = terms.map((term) => `<option value="${term}">${term} months</option>`).join("");
+  financeForm.elements.termMonths.value = String(terms.includes(Number(selectedTerm)) ? selectedTerm : defaultTermForMode(mode));
 }
 
 function vehicleSpecItems(vehicle) {
@@ -709,11 +761,18 @@ function selectVehicleForFinance(vehicle) {
   if (!vehicle || !financeForm) return;
   selectedFinanceVehicle = vehicle;
   const deal = vehicleDeal(vehicle);
+  const mode = normalizedPaymentMode(financeSettings.defaultPaymentMode);
+  const modeInput = financeForm.querySelector(`input[name="paymentMode"][value="${mode}"]`);
+  if (modeInput) modeInput.checked = true;
+  financeForm.querySelector('input[name="paymentMode"][value="finance"]')?.toggleAttribute("disabled", !financeSettings.financeEnabled);
+  financeForm.querySelector('input[name="paymentMode"][value="lease"]')?.toggleAttribute("disabled", !financeSettings.leaseEnabled);
+  renderFinanceTermOptions(mode, defaultTermForMode(mode));
   financeForm.elements.price.value = deal.hasPrice ? vehicle.price : "";
   financeForm.elements.downPayment.value = deal.downPayment;
-  financeForm.elements.termMonths.value = deal.termMonths;
-  financeForm.elements.annualRate.value = deal.annualRate;
-  financeForm.elements.taxRate.value = deal.taxRate;
+  financeForm.elements.termMonths.value = defaultTermForMode(mode);
+  financeForm.elements.annualRate.value = activeAnnualRate(mode);
+  financeForm.elements.taxRate.value = financeSettings.taxRate;
+  financeForm.elements.residualPercent.value = financeSettings.leaseResidualPercent;
   if (detailOrderTitle) detailOrderTitle.textContent = vehicle.title;
   if (detailOrderSubtitle) detailOrderSubtitle.textContent = [vehicle.series, vehicle.style].filter(Boolean).join(" | ");
   if (detailOrderFees) {
@@ -887,8 +946,46 @@ function setLanguage(nextLanguage) {
   populateInventoryFilters();
   updateInventoryIntro();
   updateInventorySourceStatus();
+  updateFinanceDisclaimer();
   renderInventory();
   updateSendEstimateButton();
+}
+
+async function loadFinanceSettings() {
+  try {
+    const response = await fetch("/api/public-finance-settings");
+    const data = await response.json();
+    if (data.ok && data.settings) financeSettings = { ...defaultFinanceSettings(), ...data.settings };
+  } catch {
+    financeSettings = defaultFinanceSettings();
+  }
+  applyFinanceSettingsToCalculator();
+}
+
+function applyFinanceSettingsToCalculator() {
+  if (!financeForm) return;
+  const mode = normalizedPaymentMode(financeSettings.defaultPaymentMode);
+  const financeInput = financeForm.querySelector('input[name="paymentMode"][value="finance"]');
+  const leaseInput = financeForm.querySelector('input[name="paymentMode"][value="lease"]');
+  if (financeInput) {
+    financeInput.disabled = !financeSettings.financeEnabled;
+    financeInput.checked = mode === "finance";
+  }
+  if (leaseInput) {
+    leaseInput.disabled = !financeSettings.leaseEnabled;
+    leaseInput.checked = mode === "lease";
+  }
+  renderFinanceTermOptions(mode, defaultTermForMode(mode));
+  financeForm.elements.downPayment.value = defaultDownPaymentForPrice(Number(financeForm.elements.price.value || 0));
+  financeForm.elements.annualRate.value = activeAnnualRate(mode);
+  financeForm.elements.taxRate.value = financeSettings.taxRate;
+  financeForm.elements.residualPercent.value = financeSettings.leaseResidualPercent;
+  updateFinanceDisclaimer();
+}
+
+function updateFinanceDisclaimer() {
+  const note = document.querySelector("[data-i18n='financeNote']");
+  if (note) note.textContent = financeSettings.disclaimer || text[language].financeNote;
 }
 
 function showVehicleDetails(vehicle) {
@@ -1286,6 +1383,15 @@ financeForm?.addEventListener("input", calculatePayment);
 financeForm?.addEventListener("input", () => {
   if (contactDealerModal && !contactDealerModal.hidden) updateContactBuyingSummary();
 });
+financeForm?.addEventListener("change", (event) => {
+  if (event.target?.name === "paymentMode") {
+    const mode = normalizedPaymentMode(event.target.value);
+    renderFinanceTermOptions(mode, defaultTermForMode(mode));
+    financeForm.elements.annualRate.value = activeAnnualRate(mode);
+  }
+  calculatePayment();
+  if (contactDealerModal && !contactDealerModal.hidden) updateContactBuyingSummary();
+});
 sendEstimateButton?.addEventListener("click", () => {
   if (selectedFinanceVehicle) openContactDealer(selectedFinanceVehicle);
 });
@@ -1398,6 +1504,7 @@ document.addEventListener("keydown", (event) => {
 async function init() {
   setLanguage(language);
   await initializeBuyerProtection();
+  await loadFinanceSettings();
   await loadInventory();
   populateInventoryFilters();
   applyUrlSearchParams();

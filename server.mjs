@@ -13,6 +13,7 @@ import {
 import {
   getOperationsSettings,
   maybeSendAfterHoursAutoReply,
+  publicFinanceSettings,
   saveOperationsSettings
 } from "./api/_operations-settings.js";
 
@@ -176,6 +177,17 @@ const server = http.createServer(async (req, res) => {
       const admin = await requireAdmin(req);
       if (!admin.ok) return sendJson(res, admin.status, { ok: false, error: admin.error });
       return sendJson(res, 200, { ok: true, user: admin.user });
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/public-finance-settings") {
+      const client = { url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_ROLE_KEY };
+      const result = await getOperationsSettings(client);
+      return sendJson(res, result.ok ? 200 : result.status || 500, {
+        ok: result.ok,
+        storage: result.storage,
+        warning: result.warning || "",
+        settings: publicFinanceSettings(result.settings)
+      });
     }
 
     if (req.method === "GET" && url.pathname === "/api/dealer-check") {

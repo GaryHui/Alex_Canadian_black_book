@@ -14,6 +14,23 @@ export const DEFAULT_OPERATIONS_SETTINGS = {
     fromEmail: "",
     subject: "We received your vehicle request",
     body: "Hi {{name}},\n\nThanks for contacting AutoSwitch Canada. We received your {{leadType}} request outside business hours. Our team will review it and follow up during the next business window.\n\nVehicle: {{vehicle}}\n\nThank you,\nAutoSwitch Canada"
+  },
+  financeLease: {
+    financeEnabled: true,
+    leaseEnabled: true,
+    defaultPaymentMode: "finance",
+    financeAnnualRate: 7.99,
+    leaseAnnualRate: 7.99,
+    taxRate: 12,
+    defaultDownPaymentPercent: 10,
+    minimumDownPayment: 2500,
+    financeTerms: [36, 48, 60, 72, 84],
+    leaseTerms: [24, 36, 48, 60],
+    defaultFinanceTerm: 72,
+    defaultLeaseTerm: 48,
+    leaseResidualPercent: 48,
+    annualMileageAllowance: 16000,
+    disclaimer: "Estimate only. Final approval, rate, term, taxes, fees, residual, and payment depend on the dealer and lender."
   }
 };
 
@@ -39,8 +56,13 @@ export function normalizeOperationsSettings(value = {}) {
       fromEmail: normalizeEmail(source.autoReply?.fromEmail),
       subject: String(source.autoReply?.subject || DEFAULT_OPERATIONS_SETTINGS.autoReply.subject).trim(),
       body: String(source.autoReply?.body || DEFAULT_OPERATIONS_SETTINGS.autoReply.body).trim()
-    }
+    },
+    financeLease: normalizeFinanceLeaseSettings(source.financeLease)
   };
+}
+
+export function publicFinanceSettings(settings = DEFAULT_OPERATIONS_SETTINGS) {
+  return normalizeFinanceLeaseSettings(settings.financeLease);
 }
 
 export async function getOperationsSettings(client) {
@@ -237,4 +259,48 @@ function minutesOfDay(value) {
 function normalizeEmail(value) {
   const email = String(value || "").trim().toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
+}
+
+function normalizeFinanceLeaseSettings(value = {}) {
+  const fallback = DEFAULT_OPERATIONS_SETTINGS.financeLease;
+  const source = value && typeof value === "object" ? value : {};
+  const financeTerms = normalizeTermList(source.financeTerms, fallback.financeTerms);
+  const leaseTerms = normalizeTermList(source.leaseTerms, fallback.leaseTerms);
+  return {
+    financeEnabled: source.financeEnabled !== false,
+    leaseEnabled: source.leaseEnabled !== false,
+    defaultPaymentMode: source.defaultPaymentMode === "lease" ? "lease" : "finance",
+    financeAnnualRate: numberInRange(source.financeAnnualRate, 0, 39.99, fallback.financeAnnualRate),
+    leaseAnnualRate: numberInRange(source.leaseAnnualRate, 0, 39.99, fallback.leaseAnnualRate),
+    taxRate: numberInRange(source.taxRate, 0, 30, fallback.taxRate),
+    defaultDownPaymentPercent: numberInRange(source.defaultDownPaymentPercent, 0, 100, fallback.defaultDownPaymentPercent),
+    minimumDownPayment: numberInRange(source.minimumDownPayment, 0, 100000, fallback.minimumDownPayment),
+    financeTerms,
+    leaseTerms,
+    defaultFinanceTerm: closestTerm(source.defaultFinanceTerm, financeTerms, fallback.defaultFinanceTerm),
+    defaultLeaseTerm: closestTerm(source.defaultLeaseTerm, leaseTerms, fallback.defaultLeaseTerm),
+    leaseResidualPercent: numberInRange(source.leaseResidualPercent, 0, 100, fallback.leaseResidualPercent),
+    annualMileageAllowance: numberInRange(source.annualMileageAllowance, 0, 50000, fallback.annualMileageAllowance),
+    disclaimer: String(source.disclaimer || fallback.disclaimer).trim()
+  };
+}
+
+function normalizeTermList(value, fallback) {
+  const terms = (Array.isArray(value) ? value : String(value || "").split(","))
+    .map((item) => Number(item))
+    .filter((item) => Number.isInteger(item) && item >= 12 && item <= 120);
+  const unique = [...new Set(terms)].sort((a, b) => a - b);
+  return unique.length ? unique : fallback;
+}
+
+function numberInRange(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
+}
+
+function closestTerm(value, terms, fallback) {
+  const number = Number(value);
+  if (terms.includes(number)) return number;
+  return terms.includes(fallback) ? fallback : terms[0];
 }
