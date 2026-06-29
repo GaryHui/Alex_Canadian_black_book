@@ -182,6 +182,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/public-finance-settings") {
       const client = { url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_ROLE_KEY };
       const result = await getOperationsSettings(client);
+      res.setHeader("Cache-Control", "no-store");
       return sendJson(res, result.ok ? 200 : result.status || 500, {
         ok: result.ok,
         storage: result.storage,

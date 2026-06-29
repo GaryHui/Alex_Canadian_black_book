@@ -953,13 +953,17 @@ function setLanguage(nextLanguage) {
 
 async function loadFinanceSettings() {
   try {
-    const response = await fetch("/api/public-finance-settings");
+    const response = await fetch("/api/public-finance-settings", { cache: "no-store" });
     const data = await response.json();
     if (data.ok && data.settings) financeSettings = { ...defaultFinanceSettings(), ...data.settings };
   } catch {
     financeSettings = defaultFinanceSettings();
   }
   applyFinanceSettingsToCalculator();
+  renderInventory();
+  calculatePayment();
+  updateSendEstimateButton();
+  if (contactDealerModal && !contactDealerModal.hidden) updateContactBuyingSummary();
 }
 
 function applyFinanceSettingsToCalculator() {
@@ -1499,6 +1503,18 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     event.target.click();
   }
+});
+
+window.addEventListener("storage", (event) => {
+  if (event.key === "autoswitch-finance-settings-updated") loadFinanceSettings();
+});
+
+window.addEventListener("focus", () => {
+  loadFinanceSettings();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) loadFinanceSettings();
 });
 
 async function init() {

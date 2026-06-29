@@ -394,6 +394,15 @@ async function saveOperationsSettings(event) {
   }
   renderOperationsSettings(data.settings || settings);
   operationsSettingsStatus.textContent = "Operations settings saved.";
+  notifyFinanceSettingsChanged();
+}
+
+function notifyFinanceSettingsChanged() {
+  try {
+    window.localStorage.setItem("autoswitch-finance-settings-updated", String(Date.now()));
+  } catch {
+    // Cross-tab notifications are best-effort.
+  }
 }
 
 function operationsSettingsPayload() {
