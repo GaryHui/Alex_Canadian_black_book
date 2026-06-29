@@ -45,6 +45,15 @@ const emailAuthConfirmWrap = document.querySelector("#email-auth-confirm-wrap");
 const emailAuthConfirm = document.querySelector("#email-auth-confirm");
 const emailAuthTermsWrap = document.querySelector("#email-auth-terms-wrap");
 const emailAuthTermsCheck = document.querySelector("#email-auth-terms-check");
+const emailTermsOpen = document.querySelector("#email-terms-open");
+const termsModal = document.querySelector("#terms-modal");
+const termsBackdrop = document.querySelector("#terms-backdrop");
+const termsClose = document.querySelector("#terms-close");
+const termsAccept = document.querySelector("#terms-accept");
+const termsCancel = document.querySelector("#terms-cancel");
+const signupConfirmModal = document.querySelector("#signup-confirm-modal");
+const signupConfirmBackdrop = document.querySelector("#signup-confirm-backdrop");
+const signupConfirmAction = document.querySelector("#signup-confirm-action");
 const emailAuthSwitchText = document.querySelector("#email-auth-switch-text");
 const emailAuthSwitchButton = document.querySelector("#email-auth-switch-button");
 const emailAuthSubmit = document.querySelector("#email-auth-submit");
@@ -222,6 +231,24 @@ const text = {
     emailTermsPrefix: "I agree to the",
     emailTermsLink: "Terms of Service",
     emailTermsRequired: "Please agree to the Terms of Service.",
+    termsEyebrow: "Account agreement",
+    termsTitle: "Terms of Service",
+    termsUpdated: "Last updated: June 29, 2026",
+    termsUseTitle: "Use of your account",
+    termsUseText: "You agree to provide accurate contact and vehicle information, keep your password secure, and use this service only for genuine vehicle valuation or dealership follow-up.",
+    termsEstimateTitle: "Valuations are estimates",
+    termsEstimateText: "Values generated through Canadian Black Book or dealer tools are informational estimates only. Final offers, purchase terms, consignment terms, taxes, fees, and financing are confirmed by the dealership after review.",
+    termsContactTitle: "Contact consent",
+    termsContactText: "By creating an account or submitting a vehicle, you authorize the dealership to contact you by email, phone, text, or similar electronic message about your request. You can ask the dealership to stop marketing messages at any time.",
+    termsPrivacyTitle: "Privacy and documents",
+    termsPrivacyText: "Your email, contact details, VIN, vehicle photos, appraisal history, and related documents may be stored and used to process your request, prevent misuse, prepare an offer, or support future service. Do not upload documents you are not authorized to share.",
+    termsMisuseTitle: "Fair use",
+    termsMisuseText: "Automated submissions, false information, attempts to bypass security checks, or use of another person's information without permission may result in account restriction or removal.",
+    termsAccept: "Agree and continue",
+    termsCancel: "Close",
+    signupConfirmTitle: "Confirm your email",
+    signupConfirmText: "We sent a confirmation link to your email. Please confirm your account first, then sign in with the same email.",
+    signupConfirmAction: "OK, go to sign in",
     emailSwitchToSignInText: "Already have an account?",
     emailSwitchToSignInAction: "Sign in",
     emailSwitchToSignUpText: "Need an account?",
@@ -239,7 +266,7 @@ const text = {
     emailPasswordMismatch: "Passwords do not match.",
     emailPasswordShort: "Use at least 6 characters for your password.",
     emailSignInReady: "Signed in successfully.",
-    emailSignUpSent: "Check your email to confirm your account, then sign in.",
+    emailSignUpSent: "Enter your password after confirming your email.",
     emailResetSent: "Check your email for the password reset link.",
     emailUpdateReady: "Password updated.",
     emailAuthRequired: "Enter your email and password.",
@@ -444,6 +471,24 @@ const text = {
     emailTermsPrefix: "J'accepte les",
     emailTermsLink: "conditions d'utilisation",
     emailTermsRequired: "Veuillez accepter les conditions d'utilisation.",
+    termsEyebrow: "Accord de compte",
+    termsTitle: "Conditions d'utilisation",
+    termsUpdated: "Derniere mise a jour : 29 juin 2026",
+    termsUseTitle: "Utilisation de votre compte",
+    termsUseText: "Vous acceptez de fournir des coordonnees et des renseignements de vehicule exacts, de garder votre mot de passe securise et d'utiliser ce service seulement pour une evaluation de vehicule ou un suivi avec la concession.",
+    termsEstimateTitle: "Les evaluations sont indicatives",
+    termsEstimateText: "Les valeurs generees par Canadian Black Book ou les outils de la concession sont des estimations informatives seulement. Les offres finales, conditions d'achat, conditions de consignation, taxes, frais et financement sont confirmes par la concession apres verification.",
+    termsContactTitle: "Consentement a etre contacte",
+    termsContactText: "En creant un compte ou en soumettant un vehicule, vous autorisez la concession a vous contacter par courriel, telephone, texto ou message electronique similaire au sujet de votre demande. Vous pouvez demander l'arret des messages marketing a tout moment.",
+    termsPrivacyTitle: "Confidentialite et documents",
+    termsPrivacyText: "Votre courriel, vos coordonnees, le NIV, les photos du vehicule, l'historique d'evaluation et les documents connexes peuvent etre conserves et utilises pour traiter votre demande, prevenir les abus, preparer une offre ou soutenir un service futur. Ne televersez pas de documents que vous n'etes pas autorise a partager.",
+    termsMisuseTitle: "Utilisation acceptable",
+    termsMisuseText: "Les soumissions automatisees, les faux renseignements, les tentatives de contourner les controles de securite ou l'utilisation des renseignements d'une autre personne sans permission peuvent entrainer une restriction ou une suppression du compte.",
+    termsAccept: "Accepter et continuer",
+    termsCancel: "Fermer",
+    signupConfirmTitle: "Confirmez votre courriel",
+    signupConfirmText: "Nous avons envoye un lien de confirmation a votre courriel. Confirmez d'abord votre compte, puis connectez-vous avec le meme courriel.",
+    signupConfirmAction: "OK, aller a la connexion",
     emailSwitchToSignInText: "Vous avez déjà un compte?",
     emailSwitchToSignInAction: "Connexion",
     emailSwitchToSignUpText: "Besoin d'un compte?",
@@ -461,7 +506,7 @@ const text = {
     emailPasswordMismatch: "Les mots de passe ne correspondent pas.",
     emailPasswordShort: "Utilisez au moins 6 caractères.",
     emailSignInReady: "Connexion réussie.",
-    emailSignUpSent: "Vérifiez votre courriel pour confirmer le compte, puis connectez-vous.",
+    emailSignUpSent: "Entrez votre mot de passe apres avoir confirme votre courriel.",
     emailResetSent: "Vérifiez votre courriel pour le lien de réinitialisation.",
     emailUpdateReady: "Mot de passe mis à jour.",
     emailAuthRequired: "Entrez votre courriel et votre mot de passe.",
@@ -588,6 +633,7 @@ let customerTurnstileGate = null;
 let sellerSubmitTurnstileGate = null;
 let pendingHumanAction = null;
 let emailAuthMode = "signin";
+let pendingSignupEmail = "";
 let makeRequestId = 0;
 let modelRequestId = 0;
 
@@ -633,6 +679,14 @@ function initialize() {
   modal.querySelectorAll("[data-close-modal]").forEach((item) => item.addEventListener("click", closeModal));
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
+      if (termsModal && !termsModal.hidden) {
+        closeTermsModal();
+        return;
+      }
+      if (signupConfirmModal && !signupConfirmModal.hidden) {
+        closeSignupConfirm();
+        return;
+      }
       closeModal();
       closeVinGuide();
       closeEmailAuthModal();
@@ -645,6 +699,13 @@ function initialize() {
   openLoginButton?.addEventListener("click", () => openEmailAuthModal("signin"));
   emailAuthClose?.addEventListener("click", closeEmailAuthModal);
   emailAuthBackdrop?.addEventListener("click", closeEmailAuthModal);
+  emailTermsOpen?.addEventListener("click", openTermsModal);
+  termsBackdrop?.addEventListener("click", closeTermsModal);
+  termsClose?.addEventListener("click", closeTermsModal);
+  termsCancel?.addEventListener("click", closeTermsModal);
+  termsAccept?.addEventListener("click", acceptTerms);
+  signupConfirmBackdrop?.addEventListener("click", closeSignupConfirm);
+  signupConfirmAction?.addEventListener("click", confirmSignupEmail);
   emailAuthSwitchButton?.addEventListener("click", () => {
     setEmailAuthMode(emailAuthSwitchButton.dataset.authMode || "signin");
   });
@@ -922,9 +983,12 @@ async function signUpWithEmail(email, password) {
     setEmailAuthStatus(error.message || t("emailAuthRequired"));
     return;
   }
-  emailAuthForm.reset();
+  emailAuthPassword.value = "";
+  emailAuthConfirm.value = "";
+  if (emailAuthTermsCheck) emailAuthTermsCheck.checked = false;
   customerTurnstileGate?.hide?.();
-  setEmailAuthStatus(t("emailSignUpSent"));
+  setEmailAuthStatus("");
+  openSignupConfirm(email);
 }
 
 async function sendPasswordReset(email) {
@@ -973,8 +1037,52 @@ function openEmailAuthModal(mode = "signin") {
 
 function closeEmailAuthModal() {
   if (!emailAuthModal || emailAuthModal.hidden) return;
+  closeTermsModal();
+  closeSignupConfirm();
   emailAuthModal.hidden = true;
   document.body.classList.remove("modal-open");
+}
+
+function openTermsModal() {
+  if (!termsModal) return;
+  termsModal.hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeTermsModal() {
+  if (!termsModal || termsModal.hidden) return;
+  termsModal.hidden = true;
+}
+
+function acceptTerms() {
+  if (emailAuthTermsCheck) emailAuthTermsCheck.checked = true;
+  closeTermsModal();
+  window.setTimeout(() => emailAuthPassword?.focus(), 0);
+}
+
+function openSignupConfirm(email) {
+  pendingSignupEmail = email || "";
+  if (!signupConfirmModal) {
+    confirmSignupEmail();
+    return;
+  }
+  signupConfirmModal.hidden = false;
+  document.body.classList.add("modal-open");
+  window.setTimeout(() => signupConfirmAction?.focus(), 0);
+}
+
+function closeSignupConfirm() {
+  if (!signupConfirmModal || signupConfirmModal.hidden) return;
+  signupConfirmModal.hidden = true;
+}
+
+function confirmSignupEmail() {
+  const email = pendingSignupEmail || emailAuthEmail.value.trim();
+  closeSignupConfirm();
+  setEmailAuthMode("signin");
+  if (email) emailAuthEmail.value = email;
+  setEmailAuthStatus(t("emailSignUpSent"));
+  window.setTimeout(() => emailAuthPassword?.focus(), 0);
 }
 
 function setEmailAuthMode(mode) {

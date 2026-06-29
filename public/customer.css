@@ -681,9 +681,125 @@ h1 {
   margin-top: 1px;
 }
 
-.email-auth-terms-check a {
+.email-auth-terms-check a,
+.inline-link-button {
   color: var(--blue);
   text-decoration: underline;
+}
+
+.inline-link-button {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.terms-modal[hidden] {
+  display: none;
+}
+
+.terms-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.terms-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 32, 51, 0.42);
+  border: 0;
+}
+
+.terms-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(680px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  padding: clamp(22px, 4vw, 34px);
+  background: #fff;
+  border: 1px solid rgba(217, 225, 236, 0.92);
+  border-radius: 10px;
+  box-shadow: 0 28px 72px rgba(20, 32, 51, 0.28);
+}
+
+.terms-dialog h2 {
+  margin: 0;
+  font-size: clamp(28px, 5vw, 42px);
+}
+
+.terms-updated {
+  margin: 8px 0 18px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.terms-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.terms-copy article {
+  padding: 12px 14px;
+  background: #fbfdff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.terms-copy h3 {
+  margin: 0 0 5px;
+  font-size: 16px;
+}
+
+.terms-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.terms-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.terms-actions .primary-button,
+.terms-actions .secondary-button {
+  min-height: 42px;
+}
+
+.signup-confirm-dialog {
+  width: min(460px, 100%);
+}
+
+.signup-confirm-dialog h2 {
+  margin-bottom: 10px;
+}
+
+.signup-confirm-dialog p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.signup-confirm-dialog .terms-actions {
+  justify-content: stretch;
+}
+
+.signup-confirm-dialog .primary-button {
+  width: 100%;
 }
 
 .email-auth-switch {

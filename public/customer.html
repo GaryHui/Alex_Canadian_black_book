@@ -533,7 +533,7 @@
             <input id="email-auth-terms-check" type="checkbox" />
             <span>
               <span data-i18n="emailTermsPrefix">By signing up, you agree to our</span>
-              <a href="#" data-i18n="emailTermsLink">Terms of Service</a>
+              <button id="email-terms-open" class="inline-link-button" type="button" data-i18n="emailTermsLink">Terms of Service</button>
             </span>
           </label>
           <div class="email-auth-footer">
@@ -552,6 +552,53 @@
         <div class="email-auth-switch">
           <span id="email-auth-switch-text" data-i18n="emailSwitchToSignInText">Already have an account?</span>
           <button id="email-auth-switch-button" type="button" data-auth-mode="signin" data-i18n="emailSwitchToSignInAction">Sign in</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="terms-modal" class="terms-modal" hidden role="dialog" aria-modal="true" aria-labelledby="terms-modal-title">
+      <button id="terms-backdrop" class="terms-modal-backdrop" type="button" aria-label="Close"></button>
+      <div class="terms-dialog">
+        <button id="terms-close" class="email-auth-close" type="button" aria-label="Close">x</button>
+        <p class="eyebrow" data-i18n="termsEyebrow">Account agreement</p>
+        <h2 id="terms-modal-title" data-i18n="termsTitle">Terms of Service</h2>
+        <p class="terms-updated" data-i18n="termsUpdated">Last updated: June 29, 2026</p>
+        <div class="terms-copy">
+          <article>
+            <h3 data-i18n="termsUseTitle">Use of your account</h3>
+            <p data-i18n="termsUseText">You agree to provide accurate contact and vehicle information, keep your password secure, and use this service only for genuine vehicle valuation or dealership follow-up.</p>
+          </article>
+          <article>
+            <h3 data-i18n="termsEstimateTitle">Valuations are estimates</h3>
+            <p data-i18n="termsEstimateText">Values generated through Canadian Black Book or dealer tools are informational estimates only. Final offers, purchase terms, consignment terms, taxes, fees, and financing are confirmed by the dealership after review.</p>
+          </article>
+          <article>
+            <h3 data-i18n="termsContactTitle">Contact consent</h3>
+            <p data-i18n="termsContactText">By creating an account or submitting a vehicle, you authorize the dealership to contact you by email, phone, text, or similar electronic message about your request. You can ask the dealership to stop marketing messages at any time.</p>
+          </article>
+          <article>
+            <h3 data-i18n="termsPrivacyTitle">Privacy and documents</h3>
+            <p data-i18n="termsPrivacyText">Your email, contact details, VIN, vehicle photos, appraisal history, and related documents may be stored and used to process your request, prevent misuse, prepare an offer, or support future service. Do not upload documents you are not authorized to share.</p>
+          </article>
+          <article>
+            <h3 data-i18n="termsMisuseTitle">Fair use</h3>
+            <p data-i18n="termsMisuseText">Automated submissions, false information, attempts to bypass security checks, or use of another person's information without permission may result in account restriction or removal.</p>
+          </article>
+        </div>
+        <div class="terms-actions">
+          <button id="terms-accept" class="primary-button" type="button" data-i18n="termsAccept">Agree and continue</button>
+          <button id="terms-cancel" class="secondary-button" type="button" data-i18n="termsCancel">Close</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="signup-confirm-modal" class="terms-modal signup-confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="signup-confirm-title">
+      <button id="signup-confirm-backdrop" class="terms-modal-backdrop" type="button" aria-label="Close"></button>
+      <div class="terms-dialog signup-confirm-dialog">
+        <h2 id="signup-confirm-title" data-i18n="signupConfirmTitle">Confirm your email</h2>
+        <p data-i18n="signupConfirmText">We sent a confirmation link to your email. Please confirm your account first, then sign in with the same email.</p>
+        <div class="terms-actions">
+          <button id="signup-confirm-action" class="primary-button" type="button" data-i18n="signupConfirmAction">OK, go to sign in</button>
         </div>
       </div>
     </section>
