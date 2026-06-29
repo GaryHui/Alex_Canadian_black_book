@@ -257,6 +257,7 @@ async function setAdminSession(session) {
 
   if (!session?.user) {
     stopAdminAutoRefresh();
+    resetAdminAlertState();
     closeAdminDrawer();
     adminAuthStatus.textContent = "Admin Google sign-in required.";
     statusEl.textContent = "";
@@ -293,6 +294,7 @@ async function setAdminSession(session) {
   }
 
   adminAuthStatus.textContent = `Signed in as ${session.user.email}`;
+  resetAdminAlertState();
   await Promise.all([loadLeads(), loadUsers(), loadDealers(), loadInventory(), loadOperationsSettings()]);
   startAdminAutoRefresh();
 }
@@ -1058,6 +1060,13 @@ function collectAdminLeadAlerts(leads) {
   adminLeadTokenMap = nextMap;
 }
 
+function resetAdminAlertState() {
+  adminLeadAlertMap = new Map();
+  adminLeadTokenMap = new Map();
+  adminLeadSnapshotReady = false;
+  renderAdminLeadAlerts();
+}
+
 function adminAlertVisibleId(id) {
   return resolveVisibleAdminLeadId(id) || String(id || "").trim();
 }
@@ -1099,15 +1108,26 @@ function hasAdminVisibleAlert(leadId) {
 function clearAdminVisibleAlertGroup(id) {
   const visibleId = adminAlertVisibleId(id);
   if (!visibleId) return;
-  const relatedIds = adminLeadsCache
-    .filter((lead) => adminAlertVisibleId(lead.id) === visibleId)
-    .map((lead) => String(lead.id || "").trim())
-    .filter(Boolean);
-  for (const leadId of relatedIds) {
+  for (const leadId of adminVisibleAlertLeadIds(id)) {
     const lead = adminLeadsCache.find((item) => String(item.id || "") === leadId);
     if (!lead?.owner_review?.unread) markAdminLeadTokenRead(leadId);
     adminLeadAlertMap.delete(leadId);
   }
+}
+
+function adminVisibleAlertLeadIds(id) {
+  const visibleId = adminAlertVisibleId(id);
+  if (!visibleId) return [];
+  const ids = new Set();
+  for (const lead of adminLeadsCache) {
+    const leadId = String(lead.id || "").trim();
+    if (leadId && adminAlertVisibleId(leadId) === visibleId) ids.add(leadId);
+  }
+  for (const alert of adminLeadAlertMap.values()) {
+    const alertId = String(alert.id || "").trim();
+    if (alertId && adminAlertVisibleId(alertId) === visibleId) ids.add(alertId);
+  }
+  return [...ids];
 }
 
 function rememberAdminLeadTokens(leads) {
@@ -1284,6 +1304,7 @@ async function openAdminLeadFromAlert(id) {
     await loadLeads({ suppressAlerts: true, forceOpenActivity: true });
   }
   const visibleId = resolveVisibleAdminLeadId(id);
+  const relatedAlertIds = adminVisibleAlertLeadIds(id);
   let card = leadsEl.querySelector(`.lead-card[data-id="${cssEscape(visibleId)}"]`);
   if (!card && adminLeadFilter !== "all") {
     setAdminLeadFilter("all");
@@ -1293,10 +1314,15 @@ async function openAdminLeadFromAlert(id) {
   if (!card) return;
   setActiveAdminLead(visibleId);
   clearAdminVisibleAlertGroup(id);
-  const lead = adminLeadsCache.find((item) => String(item.id || "") === visibleId) || adminLeadsCache.find((item) => String(item.id || "") === id);
-  if (lead?.owner_review?.unread) {
-    await markManagerReviewedByLeadId(String(lead.id || id), { silent: true, reload: false }).catch(() => null);
-    lead.owner_review.unread = false;
+  for (const leadId of relatedAlertIds) {
+    const relatedLead = adminLeadsCache.find((item) => String(item.id || "") === String(leadId || ""));
+    if (relatedLead?.owner_review?.unread) {
+      await markManagerReviewedByLeadId(String(leadId), { silent: true, reload: false }).catch(() => null);
+      relatedLead.owner_review.unread = false;
+    } else {
+      markAdminLeadTokenRead(leadId);
+    }
+    adminLeadAlertMap.delete(String(leadId));
   }
   renderAdminLeadAlerts();
   removeAdminInlineAlertButtons(card, id);
