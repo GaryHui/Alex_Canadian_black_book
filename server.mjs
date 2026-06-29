@@ -27,6 +27,7 @@ const LOG_FILE = path.join(__dirname, "server.log");
 const MAX_LEAD_PHOTOS = 20;
 const PUBLIC_LEAD_RATE_WINDOW_MS = 60 * 60 * 1000;
 const PUBLIC_LEAD_RATE_LIMIT = 8;
+const AUTH_EMAIL_RATE_LIMIT = 40;
 const publicLeadRateBuckets = new Map();
 const DISPOSABLE_EMAIL_DOMAINS = new Set([
   "10minutemail.com",
@@ -141,6 +142,12 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const result = await verifyTurnstile(body, req);
       return sendJson(res, result.status || (result.ok ? 200 : 403), result);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/auth-email-status") {
+      const body = await readJson(req);
+      const result = await getAuthEmailStatus(body, req);
+      return sendJson(res, result.ok ? 200 : result.status || 400, result);
     }
 
     if (req.method === "GET" && url.pathname === "/api/usage") {
@@ -555,6 +562,7 @@ function publicLeadContact(body, leadType) {
 
 function checkPublicLeadRateLimit(req, leadType, contact) {
   const now = Date.now();
+  const limit = leadType === "auth_email" ? AUTH_EMAIL_RATE_LIMIT : PUBLIC_LEAD_RATE_LIMIT;
   for (const [key, bucket] of publicLeadRateBuckets) {
     if (now - bucket.startedAt > PUBLIC_LEAD_RATE_WINDOW_MS) publicLeadRateBuckets.delete(key);
   }
@@ -572,7 +580,7 @@ function checkPublicLeadRateLimit(req, leadType, contact) {
     }
     bucket.count += 1;
     publicLeadRateBuckets.set(key, bucket);
-    if (bucket.count > PUBLIC_LEAD_RATE_LIMIT) {
+    if (bucket.count > limit) {
       return { ok: false, status: 429, error: "Too many submissions. Please try again later." };
     }
   }
@@ -616,6 +624,44 @@ async function validateLeadEmail(email) {
     return { ok: true };
   } catch {}
   return { ok: false, status: 400, error: "This email domain does not appear to receive email." };
+}
+
+async function getAuthEmailStatus(body, req) {
+  const email = normalizePublicEmail(body?.email || "");
+  const emailCheck = await validateLeadEmail(email);
+  if (!emailCheck.ok) return emailCheck;
+
+  const rate = checkPublicLeadRateLimit(req, "auth_email", { email, phone: "", vehicleKey: "" });
+  if (!rate.ok) return rate;
+
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: true, exists: false, available: true, source: "not_configured" };
+
+  const lookup = await findSupabaseUserByEmail(email, { url, key });
+  if (!lookup.ok) return lookup;
+  return { ok: true, exists: lookup.exists, available: !lookup.exists, source: "supabase" };
+}
+
+async function findSupabaseUserByEmail(email, supabase) {
+  const normalizedEmail = normalizePublicEmail(email);
+  const base = String(supabase.url || "").replace(/\/$/, "");
+  const perPage = 200;
+  for (let page = 1; page <= 10; page += 1) {
+    const response = await fetch(`${base}/auth/v1/admin/users?page=${page}&per_page=${perPage}`, {
+      headers: supabaseServiceHeaders(supabase.key)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { ok: false, status: response.status, error: supabaseErrorMessage(data) || "Unable to check email right now." };
+    }
+    const users = Array.isArray(data?.users) ? data.users : Array.isArray(data) ? data : [];
+    if (users.some((user) => normalizePublicEmail(user?.email) === normalizedEmail)) {
+      return { ok: true, exists: true };
+    }
+    if (users.length < perPage) break;
+  }
+  return { ok: true, exists: false };
 }
 
 function looksLikeSpamText(value) {

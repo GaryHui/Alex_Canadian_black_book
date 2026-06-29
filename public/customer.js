@@ -231,6 +231,10 @@ const text = {
     emailTermsPrefix: "I agree to the",
     emailTermsLink: "Terms of Service",
     emailTermsRequired: "Please agree to the Terms of Service.",
+    emailChecking: "Checking this email...",
+    emailAlreadyRegistered: "This email already has an account. Sign in instead.",
+    emailAvailable: "This email can be used.",
+    emailCheckUnavailable: "Email check is unavailable. You can continue.",
     termsEyebrow: "Account agreement",
     termsTitle: "Terms of Service",
     termsUpdated: "Last updated: June 29, 2026",
@@ -471,6 +475,10 @@ const text = {
     emailTermsPrefix: "J'accepte les",
     emailTermsLink: "conditions d'utilisation",
     emailTermsRequired: "Veuillez accepter les conditions d'utilisation.",
+    emailChecking: "Verification du courriel...",
+    emailAlreadyRegistered: "Ce courriel a deja un compte. Connectez-vous plutot.",
+    emailAvailable: "Ce courriel peut etre utilise.",
+    emailCheckUnavailable: "La verification du courriel est indisponible. Vous pouvez continuer.",
     termsEyebrow: "Accord de compte",
     termsTitle: "Conditions d'utilisation",
     termsUpdated: "Derniere mise a jour : 29 juin 2026",
@@ -634,6 +642,8 @@ let sellerSubmitTurnstileGate = null;
 let pendingHumanAction = null;
 let emailAuthMode = "signin";
 let pendingSignupEmail = "";
+let emailAvailabilityTimer = null;
+let emailAvailabilityState = { email: "", exists: false, checked: false };
 let makeRequestId = 0;
 let modelRequestId = 0;
 
@@ -706,6 +716,8 @@ function initialize() {
   termsAccept?.addEventListener("click", acceptTerms);
   signupConfirmBackdrop?.addEventListener("click", closeSignupConfirm);
   signupConfirmAction?.addEventListener("click", confirmSignupEmail);
+  emailAuthEmail.addEventListener("input", scheduleSignupEmailCheck);
+  emailAuthEmail.addEventListener("change", () => checkSignupEmailAvailability(emailAuthEmail.value, { force: true }));
   emailAuthSwitchButton?.addEventListener("click", () => {
     setEmailAuthMode(emailAuthSwitchButton.dataset.authMode || "signin");
   });
@@ -849,7 +861,7 @@ async function initializeCustomerAuth() {
   if (customerTurnstileWrap) customerTurnstileWrap.hidden = true;
   supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: {
-      flowType: "pkce",
+      flowType: "implicit",
       detectSessionInUrl: true,
       persistSession: true
     }
@@ -926,6 +938,11 @@ async function handleEmailAuthSubmit(event) {
     return;
   }
   if (emailAuthMode === "signup") {
+    const emailStatus = await checkSignupEmailAvailability(email, { force: true });
+    if (emailStatus.exists) {
+      switchExistingEmailToSignIn(email);
+      return;
+    }
     if (!isUsablePassword(password)) {
       setEmailAuthStatus(t("emailPasswordShort"));
       return;
@@ -1087,6 +1104,8 @@ function confirmSignupEmail() {
 
 function setEmailAuthMode(mode) {
   emailAuthMode = mode || "signin";
+  if (emailAvailabilityTimer) window.clearTimeout(emailAvailabilityTimer);
+  emailAvailabilityState = { email: "", exists: false, checked: false };
   const isReset = emailAuthMode === "reset";
   const isSignup = emailAuthMode === "signup";
   const isUpdate = emailAuthMode === "update";
@@ -1153,6 +1172,68 @@ function setEmailAuthMode(mode) {
 
 function setEmailAuthStatus(message) {
   if (emailAuthStatus) emailAuthStatus.textContent = message || "";
+}
+
+function scheduleSignupEmailCheck() {
+  if (emailAvailabilityTimer) window.clearTimeout(emailAvailabilityTimer);
+  emailAvailabilityState = { email: "", exists: false, checked: false };
+  if (emailAuthMode !== "signup") return;
+  const email = emailAuthEmail.value.trim();
+  if (!isValidEmailFormat(email)) return;
+  emailAvailabilityTimer = window.setTimeout(() => {
+    checkSignupEmailAvailability(email);
+  }, 550);
+}
+
+async function checkSignupEmailAvailability(email, { force = false } = {}) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (emailAuthMode !== "signup" || !normalizedEmail || !isValidEmailFormat(normalizedEmail)) {
+    return { exists: false, checked: false };
+  }
+  if (!force && emailAvailabilityState.checked && emailAvailabilityState.email === normalizedEmail) {
+    return emailAvailabilityState;
+  }
+
+  setEmailAuthStatus(t("emailChecking"));
+  try {
+    const response = await fetch("/api/auth-email-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: normalizedEmail })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (emailAuthEmail.value.trim().toLowerCase() !== normalizedEmail || emailAuthMode !== "signup") {
+      return { exists: false, checked: false };
+    }
+    if (!response.ok || data.ok === false) {
+      emailAvailabilityState = { email: normalizedEmail, exists: false, checked: false };
+      setEmailAuthStatus(force ? data.error || t("emailCheckUnavailable") : "");
+      return emailAvailabilityState;
+    }
+    emailAvailabilityState = {
+      email: normalizedEmail,
+      exists: Boolean(data.exists),
+      checked: true
+    };
+    setEmailAuthStatus(data.exists ? t("emailAlreadyRegistered") : t("emailAvailable"));
+    return emailAvailabilityState;
+  } catch {
+    emailAvailabilityState = { email: normalizedEmail, exists: false, checked: false };
+    if (force) setEmailAuthStatus(t("emailCheckUnavailable"));
+    return emailAvailabilityState;
+  }
+}
+
+function switchExistingEmailToSignIn(email) {
+  setEmailAuthMode("signin");
+  emailAuthEmail.value = email;
+  emailAuthPassword.value = "";
+  setEmailAuthStatus(t("emailAlreadyRegistered"));
+  window.setTimeout(() => emailAuthPassword?.focus(), 0);
+}
+
+function isValidEmailFormat(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(String(email || "").trim());
 }
 
 function sellerAuthRedirectUrl(suffix = "") {
