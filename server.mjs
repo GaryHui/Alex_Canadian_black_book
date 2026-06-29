@@ -3663,6 +3663,8 @@ async function insertLead({ url, key, lead }) {
 }
 
 const DEFAULT_ANNUAL_LIMIT = Number(process.env.ANNUAL_VALUATION_LIMIT || 3);
+const DEALER_ANNUAL_LIMIT = Number(process.env.DEALER_ANNUAL_VALUATION_LIMIT || 1000);
+const ADMIN_ANNUAL_LIMIT = -1;
 
 function ownerContactMessage() {
   const configuredContact = String(process.env.OWNER_CONTACT || "").trim();
@@ -3688,18 +3690,22 @@ async function getUsage({ userId, email, year }) {
   }
 
   if (!url || !key) {
+    const fallbackLimit = defaultAnnualLimitForRole(roleForEmail(normalizedEmail, new Map()));
     return {
       ok: true,
       storage: "not_configured",
       year,
       used: 0,
-      annualLimit: DEFAULT_ANNUAL_LIMIT,
-      remaining: DEFAULT_ANNUAL_LIMIT,
+      annualLimit: fallbackLimit,
+      unlimited: fallbackLimit < 0,
+      remaining: fallbackLimit < 0 ? null : fallbackLimit,
       contact: ownerContactMessage()
     };
   }
 
-  const annualLimit = await getAnnualLimit({ url, key, userId: normalizedUserId, year });
+  const roleResult = await accessRolesForDisplay({ url, key });
+  const role = roleForEmail(normalizedEmail, roleResult.roleByEmail);
+  const annualLimit = await getAnnualLimit({ url, key, userId: normalizedUserId, email: normalizedEmail, year, role });
   const used = await getUsedCount({ url, key, userId: normalizedUserId, email: normalizedEmail, year });
 
   if (annualLimit.error || used.error) return { ok: false, error: annualLimit.error || used.error };
@@ -3709,6 +3715,7 @@ async function getUsage({ userId, email, year }) {
     storage: "supabase",
     year,
     used: used.count,
+    role,
     annualLimit: annualLimit.limit,
     unlimited: annualLimit.limit < 0,
     remaining: annualLimit.limit < 0 ? null : Math.max(0, annualLimit.limit - used.count),
@@ -3716,8 +3723,9 @@ async function getUsage({ userId, email, year }) {
   };
 }
 
-async function getAnnualLimit({ url, key, userId, year }) {
-  if (!userId) return { limit: DEFAULT_ANNUAL_LIMIT };
+async function getAnnualLimit({ url, key, userId, email, year, role }) {
+  const defaultLimit = defaultAnnualLimitForRole(role || roleForEmail(email, new Map()));
+  if (!userId) return { limit: defaultLimit };
 
   const response = await fetch(`${url}/rest/v1/valuation_user_limits?select=annual_limit&user_id=eq.${encodeURIComponent(userId)}&valuation_year=eq.${year}&limit=1`, {
     headers: supabaseServiceHeaders(key)
@@ -3725,7 +3733,7 @@ async function getAnnualLimit({ url, key, userId, year }) {
   const rows = await response.json().catch(() => []);
   if (!response.ok) return { error: `Unable to load valuation limit (${response.status})` };
 
-  return { limit: Number(rows?.[0]?.annual_limit ?? DEFAULT_ANNUAL_LIMIT) };
+  return { limit: Number(rows?.[0]?.annual_limit ?? defaultLimit) };
 }
 
 async function getUsedCount({ url, key, userId, email, year }) {
@@ -3789,8 +3797,8 @@ async function listUserLimits(year) {
     .map((user) => {
       const emailKey = normalizeEmail(user.email);
       const limit = limitsByUser.get(user.userId) || limitsByUser.get(emailKey);
-      const annualLimit = Number(limit?.annual_limit ?? DEFAULT_ANNUAL_LIMIT);
       const role = user.role || roleByEmail.get(normalizeEmail(user.email || user.userId)) || "customer";
+      const annualLimit = Number(limit?.annual_limit ?? defaultAnnualLimitForRole(role));
       return {
         ...user,
         role,
@@ -3869,6 +3877,21 @@ function looksLikeUuid(value) {
 function preferredRole(a, b) {
   const order = { admin: 0, dealer: 1, customer: 2 };
   return (order[a] ?? 9) <= (order[b] ?? 9) ? a : b;
+}
+
+function roleForEmail(email, roleByEmail = new Map()) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return "customer";
+  if (roleByEmail.has(normalizedEmail)) return roleByEmail.get(normalizedEmail);
+  if (configuredEmails(process.env.ADMIN_EMAILS).includes(normalizedEmail)) return "admin";
+  if (configuredEmails(process.env.DEALER_EMAILS).includes(normalizedEmail)) return "dealer";
+  return "customer";
+}
+
+function defaultAnnualLimitForRole(role) {
+  if (role === "admin") return ADMIN_ANNUAL_LIMIT;
+  if (role === "dealer" || role === "dealer_env" || role === "dealer_staff") return DEALER_ANNUAL_LIMIT;
+  return DEFAULT_ANNUAL_LIMIT;
 }
 
 async function updateUserLimit(body) {

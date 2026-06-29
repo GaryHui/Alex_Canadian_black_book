@@ -844,7 +844,19 @@ async function initializeCustomerAuth() {
   }
 
   siteUrl = config.siteUrl || window.location.origin;
-  customerTurnstileGate = null;
+  customerTurnstileGate = window.createTurnstileGate?.({
+    siteKey: config.turnstileSiteKey,
+    wrap: customerTurnstileWrap,
+    container: customerTurnstile,
+    button: emailAuthSubmit,
+    statusEl: customerTurnstileStatus,
+    waitingText: t("verifyHuman"),
+    readyText: t("verifyHumanReady"),
+    failedText: t("verifyHumanFailed"),
+    action: "customer_auth",
+    lazy: true,
+    onVerified: completePendingHumanAction
+  }) || null;
   sellerSubmitTurnstileGate = window.createTurnstileGate?.({
     siteKey: config.turnstileSiteKey,
     wrap: sellerSubmitTurnstileWrap,
@@ -963,13 +975,22 @@ async function handleEmailAuthSubmit(event) {
 }
 
 async function runWithHumanVerification(action) {
+  if (customerTurnstileGate?.enabled && !customerTurnstileGate.canProceed()) {
+    pendingHumanAction = action;
+    setEmailAuthStatus(t("verifyHuman"));
+    await customerTurnstileGate.start?.();
+    return;
+  }
   await action();
 }
 
 async function completePendingHumanAction() {
   const action = pendingHumanAction;
   pendingHumanAction = null;
-  if (action) await action();
+  if (action) {
+    await action();
+    customerTurnstileGate?.reset?.();
+  }
 }
 
 async function signInWithEmail(email, password) {
