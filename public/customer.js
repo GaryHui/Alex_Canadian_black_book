@@ -1049,6 +1049,10 @@ function openEmailAuthModal(mode = "signin") {
   emailAuthModal.hidden = false;
   document.body.classList.add("modal-open");
   if (emailAuthTermsCheck) emailAuthTermsCheck.checked = false;
+  if (emailAuthMode === "signup") {
+    clearSignupAutofill();
+    window.setTimeout(clearSignupAutofill, 100);
+  }
   window.setTimeout(() => emailAuthEmail?.focus(), 0);
 }
 
@@ -1058,6 +1062,15 @@ function closeEmailAuthModal() {
   closeSignupConfirm();
   emailAuthModal.hidden = true;
   document.body.classList.remove("modal-open");
+}
+
+function clearSignupAutofill() {
+  if (emailAuthMode !== "signup") return;
+  emailAuthEmail.value = "";
+  emailAuthPassword.value = "";
+  emailAuthConfirm.value = "";
+  if (emailAuthTermsCheck) emailAuthTermsCheck.checked = false;
+  setEmailAuthStatus("");
 }
 
 function openTermsModal() {
@@ -1125,8 +1138,12 @@ function setEmailAuthMode(mode) {
   emailAuthPassword.required = !isReset;
   emailAuthConfirm.required = isSignup || isUpdate;
   if (emailAuthTermsCheck) emailAuthTermsCheck.required = isSignup;
+  emailAuthEmail.autocomplete = isSignup ? "off" : "email";
   emailAuthPassword.autocomplete = isSignup || isUpdate ? "new-password" : "current-password";
   emailAuthConfirm.autocomplete = "off";
+  emailAuthEmail.name = isSignup ? "signupEmail" : "email";
+  emailAuthPassword.name = isSignup ? "signupPassword" : "password";
+  emailAuthConfirm.name = isSignup ? "signupConfirmPassword" : "confirmPassword";
 
   const actionKey = isReset
     ? "emailResetAction"
@@ -1158,6 +1175,8 @@ function setEmailAuthMode(mode) {
     emailAuthSwitchButton.dataset.i18n = switchActionKey;
     emailAuthSwitchButton.dataset.authMode = switchMode;
   }
+
+  if (isSignup) window.setTimeout(clearSignupAutofill, 0);
 
   if (isUpdate) {
     if (emailAuthModal?.hidden) {
