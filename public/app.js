@@ -3006,14 +3006,14 @@ function renderDealerReports(leads) {
   const soldStock = dealerInventoryCache.filter((item) => String(item.status || "").toLowerCase() === "sold");
   dealerReportsListEl.innerHTML = `
     <section class="report-summary-grid" aria-label="${escapeHtml(isManager ? "Store totals" : "My totals")}">
-      ${renderDealerReportMetric(isManager ? "Store Up Sheets" : "My Up Sheets", reportLeads.length, isManager ? "Whole-store CRM records visible here" : "Assigned leads and task-access leads")}
-      ${renderDealerReportMetric("Active pipeline", activeLeads.length, "Open work still moving")}
-      ${renderDealerReportMetric("Closed", closedLeads.length, "Delivered, lost, inactive, or completed")}
-      ${renderDealerReportMetric("SELL valuations", sellerLeads.length, "Seller appraisal and acquisition work")}
-      ${renderDealerReportMetric("BUY E-Leads", buyerLeads.length, "Buyer inquiries")}
-      ${renderDealerReportMetric("Acquired / sold", acquiredLeads.length, "Won, purchased, delivered")}
+      ${renderDealerReportMetric(isManager ? "Store Up Sheets" : "Lifetime assigned", reportLeads.length, isManager ? "Whole-store CRM records visible here" : "All leads ever assigned or task-shared to you")}
+      ${renderDealerReportMetric(isManager ? "Active pipeline" : "Open leads", activeLeads.length, isManager ? "Open work still moving" : "Assigned leads not closed yet")}
+      ${renderDealerReportMetric(isManager ? "Closed" : "Closed leads", closedLeads.length, "Delivered, lost, inactive, or completed")}
+      ${renderDealerReportMetric("SELL leads", sellerLeads.length, "Seller appraisal and acquisition work")}
+      ${renderDealerReportMetric("BUY leads", buyerLeads.length, "Buyer inquiries")}
+      ${renderDealerReportMetric("Won / acquired", acquiredLeads.length, "Won, purchased, delivered")}
       ${renderDealerReportMetric("Lost", lostLeads.length, "Failed or lost opportunities")}
-      ${renderDealerReportMetric("Inventory follow-up", activeStock.length, "Assigned stock still active")}
+      ${renderDealerReportMetric(isManager ? "Inventory follow-up" : "Open stock", activeStock.length, "Assigned stock still active")}
       ${renderDealerReportMetric("Sold inventory", soldStock.length, "Assigned stock sold records")}
     </section>
     ${renderDealerDashboardStats(reportLeads, isManager)}
