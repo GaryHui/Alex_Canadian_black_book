@@ -5,11 +5,15 @@
 
   const labels = {
     en: {
-      dealer: "Dealer portal",
+      staffLogin: "Staff login",
+      staff: "Staff workbench",
+      manager: "Manager workbench",
       admin: "Admin"
     },
     fr: {
-      dealer: "Portail concessionnaire",
+      staffLogin: "Connexion employe",
+      staff: "Espace employe",
+      manager: "Espace gestionnaire",
       admin: "Admin"
     }
   };
@@ -47,12 +51,13 @@
     const copy = staffLabels();
     removeStaffLinks();
     if (!staffRole) {
+      ensureStaffLink("dealer", "/login.html?next=/dealer.html", copy.staffLogin);
       dashboardLink.hidden = false;
       return;
     }
 
     dashboardLink.hidden = true;
-    ensureStaffLink("dealer", "/dealer.html", copy.dealer);
+    ensureStaffLink("dealer", "/dealer.html", staffRole === "admin" ? copy.manager : copy.staff);
     if (staffRole === "admin") ensureStaffLink("admin", "/admin.html", copy.admin);
   }
 
