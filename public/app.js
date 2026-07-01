@@ -35,6 +35,7 @@ const reloadDealerStockButton = document.querySelector("#reload-dealer-stock");
 const reloadDealerLeadsButton = document.querySelector("#reload-dealer-leads");
 const dealerLeadAlertsEl = document.querySelector("#dealer-lead-alerts");
 const dealerTodayWorkEl = document.querySelector("#dealer-today-work");
+const dealerReportsListEl = document.querySelector("#dealer-reports-list");
 const dealerPageTitle = document.querySelector("#dealer-page-title");
 const dealerPageSubtitle = document.querySelector("#dealer-page-subtitle");
 const dealerDashboardEyebrow = document.querySelector("#dealer-dashboard-eyebrow");
@@ -159,7 +160,7 @@ dealerTodayWorkEl?.addEventListener("click", async (event) => {
   if (!button) return;
   await openDealerLead(button.dataset.dealerOpenLead || "");
 });
-dealerTodayWorkEl?.addEventListener("submit", (event) => {
+dealerReportsListEl?.addEventListener("submit", (event) => {
   const form = event.target.closest("[data-dealer-dashboard-range]");
   if (!form) return;
   event.preventDefault();
@@ -167,9 +168,9 @@ dealerTodayWorkEl?.addEventListener("submit", (event) => {
   if (!result.ok) return;
   dealerDashboardRange = normalizeDashboardDateRange(result.range);
   saveDashboardDateRange(DEALER_DASHBOARD_RANGE_KEY, dealerDashboardRange);
-  renderDealerTodayWork(dealerLeadsCache);
+  renderDealerReports(dealerLeadsCache);
 });
-dealerTodayWorkEl?.addEventListener("input", (event) => {
+dealerReportsListEl?.addEventListener("input", (event) => {
   const form = event.target.closest("[data-dealer-dashboard-range]");
   if (!form) return;
   syncDashboardDateConstraints(form);
@@ -1666,6 +1667,7 @@ async function loadDealerLeads(options = {}) {
     renderDealerLeads(dealerLeadsCache, dealerLeadRole);
     renderDealerLeadAlerts();
     renderDealerTodayWork(dealerLeadsCache);
+    renderDealerReports(dealerLeadsCache);
   } catch (error) {
     dealerLeadsStatus.textContent = error.message || "Unable to load assigned leads";
     dealerLeadsList.innerHTML = "";
@@ -1686,6 +1688,7 @@ async function loadDealerInventory() {
     dealerInventoryCache = data.inventory || [];
     renderDealerInventory(dealerInventoryCache);
     renderDealerTodayWork(dealerLeadsCache);
+    renderDealerReports(dealerLeadsCache);
   } catch (error) {
     if (dealerStockStatus) dealerStockStatus.textContent = error.message || "Unable to load assigned inventory";
     dealerStockList.innerHTML = "";
@@ -2927,7 +2930,6 @@ function renderDealerTodayWork(leads) {
   const focus = dealerWorkFocus(isManager ? managerFocusItems : staffFocusItems, isManager);
   dealerTodayWorkEl.hidden = false;
   dealerTodayWorkEl.innerHTML = `
-    ${renderDealerDashboardStats(queueLeads, isManager)}
     <section class="work-focus-panel dealer-work-focus" aria-label="Today focus">
       <div>
         <span>${isManager ? "Manager focus" : "Today focus"}</span>
@@ -2982,6 +2984,49 @@ function renderDealerTodayWork(leads) {
         </a>
       ` : ""}
     </section>
+  `;
+}
+
+function renderDealerReports(leads) {
+  if (!dealerReportsListEl) return;
+  const isManager = dealerLeadRole === "admin";
+  const currentUserEmail = String(authSession?.user?.email || "").trim().toLowerCase();
+  const reportLeads = isManager ? leads : leads.filter((lead) => {
+    const assigned = dealerLeadAssignedTo(lead);
+    const taskAssignees = Array.isArray(lead?.task_summary?.assigned_to) ? lead.task_summary.assigned_to : [];
+    return assigned === currentUserEmail || taskAssignees.map((email) => String(email || "").toLowerCase()).includes(currentUserEmail);
+  });
+  const activeLeads = reportLeads.filter((lead) => !isDealerClosedLead(lead));
+  const closedLeads = reportLeads.filter((lead) => isDealerClosedLead(lead));
+  const sellerLeads = reportLeads.filter((lead) => !isBuyerLead(lead));
+  const buyerLeads = reportLeads.filter((lead) => isBuyerLead(lead));
+  const acquiredLeads = reportLeads.filter(isDealerDashboardSoldLead);
+  const lostLeads = reportLeads.filter(isDealerDashboardLostLead);
+  const activeStock = dealerInventoryCache.filter((item) => !["sold", "archived"].includes(String(item.status || "").toLowerCase()));
+  const soldStock = dealerInventoryCache.filter((item) => String(item.status || "").toLowerCase() === "sold");
+  dealerReportsListEl.innerHTML = `
+    <section class="report-summary-grid" aria-label="${escapeHtml(isManager ? "Store totals" : "My totals")}">
+      ${renderDealerReportMetric(isManager ? "Store Up Sheets" : "My Up Sheets", reportLeads.length, isManager ? "Whole-store CRM records visible here" : "Assigned leads and task-access leads")}
+      ${renderDealerReportMetric("Active pipeline", activeLeads.length, "Open work still moving")}
+      ${renderDealerReportMetric("Closed", closedLeads.length, "Delivered, lost, inactive, or completed")}
+      ${renderDealerReportMetric("SELL valuations", sellerLeads.length, "Seller appraisal and acquisition work")}
+      ${renderDealerReportMetric("BUY E-Leads", buyerLeads.length, "Buyer inquiries")}
+      ${renderDealerReportMetric("Acquired / sold", acquiredLeads.length, "Won, purchased, delivered")}
+      ${renderDealerReportMetric("Lost", lostLeads.length, "Failed or lost opportunities")}
+      ${renderDealerReportMetric("Inventory follow-up", activeStock.length, "Assigned stock still active")}
+      ${renderDealerReportMetric("Sold inventory", soldStock.length, "Assigned stock sold records")}
+    </section>
+    ${renderDealerDashboardStats(reportLeads, isManager)}
+  `;
+}
+
+function renderDealerReportMetric(label, value, hint) {
+  return `
+    <article class="report-metric-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${formatNumber(value)}</strong>
+      <small>${escapeHtml(hint)}</small>
+    </article>
   `;
 }
 

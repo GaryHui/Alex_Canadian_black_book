@@ -14,6 +14,7 @@ const adminControlBoardEl = document.querySelector("#admin-control-board");
 const adminOverviewEl = document.querySelector("#admin-overview");
 const adminLeadAlertsEl = document.querySelector("#admin-lead-alerts");
 const adminTodayListEl = document.querySelector("#admin-today-list");
+const adminReportsListEl = document.querySelector("#admin-reports-list");
 const adminLeadFilterButtons = [...document.querySelectorAll("[data-admin-lead-filter]")];
 const adminLeadSearchInput = document.querySelector("#admin-lead-search");
 const adminLeadSortSelect = document.querySelector("#admin-lead-sort");
@@ -166,7 +167,7 @@ adminTodayListEl?.addEventListener("click", async (event) => {
     document.querySelector("#inventory-warehouse")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 });
-adminTodayListEl?.addEventListener("submit", (event) => {
+adminReportsListEl?.addEventListener("submit", (event) => {
   const form = event.target.closest("[data-admin-dashboard-range]");
   if (!form) return;
   event.preventDefault();
@@ -174,9 +175,9 @@ adminTodayListEl?.addEventListener("submit", (event) => {
   if (!result.ok) return;
   adminDashboardRange = normalizeDashboardDateRange(result.range);
   saveDashboardDateRange(ADMIN_DASHBOARD_RANGE_KEY, adminDashboardRange);
-  renderAdminToday(adminLeadsCache);
+  renderAdminReports(adminLeadsCache);
 });
-adminTodayListEl?.addEventListener("input", (event) => {
+adminReportsListEl?.addEventListener("input", (event) => {
   const form = event.target.closest("[data-admin-dashboard-range]");
   if (!form) return;
   syncDashboardDateConstraints(form);
@@ -1849,6 +1850,7 @@ function renderAdminOverview(leads) {
   adminOverviewEl.innerHTML = "";
   renderAdminControlBoard(leads);
   renderAdminToday(leads);
+  renderAdminReports(leads);
 }
 
 function renderAdminToday(leads) {
@@ -1867,7 +1869,6 @@ function renderAdminToday(leads) {
     + activeLeads.filter((lead) => !isBuyerLead(lead) && ["offer_sent", "won", "in_inventory"].includes(String(lead.status || "").toLowerCase())).length
     + draftCount;
   const reconBlockerCount = activeLeads.filter((lead) => !isBuyerLead(lead) && Number(adminDealChecklistSummary(lead).pending || 0) > 0).length;
-  const dashboardStats = renderAdminDashboardStats(leads);
   const focus = adminWorkFocus([
     { count: managerApprovalCount, label: "Clear manager approvals", detail: "Price, recon, publish, or staff updates need your decision.", filter: "manager-approval" },
     { count: unassignedCount, label: "Assign responsible reps", detail: "Give every hot lead one clear main rep before it gets cold.", filter: "unassigned" },
@@ -1880,7 +1881,6 @@ function renderAdminToday(leads) {
   ]);
 
   adminTodayListEl.innerHTML = `
-    ${dashboardStats}
     <section class="work-focus-panel admin-work-focus" aria-label="Manager focus">
       <div>
         <span>Manager focus</span>
@@ -1921,6 +1921,44 @@ function renderAdminToday(leads) {
         <small>Stock waiting on review</small>
       </button>
     </section>
+  `;
+}
+
+function renderAdminReports(leads) {
+  if (!adminReportsListEl) return;
+  const activeLeads = leads.filter((lead) => !isClosedLead(lead));
+  const closedLeads = leads.filter((lead) => isClosedLead(lead));
+  const sellerLeads = leads.filter((lead) => !isBuyerLead(lead));
+  const buyerLeads = leads.filter((lead) => isBuyerLead(lead));
+  const acquiredLeads = leads.filter(isDashboardSoldLead);
+  const lostLeads = leads.filter(isDashboardLostLead);
+  const publishedInventory = inventoryCache.filter((item) => String(item.status || "").toLowerCase() === "published");
+  const draftInventory = inventoryCache.filter((item) => ["draft", "review"].includes(String(item.status || "").toLowerCase()));
+  const soldInventory = inventoryCache.filter((item) => String(item.status || "").toLowerCase() === "sold");
+  adminReportsListEl.innerHTML = `
+    <section class="report-summary-grid" aria-label="Company totals">
+      ${renderReportMetric("All Up Sheets", leads.length, "Every lead in CRM history")}
+      ${renderReportMetric("Active pipeline", activeLeads.length, "Open BUY and SELL work")}
+      ${renderReportMetric("Closed / archived", closedLeads.length, "Completed, lost, inactive, or deleted")}
+      ${renderReportMetric("SELL valuations", sellerLeads.length, "Vehicles offered or appraised")}
+      ${renderReportMetric("BUY E-Leads", buyerLeads.length, "Public buyer inquiries")}
+      ${renderReportMetric("Acquired / sold", acquiredLeads.length, "Won, purchased, delivered")}
+      ${renderReportMetric("Lost", lostLeads.length, "Failed or lost opportunities")}
+      ${renderReportMetric("Inventory live", publishedInventory.length, "Published on Buy page")}
+      ${renderReportMetric("Inventory draft", draftInventory.length, "Warehouse review before publish")}
+      ${renderReportMetric("Inventory sold", soldInventory.length, "Sold stock records")}
+    </section>
+    ${renderAdminDashboardStats(leads)}
+  `;
+}
+
+function renderReportMetric(label, value, hint) {
+  return `
+    <article class="report-metric-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${formatNumber(value)}</strong>
+      <small>${escapeHtml(hint)}</small>
+    </article>
   `;
 }
 

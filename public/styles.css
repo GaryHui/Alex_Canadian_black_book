@@ -1524,6 +1524,52 @@ select {
   border-left-color: var(--red);
 }
 
+.admin-section-reports,
+.dealer-reports-panel {
+  border-left-color: #2563eb;
+}
+
+.admin-reports-list,
+.dealer-reports-list {
+  display: grid;
+  gap: 16px;
+}
+
+.report-summary-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.report-metric-card {
+  background: #f8fafc;
+  border: 1px solid #d8e2ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  min-height: 108px;
+  padding: 14px;
+}
+
+.report-metric-card span {
+  color: #53657f;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.report-metric-card strong {
+  color: #0b4f9c;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.report-metric-card small {
+  color: #53657f;
+  line-height: 1.35;
+}
+
 .history-head {
   align-items: center;
   display: flex;
