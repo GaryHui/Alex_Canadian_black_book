@@ -1469,6 +1469,7 @@ async function setSession(session) {
     }
     dealerAdminAllowed = true;
     dealerLeadRole = dealer.role || "dealer";
+    dealerStaffScope = dealer.role === "admin" ? "all" : "my";
     setDealerAdminLinksVisible(dealer.role === "admin");
     applyDealerWorkbenchRole(dealer.role);
     authSubtitle.textContent = dealer.role === "admin"
@@ -1519,7 +1520,7 @@ function applyDealerWorkbenchRole(role) {
   if (dealerDashboardTitle) dealerDashboardTitle.textContent = "Dashboard";
   if (dealerDashboardCopy) {
     dealerDashboardCopy.textContent = isManager
-      ? "Work your own queue like staff, or switch the staff view to review another rep's leads."
+      ? "Review all staff follow-up by default, or switch the staff view to one rep including yourself."
       : "Review your totals, then jump into the right Up Sheets view for follow-up work.";
   }
 }
@@ -1538,7 +1539,7 @@ function renderDealerAccessSummary(dealer) {
     <span>${escapeHtml(role)}</span>
     <strong>${escapeHtml(authSession?.user?.email || "")}</strong>
     <small>${canManage
-      ? "Works this portal like a staff rep, can switch staff queues, and can open Admin for manager-only decisions."
+      ? "Sees all staff follow-up here, can switch to one rep, and can open Admin for manager-only decisions."
       : "Can work assigned Up Sheets and stock, upload photos, add notes/tasks, and request manager changes."
     }</small>
   `;
@@ -1607,12 +1608,12 @@ function renderDealerStaffScopeControl() {
     ...dealerDirectoryEmails.map((email) => String(email || "").trim().toLowerCase())
   ].filter(Boolean))).sort();
   const options = [
+    `<option value="all">All staff, including owner</option>`,
     `<option value="my">My leads</option>`,
-    `<option value="all">All staff</option>`,
     ...staffEmails.map((email) => `<option value="${escapeHtml(email)}">${escapeHtml(shortEmail(email))}</option>`)
   ];
   if (!dealerStaffScope || (!["my", "all"].includes(dealerStaffScope) && !staffEmails.includes(dealerStaffScope))) {
-    dealerStaffScope = "my";
+    dealerStaffScope = "all";
   }
   dealerStaffScopeSelect.innerHTML = options.join("");
   dealerStaffScopeSelect.value = dealerStaffScope;
