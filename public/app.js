@@ -3372,9 +3372,6 @@ function filterDealerLeads(leads) {
   if (dealerLeadFilter === "aging-critical") filtered = leads.filter(isDealerAgingCriticalLead);
   if (dealerLeadFilter === "priority") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && ["high", "urgent"].includes(String(lead.priority || "").toLowerCase()));
   if (dealerLeadFilter === "unassigned") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && !String(lead.assigned_to || "").trim());
-  if (dealerLeadFilter === "my-leads") {
-    filtered = leads.filter(isDealerActiveWorkLead);
-  }
   if (dealerLeadFilter === "open-tasks") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && hasDealerOpenTask(lead));
   if (dealerLeadFilter === "updates") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && dealerLeadAlertMap.has(String(lead.id || "")));
   if (dealerLeadFilter === "buyer") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && isBuyerLead(lead));
