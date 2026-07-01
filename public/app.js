@@ -44,6 +44,8 @@ const dealerDashboardCopy = document.querySelector("#dealer-dashboard-copy");
 const dealerLeadFilterButtons = document.querySelectorAll("[data-dealer-filter]");
 const dealerLeadSortSelect = document.querySelector("#dealer-lead-sort");
 const dealerLeadSearchInput = document.querySelector("#dealer-lead-search");
+const dealerStaffScopeControl = document.querySelector("#dealer-staff-scope-control");
+const dealerStaffScopeSelect = document.querySelector("#dealer-staff-scope");
 const MAX_LEAD_PHOTOS = 20;
 const dealerLeadDrawer = document.querySelector("#dealer-lead-drawer");
 const dealerLeadDrawerContent = document.querySelector("#dealer-lead-drawer-content");
@@ -111,6 +113,7 @@ let dealerLeadRole = "dealer";
 let dealerLeadFilter = "active";
 let dealerLeadSort = "newest";
 let dealerLeadSearch = "";
+let dealerStaffScope = "my";
 let dealerLeadAlertMap = new Map();
 let dealerLeadDuplicateMap = new Map();
 let activeDealerLeadId = "";
@@ -141,6 +144,13 @@ dealerLeadSortSelect?.addEventListener("change", () => {
 dealerLeadSearchInput?.addEventListener("input", () => {
   dealerLeadSearch = String(dealerLeadSearchInput.value || "").trim().toLowerCase();
   renderDealerLeads(dealerLeadsCache, dealerLeadRole);
+});
+dealerStaffScopeSelect?.addEventListener("change", () => {
+  dealerStaffScope = String(dealerStaffScopeSelect.value || "my").trim().toLowerCase() || "my";
+  renderDealerLeads(dealerLeadsCache, dealerLeadRole);
+  renderDealerInventory(dealerInventoryCache);
+  renderDealerTodayWork(dealerLeadsCache);
+  renderDealerReports(dealerLeadsCache);
 });
 dealerLeadAlertsEl?.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-dealer-open-alert]");
@@ -1499,17 +1509,17 @@ async function setSession(session) {
 
 function applyDealerWorkbenchRole(role) {
   const isManager = role === "admin";
-  if (dealerPageTitle) dealerPageTitle.textContent = isManager ? "Manager workbench" : "Dealer workbench";
+  if (dealerPageTitle) dealerPageTitle.textContent = "Dealer workbench";
   if (dealerPageSubtitle) {
     dealerPageSubtitle.textContent = isManager
-      ? "Whole-store work, staff updates, approvals, and inventory follow-up"
+      ? "Staff-style workspace with owner access to each rep queue"
       : "Responsible leads, valuation, and quote history";
   }
-  if (dealerDashboardEyebrow) dealerDashboardEyebrow.textContent = isManager ? "Manager workbench" : "Dealer workbench";
-  if (dealerDashboardTitle) dealerDashboardTitle.textContent = isManager ? "Manager dashboard" : "Dashboard";
+  if (dealerDashboardEyebrow) dealerDashboardEyebrow.textContent = "Dealer workbench";
+  if (dealerDashboardTitle) dealerDashboardTitle.textContent = "Dashboard";
   if (dealerDashboardCopy) {
     dealerDashboardCopy.textContent = isManager
-      ? "Start with unassigned leads, overdue work, staff updates, and manager approvals."
+      ? "Work your own queue like staff, or switch the staff view to review another rep's leads."
       : "Review your totals, then jump into the right Up Sheets view for follow-up work.";
   }
 }
@@ -1528,7 +1538,7 @@ function renderDealerAccessSummary(dealer) {
     <span>${escapeHtml(role)}</span>
     <strong>${escapeHtml(authSession?.user?.email || "")}</strong>
     <small>${canManage
-      ? "Can manage team access, pricing decisions, inventory publish/sold/archive, and all Up Sheets."
+      ? "Works this portal like a staff rep, can switch staff queues, and can open Admin for manager-only decisions."
       : "Can work assigned Up Sheets and stock, upload photos, add notes/tasks, and request manager changes."
     }</small>
   `;
@@ -1579,6 +1589,33 @@ async function loadDealerDirectory() {
   } catch {
     dealerDirectoryEmails = [];
   }
+  renderDealerStaffScopeControl();
+}
+
+function renderDealerStaffScopeControl() {
+  if (!dealerStaffScopeControl || !dealerStaffScopeSelect) return;
+  const isAdmin = dealerLeadRole === "admin";
+  dealerStaffScopeControl.hidden = !isAdmin;
+  if (!isAdmin) {
+    dealerStaffScope = "my";
+    dealerStaffScopeSelect.innerHTML = `<option value="my">My leads</option>`;
+    return;
+  }
+  const currentEmail = String(authSession?.user?.email || "").trim().toLowerCase();
+  const staffEmails = Array.from(new Set([
+    currentEmail,
+    ...dealerDirectoryEmails.map((email) => String(email || "").trim().toLowerCase())
+  ].filter(Boolean))).sort();
+  const options = [
+    `<option value="my">My leads</option>`,
+    `<option value="all">All staff</option>`,
+    ...staffEmails.map((email) => `<option value="${escapeHtml(email)}">${escapeHtml(shortEmail(email))}</option>`)
+  ];
+  if (!dealerStaffScope || (!["my", "all"].includes(dealerStaffScope) && !staffEmails.includes(dealerStaffScope))) {
+    dealerStaffScope = "my";
+  }
+  dealerStaffScopeSelect.innerHTML = options.join("");
+  dealerStaffScopeSelect.value = dealerStaffScope;
 }
 
 function disableDealerTools(disabled) {
@@ -1697,22 +1734,23 @@ async function loadDealerInventory() {
 
 function renderDealerInventory(inventory) {
   if (!dealerStockList) return;
-  if (!inventory.length) {
-    if (dealerStockStatus) dealerStockStatus.textContent = "No inventory vehicles assigned to you yet.";
+  const scopedInventory = dealerScopedInventory(inventory);
+  if (!scopedInventory.length) {
+    if (dealerStockStatus) dealerStockStatus.textContent = dealerLeadRole === "admin" && dealerStaffScope === "all" ? "No inventory vehicles yet." : "No inventory vehicles in this staff view yet.";
     dealerStockList.innerHTML = `
       <article class="dealer-stock-empty">
         <strong>No stock follow-up right now</strong>
-        <span>When a seller lead moves to Warehouse and remains assigned to you, it appears here for photos, recon notes, and handoff work.</span>
+        <span>When a seller lead moves to Warehouse and remains in the selected staff view, it appears here for photos, recon notes, and handoff work.</span>
       </article>
     `;
     return;
   }
-  const active = inventory.filter((item) => !["sold", "archived"].includes(String(item.status || "").toLowerCase())).length;
-  const published = inventory.filter((item) => String(item.status || "").toLowerCase() === "published").length;
+  const active = scopedInventory.filter((item) => !["sold", "archived"].includes(String(item.status || "").toLowerCase())).length;
+  const published = scopedInventory.filter((item) => String(item.status || "").toLowerCase() === "published").length;
   if (dealerStockStatus) {
-    dealerStockStatus.textContent = `${inventory.length} assigned stock vehicle${inventory.length === 1 ? "" : "s"}. ${active} active / ${published} live on Buy page.`;
+    dealerStockStatus.textContent = `${scopedInventory.length} stock vehicle${scopedInventory.length === 1 ? "" : "s"} in this view. ${active} active / ${published} live on Buy page.`;
   }
-  dealerStockList.innerHTML = inventory.map(renderDealerInventoryCard).join("");
+  dealerStockList.innerHTML = scopedInventory.map(renderDealerInventoryCard).join("");
 }
 
 function renderDealerInventoryCard(item) {
@@ -2082,8 +2120,10 @@ function isDealerOwnLatestActivity(lead) {
 }
 
 function renderDealerLeads(leads, role) {
-  const queueLeads = leads.filter(isDealerQueueLead);
-  const stockLeadCount = leads.length - queueLeads.length;
+  renderDealerStaffScopeControl();
+  const scopedLeads = dealerScopedLeads(leads);
+  const queueLeads = scopedLeads.filter(isDealerQueueLead);
+  const stockLeadCount = scopedLeads.length - queueLeads.length;
 
   if (!queueLeads.length) {
     dealerLeadsStatus.textContent = role === "admin"
@@ -2105,7 +2145,7 @@ function renderDealerLeads(leads, role) {
   const closedCount = queueLeads.length - activeCount;
   const sortLabel = dealerLeadSort === "oldest" ? "Oldest first" : "Newest first";
   const searchLabel = dealerLeadSearch ? ` Search: "${dealerLeadSearch}".` : "";
-  const stockNote = stockLeadCount ? ` ${stockLeadCount} Inventory Follow-up. ${queueLeads.length} Up Sheets + ${stockLeadCount} Inventory = ${leads.length} total records.` : "";
+  const stockNote = stockLeadCount ? ` ${stockLeadCount} Inventory Follow-up. ${queueLeads.length} Up Sheets + ${stockLeadCount} Inventory = ${scopedLeads.length} total records.` : "";
   const foldedCount = visibleLeads.length - groupedLeads.length;
   const foldedNote = foldedCount ? ` ${foldedCount} same-vehicle duplicate${foldedCount === 1 ? "" : "s"} folded into primary vehicle files.` : "";
   dealerLeadsStatus.textContent = `${groupedLeads.length} vehicle file${groupedLeads.length === 1 ? "" : "s"} shown from ${visibleLeads.length} lead${visibleLeads.length === 1 ? "" : "s"}. ${activeCount} active / ${closedCount} closed Up Sheets.${foldedNote}${stockNote} Sort: ${sortLabel}, with urgent, overdue, and new pinned first.${searchLabel}`;
@@ -2891,7 +2931,8 @@ function renderDealerCommunicationStrip(lead) {
 function renderDealerTodayWork(leads) {
   if (!dealerTodayWorkEl) return;
   const isManager = dealerLeadRole === "admin";
-  const queueLeads = leads.filter(isDealerQueueLead);
+  const scopedLeads = dealerScopedLeads(leads);
+  const queueLeads = scopedLeads.filter(isDealerQueueLead);
   const activeLeads = queueLeads.filter(isDealerActiveWorkLead);
   const updateCount = activeLeads.filter((lead) => dealerLeadAlertMap.has(String(lead.id || ""))).length;
   const taskCount = activeLeads.filter(hasDealerOpenTask).length;
@@ -2908,15 +2949,8 @@ function renderDealerTodayWork(leads) {
   const overdueCount = activeLeads.filter((lead) => isDealerLeadOverdue(lead.next_follow_up_at || "", lead.status || "new")).length;
   const photoTaskCount = activeLeads.filter((lead) => dealerTaskText(lead).includes("photo") || dealerTaskText(lead).includes("picture")).length;
   const reconTaskCount = activeLeads.filter((lead) => dealerTaskText(lead).includes("recon") || dealerTaskText(lead).includes("repair") || dealerTaskText(lead).includes("keys") || dealerTaskText(lead).includes("documents")).length;
-  const stockFollowUpCount = dealerInventoryCache.filter((item) => !["sold", "archived"].includes(String(item.status || "").toLowerCase())).length;
-  const managerFocusItems = [
-    { count: unassignedCount, label: "Assign unowned leads", detail: "New Up Sheets need a responsible person before work starts.", filter: "unassigned" },
-    { count: reviewCount, label: "Review staff updates", detail: "Staff added price, photo, inspection, or status updates for manager approval.", filter: "updates" },
-    { count: overdueCount, label: "Clear overdue follow-ups", detail: "Follow-ups are past due and need manager attention.", filter: "due" },
-    { count: taskCount, label: "Check open tasks", detail: "See what the team has not completed yet.", filter: "open-tasks" },
-    { count: stockFollowUpCount, label: "Move inventory forward", detail: "Review recon, photo, publish, sold, or archive work.", filter: "active" },
-    { count: activeLeads.length, label: "Review whole-store queue", detail: "Scan every active lead and decide the next owner or checkpoint.", filter: "active" }
-  ];
+  const scopedInventory = dealerScopedInventory(dealerInventoryCache);
+  const stockFollowUpCount = scopedInventory.filter((item) => !["sold", "archived"].includes(String(item.status || "").toLowerCase())).length;
   const staffFocusItems = [
     { count: updateCount, label: "Review new lead updates", detail: "Start with leads changed by another team member.", filter: "updates" },
     { count: taskCount, label: "Work open tasks", detail: "Complete or update assigned tasks before adding new notes.", filter: "open-tasks" },
@@ -2927,12 +2961,12 @@ function renderDealerTodayWork(leads) {
     { count: freshCount, label: "Start fresh leads", detail: "New leads need the first touch and next step.", filter: "fresh" },
     { count: activeLeads.length, label: "Keep the active queue moving", detail: "Open your queue and continue the next best lead.", filter: "active" }
   ];
-  const focus = dealerWorkFocus(isManager ? managerFocusItems : staffFocusItems, isManager);
+  const focus = dealerWorkFocus(staffFocusItems, false);
   dealerTodayWorkEl.hidden = false;
   dealerTodayWorkEl.innerHTML = `
     <section class="work-focus-panel dealer-work-focus" aria-label="Today focus">
       <div>
-        <span>${isManager ? "Manager focus" : "Today focus"}</span>
+        <span>${isManager ? "Selected staff focus" : "Today focus"}</span>
         <strong>${escapeHtml(focus.label)}</strong>
         <small>${escapeHtml(focus.detail)}</small>
       </div>
@@ -2940,41 +2974,34 @@ function renderDealerTodayWork(leads) {
     </section>
     <section class="dealer-manager-brief" aria-label="Dealer brief">
       <button type="button" class="dealer-brief-card brief-card-hot" data-dealer-filter-shortcut="updates">
-        <span>${isManager ? "Staff updates" : "Updates"}</span>
-        <strong>${isManager ? reviewCount || updateCount : updateCount}</strong>
-        <small>${isManager ? "Need manager review" : "Lead changes to review"}</small>
+        <span>Updates</span>
+        <strong>${updateCount}</strong>
+        <small>Lead changes to review</small>
       </button>
       <button type="button" class="dealer-brief-card brief-card-hot" data-dealer-filter-shortcut="open-tasks">
         <span>Tasks</span>
         <strong>${taskCount}</strong>
-        <small>${isManager ? "Open team next actions" : "Assigned next actions"}</small>
+        <small>Assigned next actions</small>
       </button>
-      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="${isManager ? "unassigned" : "active"}">
-        <span>${isManager ? "Unassigned" : "My queue"}</span>
-        <strong>${isManager ? unassignedCount : activeLeads.length}</strong>
-        <small>${isManager ? "Need owner assignment" : "All assigned active work"}</small>
+      <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="active">
+        <span>${isManager ? "Selected queue" : "My queue"}</span>
+        <strong>${activeLeads.length}</strong>
+        <small>All active work in this view</small>
       </button>
-      ${isManager ? `
-        <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="my-leads">
-          <span>My leads</span>
-          <strong>${myLeadCount}</strong>
-          <small>Manager personally owns</small>
-        </button>
-      ` : ""}
       <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="waiting-reply">
         <span>Needs Reply</span>
         <strong>${waitingReplyCount}</strong>
         <small>Customer waiting</small>
       </button>
       <button type="button" class="dealer-brief-card" data-dealer-filter-shortcut="due">
-        <span>${isManager ? "Overdue / due" : "Due today"}</span>
-        <strong>${isManager ? overdueCount || dueCount : dueCount}</strong>
-        <small>${isManager ? "Manager should unblock" : "Follow-up due or overdue"}</small>
+        <span>Due today</span>
+        <strong>${dueCount}</strong>
+        <small>Follow-up due or overdue</small>
       </button>
       <a class="dealer-brief-card dealer-brief-link" href="#dealer-stock-section">
         <span>Inventory follow-up</span>
         <strong>${stockFollowUpCount}</strong>
-        <small>${isManager ? "Recon, publish, sold review" : "Published or warehouse stock to work"}</small>
+        <small>Published or warehouse stock to work</small>
       </a>
       ${isManager ? `
         <a class="dealer-brief-card dealer-brief-link" href="/admin.html">
@@ -2990,33 +3017,30 @@ function renderDealerTodayWork(leads) {
 function renderDealerReports(leads) {
   if (!dealerReportsListEl) return;
   const isManager = dealerLeadRole === "admin";
-  const currentUserEmail = String(authSession?.user?.email || "").trim().toLowerCase();
-  const reportLeads = isManager ? leads : leads.filter((lead) => {
-    const assigned = dealerLeadAssignedTo(lead);
-    const taskAssignees = Array.isArray(lead?.task_summary?.assigned_to) ? lead.task_summary.assigned_to : [];
-    return assigned === currentUserEmail || taskAssignees.map((email) => String(email || "").toLowerCase()).includes(currentUserEmail);
-  });
+  const reportLeads = dealerScopedLeads(leads);
   const activeLeads = reportLeads.filter((lead) => !isDealerClosedLead(lead));
   const closedLeads = reportLeads.filter((lead) => isDealerClosedLead(lead));
   const sellerLeads = reportLeads.filter((lead) => !isBuyerLead(lead));
   const buyerLeads = reportLeads.filter((lead) => isBuyerLead(lead));
   const acquiredLeads = reportLeads.filter(isDealerDashboardSoldLead);
   const lostLeads = reportLeads.filter(isDealerDashboardLostLead);
-  const activeStock = dealerInventoryCache.filter((item) => !["sold", "archived"].includes(String(item.status || "").toLowerCase()));
-  const soldStock = dealerInventoryCache.filter((item) => String(item.status || "").toLowerCase() === "sold");
+  const scopedInventory = dealerScopedInventory(dealerInventoryCache);
+  const activeStock = scopedInventory.filter((item) => !["sold", "archived"].includes(String(item.status || "").toLowerCase()));
+  const soldStock = scopedInventory.filter((item) => String(item.status || "").toLowerCase() === "sold");
+  const teamScope = isManager && dealerStaffScope === "all";
   dealerReportsListEl.innerHTML = `
-    <section class="report-summary-grid" aria-label="${escapeHtml(isManager ? "Store totals" : "My totals")}">
-      ${renderDealerReportMetric(isManager ? "Store Up Sheets" : "Lifetime assigned", reportLeads.length, isManager ? "Whole-store CRM records visible here" : "All leads ever assigned or task-shared to you")}
-      ${renderDealerReportMetric(isManager ? "Active pipeline" : "Open leads", activeLeads.length, isManager ? "Open work still moving" : "Assigned leads not closed yet")}
-      ${renderDealerReportMetric(isManager ? "Closed" : "Closed leads", closedLeads.length, "Delivered, lost, inactive, or completed")}
+    <section class="report-summary-grid" aria-label="${escapeHtml(teamScope ? "Store totals" : "Selected staff totals")}">
+      ${renderDealerReportMetric(teamScope ? "Store Up Sheets" : "Lifetime assigned", reportLeads.length, teamScope ? "Whole-store CRM records visible here" : "All leads assigned or task-shared in this staff view")}
+      ${renderDealerReportMetric(teamScope ? "Active pipeline" : "Open leads", activeLeads.length, teamScope ? "Open work still moving" : "Leads not closed yet in this staff view")}
+      ${renderDealerReportMetric(teamScope ? "Closed" : "Closed leads", closedLeads.length, "Delivered, lost, inactive, or completed")}
       ${renderDealerReportMetric("SELL leads", sellerLeads.length, "Seller appraisal and acquisition work")}
       ${renderDealerReportMetric("BUY leads", buyerLeads.length, "Buyer inquiries")}
       ${renderDealerReportMetric("Won / acquired", acquiredLeads.length, "Won, purchased, delivered")}
       ${renderDealerReportMetric("Lost", lostLeads.length, "Failed or lost opportunities")}
-      ${renderDealerReportMetric(isManager ? "Inventory follow-up" : "Open stock", activeStock.length, "Assigned stock still active")}
+      ${renderDealerReportMetric(teamScope ? "Inventory follow-up" : "Open stock", activeStock.length, "Assigned stock still active")}
       ${renderDealerReportMetric("Sold inventory", soldStock.length, "Assigned stock sold records")}
     </section>
-    ${renderDealerDashboardStats(reportLeads, isManager)}
+    ${renderDealerDashboardStats(reportLeads, teamScope)}
   `;
 }
 
@@ -3051,6 +3075,43 @@ function dealerTaskText(lead) {
 
 function dealerLeadAssignedTo(lead) {
   return String(lead?.assignedTo || lead?.assigned_to || "").trim().toLowerCase();
+}
+
+function dealerTaskAssignees(lead) {
+  return Array.isArray(lead?.task_summary?.assigned_to)
+    ? lead.task_summary.assigned_to.map((email) => String(email || "").trim().toLowerCase()).filter(Boolean)
+    : [];
+}
+
+function dealerStaffScopeEmail() {
+  const value = String(dealerStaffScope || "my").trim().toLowerCase();
+  if (value === "all") return "";
+  if (value === "my") return String(authSession?.user?.email || "").trim().toLowerCase();
+  return value;
+}
+
+function dealerLeadMatchesStaffScope(lead, email = dealerStaffScopeEmail()) {
+  if (dealerLeadRole === "admin" && dealerStaffScope === "all") return true;
+  if (!email) return true;
+  return dealerLeadAssignedTo(lead) === email || dealerTaskAssignees(lead).includes(email);
+}
+
+function dealerScopedLeads(leads) {
+  return Array.isArray(leads) ? leads.filter((lead) => dealerLeadMatchesStaffScope(lead)) : [];
+}
+
+function dealerInventoryAssignedTo(item) {
+  return String(item?.assignedTo || item?.assigned_to || item?.lead?.assigned_to || "").trim().toLowerCase();
+}
+
+function dealerInventoryMatchesStaffScope(item, email = dealerStaffScopeEmail()) {
+  if (dealerLeadRole === "admin" && dealerStaffScope === "all") return true;
+  if (!email) return true;
+  return dealerInventoryAssignedTo(item) === email;
+}
+
+function dealerScopedInventory(inventory) {
+  return Array.isArray(inventory) ? inventory.filter((item) => dealerInventoryMatchesStaffScope(item)) : [];
 }
 
 function renderDealerDashboardStats(leads, isManager = false) {
@@ -3311,8 +3372,7 @@ function filterDealerLeads(leads) {
   if (dealerLeadFilter === "priority") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && ["high", "urgent"].includes(String(lead.priority || "").toLowerCase()));
   if (dealerLeadFilter === "unassigned") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && !String(lead.assigned_to || "").trim());
   if (dealerLeadFilter === "my-leads") {
-    const currentUserEmail = String(authSession?.user?.email || "").trim().toLowerCase();
-    filtered = leads.filter((lead) => !isDealerClosedLead(lead) && dealerLeadAssignedTo(lead) === currentUserEmail);
+    filtered = leads.filter(isDealerActiveWorkLead);
   }
   if (dealerLeadFilter === "open-tasks") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && hasDealerOpenTask(lead));
   if (dealerLeadFilter === "updates") filtered = leads.filter((lead) => !isDealerClosedLead(lead) && dealerLeadAlertMap.has(String(lead.id || "")));
@@ -4123,7 +4183,10 @@ function dealerLeadAlertTitle(lead = {}) {
 
 function renderDealerLeadAlerts() {
   if (!dealerLeadAlertsEl) return;
-  const alerts = [...dealerLeadAlertMap.values()];
+  const alerts = [...dealerLeadAlertMap.values()].filter((alert) => {
+    const lead = dealerLeadsCache.find((item) => String(item.id || "") === String(alert.id || ""));
+    return lead ? dealerLeadMatchesStaffScope(lead) : true;
+  });
   dealerLeadAlertsEl.hidden = alerts.length === 0;
   dealerLeadAlertsEl.innerHTML = alerts.length ? `
     <div>
