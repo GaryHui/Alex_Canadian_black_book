@@ -3146,19 +3146,12 @@ function leadStatusTimestamp(lead) {
 }
 
 function loadDashboardDateRange(key) {
-  try {
-    return normalizeDashboardDateRange(JSON.parse(localStorage.getItem(key) || "{}"));
-  } catch (error) {
-    return normalizeDashboardDateRange({});
-  }
+  return normalizeDashboardDateRange({});
 }
 
 function saveDashboardDateRange(key, range) {
-  try {
-    localStorage.setItem(key, JSON.stringify(normalizeDashboardDateRange(range)));
-  } catch (error) {
-    // Date range persistence is best-effort.
-  }
+  // Mature CRM dashboards open on month-to-date by default.
+  // The applied range stays in memory for the current page only.
 }
 
 function validateDashboardRangeForm(form) {
