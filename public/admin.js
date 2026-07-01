@@ -15,6 +15,7 @@ const adminOverviewEl = document.querySelector("#admin-overview");
 const adminLeadAlertsEl = document.querySelector("#admin-lead-alerts");
 const adminTodayListEl = document.querySelector("#admin-today-list");
 const adminReportsListEl = document.querySelector("#admin-reports-list");
+const adminTeamSummaryEl = document.querySelector("#admin-team-summary");
 const adminLeadFilterButtons = [...document.querySelectorAll("[data-admin-lead-filter]")];
 const adminLeadSearchInput = document.querySelector("#admin-lead-search");
 const adminLeadSortSelect = document.querySelector("#admin-lead-sort");
@@ -270,6 +271,7 @@ async function setAdminSession(session) {
     leadsEl.innerHTML = "";
     usersEl.innerHTML = "";
     dealersEl.innerHTML = "";
+    if (adminTeamSummaryEl) adminTeamSummaryEl.innerHTML = "";
     inventoryEl.innerHTML = "";
     inquiriesEl.innerHTML = "";
     return;
@@ -289,6 +291,7 @@ async function setAdminSession(session) {
     leadsEl.innerHTML = "";
     usersEl.innerHTML = "";
     dealersEl.innerHTML = "";
+    if (adminTeamSummaryEl) adminTeamSummaryEl.innerHTML = "";
     inventoryEl.innerHTML = "";
     inquiriesEl.innerHTML = "";
     return;
@@ -487,7 +490,10 @@ async function loadDealers() {
     .map((staff) => String(staff.email || "").trim().toLowerCase())
     .filter(Boolean);
   dealersEl.innerHTML = (data.staff || []).map(renderDealer).join("") || "<p>No staff access yet.</p>";
-  if (adminLeadsCache.length) renderLeadWorkbench(adminLeadsCache);
+  if (adminLeadsCache.length) {
+    renderLeadWorkbench(adminLeadsCache);
+    renderAdminTeam(adminLeadsCache);
+  }
 }
 
 async function loadInventory() {
@@ -1851,6 +1857,7 @@ function renderAdminOverview(leads) {
   renderAdminControlBoard(leads);
   renderAdminToday(leads);
   renderAdminReports(leads);
+  renderAdminTeam(leads);
 }
 
 function renderAdminToday(leads) {
@@ -1959,6 +1966,71 @@ function renderReportMetric(label, value, hint) {
       <strong>${formatNumber(value)}</strong>
       <small>${escapeHtml(hint)}</small>
     </article>
+  `;
+}
+
+function renderAdminTeam(leads) {
+  if (!adminTeamSummaryEl) return;
+  const activeLeads = leads.filter((lead) => !isClosedLead(lead));
+  const staffEmails = [...new Set([
+    ...dealerStaffEmails,
+    ...activeLeads
+      .map((lead) => String(lead.assigned_to || "").trim().toLowerCase())
+      .filter(Boolean)
+  ])].sort();
+  const unassigned = activeLeads.filter((lead) => !String(lead.assigned_to || "").trim());
+  const staffRows = staffEmails.map((email) => {
+    const assigned = activeLeads.filter((lead) => String(lead.assigned_to || "").trim().toLowerCase() === email);
+    return {
+      email,
+      active: assigned.length,
+      due: assigned.filter((lead) => isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).length,
+      tasks: assigned.filter(hasAdminOpenTask).length,
+      updates: assigned.filter((lead) => lead.owner_review?.unread).length
+    };
+  }).sort((a, b) => b.updates - a.updates || b.due - a.due || b.active - a.active || a.email.localeCompare(b.email));
+  const assignedCount = staffRows.reduce((sum, row) => sum + row.active, 0);
+  const updateCount = activeLeads.filter((lead) => lead.owner_review?.unread).length;
+  const dueCount = activeLeads.filter((lead) => isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).length;
+  adminTeamSummaryEl.innerHTML = `
+    <section class="report-summary-grid admin-team-kpis" aria-label="Team assignment summary">
+      ${renderReportMetric("Active staff", staffEmails.length, "Approved staff or reps with live work")}
+      ${renderReportMetric("Assigned active", assignedCount, "Active leads with one responsible rep")}
+      ${renderReportMetric("Unassigned", unassigned.length, "Active leads needing dispatch")}
+      ${renderReportMetric("Due today", dueCount, "Follow-ups due or overdue")}
+      ${renderReportMetric("Staff updates", updateCount, "Rep changes waiting for manager review")}
+    </section>
+    <section class="admin-team-table-wrap" aria-label="Staff workload table">
+      <table class="admin-team-table">
+        <thead>
+          <tr>
+            <th>Staff</th>
+            <th>Active leads</th>
+            <th>Due</th>
+            <th>Open tasks</th>
+            <th>Updates</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${staffRows.map((row) => `
+            <tr>
+              <td>${escapeHtml(row.email)}</td>
+              <td>${formatNumber(row.active)}</td>
+              <td>${formatNumber(row.due)}</td>
+              <td>${formatNumber(row.tasks)}</td>
+              <td>${formatNumber(row.updates)}</td>
+            </tr>
+          `).join("") || `<tr><td colspan="5">No staff assignments yet.</td></tr>`}
+          <tr class="admin-team-unassigned-row">
+            <td>Unassigned</td>
+            <td>${formatNumber(unassigned.length)}</td>
+            <td>${formatNumber(unassigned.filter((lead) => isFollowUpDue(lead.next_follow_up_at, lead.status || "new")).length)}</td>
+            <td>${formatNumber(unassigned.filter(hasAdminOpenTask).length)}</td>
+            <td>${formatNumber(unassigned.filter((lead) => lead.owner_review?.unread).length)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
   `;
 }
 

@@ -33,6 +33,7 @@
         <nav class="admin-module-nav" aria-label="Admin modules">
           <a href="#admin-today">Dashboard</a>
           <a href="#admin-reports">Reports</a>
+          <a href="#admin-team">Team</a>
           <a href="#crm-leads">Up Sheets</a>
           <a href="#inventory-warehouse">Inventory</a>
           <a href="#operations-settings">Settings</a>
@@ -63,6 +64,60 @@
           </div>
         </div>
         <div id="admin-reports-list" class="admin-reports-list" aria-live="polite"></div>
+      </section>
+      <section id="admin-team" class="admin-section admin-section-team">
+        <div class="admin-section-head">
+          <div>
+            <p class="section-kicker">Team</p>
+            <h2>Staff management</h2>
+            <p>Manage staff access, review assignment coverage, and keep customer follow-up ownership clear.</p>
+          </div>
+        </div>
+        <section id="admin-team-summary" class="admin-team-summary" aria-live="polite"></section>
+        <section class="admin-section admin-section-access">
+          <div class="admin-section-head">
+            <div>
+              <p class="section-kicker">Team access</p>
+              <h2>Staff login and permissions</h2>
+              <p>Give staff access to their assigned Up Sheets and inventory follow-up. Managers keep control of pricing, publishing, deleting, and team access.</p>
+            </div>
+            <button id="reload-dealers" type="button">Reload team</button>
+          </div>
+          <div class="team-access-principles" aria-label="Dealership role model">
+            <article>
+              <strong>Manager / owner</strong>
+              <span>Reviews updates, assigns the responsible rep, approves price, publishes inventory, and controls staff access.</span>
+            </article>
+            <article>
+              <strong>Main rep</strong>
+              <span>Owns the customer follow-up, next step, notes, tasks, and photos for assigned leads or stock vehicles.</span>
+            </article>
+            <article>
+              <strong>Helpers</strong>
+              <span>Use tasks for one-off help such as inspection, wash, photo upload, viewing, or delivery prep.</span>
+            </article>
+          </div>
+          <form id="dealer-staff-form" class="dealer-staff-form">
+            <label>
+              <span>Staff Google email</span>
+              <input name="email" type="email" placeholder="sales@example.com" required />
+            </label>
+            <button type="submit">Add staff access</button>
+          </form>
+          <p id="dealers-status" class="status">Loading team access...</p>
+          <div id="admin-dealers" class="admin-users"></div>
+        </section>
+        <section class="admin-section admin-section-limits">
+          <div class="admin-section-head">
+            <div>
+              <h2>User valuation limits</h2>
+              <p>View yearly usage for customers, staff, and admins. Set annual limits or mark an account as unlimited.</p>
+            </div>
+            <button id="reload-users" type="button">Reload users</button>
+          </div>
+          <p id="users-status" class="status">Loading users...</p>
+          <div id="admin-users" class="admin-users"></div>
+        </section>
       </section>
       <section id="crm-leads" class="admin-section admin-section-leads">
         <div class="admin-section-head">
@@ -289,50 +344,6 @@
           <button type="submit">Find / recover lead</button>
         </form>
         <p id="lead-recovery-status" class="status"></p>
-      </section>
-      <section class="admin-section admin-section-access">
-        <div class="admin-section-head">
-          <div>
-            <p class="section-kicker">Team access</p>
-            <h2>Staff login and permissions</h2>
-            <p>Give staff access to their assigned Up Sheets and inventory follow-up. Managers keep control of pricing, publishing, deleting, and team access.</p>
-          </div>
-          <button id="reload-dealers" type="button">Reload team</button>
-        </div>
-        <div class="team-access-principles" aria-label="Dealership role model">
-          <article>
-            <strong>Manager / owner</strong>
-            <span>Reviews updates, assigns the responsible rep, approves price, publishes inventory, and controls staff access.</span>
-          </article>
-          <article>
-            <strong>Main rep</strong>
-            <span>Owns the customer follow-up, next step, notes, tasks, and photos for assigned leads or stock vehicles.</span>
-          </article>
-          <article>
-            <strong>Helpers</strong>
-            <span>Use tasks for one-off help such as inspection, wash, photo upload, viewing, or delivery prep.</span>
-          </article>
-        </div>
-        <form id="dealer-staff-form" class="dealer-staff-form">
-          <label>
-            <span>Staff Google email</span>
-            <input name="email" type="email" placeholder="sales@example.com" required />
-          </label>
-          <button type="submit">Add staff access</button>
-        </form>
-        <p id="dealers-status" class="status">Loading team access...</p>
-        <div id="admin-dealers" class="admin-users"></div>
-      </section>
-      <section class="admin-section admin-section-limits">
-        <div class="admin-section-head">
-          <div>
-            <h2>User valuation limits</h2>
-            <p>View yearly usage for customers, dealers, and admins. Set annual limits or mark an account as unlimited.</p>
-          </div>
-          <button id="reload-users" type="button">Reload users</button>
-        </div>
-        <p id="users-status" class="status">Loading users...</p>
-        <div id="admin-users" class="admin-users"></div>
       </section>
       <section class="admin-section admin-section-inquiries" hidden>
         <div class="admin-section-head">
